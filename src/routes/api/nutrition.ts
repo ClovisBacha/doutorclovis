@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { clientIp, makeRateLimiter } from "@/lib/rate-limit.server";
 import { consultorioDaPaciente } from "@/lib/consultorio-da-paciente.server";
 import { naoAutorizado, usuarioDaRequisicao } from "@/lib/api-auth.server";
+import { ABERTURA_DO_LUTO, REGRAS_NO_LUTO } from "@/lib/nutricao-no-luto";
 import { convertToModelMessages, streamText, type UIMessage } from "ai";
 import { createChatProvider, DEFAULT_CHAT_MODEL } from "@/lib/ai-gateway.server";
 
@@ -53,12 +54,10 @@ function ultimaPergunta(mensagens: UIMessage[]): string {
  * recuperação, anemia, leite que desceu, vontade de comer ou falta dela. O que
  * sai é a moldura de gestação em curso.
  */
-const NUTRICAO_EM_LUTO = `Você é uma nutricionista vinculada ao consultório de um obstetra. Esta paciente ESTÁ EM LUTO: a gestação dela terminou em perda.
+const NUTRICAO_EM_LUTO = `Você é uma nutricionista vinculada ao consultório de um obstetra. ${ABERTURA_DO_LUTO}
 
 Regras absolutas:
-- NUNCA fale em semanas, trimestre, evolução do bebê, amamentação do bebê, enxoval ou preparo para o parto. Nada disso existe para ela agora.
-- Não pergunte como está a gestação e não parabenize.
-- Alimentação continua sendo assunto legítimo e importante: recuperação depois da perda, anemia e reposição de ferro, apetite que sumiu ou aumentou, leite que desceu, hidratação, e — se ELA trouxer — preparo do corpo para uma gestação futura.
+${REGRAS_NO_LUTO.join("\n")}
 - Português brasileiro, tom acolhedor e prático. Frases curtas. Acolha antes de orientar.
 - NUNCA prescreva dieta formal, dose de suplemento ou conduta clínica: isso é do médico.
 - Sinal de alarme continua valendo: sangramento intenso, febre, dor forte → orientar procurar atendimento agora.`;

@@ -255,7 +255,6 @@ export function perfilNutricionalDe(args: {
     pressoesAlteradas,
     agua: doAparelho?.agua ?? null,
     tomados: doAparelho?.tomados ?? null,
-    hora: agora.getHours(),
     humores: humores.length ? humores : null,
     sintomas: triagem.sintomas.length ? triagem.sintomas : null,
     triagemDeAlerta: triagem.alerta,

@@ -326,6 +326,7 @@ export function NutricaoTab({
   gest,
   careMode = false,
   aoAssinar,
+  aoSalvarPreferencias,
   bancada,
 }: {
   profile: Profile | null;
@@ -337,6 +338,9 @@ export function NutricaoTab({
       nenhum — o defeito de "botão que promete uma ação e não faz nada" que
       este repositório já pagou três vezes. */
   aoAssinar?: () => void;
+  /** Avisa quem guarda o perfil que `food_preferences` mudou. ⚠️ Sem isto a
+      aba, que DESMONTA ao trocar de aba, reabre com o valor antigo. */
+  aoSalvarPreferencias?: (valor: string) => void;
   /* ⚠️ A bancada injeta o DADO nos MESMOS `useState` da produção, nunca o
      desenho: é a lição do `?streak=41` da folha da chama. Sem ela, a bolha
      vazia do "…", o erro do fluxo e os TRÊS desfechos do 👎 exigiriam uma
@@ -443,10 +447,15 @@ export function NutricaoTab({
       const { data: sess } = await supabase.auth.getSession();
       const uid = sess.session?.user.id;
       if (!uid) throw new Error("sessao");
+      /* ⚠️ `upsert`, E NÃO `update`. Um `update` que não casa linha nenhuma
+         devolve `error: null` — indistinguível de sucesso —, e a linha pode
+         não existir: nada a cria no cadastro, e "Pular por agora" no ritual de
+         boas-vindas fecha sem gravar. Ela escrevia "vegetariana", lia
+         "Guardei", e a nutricionista continuava sugerindo frango. O Perfil já
+         usa `upsert` pela mesma razão. */
       const { error } = await (supabase as any)
         .from("patient_profiles")
-        .update({ food_preferences: limpa || null })
-        .eq("id", uid);
+        .upsert({ id: uid, food_preferences: limpa || null });
       /* ⚠️ PGRST204 é a coluna que ainda não nasceu (o SQL chega depois do
          código): dizer "não foi possível" mandaria ela tentar de novo o que
          não vai passar. Diz o que é. */
@@ -456,6 +465,13 @@ export function NutricaoTab({
       }
       if (error) throw error;
       setPrefsGravadas(limpa);
+      /* ⚠️ O PERFIL DO PAI TAMBÉM. A aba é montada com
+         `{tab === "Nutrição" && <NutricaoTab …/>}` e DESMONTA ao trocar de
+         aba; sem avisar quem guarda o perfil, voltar aqui reinicializava o
+         campo com o `food_preferences` VELHO — e, como os dois estados nascem
+         iguais, o botão "Guardar" nem aparecia: a tela apresentava o valor
+         antigo como se fosse o gravado, enquanto o servidor já usava o novo. */
+      aoSalvarPreferencias?.(limpa);
       toast.success("Guardei. A nutricionista passa a levar isso em conta.");
     } catch (e) {
       console.warn("[nutricao] preferências não gravaram", e);

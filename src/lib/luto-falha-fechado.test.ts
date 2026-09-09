@@ -26,10 +26,13 @@
  */
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
+import { semComentarios } from "./sem-comentarios";
 
-/** ⚠️ A prosa acima cita o que ela proíbe — sai antes de qualquer busca. */
-const semComentarios = (f: string) =>
-  f.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+/* ⚠️ A prosa acima cita o que ela proíbe — sai antes de qualquer busca, pela
+   RÉGUA ÚNICA. Este arquivo tinha um apagador próprio de regex ingênua, e ela
+   é a que este repositório documenta engolir código: `minha-conta.tsx` tem
+   `accept="image/(estrela)"` em duas linhas, e a barra-asterisco dentro da
+   string abre um "comentário" que só fecha centenas de linhas abaixo. */
 
 const NUTRICAO = semComentarios(readFileSync("src/routes/api/nutrition.ts", "utf8"));
 
@@ -148,5 +151,49 @@ describe("⚠️ o Modo Cuidado da nutrição falha FECHADO", () => {
        o que é degradação inofensiva. Ele não pode herdar a régua do luto. */
     expect(corpo).toMatch(/doctorId: null/);
     expect(corpo).toMatch(/doctorId: \(data\?\.doctor_id as string \| null\) \?\? null/);
+  });
+});
+
+/**
+ * ⚠️ A OUTRA METADE DA MESMA REGRA — A TELA.
+ *
+ * O servidor falha fechado desde que este arquivo existe. O CLIENTE não
+ * falhava: `minha-conta.tsx` derivava `careMode` de `Boolean(profile?.care_mode)`,
+ * e `profile` é `null` em DOIS casos que essa linha não distinguia — "ainda
+ * não chegou" e "a leitura FALHOU". O erro até era capturado (`perfilInstavel`),
+ * e tinha UM só consumidor: a carteirinha de emergência.
+ *
+ * Com uma oscilação de rede, a paciente em Modo Cuidado abria a Nutrição e
+ * lia "Sou sua nutricionista GESTACIONAL virtual"; a bolha dela passava a
+ * perguntar "posso comer sushi NA GESTAÇÃO?"; e os portões de
+ * `nutricao-memoria.ts` caíam — até doze turnos de uma conversa ANTERIOR À
+ * PERDA voltavam para a tela, e os novos eram gravados.
+ *
+ * ⚠️ E o conserto separou DUAS PERGUNTAS que uma variável só respondia:
+ * `lutoDoPerfil` é o FATO gravado e governa o que AFIRMA o estado dela (a
+ * faixa e a chave do Perfil); `careMode` é o PORTÃO DE CONTEÚDO e falha
+ * fechado. Sem a separação, a fail-closed diria "você está em Modo Cuidado" a
+ * quem não está.
+ */
+describe("a tela também assume luto quando não conseguiu ler o perfil", () => {
+  const TELA = semComentarios(readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8"));
+
+  test("⚠️ `careMode` inclui a leitura instável", () => {
+    expect(TELA).toMatch(/const careMode = perfilInstavel \|\| lutoDoPerfil;/);
+  });
+
+  test("o fato gravado continua existindo, separado do portão", () => {
+    expect(TELA).toMatch(/const lutoDoPerfil = Boolean\(/);
+    /* E é ELE que decide a faixa do luto e a chave do Perfil — nunca o portão,
+       que afirmaria à paciente uma coisa falsa sobre a própria perda. */
+    expect(TELA).toMatch(/\{lutoDoPerfil && \(\s*<CareModeBanner/);
+    expect(TELA).toMatch(/careMode=\{lutoDoPerfil\}/);
+  });
+
+  test("⚠️ e a aba da Nutrição recebe o PORTÃO, não o fato", () => {
+    /* É ela que carrega a memória entre conversas e a palavra "gestacional". */
+    const i = TELA.indexOf("<NutricaoTab");
+    expect(i).toBeGreaterThan(-1);
+    expect(TELA.slice(i, i + 400)).toMatch(/careMode=\{careMode\}/);
   });
 });

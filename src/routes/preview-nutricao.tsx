@@ -109,11 +109,26 @@ const RESPOSTA =
   "iogurte e queijo branco cobrem isso sem esforço. Se você está enjoada, " +
   "prefira porções menores ao longo do dia.";
 
+/* ⚠️ O MODO CUIDADO TEM RESPOSTA PRÓPRIA, e não é enfeite: `NUTRICAO_EM_LUTO`
+   proíbe, com todas as letras, falar em semana e trimestre. Com uma resposta
+   só, `?luto=1` desenhava "No segundo trimestre a recomendação fica…" — um
+   estado que a produção NUNCA produz. Bancada que aprova o que o servidor não
+   produz é a classe de defeito que deixou os furos de luto anteriores
+   sobreviverem. */
+const RESPOSTA_NO_LUTO =
+  "Faz sentido se preocupar com isso agora — a proteína ajuda o corpo a se " +
+  "recuperar. Uma referência tranquila é em torno de 1 g por quilo de peso " +
+  "por dia: ovo, frango, feijão com arroz, iogurte e queijo branco cobrem " +
+  "isso sem esforço. Se o apetite sumiu, porções pequenas ao longo do dia " +
+  "valem mais que uma refeição grande.";
+
+const respostaDe = (luto: boolean) => (luto ? RESPOSTA_NO_LUTO : RESPOSTA);
+
 /* ⚠️ A SAUDAÇÃO NÃO ENTRA AQUI — o componente a deriva do perfil e do Modo
    Cuidado, e é justamente essa derivação que a bancada precisa exercitar. */
-const CONVERSA: ChatMsg[] = [
+const conversaDe = (luto: boolean): ChatMsg[] => [
   { role: "user", content: PERGUNTA },
-  { role: "assistant", content: RESPOSTA },
+  { role: "assistant", content: respostaDe(luto) },
 ];
 
 /* ⚠️ O que entra no histórico é o TÍTULO da foto, nunca a imagem: é o que
@@ -150,10 +165,11 @@ const MINIATURA =
       "</svg>",
   );
 
-/* Três respostas para caber os três desfechos do voto na mesma foto. */
-const TRES: ChatMsg[] = [
+/* Três respostas para caber os três desfechos do voto na mesma foto. As duas
+   últimas valem nos dois modos: não citam semana nem gestação. */
+const tresDe = (luto: boolean): ChatMsg[] => [
   { role: "user", content: PERGUNTA },
-  { role: "assistant", content: RESPOSTA },
+  { role: "assistant", content: respostaDe(luto) },
   { role: "user", content: "Posso comer salmão?" },
   {
     role: "assistant",
@@ -194,18 +210,18 @@ function Pagina() {
     estado === "foto"
       ? { mensagens: FOTO, fotos: { 1: MINIATURA } }
       : estado === "conversa"
-        ? { mensagens: CONVERSA }
+        ? { mensagens: conversaDe(luto) }
         : estado === "votou"
-          ? { mensagens: TRES, votos: { 2: true, 4: false, 6: "fila" as const } }
+          ? { mensagens: tresDe(luto), votos: { 2: true, 4: false, 6: "fila" as const } }
           : estado === "carregando"
             ? {
-                mensagens: [CONVERSA[0], { role: "assistant" as const, content: "" }],
+                mensagens: [conversaDe(luto)[0], { role: "assistant" as const, content: "" }],
                 carregando: true,
               }
             : estado === "erro"
               ? {
                   mensagens: [
-                    CONVERSA[0],
+                    conversaDe(luto)[0],
                     {
                       role: "assistant" as const,
                       content: "Você atingiu o limite de mensagens de hoje. Tente de novo amanhã.",

@@ -62,8 +62,14 @@ export type PerfilNutricional = {
   agua?: { copos: number; meta: number } | null;
   /** Os suplementos que ela marcou como tomados hoje; `[]` = nenhum ainda. */
   tomados?: string[] | null;
-  /** 0–23, o relógio DELA — decide a sugestão de refeição da vez. */
-  hora?: number | null;
+  /* ⚠️ NÃO EXISTE `hora` AQUI, E A AUSÊNCIA É DELIBERADA. Havia um campo com
+     este nome, escrito a cada pergunta e lido por NINGUÉM — `blocoDaPaciente`
+     nunca o tocou. O comentário dele prometia "o relógio DELA" e o valor era
+     `agora.getHours()` no SERVIDOR, que roda em UTC: o próximo a ligá-lo
+     entregaria "lanche da manhã" às 6h de Brasília e "madrugada" às 21h. Quem
+     de fato conhece a hora dela é a TELA, e é lá que `momentoDoDia` e
+     `conviteDoMomento` são chamados. Campo morto com um comentário afirmando
+     uma garantia que ele não tem é armadilha para quem for ligá-lo. */
   /**
    * Como ela vem se sentindo: o humor que ELA marcou no diário nos últimos
    * dias, agregado por RÓTULO DE CATÁLOGO (`MOOD_LABEL`), nunca o texto do

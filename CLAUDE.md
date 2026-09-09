@@ -14911,3 +14911,140 @@ os dois que entraram (`humoresDe`, `triagemDe` em `nutricao-contexto.ts`):
 
 **Sem SQL**, sem bancada (é prompt, como a pressão): `journal_entries.mood` e
 `triage_logs.symptoms` existem desde as primeiras migrations.
+
+## A nota da nutricionista, refeita do zero (set/2026)
+
+Pedido do dono depois do último item da nota 6,5: refazer a nota olhando a aba
+como ela está hoje. O método foi o de sempre — quatro auditorias adversariais
+em paralelo (luto e privacidade · recurso morto e promessa quebrada · falha
+aberta e degrau de coluna · valor clínico de produto), e **cada achado foi
+conferido abrindo o arquivo antes de virar código**: dos que chegaram, um era
+falso (a lista de interruptores de aviso TEM chamador) e vários eram
+observações, não defeitos. Achado sem cético continua sendo hipótese.
+
+O que segue é o que sobreviveu.
+
+### ⚠️ 1. `/api/prato` NÃO TINHA PROMPT DE LUTO — nenhum
+
+O achado mais caro, e ele estava de pé desde que a foto nasceu. `prato.ts`
+recebia `careMode` de `consultorioDaPaciente`, passava-o para o portão do
+Premium e para o bloco da paciente — e **nunca para o prompt**.
+`promptDaFoto(assunto)` não tinha sequer o parâmetro.
+
+⚠️ **O que o luto fazia na foto era só OMITIR semana, trimestre e ganho do
+bloco de contexto. Omissão não é instrução.** O modelo continuava recebendo
+"você é a nutricionista deste app" — de um app de gestação — e uma linha
+mandando "fale para o pós-parto e para a amamentação, nunca como se ainda
+estivesse grávida", sem uma palavra proibindo falar do bebê. E **a câmera FICA
+em Modo Cuidado**, por decisão registrada na tela: a paciente em luto
+fotografa o prato e a resposta podia voltar falando da gestação dela.
+
+- **`src/lib/nutricao-no-luto.ts` é a lista ÚNICA**, lida pelos dois endpoints.
+  Duas cópias divergem no primeiro conserto, e a divergência apareceria como a
+  conversa protegida e a foto não — que é exatamente o estado que ela fechou.
+- ⚠️ **`careMode` é PARÂMETRO de `promptDaFoto`, e não um `if` num canto:** a
+  linha do "JÁ TEVE O BEBÊ" fala de amamentação e de estar grávida, as duas
+  coisas que as regras do luto proíbem na linha de cima. Ela SAI no luto e
+  FICA fora dele — quem já pariu precisa dela.
+- ⚠️ **E O TESTE QUE DIZIA COBRIR ISTO ASSERIA A LINHA VIZINHA.** Ele se chama
+  "o Modo Cuidado sai da MESMA régua da conversa" e cobrava
+  `blocoDaNutricao(patientId, careMode` — nunca o prompt. Hoje há asserção
+  sobre `promptDaFoto(assunto, careMode)` e sobre o conteúdo dos DOIS prompts
+  nos DOIS modos (`OS_QUATRO`).
+- ⚠️ **E A BANCADA NÃO TINHA COMO PEGAR:** `?luto=1&estado=foto` fabrica a
+  resposta no cliente, então `promptDaFoto` nunca é exercitado ali.
+
+### ⚠️ 2. O `careMode` DA TELA FALHAVA ABERTO — e destrancava a memória
+
+Dois auditores independentes convergiram neste. `minha-conta.tsx` derivava
+`careMode` de `Boolean(profile?.care_mode)`, e `profile` é `null` em DOIS
+casos que a linha não distinguia: "ainda não chegou" e **"a leitura FALHOU"**.
+O erro até era capturado (`perfilInstavel`) e tinha **um só consumidor**: a
+carteirinha de emergência.
+
+Com uma oscilação de rede, a paciente em Modo Cuidado abria a Nutrição e:
+
+1. **até doze turnos de uma conversa ANTERIOR À PERDA voltavam para a tela** —
+   literalmente o que `nutricao-memoria.ts` declara impedir ("nem lê, nem
+   grava… trazê-la de volta seria a porta dos fundos do portão de luto"), e os
+   turnos novos eram GRAVADOS;
+2. lia "Sou sua nutricionista **gestacional** virtual";
+3. a própria bolha dela passava a perguntar "posso comer sushi **na
+   gestação**?" (`perguntaPossoComer(a, careMode)`).
+
+⚠️ **A assimetria é o que faz disto defeito e não decisão:** a metade servidora
+da mesma regra falha FECHADO de propósito desde que `luto-falha-fechado.test.ts`
+existe. O prompt ficava protegido; a tela e o banco, não.
+
+⚠️ **E O CONSERTO SEPAROU DUAS PERGUNTAS QUE UMA VARIÁVEL SÓ RESPONDIA.**
+`lutoDoPerfil` é o FATO gravado ("ela ligou o Modo Cuidado?") e governa o que
+AFIRMA o estado dela — a faixa do luto e a chave do Perfil. `careMode` é o
+PORTÃO DE CONTEÚDO ("o app deve calar sobre o bebê?") e falha fechado. Sem a
+separação, a fail-closed diria "você está em Modo Cuidado" a quem não está, com
+um botão "Sair" que grava `care_mode: false` sobre nada. É a mesma distinção
+que a ficha de emergência já fazia com `!profile || careMode` no rótulo.
+
+⚠️ **E o portão é na FONTE, nunca uma prop `instavel` que cada aba combinasse
+com o luto** — segunda régua no chamador é o que este repositório proíbe desde
+`humorDaJornada`, e a décima oitava aba escrita amanhã nasceria sem ela.
+⚠️ **Nada de socorro depende disto:** a Central, o 192 e a ficha já não são
+gateados por `careMode`. O Modo Cuidado faz o app parar de FALAR DO BEBÊ,
+nunca de socorrer.
+
+### ⚠️ 3. "GUARDEI" SOBRE UM SALVAMENTO QUE PODIA NÃO TER ACONTECIDO
+
+Dois defeitos na mesma função (`gravarPreferencias`), e os dois faziam a tela
+afirmar um sucesso que o banco não tinha:
+
+- ⚠️ **`.update()` que não casa linha nenhuma devolve `error: null`** — o
+  PostgREST responde 204, indistinguível de sucesso. E a linha PODE não
+  existir: nada cria `patient_profiles` no cadastro, e "Pular por agora" no
+  ritual fecha sem gravar. Ela escrevia "vegetariana", lia "Guardei", e a
+  nutricionista continuava sugerindo frango — do lado do servidor tudo
+  coerente, porque `blocoDaNutricao` faz `maybeSingle()` e devolve `""`. **O
+  Perfil já usava `upsert` pela mesma razão.**
+- ⚠️ **O `profile` do pai não era atualizado, e a aba DESMONTA ao trocar de
+  aba.** Ao voltar, os dois estados nasciam do perfil VELHO — e, como nascem
+  iguais, o botão "Guardar" nem aparecia: a tela apresentava o valor antigo
+  **como se fosse o gravado**, enquanto o servidor já usava o novo. Hoje há
+  `aoSalvarPreferencias`, no mesmo padrão do `care_mode`.
+
+### 4. O campo `hora` era morto, com um comentário afirmando uma garantia falsa
+
+`PerfilNutricional.hora` era escrito a cada pergunta e lido por NINGUÉM —
+`blocoDaPaciente` nunca o tocou. O comentário prometia "o relógio DELA" e o
+valor era `agora.getHours()` no **servidor**, que roda em UTC: o próximo a
+ligá-lo entregaria "lanche da manhã" às 6h de Brasília e "madrugada" às 21h.
+Quem de fato conhece a hora dela é a TELA. **Campo morto com um comentário
+afirmando uma garantia que ele não tem é armadilha para quem for ligá-lo.**
+
+### ⚠️ 5. A BANCADA DO MODO CUIDADO DESENHAVA UM ESTADO IMPOSSÍVEL
+
+`?luto=1&estado=conversa` mostrava uma resposta de exemplo dizendo **"No
+segundo trimestre a recomendação fica em torno de 1,1 g por quilo…"** — uma
+frase que `NUTRICAO_EM_LUTO` proíbe com todas as letras. Havia uma `RESPOSTA`
+só, compartilhada por todos os estados.
+
+⚠️ **E o estado JÁ ESTAVA na varredura de bancadas da CI** — ela abriu a
+página, leu o console e aprovou, porque uma varredura de erro de console não
+tem como ver uma frase errada. Bancada que aprova o que o servidor não produz
+é a classe que deixou os furos de luto anteriores sobreviverem.
+
+### As armadilhas de teste desta rodada
+
+- ⚠️ **Dois testes travavam a GRAFIA e reprovaram a lista única** — a décima
+  quinta vez nesta base. `toContain("ESTÁ EM LUTO")` e
+  `toContain("recuperação depois da perda")` liam `api/nutrition.ts` e ficaram
+  vermelhos quando as regras mudaram de arquivo, ou seja **sobre uma mudança
+  que só ampliou a cobertura**. Hoje cobram a garantia (o prompt existe e
+  CARREGA as regras, morem elas onde morarem) e, de quebra, que as duas portas
+  leiam a mesma lista.
+- ⚠️ **`luto-falha-fechado.test.ts` tinha um apagador de comentários PRÓPRIO**,
+  de regex ingênua — e o teste novo lê `minha-conta.tsx`, que tem
+  `accept="image/(estrela)"` em duas linhas: a barra-asterisco dentro da string
+  abriria um "comentário" que só fecha centenas de linhas abaixo. Passou a usar
+  `semComentarios`, a régua única.
+
+**Sem SQL.** As cinco correções saem de colunas e tabelas que já existem.
+**Bancada:** `/preview-nutricao?luto=1&estado=conversa&painel=1` (a resposta
+própria do Modo Cuidado) · `?estado=votou&luto=1`.

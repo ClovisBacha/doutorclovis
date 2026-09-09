@@ -1560,7 +1560,35 @@ function MinhaContaPage() {
   };
 
   // Modo Cuidado 🤍 — lido do perfil; pausa a gamificação globalmente.
-  const careMode = Boolean((profile as { care_mode?: boolean } | null)?.care_mode);
+  /* ⚠️ "NÃO CONSEGUI LER" VALE LUTO — a régua da casa, aplicada onde faltava.
+     `Boolean(null?.care_mode)` é `false`, e `profile` é `null` em DOIS casos
+     que a linha antiga não distinguia: "ainda não chegou" e "a leitura
+     FALHOU". Com uma oscilação de rede, a paciente em Modo Cuidado abria a
+     Nutrição e a aba dizia "Sou sua nutricionista GESTACIONAL virtual", a
+     própria bolha dela passava a perguntar "posso comer sushi NA GESTAÇÃO?",
+     e — o pior — os portões de `nutricao-memoria.ts` caíam: até doze turnos
+     de uma conversa ANTERIOR À PERDA voltavam para a tela, e os novos eram
+     gravados. O servidor já falha fechado nisto há tempo
+     (`consultorio-da-paciente.server.ts` devolve `careMode: true` em qualquer
+     erro); era a metade da tela que continuava aberta.
+     ⚠️ E o portão é aqui, na FONTE, e não uma prop `instavel` que cada aba
+     combinasse com o luto: uma segunda régua no chamador é o que este
+     repositório proíbe desde `humorDaJornada`, e a décima oitava aba escrita
+     amanhã nasceria sem ela.
+     ⚠️ Nada de socorro depende disto: a Central de Emergência, o 192 e a
+     ficha já não são gateados por `careMode` (a ficha, aliás, já usava este
+     mesmo `!profile ||` para o rótulo). O Modo Cuidado faz o app parar de
+     FALAR DO BEBÊ, nunca de socorrer. */
+  /* ⚠️ SÃO DUAS PERGUNTAS, E ELAS SE SEPARAM AQUI.
+     `lutoDoPerfil` é o FATO gravado ("ela ligou o Modo Cuidado?") e governa o
+     que AFIRMA o estado dela: a faixa do luto e a chave do Perfil. Afirmar
+     "você está em Modo Cuidado" a quem não está — porque a leitura do perfil
+     caiu — seria o app contando a ela uma coisa falsa sobre a própria perda.
+     `careMode` é o PORTÃO DE CONTEÚDO ("o app deve calar sobre o bebê?") e
+     falha fechado. É a mesma distinção que a ficha de emergência já fazia com
+     `!profile || careMode` no rótulo. */
+  const lutoDoPerfil = Boolean((profile as { care_mode?: boolean } | null)?.care_mode);
+  const careMode = perfilInstavel || lutoDoPerfil;
   useEffect(() => {
     if (!profile) return;
     let vivo = true;
@@ -2829,7 +2857,7 @@ function MinhaContaPage() {
                   }
                 />
               </TabErrorBoundary>
-              {careMode && (
+              {lutoDoPerfil && (
                 <div className="mt-4">
                   <CareModeBanner onExit={() => toggleCareMode(false)} onNavigate={goToTab} />
                 </div>
@@ -2959,7 +2987,7 @@ function MinhaContaPage() {
               </div>
             </div>
 
-            {careMode && (
+            {lutoDoPerfil && (
               <CareModeBanner onExit={() => toggleCareMode(false)} onNavigate={goToTab} />
             )}
             {/* ── Celular: hub da Saúde — seis quadrados, dois por linha ──── */}
@@ -3161,6 +3189,14 @@ function MinhaContaPage() {
                          do app — uma segunda tela de assinatura divergiria da
                          primeira no dia em que o preço mudasse. */
                       aoAssinar={() => setPremiumOpen(true)}
+                      /* O MESMO padrão do `care_mode` da linha 1600: quem
+                         guarda o perfil é este componente, e a aba desmonta ao
+                         trocar de aba. */
+                      aoSalvarPreferencias={(v) =>
+                        setProfile((p) =>
+                          p ? ({ ...p, food_preferences: v || null } as Profile) : p,
+                        )
+                      }
                     />
                   </div>
                 )}
@@ -3233,7 +3269,12 @@ function MinhaContaPage() {
                   <ProfileTab
                     profile={profile}
                     onSaved={setProfile}
-                    careMode={careMode}
+                    /* ⚠️ A CHAVE MOSTRA O FATO, e nunca o portão: ela é o
+                       controle que LIGA e DESLIGA o Modo Cuidado, e desenhá-la
+                       ligada por causa de uma leitura que caiu faria a
+                       paciente tocar para "sair" de um estado em que ela não
+                       está — gravando `care_mode: false` sobre nada. */
+                    careMode={lutoDoPerfil}
                     onToggleCare={toggleCareMode}
                     onNavigate={goToTab}
                     ehMedico={isDoctor}

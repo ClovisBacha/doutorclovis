@@ -335,3 +335,54 @@ describe("⚠️ como ela vem passando: SÓ catálogo entra, nunca o que ela esc
     expect(SERVIDOR).toMatch(/triagemRes\?\.error \? \[\]/);
   });
 });
+
+/**
+ * ⚠️ "GUARDEI" TEM DE SER VERDADE.
+ *
+ * Dois defeitos na mesma função (`gravarPreferencias`), e os dois faziam a
+ * tela afirmar um sucesso que o banco não tinha:
+ *
+ *  1. `.update()` que não casa linha nenhuma devolve `error: null` — o
+ *     PostgREST responde 204, e o resultado é indistinguível de sucesso. E a
+ *     linha PODE não existir: nada cria `patient_profiles` no cadastro, e
+ *     "Pular por agora" no ritual de boas-vindas fecha sem gravar. Ela
+ *     escrevia "vegetariana", lia "Guardei", e a nutricionista continuava
+ *     sugerindo frango — do lado do servidor tudo coerente, porque
+ *     `blocoDaNutricao` faz `maybeSingle()` e, sem linha, devolve "".
+ *  2. O `profile` do PAI não era atualizado, e a aba DESMONTA ao trocar de
+ *     aba (`{tab === "Nutrição" && …}`). Ao voltar, os dois estados nasciam do
+ *     perfil VELHO — e, como nascem iguais, o botão "Guardar" nem aparecia: a
+ *     tela apresentava o valor antigo como se fosse o gravado.
+ */
+describe("as preferências: a tela só diz 'guardei' sobre o que o banco tem", () => {
+  const TAB = semComentarios(readFileSync("src/components/nutricao-tab.tsx", "utf8"));
+  const corpo = (() => {
+    const i = TAB.indexOf("async function gravarPreferencias()");
+    expect(i).toBeGreaterThan(-1);
+    const f = TAB.indexOf("\n  }", i);
+    return TAB.slice(i, f > i ? f : TAB.length);
+  })();
+
+  test("⚠️ é `upsert`, e nunca `update` — a linha do perfil pode não existir", () => {
+    expect(corpo).toMatch(/\.upsert\(\{\s*id: uid,\s*food_preferences:/);
+    expect(corpo).not.toMatch(/\.update\(\{\s*food_preferences/);
+  });
+
+  test("⚠️ e ela avisa quem guarda o perfil, senão volta o valor antigo", () => {
+    const iAviso = corpo.indexOf("aoSalvarPreferencias?.(limpa)");
+    const iToast = corpo.indexOf("Guardei.");
+    expect(iAviso).toBeGreaterThan(-1);
+    expect(iToast).toBeGreaterThan(-1);
+    /* Depois do erro ter sido conferido: avisar sobre uma gravação que não
+       aconteceu é o defeito com outro nome. */
+    expect(corpo.indexOf("if (error) throw error")).toBeLessThan(iAviso);
+  });
+
+  test("e o pai de fato atualiza o perfil que ele guarda", () => {
+    const MC = semComentarios(readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8"));
+    const i = MC.indexOf("aoSalvarPreferencias=");
+    expect(i).toBeGreaterThan(-1);
+    expect(MC.slice(i, i + 200)).toMatch(/setProfile\(/);
+    expect(MC.slice(i, i + 200)).toMatch(/food_preferences/);
+  });
+});

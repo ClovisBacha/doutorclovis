@@ -23,50 +23,67 @@ import {
   tituloDaFoto,
 } from "./foto-da-nutricao";
 
+import { ABERTURA_DO_LUTO, REGRAS_NO_LUTO } from "./nutricao-no-luto";
+
+/* ⚠️ OS QUATRO: prato e rótulo, nos DOIS modos. As proibições de caloria,
+   diagnóstico e julgamento valem igual no luto — e antes de o luto ter prompt
+   próprio na foto, metade destas asserções cobria um caminho só. */
+const OS_QUATRO = [
+  promptDoPrato(false),
+  promptDoRotulo(false),
+  promptDoPrato(true),
+  promptDoRotulo(true),
+];
+
 describe("o que o prompt NUNCA pode pedir", () => {
   test("⚠️ nenhum dos dois pede caloria, dieta ou emagrecimento", () => {
     /* `nutricao-perfil.ts` cola "NUNCA proponha restrição calórica" ao número
        do ganho de peso porque solto o modelo transforma "acima da faixa" num
        plano de emagrecimento. Uma ferramenta que devolve um número de
        calorias seria a porta dos fundos daquela decisão. */
-    for (const p of [promptDoPrato(), promptDoRotulo()]) {
+    for (const p of OS_QUATRO) {
       expect(p).toMatch(/NUNCA estime calorias/);
       expect(p).not.toMatch(/quantas calorias|estime as calorias|conte as calorias/i);
     }
   });
   test("⚠️ nenhum dos dois pede diagnóstico nem dose", () => {
-    for (const p of [promptDoPrato(), promptDoRotulo()]) {
+    for (const p of OS_QUATRO) {
       expect(p).toMatch(/NUNCA dê diagnóstico nem prescreva dose/);
     }
   });
   test("⚠️ o prato não julga a refeição que ela já comeu", () => {
-    const p = promptDoPrato();
-    expect(p).toMatch(/Não julgue o que ela comeu/);
-    /* A sugestão olha para a PRÓXIMA refeição — "o que faltou aqui" é cobrança
+    for (const p of [promptDoPrato(false), promptDoPrato(true)]) {
+      expect(p).toMatch(/Não julgue o que ela comeu/);
+      /* A sugestão olha para a PRÓXIMA refeição — "o que faltou aqui" é cobrança
        sobre uma comida que já acabou. */
-    expect(p).toMatch(/PRÓXIMA refeição/);
+      expect(p).toMatch(/PRÓXIMA refeição/);
+    }
   });
   test("⚠️ o rótulo LÊ, e nunca decide se pode comer", () => {
-    const p = promptDoRotulo();
-    expect(p).toMatch(/NUNCA diga simplesmente 'pode comer' ou 'não pode comer'/);
-    /* Chutar um número de um rótulo ilegível é o defeito exato que fez o
+    for (const p of [promptDoRotulo(false), promptDoRotulo(true)]) {
+      expect(p).toMatch(/NUNCA diga simplesmente 'pode comer' ou 'não pode comer'/);
+      /* Chutar um número de um rótulo ilegível é o defeito exato que fez o
        catálogo aberto ser recusado. */
-    expect(p).toMatch(/nunca chute um valor/);
+      expect(p).toMatch(/nunca chute um valor/);
+    }
   });
   test("a alergia vem PRIMEIRO na leitura do rótulo", () => {
     /* É a única coisa nesta tela que pode fazer mal de verdade, e ela chega
        pelo bloco da paciente que o servidor cola no fim do prompt. */
-    const p = promptDoRotulo();
-    const iAlergia = p.indexOf("alergia");
-    const iTabela = p.indexOf("tabela nutricional");
-    expect(iAlergia).toBeGreaterThan(-1);
-    expect(iTabela).toBeGreaterThan(-1);
-    expect(iAlergia).toBeLessThan(iTabela);
-    expect(p).toMatch(/diga ISSO PRIMEIRO/);
+    for (const p of [promptDoRotulo(false), promptDoRotulo(true)]) {
+      const iAlergia = p.indexOf("alergia");
+      const iTabela = p.indexOf("tabela nutricional");
+      expect(iAlergia).toBeGreaterThan(-1);
+      expect(iTabela).toBeGreaterThan(-1);
+      expect(iAlergia).toBeLessThan(iTabela);
+      expect(p).toMatch(/diga ISSO PRIMEIRO/);
+    }
   });
   test("a sugestão do prato tem teto — duas, nunca uma lista", () => {
-    expect(promptDoPrato()).toMatch(/ATÉ DUAS coisas/);
-    expect(promptDoPrato()).toMatch(/Nunca mais de duas/);
+    for (const p of [promptDoPrato(false), promptDoPrato(true)]) {
+      expect(p).toMatch(/ATÉ DUAS coisas/);
+      expect(p).toMatch(/Nunca mais de duas/);
+    }
   });
 });
 
@@ -94,8 +111,43 @@ describe("o arquivo que entra", () => {
   test("o título diz o que ela mandou", () => {
     expect(tituloDaFoto("prato")).toMatch(/prato/i);
     expect(tituloDaFoto("rotulo")).toMatch(/rótulo/i);
-    expect(promptDaFoto("prato")).toBe(promptDoPrato());
-    expect(promptDaFoto("rotulo")).toBe(promptDoRotulo());
+    expect(promptDaFoto("prato", false)).toBe(promptDoPrato(false));
+    expect(promptDaFoto("rotulo", false)).toBe(promptDoRotulo(false));
+  });
+
+  /* ⚠️ ESTE BLOCO NASCEU DE UM DEFEITO EM PRODUÇÃO: `/api/prato` recebia
+     `careMode`, passava-o para o portão do Premium e para o bloco da paciente,
+     e NUNCA para o prompt — `promptDaFoto` não tinha sequer o parâmetro. O que
+     o luto fazia na foto era só OMITIR semana e trimestre do contexto, e
+     omissão não é instrução. O teste que dizia cobrir isto asseria a linha
+     VIZINHA (`blocoDaNutricao(patientId, careMode`), nunca o prompt. */
+  test("⚠️ no luto, os DOIS prompts da foto trazem as regras do luto", () => {
+    for (const p of [promptDoPrato(true), promptDoRotulo(true)]) {
+      expect(p).toContain(ABERTURA_DO_LUTO);
+      for (const regra of REGRAS_NO_LUTO) expect(p).toContain(regra);
+    }
+  });
+  test("⚠️ no luto sai a linha que fala de grávida e de amamentação", () => {
+    /* Ela manda "fale para o pós-parto e para a amamentação" — as duas coisas
+       que as regras do luto proíbem na linha de cima. Deixá-la seria o prompt
+       se contradizendo dentro do mesmo bloco. */
+    for (const p of [promptDoPrato(true), promptDoRotulo(true)]) {
+      expect(p).not.toMatch(/grávida/i);
+      expect(p).not.toMatch(/amamentação só se/i);
+    }
+    /* E fora do luto ela FICA: quem já pariu precisa dela. */
+    expect(promptDoPrato(false)).toMatch(/JÁ TEVE O BEBÊ/);
+  });
+  test("as regras do luto são UMA lista, lida pelos dois endpoints", () => {
+    /* Duas cópias divergem no primeiro conserto, e a divergência apareceria
+       como a conversa protegida e a foto não — o estado que isto fechou. */
+    const CONVERSA = semComentarios(readFileSync("src/routes/api/nutrition.ts", "utf8"));
+    expect(CONVERSA).toMatch(/REGRAS_NO_LUTO\.join/);
+    expect(CONVERSA).toContain("${ABERTURA_DO_LUTO}");
+    /* E nenhum dos dois reescreve uma regra à mão. */
+    expect(CONVERSA).not.toContain("NUNCA fale em semanas, trimestre");
+    const FOTO = semComentarios(readFileSync("src/lib/foto-da-nutricao.ts", "utf8"));
+    expect(FOTO).not.toContain("NUNCA fale em semanas, trimestre");
   });
 });
 
@@ -115,6 +167,10 @@ describe("o servidor", () => {
     /* A garantia (o MESMO `careMode` da régua entra no bloco), não a grafia: a
        chamada ganhou o "agora" e o contexto do aparelho. */
     expect(API).toMatch(/blocoDaNutricao\(\s*patientId,\s*careMode/);
+    /* ⚠️ E O PROMPT TAMBÉM. Esta linha faltava, e a falta dela era o defeito:
+       `careMode` chegava ao portão e ao bloco, e o prompt do modelo continuava
+       sendo o de sempre. */
+    expect(API).toMatch(/promptDaFoto\(\s*assunto,\s*careMode\s*\)/);
   });
   test("⚠️ assunto desconhecido cai em PRATO, o prompt que não lê números", () => {
     expect(API).toMatch(/bruto === "rotulo" \? "rotulo" : "prato"/);

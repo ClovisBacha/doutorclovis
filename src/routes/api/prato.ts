@@ -152,7 +152,7 @@ export const Route = createFileRoute("/api/prato")({
               contents: [
                 {
                   parts: [
-                    { text: promptDaFoto(assunto) + blocoDaPaciente },
+                    { text: promptDaFoto(assunto, careMode) + blocoDaPaciente },
                     {
                       inline_data: {
                         mime_type: foto.type.split(";")[0].trim().toLowerCase(),

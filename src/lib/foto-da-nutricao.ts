@@ -46,6 +46,8 @@
  * estritamente melhor em todos os eixos, e custa o mesmo endpoint.
  */
 
+import { ABERTURA_DO_LUTO, REGRAS_NO_LUTO } from "@/lib/nutricao-no-luto";
+
 /** Os tipos que a câmera do celular produz, e os únicos que o modelo lê. */
 export const IMAGEM_TIPOS = ["image/jpeg", "image/png", "image/webp"] as const;
 
@@ -80,26 +82,39 @@ export function tituloDaFoto(assunto: AssuntoDaFoto): string {
   return assunto === "prato" ? "📷 Foto do meu prato" : "📷 Foto de um rótulo";
 }
 
-const COMUM = [
-  "Você é a nutricionista deste app, falando com a paciente em português do Brasil.",
-  "Regras absolutas:",
-  /* ⚠️ As três proibições do cabeçalho, escritas para o modelo. */
-  "- NUNCA estime calorias, e não fale em emagrecer, cortar, dieta, déficit ou restrição.",
-  "- NUNCA dê diagnóstico nem prescreva dose de nada: isso é do médico dela.",
-  "- Não julgue o que ela comeu. Ninguém precisa de nota pela refeição de ontem.",
-  "- Frases curtas, tom de quem está do lado dela. Sem markdown pesado, sem tabela.",
-  "- Se a foto não mostrar o que foi pedido, diga isso em uma linha e peça outra foto.",
-  "- Se o que você sabe dela disser que ela JÁ TEVE O BEBÊ, fale para o pós-parto (e para a amamentação só se ela amamentar), nunca como se ainda estivesse grávida.",
-].join("\n");
+/**
+ * ⚠️ `careMode` DECIDE A ÚLTIMA LINHA, e é por isso que ele é PARÂMETRO e não
+ * um `if` num canto: a linha do "JÁ TEVE O BEBÊ" fala de amamentação e de
+ * estar grávida — as duas coisas que `REGRAS_NO_LUTO` proíbe. Sem a troca, a
+ * paciente em luto recebia a instrução de falar do pós-parto dela.
+ */
+function comum(careMode: boolean): string {
+  return [
+    "Você é a nutricionista deste app, falando com a paciente em português do Brasil.",
+    ...(careMode ? [ABERTURA_DO_LUTO] : []),
+    "Regras absolutas:",
+    /* ⚠️ As três proibições do cabeçalho, escritas para o modelo. */
+    "- NUNCA estime calorias, e não fale em emagrecer, cortar, dieta, déficit ou restrição.",
+    "- NUNCA dê diagnóstico nem prescreva dose de nada: isso é do médico dela.",
+    "- Não julgue o que ela comeu. Ninguém precisa de nota pela refeição de ontem.",
+    "- Frases curtas, tom de quem está do lado dela. Sem markdown pesado, sem tabela.",
+    "- Se a foto não mostrar o que foi pedido, diga isso em uma linha e peça outra foto.",
+    ...(careMode
+      ? REGRAS_NO_LUTO
+      : [
+          "- Se o que você sabe dela disser que ela JÁ TEVE O BEBÊ, fale para o pós-parto (e para a amamentação só se ela amamentar), nunca como se ainda estivesse grávida.",
+        ]),
+  ].join("\n");
+}
 
 /**
  * ⚠️ O PRATO PERGUNTA PELA PRÓXIMA REFEIÇÃO, e não pela que está na foto.
  * "O que faltou aqui" lê como cobrança sobre uma comida que ela já comeu; "o
  * que deixaria a próxima melhor" é a mesma informação virada para a frente.
  */
-export function promptDoPrato(): string {
+export function promptDoPrato(careMode: boolean): string {
   return [
-    COMUM,
+    comum(careMode),
     "",
     "A paciente fotografou o prato dela. Faça, nesta ordem:",
     "1. Diga em uma frase o que você está vendo no prato.",
@@ -116,9 +131,9 @@ export function promptDoPrato(): string {
  * ela — um veredito sobre o produto inteiro seria prescrição a partir de uma
  * foto, e ela pode ter fotografado só metade do rótulo.
  */
-export function promptDoRotulo(): string {
+export function promptDoRotulo(careMode: boolean): string {
   return [
-    COMUM,
+    comum(careMode),
     "",
     "A paciente fotografou o rótulo de um produto. Faça, nesta ordem:",
     "1. Diga qual produto parece ser, se der para ver.",
@@ -131,6 +146,6 @@ export function promptDoRotulo(): string {
   ].join("\n");
 }
 
-export function promptDaFoto(assunto: AssuntoDaFoto): string {
-  return assunto === "prato" ? promptDoPrato() : promptDoRotulo();
+export function promptDaFoto(assunto: AssuntoDaFoto, careMode: boolean): string {
+  return assunto === "prato" ? promptDoPrato(careMode) : promptDoRotulo(careMode);
 }

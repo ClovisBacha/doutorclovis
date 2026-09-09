@@ -179,6 +179,7 @@ describe("6. o servidor da Nutrição também sabe do luto", () => {
      o que importa: o servidor da nutrição resolve o luto por uma régua que lê
      `care_mode`. */
   const regua = readFileSync("src/lib/consultorio-da-paciente.server.ts", "utf8");
+  const luto = readFileSync("src/lib/nutricao-no-luto.ts", "utf8");
 
   test("o perfil é lido com care_mode", () => {
     expect(nutricao).toContain("consultorioDaPaciente(usuario.id)");
@@ -193,8 +194,14 @@ describe("6. o servidor da Nutrição também sabe do luto", () => {
   });
 
   test("existe um prompt próprio para quem perdeu a gestação", () => {
+    /* ⚠️ A GARANTIA, NUNCA A GRAFIA — de novo. Este teste travava as duas
+       strings dentro de `api/nutrition.ts` e ficou vermelho no dia em que as
+       regras do luto viraram lista ÚNICA (`nutricao-no-luto.ts`), lida também
+       por `/api/prato` — uma mudança que só ampliou a cobertura, porque a foto
+       não tinha prompt de luto nenhum. O que se cobra é que o prompt exista e
+       CARREGUE as regras, morem elas onde morarem. */
     expect(nutricao).toContain("NUTRICAO_EM_LUTO");
-    expect(nutricao).toContain("ESTÁ EM LUTO");
+    expect(nutricao + luto).toContain("ESTÁ EM LUTO");
   });
 
   test("e é ELE que entra quando careMode é verdadeiro", () => {
@@ -206,7 +213,12 @@ describe("6. o servidor da Nutrição também sabe do luto", () => {
   test("alimentação continua sendo assunto — não vira silêncio", () => {
     /* Recuperação, anemia, leite que desceu: o luto não tira dela o direito à
        orientação nutricional. Suprimir tudo seria trocar um erro por outro. */
-    expect(nutricao).toContain("recuperação depois da perda");
+    expect(nutricao + luto).toContain("recuperação depois da perda");
+    /* E as duas portas leem a MESMA lista: duas cópias divergem no primeiro
+       conserto, e a divergência apareceria como a conversa protegida e a foto
+       não — que foi exatamente o estado que a lista única veio fechar. */
+    expect(nutricao).toMatch(/REGRAS_NO_LUTO/);
+    expect(readFileSync("src/lib/foto-da-nutricao.ts", "utf8")).toMatch(/REGRAS_NO_LUTO/);
   });
 });
 
