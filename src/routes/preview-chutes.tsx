@@ -20,6 +20,7 @@ import { KicksTab, type KickSession } from "@/components/kicks-tab";
  *   `?estado=contando`  — sessão em curso dentro do prazo, sem alarme
  *   `?estado=historico` — sessões anteriores, os três cartões
  *   `?estado=serie`     — doze contagens: o gráfico com a faixa do "seu normal"
+ *   `?estado=longo`     — 14 noites: o corte da lista e o que ficou de fora
  *   `?estado=luto`      — Modo Cuidado
  *
  * ⚠️ `?w=` é a semana. Antes da 26ª a tela não fala de contagem (SOGC 2023);
@@ -60,13 +61,20 @@ export const Route = createFileRoute("/preview-chutes")({
    diverge — o React descarta a árvore. Mesma regra da bancada das contrações. */
 const ANCORA = new Date("2026-09-05T21:40:00-03:00").getTime();
 
-function sessao(hMin: number, chutes: number, duracaoMin: number): KickSession {
+/**
+ * ⚠️ **`strength` ENTROU NO HELPER, e sem ela os chips de força nunca tinham
+ * sido fotografados.** A coluna é lida pela lista (é o eixo com aOR 2,53), e a
+ * bancada gravava `undefined` em todas as linhas — ou seja, ela desenhava o
+ * único estado que não precisava provar: o de um banco anterior a set/2026.
+ */
+function sessao(hMin: number, chutes: number, duracaoMin: number, forca?: number): KickSession {
   const ini = ANCORA - hMin * 60000;
   return {
     id: `s${hMin}`,
     started_at: new Date(ini).toISOString(),
     ended_at: new Date(ini + duracaoMin * 60000).toISOString(),
     kick_count: chutes,
+    strength: forca ?? null,
   };
 }
 
@@ -104,11 +112,20 @@ const SERIE: KickSession[] = [
 const ULTIMA_INCOMPLETA: KickSession[] = [sessao(60 * 20, 6, 120), ...SERIE];
 
 const HISTORICO: KickSession[] = [
-  sessao(60 * 20, 10, 24),
-  sessao(60 * 44, 10, 31),
-  sessao(60 * 68, 10, 18),
+  sessao(60 * 20, 10, 24, 2),
+  sessao(60 * 44, 10, 31, 1),
+  sessao(60 * 68, 10, 18, 3),
+  /* ⚠️ A noite do alarme: duas horas com sete movimentos. É ela que prova o
+     chip âmbar — antes, esta linha saía com o mesmo azul-pálido de uma noite
+     em que ela simplesmente encerrou cedo. */
   sessao(60 * 92, 7, 120),
 ];
+
+/* ⚠️ Catorze noites: o único estado que prova o corte da lista e a frase que
+   diz o que ficou de fora. Com dez ou menos, o corte é invisível. */
+const LONGO: KickSession[] = Array.from({ length: 14 }, (_, i) =>
+  sessao(60 * 24 * (i + 1), 10, 9 + (i % 5), (i % 3) + 1),
+);
 
 function Pagina() {
   const { w: wBruto, semdum, estado } = Route.useSearch();
@@ -134,9 +151,11 @@ function Pagina() {
               ? { history: HISTORICO }
               : estado === "serie"
                 ? { history: SERIE }
-                : estado === "ultima-incompleta"
-                  ? { history: ULTIMA_INCOMPLETA }
-                  : { history: [] };
+                : estado === "longo"
+                  ? { history: LONGO }
+                  : estado === "ultima-incompleta"
+                    ? { history: ULTIMA_INCOMPLETA }
+                    : { history: [] };
 
   return (
     <div className="mx-auto max-w-lg px-4 py-6">

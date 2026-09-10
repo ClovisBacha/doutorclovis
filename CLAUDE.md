@@ -15372,3 +15372,148 @@ ignorar, e é a mesma lição que já pôs `*-tmp.mjs` no `.gitignore` e no
 **Bancadas:** `/preview-nutricao?estado=socorro&painel=1` (o par e o cartão) ·
 `/preview-prontuario?perdapeso=1` (a perda em âmbar) · `?perdapeso=1&pos=1` (o
 portão do pós-parto). As três entraram na varredura da CI.
+
+## O contador de movimentos: a força que se perdia no socorro (set/2026)
+
+Pedido do dono: _"para aba de chutes do app veja o que tem que melhorar e
+melhore para ele ficar bem melhor"_. A auditoria foi medida, não deduzida — o
+código lido inteiro, sete estados da bancada abertos num navegador a 393px e
+fotografados. Doze achados; os graves abaixo, e o que ficou de fora está dito.
+
+### ⚠️ A FORÇA NÃO SOBREVIVIA À TROCA DE ABA — e quem a destruía era o próprio
+
+### botão de socorro da tela
+
+O defeito mais caro, e ele é o **mesmo** que `sessao-guardada.ts` foi criado
+para consertar: resolvido para o `count`, deixado de pé para a `forca`.
+
+Ela é escolhida DURANTE a sessão e vivia só em `useState`. `RegistrosHub`
+renderiza `<Fade key={sub}>`, então trocar de sub-tela DESMONTA a aba — e o
+caminho que troca de aba é `onNavigate("Consultas")`, o botão **"Falar com o
+meu médico"**. Ou seja: quem marcou **"Mais fraco"** e foi falar com o médico
+por causa disso voltava com o chip em "Como sempre", e a linha era gravada
+afirmando o contrário do que ela tinha marcado.
+
+⚠️ **E o eixo não é acessório: Heazell 2017 dá aOR 2,53 para redução de FORÇA**
+(contra 2,97 para frequência) — foi por esse número que a coluna existe. Um
+dado clínico invertido em silêncio é pior que dado nenhum.
+
+- ⚠️ **O chip GRAVA no toque, e não só no toque seguinte no bebê.** Ela pode
+  marcar "Mais fraco" e ir DIRETO ao botão do médico: sem a gravação ali, a
+  escolha nunca teria sido persistida — e é exatamente a paciente que mais
+  importa.
+- ⚠️ **Fora do catálogo de três, a leitura devolve `undefined` — nunca 2.**
+  Quem escolhe o padrão de exibição é o componente, num lugar só; cravar "Como
+  sempre" na leitura faria o storage AFIRMAR uma escolha que ela não fez. Pelo
+  mesmo motivo, pacote de versão anterior não reescreve o padrão da tela
+  (`guardada.forca ?? f`).
+
+### ⚠️ A TELA SE CONTRADIZIA NA SEMANA 12, e o custo era um alarme falso que ela
+
+### dava a si mesma
+
+Fotografado em `?estado=vazio&w=12`: a frase "A contagem começa por volta da
+semana 26" e, dois centímetros abaixo, o convite azul **"Iniciar sessão"** — o
+botão mais destacado da tela desmentindo o texto acima dele.
+
+⚠️ **E o dano não é de coerência.** Antes da 26ª o bebê se mexe e ela não sente;
+`sinalMovimentosReduzidos` CALA de propósito com a semana conhecida abaixo de 28. Ou seja, o app deixava ela contar dois movimentos em duas horas e concluir
+sozinha o que ele decidiu não afirmar.
+
+⚠️ **A capacidade NÃO foi apagada — ela deixou de ser CONVIDADA.** Antes da 26ª
+entra a frase honesta ("é normal não chegar a 10 — o que ainda não dá para
+confiar é no que você sente") e um "Contar mesmo assim" discreto. É a mesma
+linha que separa "não está aqui agora" de "não existe mais".
+
+### ⚠️ A CONTAGEM TERMINADA NÃO DIZIA NADA — o único retorno era `toast.error`
+
+Ela conta dez movimentos, o botão some, a tela volta ao começo, e nada diz que
+gravou. Do lado de quem usa, isso é indistinguível de ter perdido a contagem —
+e **quem acha que perdeu conta de novo, ou desiste**. É a mesma lição que o
+cronômetro de contrações e o registro de marco do bebê já pagaram aqui.
+
+⚠️ **O texto diz o RESULTADO, nunca "parabéns".** Isto é medida clínica, não
+conquista: uma contagem que parou em quatro movimentos também é salva, e
+festejá-la seria o app comemorando o que ela veio relatar. O tempo só aparece
+quando os dez fecharam, porque é só aí que ele quer dizer alguma coisa.
+
+⚠️ **E a duração sai de `active.startedAt`, nunca de `startRef`** — ele é zero
+numa sessão restaurada antes do efeito e na bancada, e `Date.now() - 0` são
+décadas no lugar de minutos.
+
+### ⚠️ A NOITE DO ALARME PARECIA UMA NOITE QUALQUER
+
+Uma contagem encerrada aos oito minutos com quatro movimentos e a que passou
+**duas horas** com quatro saíam no histórico com o mesmo chip azul-pálido — e a
+segunda é literalmente o caso que faz esta tela existir. É a linha que ela
+mostra ao médico, e a que ela procura para saber se já aconteceu antes. Hoje
+sai em âmbar, "4 em 2h" (medido: 8,13:1).
+
+⚠️ **A régua é a ÚNICA, e vai SEM SEMANA de propósito.** O limite não se
+reescreve aqui, e passar `weeks` seria PIOR que não passar: `weeks` é a semana
+de HOJE, e uma contagem de dois meses atrás foi feita noutra. A própria
+`sinalMovimentosReduzidos` declara que os dois limites (dez movimentos, duas
+horas) não dependem da semana — ela só decide quando a contagem COMEÇA, que é
+pergunta sobre a sessão em curso, não sobre uma noite passada.
+
+### O resto, e o que só a FOTO pegou
+
+- ⚠️ **"do normal DELE"** na linha de socorro — o app não tem campo de gênero, e
+  o nome não diz o gênero de ninguém. Quarta aparição desta família nesta base
+  (o bolão, o agradecimento do chá, o título da lista de presentes), e a
+  primeira dentro de um caminho de SOCORRO: a frase que ela lê no minuto em que
+  decide se liga para o médico não pode errar sobre o próprio bebê.
+- ⚠️ **"Falar com o meu médico" aparecia DUAS VEZES na tela do alerta**, com o
+  mesmo rótulo e o mesmo destino, a poucos centímetros. Dois botões idênticos
+  não somam caminho — fazem quem está em pânico parar para decidir qual é qual.
+  Fora do alarme a linha discreta continua o tempo todo, que é a razão de ela
+  existir (PSANZ Rec. 3: a percepção dela ganha de qualquer número).
+- ⚠️ **E os chips de força ficavam ABAIXO do cartão que manda ligar — achado da
+  FOTO, e nenhuma asserção estava perto disso.** A ação daquele minuto é LIGAR;
+  um formulário embaixo da instrução compete com ela e sugere que ainda há algo
+  a preencher antes. O valor já escolhido continua indo para a linha; o que some
+  é o PEDIDO, não o dado.
+- ⚠️ **A lista desenhava até 120 linhas** enquanto o comentário do `load()` logo
+  acima promete "as dez últimas". A janela de 90 dias existe para o GRÁFICO ter
+  série. Medido a 393px: doze linhas já são ~1.300px de rolagem. **E o que fica
+  de fora é DITO** — cortar em silêncio faria quem conta há dois meses achar que
+  o app esqueceu, e esta é a tela em que "sumiu" é a leitura mais cara possível.
+- ⚠️ **O emoji 👶🦵 e o título "Contador de chutes" eram o assunto dito duas
+  vezes:** toda montagem na produção passa por `RegistrosHub`, que desenha
+  `VoltarDaGrade` logo acima com a peça 3D dos Chutes no pratinho e o rótulo
+  "Chutes". Os dois saíram.
+- O comentário órfão `/* ---------- Checklist ---------- */`, resto do move de
+  `minha-conta.tsx`, saiu.
+
+### ⚠️ O que foi medido e NÃO virou mudança
+
+**A linha do gráfico é índigo (`#4F46E5`) numa tela azul-céu.** Ela é a
+identidade de `GraficoClinico`, que desenha peso, pressão e glicemia no
+prontuário do MÉDICO — e "cor de linha é identidade" é regra deste
+repositório. Trocá-la por prop mexeria num componente clínico compartilhado por
+uma discordância estética marginal. Fica registrado como decisão.
+
+### As armadilhas desta leva
+
+- ⚠️ **O teste de fonte da aba tinha um apagador de comentários PRÓPRIO**, de
+  regex ingênua. Passou a usar `semComentarios`, a régua única: esta tela não
+  tem `accept="image/(estrela)"` hoje, e ter uma cópia da régua é esperar que
+  ninguém acrescente um.
+- ⚠️ **O meu script de mutação imprimiu "❌ VERDE" sobre uma mutação que NUNCA
+  FOI APLICADA** — o `assert` do python abortou e o shell seguiu para o `bun
+test`. **Mutação que não muda o texto tem de FALHAR ALTO**, senão o relatório
+  vira o oposto do que ele mede. Refeita, ela fica vermelha.
+- ⚠️ **O Playwright do projeto espera o build 1223 e o contêiner tem o 1194**:
+  `chromium.launch({ executablePath: "/opt/pw-browsers/chromium" })`. Sem isso
+  ele manda rodar `npx playwright install`, que não é o conserto.
+- ⚠️ **`pkill` no mesmo comando do portão devolve 144** — de novo. Um comando
+  por vez. E o `bun run dev` subiu em 8081 com um vite velho ocupando a 8080:
+  **antes de medir, confira em que porta ele subiu.**
+
+**Sem SQL:** `strength` já existe (`APLICAR_FORCA_DO_MOVIMENTO.sql`), e a força
+guardada mora no `localStorage`.
+**Bancadas novas:** `/preview-chutes?estado=longo` (o corte da lista e a frase
+do que ficou de fora) · `?estado=vazio&w=12` (o convite antes da 26ª). E o
+helper da bancada passou a gravar `strength` — **os chips de força nunca tinham
+sido fotografados**, porque ela desenhava só o estado de um banco anterior a
+set/2026.

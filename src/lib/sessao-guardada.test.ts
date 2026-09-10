@@ -55,6 +55,42 @@ describe("guardar e ler", () => {
   });
 });
 
+describe("⚠️ a FORÇA viaja junto", () => {
+  /* ⚠️ **Era o MESMO defeito que este arquivo veio consertar, resolvido para
+     um campo e deixado de pé para o outro.** A força é escolhida durante a
+     sessão e vive em `useState`; quem toca em "Falar com o meu médico" porque
+     sentiu o bebê MAIS FRACO volta com o chip em "Como sempre", e a linha é
+     gravada afirmando o contrário do que ela marcou — no eixo cuja razão de
+     chance para desfecho ruim é 2,53 (Heazell 2017). */
+  test("o que ela marcou volta com a contagem", () => {
+    const startedAt = new Date(AGORA - min(40)).toISOString();
+    guardarSessao("u1", { startedAt, count: 4, forca: 1 });
+    expect(lerSessao("u1", AGORA)?.forca).toBe(1);
+  });
+
+  test("⚠️ pacote de versão anterior devolve `undefined`, e nunca 2", () => {
+    /* Quem escolhe o padrão de exibição é o componente, num lugar só. Cravar
+       "Como sempre" aqui faria a leitura AFIRMAR uma escolha que ela nunca
+       fez. */
+    guardarSessao("u1", { startedAt: new Date(AGORA - min(5)).toISOString(), count: 2 });
+    expect(lerSessao("u1", AGORA)?.forca).toBeUndefined();
+  });
+
+  test("⚠️ fora do catálogo de três também é `undefined`", () => {
+    for (const cru of [0, 4, -1, 2.5, "1", null]) {
+      memoria.set(
+        chaveDaSessaoDeChutes("u1"),
+        JSON.stringify({ startedAt: new Date(AGORA - min(5)).toISOString(), count: 2, forca: cru }),
+      );
+      const lida = lerSessao("u1", AGORA);
+      /* A sessão continua valendo — o que não vale é a força. */
+      expect(lida?.count).toBe(2);
+      if (cru === 2.5) expect(lida?.forca).toBe(2);
+      else expect(lida?.forca).toBeUndefined();
+    }
+  });
+});
+
 describe("⚠️ o que NÃO volta", () => {
   test("sessão de ontem é abandono, não pausa", () => {
     /* Restaurar uma contagem de ontem faria a tela mostrar um relógio que não

@@ -33,6 +33,23 @@ export type SessaoGuardada = {
   /** ISO do início — é ele que ancora o relógio e o `started_at` da linha. */
   startedAt: string;
   count: number;
+  /**
+   * ⚠️ **A FORÇA VIAJA JUNTO, e deixá-la de fora era o MESMO defeito que este
+   * arquivo foi criado para consertar — resolvido para um campo e deixado de
+   * pé para o outro.**
+   *
+   * Ela é escolhida DURANTE a sessão e vive em `useState`. Trocar de sub-tela
+   * desmonta a aba, e o pior caminho continua sendo o do SOCORRO: quem toca em
+   * "Falar com o meu médico" porque sentiu o bebê **mais fraco** volta com o
+   * chip em "Como sempre" — e a linha é gravada afirmando o contrário do que
+   * ela marcou, no eixo cuja razão de chance para desfecho ruim é 2,53
+   * (Heazell 2017). Um dado clínico invertido em silêncio é pior que dado
+   * nenhum.
+   *
+   * Opcional no tipo porque um pacote gravado por uma versão anterior não a
+   * tem — e ausência vira o padrão do componente, nunca um valor inventado.
+   */
+  forca?: number;
 };
 
 /**
@@ -71,7 +88,13 @@ export function lerSessao(uid: string | null, agora: number): SessaoGuardada | n
       guardarSessao(uid, null);
       return null;
     }
-    return { startedAt: s.startedAt, count: Math.max(0, Math.floor(s.count)) };
+    /* ⚠️ A força é SANEADA, e fora do catálogo vale "não sei" (`undefined`),
+       nunca 2: quem restaura um pacote adulterado ou de outra versão não pode
+       receber "Como sempre" como se ela tivesse marcado isso. Quem escolhe o
+       padrão de exibição é o componente, num lugar só. */
+    const f =
+      typeof s.forca === "number" && s.forca >= 1 && s.forca <= 3 ? Math.floor(s.forca) : undefined;
+    return { startedAt: s.startedAt, count: Math.max(0, Math.floor(s.count)), forca: f };
   } catch {
     return null;
   }

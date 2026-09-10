@@ -71,6 +71,13 @@ const FORCAS = [
   { valor: 3, rotulo: "Mais forte" },
 ] as const;
 
+/**
+ * Quantas noites a lista desenha. A JANELA da consulta continua sendo de 90
+ * dias — ela alimenta o gráfico e a faixa pessoal —, e este número é só o que
+ * cabe numa tela sem virar rolagem.
+ */
+const LINHAS_NO_HISTORICO = 10;
+
 export function KicksTab({
   weeks,
   babyName,
@@ -181,6 +188,9 @@ export function KicksTab({
     if (!guardada) return;
     setActive({ startedAt: guardada.startedAt });
     setCount(guardada.count);
+    /* ⚠️ A força volta junto — e o pacote sem ela (versão anterior) NÃO
+       reescreve o padrão: `?? forca` mantém o que a tela já tem. */
+    setForca((f) => guardada.forca ?? f);
     startRef.current = new Date(guardada.startedAt).getTime();
     setElapsed(Date.now() - new Date(guardada.startedAt).getTime());
   }, [ehBancada, uid, active]);
@@ -220,7 +230,7 @@ export function KicksTab({
     setCount(0);
     startRef.current = Date.now();
     setElapsed(0);
-    guardarSessao(uid, { startedAt, count: 0 });
+    guardarSessao(uid, { startedAt, count: 0, forca });
   }
 
   async function tap() {
@@ -228,7 +238,7 @@ export function KicksTab({
     hapticKick(); // vínculo tátil: o bebê "chuta de volta"
     const next = count + 1;
     setCount(next);
-    guardarSessao(uid, { startedAt: active.startedAt, count: next });
+    guardarSessao(uid, { startedAt: active.startedAt, count: next, forca });
     if (next >= 10) {
       await stop(next);
     }
@@ -275,6 +285,28 @@ export function KicksTab({
       toast.error("Não foi possível salvar a sessão. Tente novamente.");
       return;
     }
+    /* ⚠️ **A CONTAGEM ACABAVA EM SILÊNCIO — o único retorno desta tela era
+       `toast.error`.** Ela conta dez movimentos, o botão some, a tela volta ao
+       começo, e nada diz que gravou: do lado de quem usa, isso é
+       indistinguível de ter perdido a contagem — e quem acha que perdeu conta
+       de novo, ou desiste. É a mesma lição que o cronômetro de contrações e o
+       registro de marco do bebê já pagaram aqui.
+
+       ⚠️ **E o texto diz o RESULTADO, nunca "parabéns".** Isto é medida
+       clínica, não conquista: uma contagem que parou em quatro movimentos
+       também é salva, e festejá-la seria o app comemorando o que ela veio
+       relatar. O tempo aparece só quando os dez fecharam, porque é só aí que
+       ele quer dizer alguma coisa (é o eixo do gráfico). */
+    /* ⚠️ A duração sai de `active.startedAt` — o mesmo instante que vai para
+       a linha —, e nunca de `startRef`: ele é zero numa sessão restaurada
+       antes do efeito e na bancada, e `Date.now() - 0` são décadas. */
+    const minutos = Math.max(
+      1,
+      Math.round((Date.now() - new Date(active.startedAt).getTime()) / 60000),
+    );
+    toast.success(
+      finalCount >= 10 ? `10 movimentos em ${minutos} min. Contagem salva.` : "Contagem salva.",
+    );
     setActive(null);
     setCount(0);
     guardarSessao(uid, null);
@@ -321,6 +353,9 @@ export function KicksTab({
      — na tela que mede um dos nove sintomas VERMELHOS. A régua está em
      `serie-de-chutes.ts`, com o caso medido. */
   const ultima = ultimaContagem(history);
+  /* A consulta já vem decrescente (`order("started_at", { ascending: false })`),
+     então as primeiras são as últimas noites. */
+  const historicoVisivel = history.slice(0, LINHAS_NO_HISTORICO);
 
   /* Modo Cuidado: a aba inteira se cala. Ela oferecia "conte 10
      movimentos de {nome do bebê}" — o convite mais doloroso possível para
@@ -346,9 +381,14 @@ export function KicksTab({
         </div>
       )}
 
+      {/* ⚠️ **SEM EMOJI E SEM TÍTULO AQUI — os dois são o assunto dito duas
+          vezes.** Toda montagem desta aba na produção passa por `RegistrosHub`,
+          que desenha `VoltarDaGrade` logo acima com a peça 3D dos Chutes no
+          pratinho e o rótulo "Chutes". O 👶🦵 era a mesma coisa em emoji, dois
+          centímetros abaixo da arte — e emoji tem cor própria em cada sistema,
+          que é a razão pela qual o telefone e o calendário desta base foram
+          desenhados. */}
       <div className="glass-card glass-sky rounded-3xl p-8 text-center">
-        <p className="text-4xl mb-3">👶🦵</p>
-        <p className="font-serif text-xl text-sky-800">Contador de chutes</p>
         {/* ⚠️ O texto passou a descrever o MÉTODO com melhor base — o
             count-to-ten vespertino de Moore & Piacquadio, que é o que ACOG,
             SOGC e PSANZ adotaram: mede-se o TEMPO até dez movimentos, deitada
@@ -366,21 +406,52 @@ export function KicksTab({
             Valem chutes, socos, rolamentos e cutucadas. Soluços não contam.
           </p>
         )}
+        {/* ⚠️ **A TELA SE CONTRADIZIA, e o custo era um alarme falso que ela
+            dava a si mesma.** Fotografado em `?estado=vazio&w=12`: a frase
+            "A contagem começa por volta da semana 26" e, dois centímetros
+            abaixo, o convite azul "Iniciar sessão" — o botão mais destacado da
+            tela desmentindo o texto acima dele.
+
+            E o dano não é de coerência: antes da 26ª o bebê se mexe e ela não
+            sente. Uma contagem que "falha" na semana 16 produz medo puro, e
+            `sinalMovimentosReduzidos` CALA de propósito com a semana conhecida
+            abaixo de 28 — ou seja, o app deixaria ela contar dois movimentos em
+            duas horas e concluir sozinha o que ele decidiu não afirmar.
+
+            ⚠️ **A CAPACIDADE NÃO FOI APAGADA — ela deixou de ser CONVIDADA.**
+            Quem já sente e quer contar continua tendo o caminho, agora com a
+            verdade dita ao lado. É a mesma linha que separa "não está aqui
+            agora" de "não existe mais". */}
         {!active ? (
-          <button
-            onClick={start}
-            className="press mt-6 min-h-11 rounded-full px-8 text-sm font-semibold text-white shadow-sm transition-all duration-300 active:scale-95 hover:opacity-90"
-            style={{
-              /* ⚠️ Medido no pixel: branco sobre `#0369a1` dá 5,7:1 e sobre
-                 `#075985`, 7,3 — os dois passam. A versão anterior era o
-                 gradiente rosa do app com `text-primary-foreground`, e media
-                 3,19:1 no ponto claro: o rótulo do botão que abre a tela era
-                 dos textos menos legíveis dela. */
-              background: "radial-gradient(circle at 30% 30%, #0369a1, #075985 70%)",
-            }}
-          >
-            Iniciar sessão
-          </button>
+          isMonitoringPhase ? (
+            <button
+              onClick={start}
+              className="press mt-6 min-h-11 rounded-full px-8 text-sm font-semibold text-white shadow-sm transition-all duration-300 active:scale-95 hover:opacity-90"
+              style={{
+                /* ⚠️ Medido no pixel: branco sobre `#0369a1` dá 5,7:1 e sobre
+                   `#075985`, 7,3 — os dois passam. A versão anterior era o
+                   gradiente rosa do app com `text-primary-foreground`, e media
+                   3,19:1 no ponto claro: o rótulo do botão que abre a tela era
+                   dos textos menos legíveis dela. */
+                background: "radial-gradient(circle at 30% 30%, #0369a1, #075985 70%)",
+              }}
+            >
+              Iniciar sessão
+            </button>
+          ) : (
+            <div className="mt-6">
+              <p className="text-[13px] leading-snug text-muted-foreground">
+                Antes da semana {SEMANA_DE_OBSERVAR} é normal não chegar a 10 — o bebê se mexe
+                muito, e o que ainda não dá para confiar é no que você sente.
+              </p>
+              <button
+                onClick={start}
+                className="press mt-2 min-h-11 rounded-full border border-sky-300 px-6 text-sm font-medium text-sky-900"
+              >
+                Contar mesmo assim
+              </button>
+            </div>
+          )
         ) : (
           <div className="mt-6">
             <button
@@ -432,35 +503,55 @@ export function KicksTab({
             )}
             {/* ⚠️ A FORÇA, escolhida DURANTE a sessão e não depois: perguntar
                 no fim seria um passo a mais no momento em que ela quer só
-                fechar. "Como sempre" já vem marcado, que é o caso comum. */}
-            <div className="mt-4">
-              <p className="text-[13px] text-muted-foreground">Como estão os movimentos?</p>
-              <div className="mt-2 flex justify-center gap-2">
-                {FORCAS.map((f) => (
-                  <button
-                    key={f.valor}
-                    type="button"
-                    onClick={() => setForca(f.valor)}
-                    className={`press min-h-11 rounded-full border px-3 text-xs font-medium transition-colors ${
-                      forca === f.valor
-                        ? "border-sky-700 bg-sky-700 text-white"
-                        : "border-border text-muted-foreground hover:border-sky-400"
-                    }`}
-                  >
-                    {f.rotulo}
-                  </button>
-                ))}
-              </div>
-              {/* ⚠️ "Mais fraco" NÃO vira alarme vermelho automático — seria um
+                fechar. "Como sempre" já vem marcado, que é o caso comum.
+
+                ⚠️ **E ELA SAI DE CENA QUANDO O ALARME ACENDE — achado da FOTO,
+                não de asserção nenhuma.** Fotografado em `?estado=alerta`:
+                logo abaixo de "Ligue para o seu médico agora ou procure a
+                maternidade" a tela oferecia três chips perguntando "Como estão
+                os movimentos?". A ação daquele minuto é LIGAR; um formulário
+                embaixo da instrução compete com ela e sugere que ainda há algo
+                a preencher antes. O valor já escolhido continua valendo e vai
+                para a linha no encerramento — o que some é o pedido, não o
+                dado. */}
+            {!movimentosReduzidos && (
+              <div className="mt-4">
+                <p className="text-[13px] text-muted-foreground">Como estão os movimentos?</p>
+                <div className="mt-2 flex justify-center gap-2">
+                  {FORCAS.map((f) => (
+                    <button
+                      key={f.valor}
+                      type="button"
+                      onClick={() => {
+                        setForca(f.valor);
+                        /* ⚠️ Gravar aqui, e não só no toque seguinte no bebê: ela
+                         pode marcar "Mais fraco" e ir DIRETO ao botão de falar
+                         com o médico — que é o caminho que desmonta a aba. Sem
+                         esta linha, exatamente a paciente que mais importa
+                         voltaria com o chip trocado. */
+                        guardarSessao(uid, { startedAt: active.startedAt, count, forca: f.valor });
+                      }}
+                      className={`press min-h-11 rounded-full border px-3 text-xs font-medium transition-colors ${
+                        forca === f.valor
+                          ? "border-sky-700 bg-sky-700 text-white"
+                          : "border-border text-muted-foreground hover:border-sky-400"
+                      }`}
+                    >
+                      {f.rotulo}
+                    </button>
+                  ))}
+                </div>
+                {/* ⚠️ "Mais fraco" NÃO vira alarme vermelho automático — seria um
                   limiar clínico novo inventado aqui, e a régua deste app mora
                   em `sinais-clinicos.ts`. O que ele faz é dizer a verdade e
                   oferecer o caminho que já está logo abaixo. */}
-              {forca === 1 && (
-                <p className="mt-2 text-[13px] leading-snug text-sky-900">
-                  Movimento mais fraco que o normal dele é motivo de falar com o seu médico hoje.
-                </p>
-              )}
-            </div>
+                {forca === 1 && (
+                  <p className="mt-2 text-[13px] leading-snug text-sky-900">
+                    Movimento mais fraco que o normal é motivo de falar com o seu médico hoje.
+                  </p>
+                )}
+              </div>
+            )}
 
             <button
               onClick={() => stop()}
@@ -484,20 +575,37 @@ export function KicksTab({
 
             ⚠️ É uma linha discreta, e não um segundo cartão vermelho: dois
             blocos de alarme na mesma tela apagam a hierarquia do que dispara
-            de verdade. O 192 continua exclusivo do cartão vermelho. */}
-        <div className="mt-5 border-t border-sky-200/70 pt-4 text-left">
-          <p className="text-[13px] leading-snug text-muted-foreground">
-            Sentiu {label} diferente do normal dele — se mexendo menos, mais fraco, ou um dia
-            diferente de todos? Não espere por esta contagem.
-          </p>
-          <button
-            type="button"
-            onClick={() => onNavigate?.("Consultas")}
-            className="press mt-2 inline-flex h-11 items-center rounded-full bg-sky-700 px-4 text-sm font-semibold text-white"
-          >
-            Falar com o meu médico
-          </button>
-        </div>
+            de verdade. O 192 continua exclusivo do cartão vermelho.
+
+            ⚠️ **E ELA SOME QUANDO O CARTÃO VERMELHO ESTÁ NA TELA.** Fotografado
+            em `?estado=alerta`: "Falar com o meu médico" aparecia DUAS VEZES,
+            com o mesmo rótulo e o mesmo destino, a poucos centímetros um do
+            outro. Dois botões idênticos não somam caminho — eles fazem quem
+            está em pânico parar para decidir qual é qual, e ensinam que o app
+            repete as coisas. Fora do alarme ela continua o tempo todo, que é a
+            razão de ela existir. */}
+        {!movimentosReduzidos && (
+          <div className="mt-5 border-t border-sky-200/70 pt-4 text-left">
+            {/* ⚠️ **"do normal DELE" — o app não tem campo de gênero, e o nome
+              não diz o gênero de ninguém.** Quarta aparição desta família nesta
+              base (o bolão, o agradecimento do chá, o título da lista de
+              presentes), e a primeira dentro de um caminho de socorro: a frase
+              que ela lê no minuto em que decide se liga para o médico não pode
+              trazer um erro sobre o próprio bebê. A saída é a mesma de sempre —
+              construção impessoal, que é verdadeira para todo mundo. */}
+            <p className="text-[13px] leading-snug text-muted-foreground">
+              Sentiu {label} diferente do normal — se mexendo menos, mais fraco, ou um dia diferente
+              de todos? Não espere por esta contagem.
+            </p>
+            <button
+              type="button"
+              onClick={() => onNavigate?.("Consultas")}
+              className="press mt-2 inline-flex h-11 items-center rounded-full bg-sky-700 px-4 text-sm font-semibold text-white"
+            >
+              Falar com o meu médico
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ⚠️ O GRÁFICO É DE TEMPO ATÉ 10 MOVIMENTOS, e a linha esperada é PLANA.
@@ -628,12 +736,35 @@ export function KicksTab({
           {!instavel && history.length === 0 && (
             <p className="text-sm text-muted-foreground">Nenhuma sessão registrada ainda.</p>
           )}
-          {history.map((s) => {
+          {/* ⚠️ **A LISTA DESENHAVA ATÉ 120 LINHAS, e o comentário do `load()`
+              logo acima promete "as dez últimas".** A janela de 90 dias existe
+              para o GRÁFICO ter série; a lista é para ela reconhecer as
+              últimas noites. Medido a 393px: doze linhas já são ~1.300px de
+              rolagem, e quem conta todo dia chega a três meses de linhas
+              idênticas entre a fita de estatísticas e o fim da tela.
+
+              ⚠️ E o que fica de fora é DITO. Cortar em silêncio faria a
+              paciente que conta há dois meses achar que o app esqueceu — e
+              esta é a tela em que "sumiu" é a leitura mais cara possível. */}
+          {historicoVisivel.map((s) => {
             const dur = s.ended_at
               ? Math.round(
                   (new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()) / 60000,
                 )
               : 0;
+            /* ⚠️ **A RÉGUA É A ÚNICA, e ela vai SEM SEMANA de propósito.** O
+               limite não pode ser reescrito aqui — o CLAUDE.md proíbe limite
+               clínico fora de `sinais-clinicos.ts` —, e passar `weeks` seria
+               pior que não passar: `weeks` é a semana de HOJE, e uma contagem
+               de dois meses atrás foi feita noutra. A própria régua declara
+               que os dois limites (dez movimentos, duas horas) não dependem da
+               semana; ela só decide quando a contagem COMEÇA, que é uma
+               pergunta sobre a sessão em curso e não sobre uma noite passada. */
+            const naoChegouEmDuasHoras = !!sinalMovimentosReduzidos({
+              semanas: null,
+              movimentos: s.kick_count,
+              minutos: dur,
+            });
             return (
               <div
                 key={s.id}
@@ -648,6 +779,17 @@ export function KicksTab({
                 {s.kick_count >= 10 ? (
                   <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">
                     ✓ 10
+                  </span>
+                ) : naoChegouEmDuasHoras ? (
+                  /* ⚠️ **A NOITE DO ALARME PARECIA UMA NOITE QUALQUER.** Uma
+                     contagem que ela encerrou aos oito minutos com quatro
+                     movimentos e a que passou DUAS HORAS com quatro saíam com
+                     o mesmo chip azul-pálido — e a segunda é literalmente o
+                     caso que faz esta tela existir. É a linha que ela mostra ao
+                     médico, e a que ela procura quando quer saber se já
+                     aconteceu antes. */
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
+                    {s.kick_count} em 2h
                   </span>
                 ) : (
                   <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs text-sky-900">
@@ -675,10 +817,15 @@ export function KicksTab({
               </div>
             );
           })}
+          {history.length > historicoVisivel.length && (
+            <p className="pt-1 text-[13px] text-muted-foreground">
+              Mostrando as {LINHAS_NO_HISTORICO} últimas. As outras{" "}
+              {history.length - historicoVisivel.length} dos últimos 90 dias continuam salvas e
+              entram nas contas acima.
+            </p>
+          )}
         </div>
       </div>
     </div>
   );
 }
-
-/* ---------- Checklist ---------- */

@@ -59,6 +59,12 @@ const EXTRAS = [
   "/preview-chutes?estado=serie",
   "/preview-chutes?estado=instavel-historico",
   "/preview-chutes?estado=ultima-incompleta",
+  /* ⚠️ O corte da lista e a frase que diz o que ficou de fora só existem acima
+     de dez noites — com menos, o corte é invisível. */
+  "/preview-chutes?estado=longo",
+  /* ⚠️ A semana antes da 26ª: a tela dizia "a contagem começa por volta da
+     semana 26" e oferecia o convite azul logo abaixo. */
+  "/preview-chutes?estado=vazio&w=12",
   /* ⚠️ Sem DUM: a régua dos movimentos NÃO pode calar, e este era o estado
      impossível de fotografar — ele precisou de parâmetro próprio, porque o
      router descarta `?w=` antes de a bancada ver. */
