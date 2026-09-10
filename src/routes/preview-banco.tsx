@@ -55,6 +55,15 @@ const FALTANDO: ArquivoConferido[] = [
     estado: "aplicado",
     alvos: [{ tabela: "doctors", colunas: [], estado: "ok" }],
   },
+  /* ⚠️ ESTE É O CASO REAL DE HOJE, e sem ele a ressalva de conferência parcial
+     nunca teria sido desenhada: a sonda pergunta por `clinical_acks`, que existe
+     desde jul/2026, então o arquivo aparece como APLICADO — para qualquer
+     versão da view que ele monta. */
+  {
+    arquivo: "APLICAR_EVENTOS_CLINICOS.sql",
+    estado: "aplicado",
+    alvos: [{ tabela: "clinical_acks", colunas: [], estado: "ok" }],
+  },
 ];
 
 const INCERTO: ArquivoConferido[] = [
@@ -70,7 +79,12 @@ const INCERTO: ArquivoConferido[] = [
       },
     ],
   },
-  ...FALTANDO.slice(2),
+  /* ⚠️ SEM o arquivo da view aqui: ele já entra ACIMA como incerto, e um mesmo
+     `APLICAR_` em dois estados é um arranjo que a produção nunca produz — a
+     bancada estaria desenhando a ressalva sobre uma linha amarela. */
+  ...FALTANDO.filter(
+    (a) => a.estado === "aplicado" && a.arquivo !== "APLICAR_EVENTOS_CLINICOS.sql",
+  ),
 ];
 
 const TUDO_OK: ArquivoConferido[] = FALTANDO.slice(2);

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { comConferenciaParcial, oQueEscapaDaConferencia } from "@/lib/aplicar-que-se-re-roda";
 import type { ArquivoConferido } from "@/lib/saude-do-banco.functions";
 
 /**
@@ -74,6 +75,10 @@ export function SaudeDoBancoTab({
   const faltando = estado.arquivos.filter((a) => a.estado === "faltando");
   const incertos = estado.arquivos.filter((a) => a.estado === "incerto");
   const aplicados = estado.arquivos.filter((a) => a.estado === "aplicado");
+  /* ⚠️ Os que a sonda de tabela/coluna não alcança por inteiro. Sem esta
+     ressalva, a caixa verde afirmaria completude sobre uma pergunta que ela não
+     faz — e é o arquivo que a documentação manda RE-RODAR. */
+  const parciais = comConferenciaParcial(aplicados);
 
   return (
     <div className="space-y-5">
@@ -93,10 +98,28 @@ export function SaudeDoBancoTab({
           54 verdes com dois vermelhos no meio não responde isso. */}
       {faltando.length === 0 && incertos.length === 0 ? (
         <Aviso tom="verde" titulo="Nada pendente">
-          As {estado.arquivos.length} conferências passaram. Todo <code>APLICAR_*.sql</code> que o
-          repositório conhece já está no banco.
+          As {estado.arquivos.length} conferências passaram — nenhuma tabela e nenhuma coluna que o
+          repositório conhece está faltando.
         </Aviso>
       ) : null}
+
+      {/* ⚠️ SEMPRE, e não só quando está tudo verde: um arquivo cuja pendência
+          esta sonda não enxerga continua sem ser enxergado com outros dez
+          faltando. */}
+      {parciais.length > 0 && (
+        <Aviso tom="ambar" titulo="O que esta conferência NÃO alcança">
+          {/* ⚠️ Sem `<ul>`: o `Aviso` embrulha os filhos num `<p>`, e uma lista
+              dentro de um parágrafo é HTML inválido — o React descarta a árvore
+              na hidratação. Esta base já ficou SEM ABRIR por um defeito de
+              hidratação; foi a foto da bancada que pegou. */}
+          {parciais.map((x) => (
+            <span key={x.arquivo} className="block [&+&]:mt-2">
+              <code>{x.arquivo}</code> aparece como aplicado, e {x.oQueEscapa}. Quem responde isso é
+              a aba <strong>“{x.ondeConferir}”</strong>.
+            </span>
+          ))}
+        </Aviso>
+      )}
 
       {faltando.length > 0 && (
         <section className="space-y-3">
@@ -147,7 +170,9 @@ export function SaudeDoBancoTab({
           </summary>
           <ul className="mt-3 space-y-1 text-sm text-muted-foreground">
             {aplicados.map((a) => (
-              <li key={a.arquivo}>✅ {a.arquivo}</li>
+              <li key={a.arquivo}>
+                {oQueEscapaDaConferencia(a.arquivo) ? "⚠️" : "✅"} {a.arquivo}
+              </li>
             ))}
           </ul>
         </details>

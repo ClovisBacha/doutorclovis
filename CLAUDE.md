@@ -15773,3 +15773,52 @@ apontando para linhas que não eram a do comentário. Ele vai ANTES do bloco.
 **Bancada:** `/preview-saude-clinica?estado=campovelho` · `?estado=semcoluna` ·
 `?estado=fora` · `?estado=vazio` · `?estado=semview` — os cinco entraram na
 varredura da CI (a varredura de disco abre só o padrão).
+
+#### ⚠️ E A OUTRA METADE: a aba Banco afirmava completude que a sonda não prova
+
+A caixa verde dela dizia **"Todo `APLICAR_*.sql` que o repositório conhece já
+está no banco"** — sobre uma sonda que pergunta por TABELA e por COLUNA, e
+nunca pela VERSÃO de uma view. É a mesma tranquilização falsa que a fila
+clínica já tinha consertado uma vez ("nenhuma fonte com dado ficou de fora"
+dito sobre uma checagem que não checou nada).
+
+Hoje ela fala do que de fato perguntou (_"nenhuma tabela e nenhuma coluna …
+está faltando"_), e `src/lib/aplicar-que-se-re-roda.ts` acrescenta a ressalva:
+o arquivo aparece como aplicado, o que escapa da conferência, e **o rótulo
+exato da aba** onde a pergunta certa é feita.
+
+- ⚠️ **NÃO é um buraco a tapar no gerador.** O mapa é gerado a partir do SQL, e
+  um gerador não tem como saber que uma view foi recriada — é uma pergunta que
+  aquela sonda não faz, e que outra tela faz.
+- ⚠️ **A ressalva é desenhada SEMPRE, e não só no verde**: um arquivo cuja
+  pendência esta sonda não enxerga continua sem ser enxergado com outros dez
+  faltando.
+- ⚠️ **Só sobre o que foi dado como APLICADO.** O que está na lista vermelha já
+  tem o seu lugar, e o mesmo arquivo em duas caixas com dois tons contradiz a
+  tela.
+- ⚠️ **`ondeConferir` é o RÓTULO da fita, nunca o título do arquivo** — e o
+  teste pegou isso na primeira execução: eu tinha escrito "A fila clínica está
+  completa?" e a aba se chama **"Fila clínica"**. Um destino que não é o nome
+  que o dono lê na tela manda ele procurar uma aba que não existe.
+- ⚠️ **A lista é CURTA de propósito**: ela não é "arquivos importantes", é
+  "arquivos cuja pendência a sonda de tabela/coluna não enxerga". Há teto no
+  teste — um item a mais gasta a atenção que o único caso de verdade precisa.
+
+⚠️ **E A FOTO PEGOU UM DEFEITO QUE EU ACABARA DE INTRODUZIR: `<ul>` dentro de
+`<p>`.** `Aviso` embrulha os filhos num parágrafo, e lista dentro de parágrafo
+é HTML inválido — **o React descarta a árvore na hidratação**. Esta base já
+ficou SEM ABRIR por um defeito de hidratação; `tsc`, lint e a suíte inteira
+estavam verdes. Um `<span className="block">` por ressalva resolve.
+
+⚠️ **E a bancada não tinha como desenhar o estado novo** — `preview-banco` não
+tinha nenhum `APLICAR_EVENTOS_CLINICOS.sql` na lista de APLICADOS, então a
+ressalva nunca apareceria. Bancada que não consegue provar o recurso é bancada
+que aprova qualquer coisa. ⚠️ E a primeira correção pôs o MESMO arquivo em dois
+estados no `?estado=incerto` (incerto e aplicado ao mesmo tempo), que é um
+arranjo que a produção nunca produz.
+
+⚠️ **E uma asserção minha passou verde na mutação, pela armadilha de sempre:**
+`toContain("parciais.length > 0")` fica VERDE sobre
+`{false && parciais.length > 0 && (`, porque a string está lá dentro. O teste
+passou a LER a condição do bloco (de trás para a frente, a partir do texto da
+ressalva) e a cobrar que nada a neutralize. Cinco mutantes em vermelho.
