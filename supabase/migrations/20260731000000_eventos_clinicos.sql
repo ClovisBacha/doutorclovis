@@ -325,6 +325,9 @@ $tc$;
 DO $view$
 DECLARE
   partes text[] := ARRAY[]::text[];
+  /* Qual expressão usar para a força do movimento — ver o bloco de
+     `kick_sessions`: a coluna nasce num `APLICAR_` que pode não ter rodado. */
+  forca_col text := 'NULL::smallint';
   pares  text[];
   sql    text;
 BEGIN
@@ -433,13 +436,29 @@ BEGIN
   END IF;
 
   IF to_regclass('public.kick_sessions') IS NOT NULL THEN
-    partes := array_append(partes, $sql$
+    -- ⚠️ ESTE BLOCO DIVERGIU DO `APLICAR_EVENTOS_CLINICOS.sql` E A FORÇA SE
+    -- PERDIA NUM BANCO NOVO. A migration montava a mesma view SEM `forca`:
+    -- quem aplicasse só as migrations teria a coluna gravada, o chip na tela
+    -- da paciente, e NADA no prontuário — sem erro nenhum, porque a view
+    -- continua válida. Os dois arquivos montam a MESMA view e têm de dizer a
+    -- mesma coisa.
+    --
+    -- `strength` nasce em APLICAR_FORCA_DO_MOVIMENTO.sql, que pode não ter
+    -- rodado ainda: sem este teste, o CREATE VIEW falharia INTEIRO e as onze
+    -- fontes cairiam junto por causa de uma coluna nova.
+    SELECT CASE WHEN EXISTS (
+             SELECT 1 FROM information_schema.columns
+              WHERE table_schema = 'public' AND table_name = 'kick_sessions'
+                AND column_name = 'strength'
+           ) THEN 'k.strength' ELSE 'NULL::smallint' END
+      INTO forca_col;
+    partes := array_append(partes, replace($sql$
       SELECT 'kick_sessions'::text, k.id, k.user_id, k.started_at,
              'movimento'::text,
-             jsonb_build_object('chutes', k.kick_count),
+             jsonb_strip_nulls(jsonb_build_object('chutes', k.kick_count, 'forca', $FORCA$)),
              k.notes
         FROM public.kick_sessions k
-    $sql$);
+    $sql$, '$FORCA$', forca_col));
   END IF;
 
   IF to_regclass('public.journal_entries') IS NOT NULL THEN

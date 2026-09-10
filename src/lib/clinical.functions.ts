@@ -70,6 +70,13 @@ export type DadosEvento = {
   intensidade?: number | null;
   duracao_seg?: number | null;
   chutes?: number | null;
+  /* ⚠️ A FORÇA DO MOVIMENTO (1 mais fraco · 2 como sempre · 3 mais forte).
+     Ela é escrita por `kick_sessions.strength` e projetada pela view; sem este
+     campo o dado chegava ao painel e era DESCARTADO no caminho — a coluna
+     escrita e nunca lida que este repositório já pagou meia dúzia de vezes.
+     Heazell 2017: redução de FORÇA tem aOR 2,53 para natimortalidade, contra
+     2,97 da frequência. É quase o mesmo peso, e o médico só via a frequência. */
+  forca?: number | null;
   humor?: string | null;
   epds?: number | null;
   epds_q10?: number | null;

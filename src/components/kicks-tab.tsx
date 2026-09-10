@@ -37,6 +37,7 @@ import {
   serieDeChutes,
   ultimaContagem,
 } from "@/lib/serie-de-chutes";
+import { FORCA_PADRAO, NIVEIS_DE_FORCA, nivelDeForca } from "@/lib/forca-do-movimento";
 import { guardarSessao, lerSessao } from "@/lib/sessao-guardada";
 import { sinalMovimentosReduzidos } from "@/lib/sinais-clinicos";
 import { manterTelaAcesa } from "@/lib/tela-acesa";
@@ -62,14 +63,12 @@ export type KickSession = {
  * natimortalidade: redução de FREQUÊNCIA aOR 2,97; redução de FORÇA aOR 2,53.
  * O contador media a primeira e ignorava a segunda.
  *
- * ⚠️ TRÊS níveis, e não a escala de 1 a 5 do Count the Kicks: a tela irmã já
- * usa três, e duas escalas no mesmo hub ensinam a decodificar.
+ * ⚠️ O CATÁLOGO MORA EM `src/lib/forca-do-movimento.ts`, e não aqui: quem lê
+ * este dado são DOIS — ela, no histórico logo abaixo, e o MÉDICO, no
+ * prontuário, por `clinical_events`. Duas tabelas de rótulo divergiriam no
+ * primeiro ajuste, e a divergência apareceria como o painel chamando de outra
+ * coisa o que ela marcou.
  */
-const FORCAS = [
-  { valor: 1, rotulo: "Mais fraco" },
-  { valor: 2, rotulo: "Como sempre" },
-  { valor: 3, rotulo: "Mais forte" },
-] as const;
 
 /**
  * Quantas noites a lista desenha. A JANELA da consulta continua sendo de 90
@@ -114,7 +113,7 @@ export function KicksTab({
   const [instavel, setInstavel] = useState(bancada?.instavel ?? false);
   /* Como sempre é o padrão: é o caso comum, e um padrão vazio obrigaria a
      escolher algo para poder encerrar. */
-  const [forca, setForca] = useState(2);
+  const [forca, setForca] = useState<number>(FORCA_PADRAO);
   const startRef = useRef<number>(0);
   const [elapsed, setElapsed] = useState((bancada?.ativa?.minutos ?? 0) * 60000);
   /* Booleano, e nunca o objeto: um literal remontado a cada render faria os
@@ -518,7 +517,7 @@ export function KicksTab({
               <div className="mt-4">
                 <p className="text-[13px] text-muted-foreground">Como estão os movimentos?</p>
                 <div className="mt-2 flex justify-center gap-2">
-                  {FORCAS.map((f) => (
+                  {NIVEIS_DE_FORCA.map((f) => (
                     <button
                       key={f.valor}
                       type="button"
@@ -614,6 +613,14 @@ export function KicksTab({
         <div className="rounded-3xl card-material p-5">
           <GraficoClinico
             titulo="Tempo até 10 movimentos"
+            /* ⚠️ A identidade é a DA TELA: a aba inteira é azul-céu, e o
+               gráfico entrava nela com a linha índigo do prontuário. */
+            paleta="chutes"
+            /* ⚠️ O cartão já está desenhado logo acima (`card-material`): sem
+               isto a figura desenhava a MOLDURA DELA por dentro — duas bordas
+               concêntricas, com a de dentro sendo o cartão de contorno que o
+               app da paciente já tinha tirado de todo o resto. */
+            moldura="nenhuma"
             series={[
               {
                 rotulo: "Tempo até 10",
@@ -765,6 +772,11 @@ export function KicksTab({
               movimentos: s.kick_count,
               minutos: dur,
             });
+            /* ⚠️ A FORÇA É LIDA PELO CATÁLOGO, e não por dois `if` de
+               número solto: o nível do meio não tem chip de propósito, e um
+               `=== 1 || === 3` escrito aqui é a régua duplicada — o dia em que
+               alguém acrescentar um nível, este chip some sem erro nenhum. */
+            const forcaDaNoite = nivelDeForca(s.strength);
             return (
               <div
                 key={s.id}
@@ -801,14 +813,15 @@ export function KicksTab({
                     que este repositório já pagou meia dúzia de vezes. É o eixo
                     com aOR 2,53 para desfecho ruim, e é comparando com as
                     outras noites que ela percebe a MUDANÇA. */}
-                {s.strength === 1 && (
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-900">
-                    mais fraco
-                  </span>
-                )}
-                {s.strength === 3 && (
-                  <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs text-sky-900">
-                    mais forte
+                {forcaDaNoite?.chip && (
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs ${
+                      forcaDaNoite.valor === 1
+                        ? "bg-amber-100 text-amber-900"
+                        : "bg-sky-100 text-sky-900"
+                    }`}
+                  >
+                    {forcaDaNoite.chip}
                   </span>
                 )}
                 {/* O minuto é o dado da série — ele vem por último e alinhado à

@@ -63,9 +63,13 @@ function ev(
   gravidade: EventoClinico["gravidade"],
   texto: string | null = null,
   notas: string[] = [],
+  /* A FONTE importa: `resumo` desempata por ela o vocabulário de `nivel`
+     (triagem × rastreio), e uma bancada que carimba tudo como `health_logs`
+     desenharia um estado que o servidor não produz. */
+  fonte = "health_logs",
 ): EventoClinico {
   return {
-    fonte: "health_logs",
+    fonte,
     fonte_id: ocorrido_em,
     user_id: "00000000-0000-4000-8000-000000000001",
     ocorrido_em,
@@ -112,6 +116,30 @@ function Bancada() {
     ev("2026-08-12T08:00:00.000Z", "medida", { weight_kg: perdapeso ? 55.2 : 71.4 }, "normal"),
     ev("2026-08-09T21:40:00.000Z", "medida", { glucose_mg_dl: 96 }, "normal"),
     ev("2026-08-04T09:10:00.000Z", "medida", { systolic: 128, diastolic: 84 }, "normal"),
+    /* ⚠️ AS DUAS SESSÕES DE MOVIMENTO EXISTEM PARA PROVAR A FORÇA, e ela nunca
+       tinha sido fotografada: a bancada não trazia nenhum evento `movimento`,
+       então a coluna era escrita, projetada pela view e DESCARTADA no caminho
+       sem que nenhuma tela mostrasse isso. A de baixo é o nível do meio, e ela
+       tem de sair SEM adjetivo nenhum — "como sempre" em toda linha afogaria
+       a de cima, que é a única que carrega notícia. */
+    ev(
+      "2026-08-16T22:05:00.000Z",
+      "movimento",
+      { chutes: 10, forca: 1 },
+      "normal",
+      null,
+      [],
+      "kick_sessions",
+    ),
+    ev(
+      "2026-08-14T21:50:00.000Z",
+      "movimento",
+      { chutes: 10, forca: 2 },
+      "normal",
+      null,
+      [],
+      "kick_sessions",
+    ),
   ];
 
   const consultas: Consulta[] = [

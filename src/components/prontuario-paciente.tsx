@@ -39,6 +39,7 @@ import {
   type FichaClinica,
   type Serie,
 } from "@/lib/clinical.functions";
+import { nivelDeForca } from "@/lib/forca-do-movimento";
 import { formataTelefone, linkTel } from "@/lib/telefone";
 import { quando } from "@/lib/quando";
 import { GraficoClinico, daSerie, seriesDePressao } from "./grafico-clinico";
@@ -569,7 +570,27 @@ function resumo(e: EventoClinico): string {
   if (d.nivel) {
     partes.push(e.fonte === "epds_logs" ? `rastreio ${d.nivel}` : `triagem ${d.nivel}`);
   }
-  if (d.chutes != null) partes.push(`${d.chutes} movimentos`);
+  /* ⚠️ **A FORÇA CHEGA AQUI, e antes ela não chegava a lugar nenhum.** Ela é
+     escolhida pela paciente durante a sessão, gravada em
+     `kick_sessions.strength` e projetada pela view — e o prontuário mostrava
+     só a CONTAGEM. Metade de um recurso: ela via o chip, ele via um número.
+     Heazell 2017 dá aOR 2,53 para redução de FORÇA contra 2,97 da frequência,
+     ou seja quase o mesmo peso, e o eixo mais novo era o invisível.
+
+     ⚠️ O RÓTULO SAI DO CATÁLOGO ÚNICO, nunca de um `if` de número aqui: é o
+     mesmo que a tela dela usa, e duas tabelas divergiriam no primeiro ajuste
+     — com a divergência aparecendo como o painel chamando de outra coisa o
+     que ela marcou. E o nível do meio CALA (`frase` nula): "como sempre" em
+     toda linha afogaria as duas que carregam notícia.
+
+     ⚠️ E ela NÃO mexe na gravidade. O limite clínico mora em
+     `sinais-clinicos.ts` e não se reescreve aqui; o que este eixo faz é
+     APARECER na linha do tempo, que é o que faltava. */
+  if (d.chutes != null || d.forca != null) {
+    const forca = nivelDeForca(d.forca)?.frase;
+    const base = d.chutes != null ? `${d.chutes} movimentos` : "movimentos";
+    partes.push(forca ? `${base} (${forca})` : base);
+  }
   if (d.intensidade != null) {
     partes.push(`intensidade ${d.intensidade}${d.duracao_seg ? ` · ${d.duracao_seg}s` : ""}`);
   }

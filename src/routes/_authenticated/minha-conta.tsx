@@ -31,6 +31,8 @@ import { TabErrorBoundary } from "@/components/tab-error-boundary";
 import { TabSkeleton } from "@/components/tab-skeleton";
 import { BabyJourneyModal, PremiumUpsellModal } from "@/components/baby-journey";
 import { supabase } from "@/integrations/supabase/client";
+import { nivelDeForca } from "@/lib/forca-do-movimento";
+import { colunaAusente } from "@/lib/postgrest";
 import { avisoQuePodeAparecer, lerLinhaDoStream, passoDaDigitacao } from "@/lib/chat-stream";
 import { formatarDinheiro } from "@/lib/dinheiro";
 import { DOCTOR } from "@/lib/doctor.config";
@@ -8722,11 +8724,37 @@ type TimelineEvent = {
   badge?: string;
 };
 
+/**
+ * As sessões de chutes da linha do tempo.
+ *
+ * ⚠️ **DEGRAU DE RECUO, e ele não é opcional.** `strength` nasce em
+ * `APLICAR_FORCA_DO_MOVIMENTO.sql`, que o dono roda À MÃO e DEPOIS do deploy.
+ * Num banco sem a coluna o PostgREST devolve `42703` para o select INTEIRO —
+ * e como o chamador faz `data ?? []`, a seção de chutes sumiria da linha do
+ * tempo em silêncio. É a forma mais cara de defeito deste repositório: a
+ * coluna nova apagando o recurso antigo, sem erro nenhum.
+ */
+async function lerChutesDaLinha(userId: string) {
+  const consulta = (cols: string) =>
+    (supabase as any)
+      .from("kick_sessions")
+      .select(cols)
+      .eq("user_id", userId)
+      .not("ended_at", "is", null)
+      .order("started_at", { ascending: false });
+  const cheia = await consulta("id, started_at, ended_at, kick_count, strength");
+  if (!colunaAusente(cheia.error)) return cheia;
+  return await consulta("id, started_at, ended_at, kick_count");
+}
+
 const EV_STYLE: Record<TimelineEvent["type"], { dot: string; badge: string }> = {
   saude: { dot: "bg-primary/50", badge: "bg-primary/10 text-primary" },
   diario: { dot: "bg-primary/60", badge: "bg-primary/10 text-primary" },
   consulta: { dot: "bg-emerald-400", badge: "bg-emerald-100 text-emerald-700" },
-  chutes: { dot: "bg-primary", badge: "bg-primary/10 text-primary" },
+  /* ⚠️ AZUL, e não o rosa do resto: os Chutes têm identidade própria na aba
+     (`glass-sky`, `bg-sky-700`), e aqui a linha saía com o MESMO ponto rosa do
+     marco gestacional — dois assuntos diferentes com o mesmo desenho. */
+  chutes: { dot: "bg-sky-600", badge: "bg-sky-100 text-sky-800" },
   preconsulta: { dot: "bg-rose-400", badge: "bg-rose-100 text-rose-700" },
   marco: { dot: "bg-primary", badge: "bg-primary/10 text-primary" },
 };
@@ -8780,12 +8808,7 @@ function TimelineTab({ profile, gest }: { profile: Profile | null; gest: Gest })
         .select("id, recorded_at, title, orientacoes")
         .eq("user_id", userId)
         .order("recorded_at", { ascending: false }),
-      (supabase as any)
-        .from("kick_sessions")
-        .select("id, started_at, kick_count")
-        .eq("user_id", userId)
-        .not("ended_at", "is", null)
-        .order("started_at", { ascending: false }),
+      lerChutesDaLinha(userId),
       (supabase as any)
         .from("preconsulta_forms")
         .select("id, submitted_at, weeks_at_submission, emotional_state")
@@ -8826,11 +8849,25 @@ function TimelineTab({ profile, gest }: { profile: Profile | null; gest: Gest })
       });
     }
     for (const r of kicksRes.data ?? []) {
+      /* ⚠️ **A DURAÇÃO É O DADO CLÍNICO, e a linha não a trazia.** O que se
+         acompanha aqui é o TEMPO ATÉ 10 MOVIMENTOS (Moore & Piacquadio), não
+         quantos chutes houve no dia: "10 chutes" em doze minutos e "10 chutes"
+         em duas horas são notícias opostas, e a linha do tempo dizia
+         exatamente a mesma coisa das duas. */
+      const min =
+        r.ended_at && r.started_at
+          ? Math.round((new Date(r.ended_at).getTime() - new Date(r.started_at).getTime()) / 60000)
+          : null;
+      const chutes = r.kick_count ?? 0;
+      const forcaDaNoite = nivelDeForca(r.strength)?.frase;
       all.push({
         id: r.id,
         date: r.started_at?.slice(0, 10),
         type: "chutes",
-        title: `${r.kick_count ?? 0} chutes registrados`,
+        title: min != null ? `${chutes} chutes em ${min} min` : `${chutes} chutes`,
+        /* A força só fala nos dois extremos — o nível do meio é o padrão, e
+           anunciá-lo em toda linha afogaria as que carregam notícia. */
+        detail: forcaDaNoite ? `Movimentos ${forcaDaNoite}` : undefined,
       });
     }
     for (const r of preRes.data ?? []) {
