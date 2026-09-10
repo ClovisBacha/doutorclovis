@@ -15517,3 +15517,149 @@ do que ficou de fora) · `?estado=vazio&w=12` (o convite antes da 26ª). E o
 helper da bancada passou a gravar `strength` — **os chips de força nunca tinham
 sido fotografados**, porque ela desenhava só o estado de um banco anterior a
 set/2026.
+
+## O contador de movimentos escrevia e ninguém lia: a força e a duração (set/2026)
+
+Pedido do dono: _"faça ainda mais coisas que você acredita que precisamos nessa
+questão dos chutes, veja se o fluxo e armazenamento desses dados está
+funcionando, além do que melhorar na questão estética — lembre-se das cores"_.
+A auditoria de FLUXO achou a mesma classe três vezes, e ela é a mais cara deste
+repositório: **o dado é gravado, projetado, e DESCARTADO no caminho.**
+
+### ⚠️ A FORÇA CHEGAVA AO BANCO E NÃO CHEGAVA AO MÉDICO
+
+Ela é escolhida pela paciente durante a sessão, gravada em
+`kick_sessions.strength`, projetada em `clinical_events` por
+`APLICAR_EVENTOS_CLINICOS.sql` — e ali a corrente quebrava: `DadosEvento` não
+tinha o campo, e `resumo()` no prontuário imprimia só `${d.chutes} movimentos`.
+**Ela via o chip; ele via um número.** Heazell 2017 dá aOR 2,53 para redução de
+FORÇA contra 2,97 da frequência: quase o mesmo peso, e o eixo mais novo era o
+invisível.
+
+⚠️ **E A MIGRATION TINHA DIVERGIDO DO `APLICAR_`.** Os dois montam a MESMA
+view, e `migrations/20260731000000_eventos_clinicos.sql` a montava **sem
+`forca`**. Num banco erguido só por migrations a coluna era gravada, o chip
+aparecia na tela dela, e o painel não recebia nada — **sem erro nenhum, porque a
+view continua válida**. A regra que fica: **arquivo que monta a mesma view diz a
+mesma coisa, e existe catraca comparando os dois blocos.**
+
+### ⚠️ A DURAÇÃO — o alarme vermelho dela não chegava a lugar nenhum
+
+Pior que a força, e é o mesmo defeito um degrau acima. O que esta tela mede é o
+**TEMPO ATÉ 10 MOVIMENTOS**; a view projetava só a contagem. Então
+**"4 movimentos" no prontuário era indistinguível de uma sessão que ela encerrou
+em cinco minutos E do cartão vermelho com o 192 que a tela dela mostra a partir
+de duas horas.** Redução de movimentos fetais é um dos NOVE SINTOMAS VERMELHOS
+de `triage.ts`; chegando por esta porta, ela chegava sem cor e sem número.
+
+- **`duracao_min` entra pelas DUAS montagens da view**, calculada de
+  `ended_at - started_at`. ⚠️ Sessão aberta ou instante invertido por relógio
+  torto viram NULL e o `strip_nulls` os descarta: **um "-3 min" no prontuário é
+  pior que campo ausente.**
+- **A gravidade passa a sair da régua ÚNICA** (`sinalMovimentosReduzidos`), e
+  ⚠️ **o que muda é a VOZ**: a nota daquela função é escrita PARA A PACIENTE
+  ("Ligue para o seu médico agora"), e repeti-la no prontuário seria o app
+  mandando o médico ligar para o médico dele. `avaliar()` já fazia exatamente
+  isso com a triagem e o EPDS — a classificação vem de lá, a frase é da tela.
+- ⚠️ **`semanas: null` de propósito**: a semana que se tem ali é a de HOJE, e
+  uma sessão de dois meses atrás aconteceu noutra. A própria régua declara que
+  os dois limites (dez movimentos, duas horas) não dependem da semana.
+- ⚠️ **Sem `duracao_min` NÃO alarma**, e este é o estado de todo banco antes de
+  o dono rodar o SQL: a ausência tem de significar silêncio, nunca alarme.
+
+### ⚠️ E A FILA DE TRABALHO CONTINUA SEM `movimento` — decisão registrada
+
+`eventosQuePedemOlhar` filtra `.in("especie", ["medida","sintoma","humor"])`,
+com a razão escrita: _"são sinais de engajamento, não de deterioração"_. Essa
+razão foi escrita quando o evento carregava só a CONTAGEM — sem duração não há
+régua, e toda linha saía normal. **Com a duração ela deixou de ser inteiramente
+verdadeira**: uma sessão `grave` é deterioração, e é a mesma coisa que a
+triagem vermelha já leva à fila por outra porta.
+
+**Não mudei o roteamento**, e isto é decisão e não esquecimento: mexer em qual
+evento clínico entra na fila do consultório é escolha do dono. O que a leva de
+set/2026 entrega é a COR e o NÚMERO na linha do tempo e no bloco de pendentes
+da ficha dela — que é a entrega de menor risco do mesmo fato. Para reverter,
+é uma linha (`"movimento"` no `.in()`), e o argumento dos dois lados está aqui.
+
+### `forca-do-movimento.ts` — o catálogo, e por que ele existe
+
+⚠️ **São DOIS leitores que precisam concordar**: ela, no histórico, e o médico,
+no prontuário. Duas tabelas de rótulo divergiriam no primeiro ajuste, e a
+divergência apareceria como **o painel chamando de outra coisa o que ela
+marcou**.
+
+- ⚠️ **O nível do MEIO não se anuncia** (`chip` e `frase` nulos). "Como sempre"
+  é o padrão; escrevê-lo em toda linha do histórico e em toda linha do
+  prontuário afogaria as duas únicas que carregam notícia.
+- ⚠️ **Fora do catálogo devolve `null`, nunca o padrão.** Quem escolhe o que
+  exibir na ausência de escolha é a TELA, num lugar só — cravar "como sempre"
+  na leitura faria o leitor AFIRMAR uma escolha que ela não fez.
+
+### ⚠️ A linha do tempo da conta perdia a duração, e usava o rosa do marco
+
+`minha-conta.tsx` escrevia `"N chutes registrados"` — sem a duração — e pintava
+o ponto com `bg-primary`, **o mesmo desenho do marco gestacional**: dois
+assuntos diferentes com a mesma cara. Hoje diz `"N chutes em M min"` mais a
+força, em azul.
+
+⚠️ **E o select de `strength` ganhou DEGRAU.** A coluna nasce num `APLICAR_` que
+o dono roda à mão e DEPOIS do deploy; como o chamador faz `data ?? []`, um
+`42703` faria a seção de chutes **sumir da linha do tempo em silêncio**. É a
+forma mais cara de defeito deste repositório: a coluna nova apagando o recurso
+antigo.
+
+### A estética, com a régua do dono: "lembre-se das cores"
+
+- ⚠️ **CARTÃO DENTRO DE CARTÃO.** `GraficoClinico` nasceu no painel do médico,
+  onde a figura É o cartão (`rounded-2xl border border-border bg-background`); a
+  aba de chutes embrulhava isso num `card-material` e saíam **duas bordas
+  concêntricas — com a de dentro sendo justamente o cartão de contorno que o app
+  da paciente já tinha tirado de todas as outras telas.** É a mesma lição do
+  ponto do gráfico que se anunciava como botão: **trazer um componente do painel
+  para o app da paciente é trazer as propriedades dele junto.** `moldura="nenhuma"`
+  para quem já desenhou o cartão, e o estado VAZIO usa a mesma caixa — senão ele
+  volta a aninhar sozinho.
+- ⚠️ **A LINHA ERA ÍNDIGO NUMA TELA AZUL-CÉU.** "Cor de linha é identidade"
+  continua valendo; o que estava errado é que a identidade desenhada não era a
+  da tela. `paleta="chutes"` põe `sky-700` — **o MESMO tom do botão de iniciar
+  sessão logo acima**, não um azul parecido.
+- ⚠️ **CATÁLOGO FECHADO, e nunca um hex por prop.** Prop de cor livre convida o
+  próximo a escolher um tom bonito e não medido. Cada par passou nas seis
+  checagens do validador (`scripts/validate_palette.js` da skill `dataviz`) nos
+  DOIS modos, contra a superfície de cada um (claro `#fffdfc`, escuro
+  `#0f172b`): chutes claro ΔE 12,5 protan · 28,1 normal; escuro 12,4 · 25,8.
+- ⚠️ **`--serie-b` existe porque o CONTRATO é de até duas séries**, não porque
+  haja uma segunda hoje. Deixá-la herdando o ciano da paleta clínica embarcaria
+  um par sky↔ciano que REPROVA na separação para daltonismo — o dia em que
+  alguém acrescentasse a segunda série, ela nasceria indistinguível da primeira.
+
+Medido depois: figura sem borda, sem fundo e sem padding dentro do cartão;
+`stroke` `#0369a1` no claro e `#0d9bd8` no escuro, iguais ao `--serie-a`.
+
+### ⚠️ As armadilhas desta leva
+
+- ⚠️ **"Outra ocorrência do mesmo nome", de novo.** `nivelDeForca(r.strength)`
+  aparecia DUAS vezes na mesma linha da linha do tempo (uma no teste do ternário,
+  outra no valor), e a mutação que apagava a leitura passou VERDE porque a
+  segunda sobrevivia. O conserto foi no CÓDIGO (um `const`, que também evita
+  chamar a função duas vezes) e na âncora do teste.
+- ⚠️ **A bancada do prontuário não trazia evento `movimento` NENHUM** — foi por
+  isso que a corrente quebrada sobreviveu tanto tempo. Agora traz os três casos
+  (a noite do alarme, o nível 1 e o nível do meio, que tem de sair **sem
+  adjetivo**), e `ev()` ganhou o parâmetro `fonte`: carimbar tudo como
+  `health_logs` desenharia um estado que o servidor não produz.
+- ⚠️ **Medir cor com um canvas reaproveitado MENTE.** `fillStyle` com alfa
+  compõe sobre o pixel ANTERIOR: os pontos translúcidos da linha do tempo saíram
+  com cinco cores diferentes, todas falsas. Limpe o pixel entre leituras — ou
+  meça só o que é opaco.
+- ⚠️ **`playwright` não resolve a partir de `/tmp`**: o script de medição tem de
+  rodar de dentro do repositório (e com
+  `executablePath: "/opt/pw-browsers/chromium"`).
+
+**Aplicar no Supabase:** `supabase/APLICAR_EVENTOS_CLINICOS.sql` (idempotente) —
+é ele que faz a view enxergar a força e a duração. Sem rodar, nada quebra: os
+dois campos simplesmente não existem no `dados`, `sinalMovimentosReduzidos` não
+alarma, e o prontuário continua imprimindo só a contagem, como hoje.
+
+**Bancadas:** `/preview-prontuario?secao=linha` (as três sessões de movimento).

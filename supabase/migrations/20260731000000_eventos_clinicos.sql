@@ -455,7 +455,24 @@ BEGIN
     partes := array_append(partes, replace($sql$
       SELECT 'kick_sessions'::text, k.id, k.user_id, k.started_at,
              'movimento'::text,
-             jsonb_strip_nulls(jsonb_build_object('chutes', k.kick_count, 'forca', $FORCA$)),
+             jsonb_strip_nulls(jsonb_build_object(
+               'chutes', k.kick_count,
+               'forca', $FORCA$,
+               -- ⚠️ A DURAÇÃO É O DADO CLÍNICO, e ela não vinha. O que se mede
+               -- aqui é o TEMPO ATÉ 10 MOVIMENTOS: "4 movimentos" no prontuário
+               -- era indistinguível de uma sessão que ela encerrou em cinco
+               -- minutos E do alarme vermelho que a tela dela mostra a partir
+               -- de duas horas. Sem esta linha o painel não tinha como saber a
+               -- diferença — e a régua de movimentos reduzidos, que é um dos
+               -- nove sintomas VERMELHOS, não tinha em que se apoiar.
+               --
+               -- Sessão aberta (`ended_at` nulo) ou instante invertido por
+               -- relógio torto viram NULL e o `strip_nulls` os descarta: um
+               -- "-3 min" no prontuário é pior que campo ausente.
+               'duracao_min', CASE WHEN k.ended_at > k.started_at
+                 THEN ROUND(EXTRACT(EPOCH FROM (k.ended_at - k.started_at)) / 60)::int
+               END
+             )),
              k.notes
         FROM public.kick_sessions k
     $sql$, '$FORCA$', forca_col));

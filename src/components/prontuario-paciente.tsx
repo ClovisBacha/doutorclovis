@@ -586,9 +586,13 @@ function resumo(e: EventoClinico): string {
      ⚠️ E ela NÃO mexe na gravidade. O limite clínico mora em
      `sinais-clinicos.ts` e não se reescreve aqui; o que este eixo faz é
      APARECER na linha do tempo, que é o que faltava. */
-  if (d.chutes != null || d.forca != null) {
+  if (d.chutes != null || d.forca != null || d.duracao_min != null) {
     const forca = nivelDeForca(d.forca)?.frase;
-    const base = d.chutes != null ? `${d.chutes} movimentos` : "movimentos";
+    /* ⚠️ A DURAÇÃO ENTRA NA MESMA FRASE, e ela é o que separa duas notícias
+       opostas: "4 movimentos" pode ser uma sessão de cinco minutos ou o alarme
+       vermelho de duas horas que a paciente acabou de ler na tela dela. */
+    const tempo = d.duracao_min != null ? ` em ${d.duracao_min} min` : "";
+    const base = (d.chutes != null ? `${d.chutes} movimentos` : "movimentos") + tempo;
     partes.push(forca ? `${base} (${forca})` : base);
   }
   if (d.intensidade != null) {

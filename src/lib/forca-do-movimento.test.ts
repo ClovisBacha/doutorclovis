@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
+import { avaliar } from "./clinical.functions";
 import { FORCA_PADRAO, NIVEIS_DE_FORCA, nivelDeForca } from "./forca-do-movimento";
 import { semComentarios } from "./sem-comentarios";
 
@@ -155,5 +156,67 @@ describe("⚠️ a linha do tempo da conta", () => {
 
   test("o ponto da linha segue a identidade azul da aba, e não o rosa do marco", () => {
     expect(conta).toMatch(/chutes: \{ dot: "bg-sky-\d+"/);
+  });
+});
+
+describe("⚠️ a DURAÇÃO chega ao médico, e com ela a noite do alarme", () => {
+  /* O que se mede aqui é o TEMPO ATÉ 10 MOVIMENTOS. Sem a duração, "4
+     movimentos" no prontuário é indistinguível de uma sessão de cinco minutos
+     E do cartão vermelho que a tela dela mostra a partir de duas horas. */
+
+  test("duas horas sem chegar a dez fica GRAVE", () => {
+    const { g, notas } = avaliar("movimento", { chutes: 4, duracao_min: 130 });
+    expect(g).toBe("grave");
+    expect(notas.join(" ")).toContain("4 movimentos em 130 min");
+  });
+
+  test("⚠️ a nota é a do MÉDICO, nunca a frase escrita para a paciente", () => {
+    /* Repeti-la aqui seria o app mandando o médico ligar para o médico dele. */
+    const { notas } = avaliar("movimento", { chutes: 4, duracao_min: 130 });
+    expect(notas.join(" ").toLowerCase()).not.toContain("ligue para o seu médico");
+    expect(notas.join(" ").toLowerCase()).not.toContain("você sentiu");
+  });
+
+  test("a sessão curta e a que chegou a dez continuam normais", () => {
+    expect(avaliar("movimento", { chutes: 4, duracao_min: 8 }).g).toBe("normal");
+    expect(avaliar("movimento", { chutes: 10, duracao_min: 130 }).g).toBe("normal");
+  });
+
+  test("⚠️ sem duração NÃO alarma — é o estado de todo banco antes do SQL novo", () => {
+    expect(avaliar("movimento", { chutes: 4 }).g).toBe("normal");
+  });
+
+  test("⚠️ a régua é a de `sinais-clinicos`, e nunca um limite escrito aqui", () => {
+    const t = semComentarios(fonte("src/lib/clinical.functions.ts"));
+    const i = t.indexOf('if (especie === "movimento")');
+    expect(i).toBeGreaterThan(-1);
+    const bloco = t.slice(i, t.indexOf("\n  }", i));
+    expect(bloco).toContain("sinalMovimentosReduzidos");
+    /* Nenhum número clínico solto: os dois limites moram na régua. */
+    expect(bloco).not.toMatch(/\b(120|10)\b/);
+    /* ⚠️ A semana é NULA de propósito: a que se tem aqui é a de HOJE, e uma
+       sessão de dois meses atrás aconteceu noutra. */
+    expect(bloco).toContain("semanas: null");
+  });
+
+  test("as DUAS montagens da view projetam a duração", () => {
+    for (const caminho of [
+      "supabase/APLICAR_EVENTOS_CLINICOS.sql",
+      "supabase/migrations/20260731000000_eventos_clinicos.sql",
+    ]) {
+      const sql = fonte(caminho);
+      const i = sql.indexOf("IF to_regclass('public.kick_sessions')");
+      const bloco = sql.slice(i, sql.indexOf("END IF;", i));
+      expect(caminho).toBeTruthy();
+      expect(bloco).toContain("'duracao_min'");
+      /* Sessão aberta ou instante invertido viram NULL — "-3 min" no
+         prontuário é pior que campo ausente. */
+      expect(bloco).toContain("k.ended_at > k.started_at");
+    }
+  });
+
+  test("o prontuário mostra a duração na mesma frase da contagem", () => {
+    const medico = semComentarios(fonte("src/components/prontuario-paciente.tsx"));
+    expect(medico).toMatch(/em \$\{d\.duracao_min\} min/);
   });
 });

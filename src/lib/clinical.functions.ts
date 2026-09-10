@@ -26,6 +26,7 @@ import { computeGestation } from "./gestacao";
 import {
   piorSinal,
   sinalGlicemia,
+  sinalMovimentosReduzidos,
   sinalPressao,
   sinalSaturacao,
   type Gravidade,
@@ -77,6 +78,12 @@ export type DadosEvento = {
      Heazell 2017: redução de FORÇA tem aOR 2,53 para natimortalidade, contra
      2,97 da frequência. É quase o mesmo peso, e o médico só via a frequência. */
   forca?: number | null;
+  /* ⚠️ A DURAÇÃO DA SESSÃO DE MOVIMENTOS, em minutos. Ela é o dado clínico —
+     o que se mede é o TEMPO ATÉ 10 MOVIMENTOS —, e sem ela "4 movimentos" no
+     prontuário é indistinguível de uma sessão de cinco minutos E do alarme
+     vermelho que a tela dela mostra a partir de duas horas. É por ela que a
+     régua de movimentos reduzidos passa a valer também do lado do médico. */
+  duracao_min?: number | null;
   humor?: string | null;
   epds?: number | null;
   epds_q10?: number | null;
@@ -111,7 +118,10 @@ const COLS = "fonte,fonte_id,user_id,ocorrido_em,especie,dados,texto";
    é ela que ordena a fila do médico, e ordenar por média esconderia justamente
    o caso que não pode esperar.
    ──────────────────────────────────────────────────────────────────────────── */
-function avaliar(especie: EspecieEvento, d: DadosEvento): { g: Gravidade; notas: string[] } {
+/* Exportada para o teste alcançá-la — a régua da gravidade é o que decide a
+   cor da linha no prontuário, e ela precisa ser exercitada com dado, não lida
+   como texto. */
+export function avaliar(especie: EspecieEvento, d: DadosEvento): { g: Gravidade; notas: string[] } {
   const sinais: (Sinal | null)[] = [
     sinalPressao(d.systolic, d.diastolic),
     sinalGlicemia(d.glucose_mg_dl),
@@ -133,6 +143,36 @@ function avaliar(especie: EspecieEvento, d: DadosEvento): { g: Gravidade; notas:
     sinais.push({ gravidade: "grave", nota: `EPDS ${d.epds} — rastreio positivo` });
   } else if (d.epds != null && d.epds >= 10) {
     sinais.push({ gravidade: "atencao", nota: `EPDS ${d.epds}` });
+  }
+
+  /* ⚠️ **A NOITE DO ALARME CHEGA AO MÉDICO.** A paciente que conta duas horas
+     e não chega a dez lê, na tela dela, um cartão vermelho com o 192 — e o
+     prontuário mostrava a mesma linha cinzenta de qualquer outra noite.
+     Redução de movimentos fetais é um dos NOVE SINTOMAS VERMELHOS de
+     `triage.ts`; chegando por esta porta, ela ficava sem cor.
+
+     ⚠️ A RÉGUA É A ÚNICA (`sinais-clinicos.ts`), e o que muda é a VOZ: a nota
+     dela é escrita PARA A PACIENTE ("Ligue para o seu médico agora"), e
+     repeti-la aqui seria o app mandando o médico ligar para o médico dele. É o
+     mesmo que este bloco já faz com a triagem e o EPDS — a classificação vem
+     de lá, a frase é a desta tela.
+
+     ⚠️ E `semanas: null` de propósito: a semana que se tem aqui é a de HOJE, e
+     uma sessão de dois meses atrás aconteceu noutra. A própria régua declara
+     que os dois limites (dez movimentos, duas horas) não dependem da semana —
+     ela só decide quando a contagem COMEÇA. */
+  if (especie === "movimento") {
+    const reduzido = sinalMovimentosReduzidos({
+      semanas: null,
+      movimentos: d.chutes,
+      minutos: d.duracao_min,
+    });
+    if (reduzido) {
+      sinais.push({
+        gravidade: reduzido.gravidade,
+        nota: `${d.chutes} movimentos em ${d.duracao_min} min de contagem`,
+      });
+    }
   }
 
   // SOS é emergência por definição: ela apertou o botão.
