@@ -15662,4 +15662,23 @@ Medido depois: figura sem borda, sem fundo e sem padding dentro do cartão;
 dois campos simplesmente não existem no `dados`, `sinalMovimentosReduzidos` não
 alarma, e o prontuário continua imprimindo só a contagem, como hoje.
 
+### ⚠️ E O TEXTO QUE O MÉDICO ASSINA NÃO FALAVA DOS MOVIMENTOS
+
+`resumoParaAchados` — o pré-preenchimento do campo de ACHADOS da consulta —
+cobria pressão, peso, glicemia, sintomas e SOS. **Nenhuma palavra sobre as
+contagens.** Ele lia "PA em casa: 4 registros" e nada sobre a noite em que ela
+contou duas horas sem chegar a dez, desde a última consulta.
+
+- ⚠️ **SÓ AS NOITES QUE A RÉGUA MARCOU**, e nunca todas: uma paciente que conta
+  todo dia geraria trinta linhas num campo que o médico lê em pé, afogando
+  justamente a que importa. Quem separa é `gravidade`, que sai da régua única —
+  **não há limite escrito ali**, e há teste varrendo o bloco atrás de número
+  clínico solto.
+- ⚠️ **A FORÇA VAI COMO CONTAGEM, nunca como veredito**, e com o DENOMINADOR
+  junto: "2 de 9" é outra conversa que "2 de 2". Não existe corte de "quantas
+  noites mais fracas importam" em `sinais-clinicos.ts`, e inventá-lo aqui seria
+  escrever limite clínico fora do único lugar onde eles moram.
+- **A emergência continua sendo a ÚLTIMA linha**, pela decisão que já estava
+  escrita: é a que não pode ser cortada por rolagem do campo.
+
 **Bancadas:** `/preview-prontuario?secao=linha` (as três sessões de movimento).

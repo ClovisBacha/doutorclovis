@@ -105,6 +105,41 @@ export function resumoParaAchados(
     );
   }
 
+  /* ─── MOVIMENTOS: A NOITE DO ALARME, E A MUDANÇA DE FORÇA ────────────────
+     ⚠️ Este bloco faltava, e ele é o que a consulta mais precisa ouvir sobre o
+     contador: redução de movimentos fetais é um dos NOVE SINTOMAS VERMELHOS de
+     `triage.ts`, e o texto que o médico assina não trazia uma palavra sobre
+     ela. Ele lia "PA em casa: 4 registros" e nada sobre a noite em que ela
+     contou duas horas sem chegar a dez.
+
+     ⚠️ SÓ AS NOITES QUE A RÉGUA MARCOU, e nunca todas: uma paciente que conta
+     todo dia geraria trinta linhas num campo que o médico lê em pé, e afogaria
+     justamente a que importa. Quem separa é `gravidade`, que sai da régua única
+     de `sinais-clinicos.ts` — não há limite escrito aqui. */
+  const movimentos = noPeriodo.filter((e) => e.especie === "movimento");
+  const semChegarADez = movimentos.filter((e) => e.gravidade !== "normal");
+  if (semChegarADez.length > 0) {
+    linhas.push(
+      `⚠️ Movimentos: ${semChegarADez.length} ${
+        semChegarADez.length === 1 ? "contagem" : "contagens"
+      } sem chegar a 10 em 2h (${semChegarADez.map((e) => dia(e.ocorrido_em)).join(", ")})`,
+    );
+  }
+  /* ⚠️ A FORÇA VAI COMO CONTAGEM, e nunca como veredito. Heazell 2017 dá aOR
+     2,53 para redução de força — perto dos 2,97 da frequência —, mas nenhum
+     corte de "quantas noites mais fracas importam" existe em `sinais-clinicos`,
+     e inventá-lo aqui seria escrever limite clínico fora do único lugar onde
+     eles moram. O que o médico recebe é o FATO com o denominador junto: 2 de 9
+     é outra conversa que 2 de 2. */
+  const maisFracos = movimentos.filter((e) => e.dados.forca === 1);
+  if (maisFracos.length > 0) {
+    linhas.push(
+      `Movimentos mais fracos que o normal em ${maisFracos.length} de ${movimentos.length} ${
+        movimentos.length === 1 ? "contagem" : "contagens"
+      }`,
+    );
+  }
+
   const emergencias = noPeriodo.filter((e) => e.especie === "emergencia");
   if (emergencias.length > 0) {
     /* Emergência entra SEMPRE e por último, para ficar visível no fim do bloco:
