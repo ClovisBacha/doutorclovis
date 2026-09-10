@@ -71,6 +71,14 @@ const EXTRAS = [
   "/preview-chutes?estado=alerta&semdum=1",
   /* ⚠️ Peso, pressão e glicemia: `parcial` é o estado que mais engana — a
      leitura falhou COM dados à mostra, que é o caso de depois de salvar. */
+  /* ⚠️ A saúde da fila clínica: os dois alarmes só nascem de um banco em que o
+     SQL foi rodado fora de ordem, e `campovelho` é o CASO REAL de hoje — as
+     doze fontes verdes com a view anterior aos campos do movimento. */
+  "/preview-saude-clinica?estado=fora",
+  "/preview-saude-clinica?estado=campovelho",
+  "/preview-saude-clinica?estado=semcoluna",
+  "/preview-saude-clinica?estado=vazio",
+  "/preview-saude-clinica?estado=semview",
   "/preview-saude-registros?estado=parcial",
   "/preview-saude-registros?estado=instavel",
   "/preview-saude-registros?estado=grave",

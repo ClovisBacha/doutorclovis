@@ -1,5 +1,6 @@
 /**
- * A FILA CLÍNICA ESTÁ COMPLETA? — o controle que faltava, e o risco que ele cobre.
+ * A FILA CLÍNICA ESTÁ COMPLETA? — o controle que faltava, e os dois riscos que
+ * ele cobre.
  *
  * ⚠️ **A VIEW `clinical_events` PODE ESTAR INCOMPLETA SEM NINGUÉM SABER.**
  *
@@ -26,74 +27,67 @@
  * ⚠️ **"Sem dados" NUNCA vira "ok".** Uma tabela vazia não prova nada sobre a
  * view, e responder verde ali seria a mesma mentira que este arquivo existe
  * para pegar. O estado é `indeterminado`, e a tela diz isso.
+ *
+ * ⚠️ **E CONFERIR A FONTE NÃO CONFERE O CAMPO — é o segundo risco, e ele
+ * acontece com mais frequência.** A view não só GANHA fontes: ela ganha
+ * CAMPOS. Quando `kick_sessions` passou a projetar `forca` e `duracao_min`, a
+ * fonte já estava lá — a comparação fonte-a-fonte responde `ok` do mesmo jeito,
+ * com a view antiga, e nada nesta tela mudaria de cor. O dado é gravado, a
+ * fonte aparece verde, e o campo simplesmente não existe no `dados`.
+ *
+ * O preço é conhecido: sem `duracao_min`, `sinalMovimentosReduzidos` recebe
+ * `undefined` e **cala** (degradação segura, por construção) — então uma noite
+ * de duas horas com quatro movimentos chega ao prontuário como "4 movimentos",
+ * sem cor e sem número. Nada quebra; o alarme deixa de existir.
+ *
+ * Por isso a segunda comparação, campo a campo: **a tabela tem linha que PODE
+ * produzir aquele campo** e **a view devolve alguma linha com ele preenchido**?
+ * Tem e não devolve = a view está velha, e o conserto é rodar de novo o mesmo
+ * `APLICAR_EVENTOS_CLINICOS.sql` (idempotente — ela se amplia sozinha).
+ *
+ * ⚠️ **As duas RÉGUAS moram em `saude-clinica.ts`, puras.** Aqui ficam só as
+ * sondas: enterradas no handler, as decisões só poderiam ser testadas por
+ * TEXTO — e teste de texto fica verde exatamente sobre o defeito que ele
+ * existe para pegar.
  */
 import { createServerFn } from "@tanstack/react-start";
 
 import { requireSuperAdmin, TokenSchema } from "@/lib/platform-admin.server";
+import {
+  CAMPOS_CLINICOS,
+  estadoDaFonte,
+  estadoDoCampo,
+  FONTES_CLINICAS,
+  type EstadoDaFonte,
+  type EstadoDoCampo,
+  type SaudeClinica,
+  type Sonda,
+} from "@/lib/saude-clinica";
 
-/**
- * As doze fontes que a view deve unir, com o que cada uma carrega.
- *
- * ⚠️ **A ordem é de GRAVIDADE, e não alfabética.** Quem abre esta tela precisa
- * ver primeiro o que dói mais se estiver faltando — e a EPDS é a primeira
- * porque é a única que pode carregar ideação de autolesão.
- */
-export const FONTES_CLINICAS = [
-  { tabela: "epds_logs", nome: "EPDS (rastreio de depressão)", peso: "ideação de autolesão" },
-  { tabela: "triage_logs", nome: "Triagem de sintomas", peso: "sintomas vermelhos" },
-  { tabela: "panic_events", nome: "SOS", peso: "emergência" },
-  { tabela: "health_logs", nome: "Pressão, glicemia, peso", peso: "pré-eclâmpsia" },
-  { tabela: "contraction_sessions", nome: "Contrações", peso: "trabalho de parto prematuro" },
-  { tabela: "kick_sessions", nome: "Movimentos do bebê", peso: "redução de movimento" },
-  { tabela: "exam_files", nome: "Exames enviados", peso: "histórico" },
-  { tabela: "journal_entries", nome: "Diário (só o rótulo de humor)", peso: "humor" },
-  { tabela: "consultations", nome: "Consultas registradas", peso: "linha do tempo" },
-  { tabela: "doctor_questions", nome: "Perguntas ao médico", peso: "dúvida clínica" },
-  { tabela: "preconsulta_forms", nome: "Pré-consulta", peso: "preparo da consulta" },
-  { tabela: "appointment_requests", nome: "Pedidos de consulta", peso: "agenda" },
-] as const;
-
-export type EstadoDaFonte = {
-  tabela: string;
-  nome: string;
-  peso: string;
-  /**
-   * `ausente`      — a tabela não existe (falta rodar o APLICAR_ dela)
-   * `fora_da_view` — a tabela TEM linhas e a view não devolve nenhuma: view velha
-   * `ok`           — a tabela tem linhas e a view as devolve
-   * `indeterminado`— a tabela existe e está vazia: não dá para concluir nada
-   * `ilegivel`     — a leitura falhou
-   */
-  estado: "ausente" | "fora_da_view" | "ok" | "indeterminado" | "ilegivel";
-  linhasNaTabela: number | null;
-  linhasNaView: number | null;
+export {
+  CAMPOS_CLINICOS,
+  FONTES_CLINICAS,
+  type EstadoDaFonte,
+  type EstadoDoCampo,
+  type SaudeClinica,
 };
 
-export type SaudeClinica = {
-  ok: true;
-  /** ⚠️ `false` quando a própria view não responde — aí nada abaixo vale. */
-  viewExiste: boolean;
-  fontes: EstadoDaFonte[];
-  foraDaView: number;
-  ausentes: number;
-};
+/** A sonda que não chegou a acontecer — a view não existe, então nada dela vale. */
+const NAO_SONDADO: Sonda = { n: null, ausente: false, semColuna: false };
 
 /** Conta linhas sem trazer nenhuma — o conteúdo clínico não precisa viajar. */
-async function contar(
-  sb: any,
-  tabela: string,
-  filtro?: (q: any) => any,
-): Promise<{ n: number | null; ausente: boolean }> {
+async function contar(sb: any, tabela: string, filtro?: (q: any) => any): Promise<Sonda> {
   let q = sb.from(tabela).select("*", { count: "exact", head: true });
   if (filtro) q = filtro(q);
   const { count, error } = await q;
   if (error) {
-    /* 42P01 = tabela não existe. Qualquer outro erro é "não consegui ler", e
-       os dois NÃO podem virar a mesma resposta: um é "falta rodar o SQL", o
-       outro é "tente de novo". */
-    return { n: null, ausente: error.code === "42P01" };
+    return {
+      n: null,
+      ausente: error.code === "42P01",
+      semColuna: error.code === "42703",
+    };
   }
-  return { n: count ?? 0, ausente: false };
+  return { n: count ?? 0, ausente: false, semColuna: false };
 }
 
 export const saudeClinica = createServerFn({ method: "POST" })
@@ -108,36 +102,63 @@ export const saudeClinica = createServerFn({ method: "POST" })
     const daView = await contar(sb, "clinical_events");
     const viewExiste = !daView.ausente && daView.n !== null;
 
-    /* ⚠️ Todas as sondas em PARALELO: são 24 contagens independentes, e em
-       série seriam 24 latências somadas numa tela que o dono abre para ter uma
+    /* ⚠️ Todas as sondas em PARALELO: são 28 contagens independentes, e em
+       série seriam 28 latências somadas numa tela que o dono abre para ter uma
        resposta rápida. */
-    const fontes = await Promise.all(
+    const fontesEmVoo = Promise.all(
       FONTES_CLINICAS.map(async (f): Promise<EstadoDaFonte> => {
         const [tabela, naView] = await Promise.all([
           contar(sb, f.tabela),
           viewExiste
             ? contar(sb, "clinical_events", (q: any) => q.eq("fonte", f.tabela))
-            : Promise.resolve({ n: null, ausente: false }),
+            : Promise.resolve(NAO_SONDADO),
         ]);
-
-        const base = {
+        return {
           tabela: f.tabela,
           nome: f.nome,
           peso: f.peso,
           linhasNaTabela: tabela.n,
           linhasNaView: naView.n,
+          estado: estadoDaFonte(tabela, naView, viewExiste),
         };
-
-        if (tabela.ausente) return { ...base, estado: "ausente" };
-        if (tabela.n === null) return { ...base, estado: "ilegivel" };
-        /* ⚠️ Tabela vazia não prova nada sobre a view — e responder "ok" aqui
-           seria exatamente a mentira que este arquivo existe para pegar. */
-        if (tabela.n === 0) return { ...base, estado: "indeterminado" };
-        if (!viewExiste || naView.n === null) return { ...base, estado: "ilegivel" };
-        if (naView.n === 0) return { ...base, estado: "fora_da_view" };
-        return { ...base, estado: "ok" };
       }),
     );
+
+    /* ⚠️ As duas comparações saem na MESMA leva, e a espera é a de UMA.
+       Encadeá-las (`await` das fontes, depois o dos campos) somaria duas
+       latências — e as duas só dependem de `viewExiste`, já resolvido acima. */
+    const camposEmVoo = Promise.all(
+      CAMPOS_CLINICOS.map(async (c): Promise<EstadoDoCampo> => {
+        const [naTabela, naView] = await Promise.all([
+          /* ⚠️ "Quantas linhas PODEM produzir este campo?" — nunca "quantas
+             linhas a tabela tem". Uma sessão de chutes ainda aberta não produz
+             duração nenhuma, e contá-la faria a tela acusar view velha sobre
+             uma paciente que só não terminou de contar. */
+          contar(sb, c.fonte, (q: any) => q.not(c.colunaDaTabela, "is", null)),
+          /* ⚠️ Chave de `jsonb` ausente devolve NULL no `->>`, então este filtro
+             conta exatamente as linhas em que a view PROJETOU o campo. Se o
+             PostgREST recusar a sintaxe, o erro cai em `ilegivel` — "não
+             consegui conferir" nunca vira "ok". */
+          viewExiste
+            ? contar(sb, "clinical_events", (q: any) =>
+                q.eq("fonte", c.fonte).not(`dados->>${c.campo}`, "is", null),
+              )
+            : Promise.resolve(NAO_SONDADO),
+        ]);
+        return {
+          fonte: c.fonte,
+          campo: c.campo,
+          nome: c.nome,
+          peso: c.peso,
+          sqlDaColuna: c.sqlDaColuna,
+          linhasQuePodem: naTabela.n,
+          linhasComOCampo: naView.n,
+          estado: estadoDoCampo(naTabela, naView, viewExiste),
+        };
+      }),
+    );
+
+    const [fontes, campos] = await Promise.all([fontesEmVoo, camposEmVoo]);
 
     return {
       ok: true as const,
@@ -145,5 +166,7 @@ export const saudeClinica = createServerFn({ method: "POST" })
       fontes,
       foraDaView: fontes.filter((f) => f.estado === "fora_da_view").length,
       ausentes: fontes.filter((f) => f.estado === "ausente").length,
+      campos,
+      camposForaDaView: campos.filter((c) => c.estado === "fora_da_view").length,
     };
   });

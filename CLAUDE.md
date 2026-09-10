@@ -15682,3 +15682,94 @@ contou duas horas sem chegar a dez, desde a última consulta.
   escrita: é a que não pode ser cortada por rolagem do campo.
 
 **Bancadas:** `/preview-prontuario?secao=linha` (as três sessões de movimento).
+
+### ⚠️ A ABA BANCO DIRIA "APLICADO" COM A VIEW VELHA (set/2026)
+
+Achado ao conferir, link por link, se a leva do movimento estava mesmo aplicada
+— e ele é meu: **a leva de hoje mudou a view e não mudou a conferência.**
+
+`clinical_events` ganhou dois campos (`forca`, `duracao_min`). A tela que
+existe para dizer o que falta rodar não tinha como ver isso, por dois caminhos
+diferentes:
+
+- **A aba Banco 🗄️** confere `APLICAR_EVENTOS_CLINICOS.sql` pela existência de
+  `clinical_acks` — uma tabela que existe desde jul/2026. ⚠️ E o mapa é
+  GERADO a partir do SQL: **um gerador não tem como saber que uma view foi
+  recriada.** Ou seja, ela responderia "aplicado" para qualquer VERSÃO da view,
+  e é justamente o arquivo que a documentação manda RE-RODAR sempre que a view
+  ganha fonte ou campo.
+- **A aba "A fila clínica está completa?"** compara fonte a fonte. Com
+  `kick_sessions` na view desde jul/2026, as doze fontes ficam VERDES e a
+  comparação não enxerga campo nenhum.
+
+⚠️ **E o preço de não ver é uma degradação SEGURA, que é o que a torna
+invisível.** Sem `duracao_min`, `sinalMovimentosReduzidos` recebe `undefined` e
+**cala** — por construção, e certo. Não há erro, não há log, não há tela vazia:
+uma noite de duas horas com quatro movimentos chega ao prontuário como "4
+movimentos", sem cor e sem número, e o alarme simplesmente deixa de existir.
+
+**A segunda comparação é campo a campo:** a tabela tem linha que PODE produzir
+aquele campo, e a view devolve alguma linha com ele preenchido?
+
+- ⚠️ **`colunaDaTabela` é a coluna de ORIGEM, nunca o nome do campo.**
+  `duracao_min` não existe em `kick_sessions` — ele nasce de
+  `ended_at - started_at` DENTRO da view. Sondar pelo nome do campo seria
+  sondar uma coluna que nunca existiu, e a tela responderia `coluna_ausente`
+  para sempre, mandando o dono rodar um SQL que não conserta nada. Há teste
+  cobrando que os dois nomes nunca coincidam.
+- ⚠️ **"Quantas linhas PODEM produzir" e não "quantas a tabela tem".** Uma
+  sessão de chutes ainda ABERTA não produz duração nenhuma; contá-la faria a
+  tela acusar view velha sobre uma paciente que só não terminou de contar.
+- ⚠️ **`42703` é uma pendência PRÓPRIA, e não "view velha".** `strength` nasce
+  em `APLICAR_FORCA_DO_MOVIMENTO.sql`; a projeção dela nasce no da view. São
+  dois consertos diferentes, e juntá-los numa mensagem só mandaria o dono rodar
+  o arquivo errado — e concluir que a tela mente. `contar()` passou a ter três
+  desfechos (`42P01` · `42703` · qualquer outro), porque juntar o terceiro faria
+  uma oscilação de rede virar uma pendência inventada.
+- ⚠️ **A ordem dos estados é a do CONSERTO, e não a da gravidade:** sem a
+  tabela não adianta falar da coluna, e sem a coluna não adianta falar da view.
+- ⚠️ **O filtro do lado da view é a CHAVE do `jsonb`** (`dados->>campo`), e não
+  só a fonte: contando só `fonte`, a conferência do campo vira a conferência da
+  fonte e a view velha passa verde para sempre. Se o PostgREST recusar a
+  sintaxe, o erro cai em `ilegivel` — **"não consegui conferir" nunca vira
+  "ok"**, que é a lei deste arquivo desde que ele nasceu.
+
+⚠️ **E VERMELHO E VERDE NÃO APARECEM JUNTOS.** A caixa verde falava só das
+fontes; com um campo fora da view ela ficaria a um centímetro de um alarme
+dizendo o contrário — a contradição na mesma tela que este repositório já pagou
+uma vez ("TEM ACESSO" ≠ "ESTÁ PAGANDO"). Ela espera as DUAS comparações, e
+passou a mostrar as DUAS contagens: com um número só, ela é lida como veredito
+sobre a view inteira, e ela é justamente a que fica verde com a view velha.
+
+⚠️ **AS RÉGUAS SAÍRAM DO HANDLER PARA `src/lib/saude-clinica.ts`, e a razão é a
+de sempre.** `saude-clinica.functions.ts` abre com `createServerFn`, pede
+`supabaseAdmin` e exige token de super-admin: um teste dele só poderia afirmar
+coisas sobre o TEXTO do arquivo — e este repositório já registrou doze vezes que
+teste de texto fica verde exatamente sobre o defeito que ele existe para pegar.
+Puras, as duas réguas são EXECUTADAS em cada desfecho. Sete mutantes em
+vermelho, inclusive o que faz a sonda do campo virar a sonda da fonte.
+
+⚠️ **E a bancada nunca tinha desenhado o caso real.** `?estado=campovelho` é o
+estado de hoje — as doze fontes verdes com a view anterior aos campos —, e
+`?estado=semcoluna` é a outra pendência. Fotografado: um alarme vermelho e
+**zero** caixa verde no primeiro; a caixa verde com "1 de 2 campos conferidos" e
+o conserto do SQL da coluna no segundo; zero erros de console nos seis estados.
+
+⚠️ **O que NÃO foi feito, e é decisão do dono:** `movimento` continua fora de
+`eventosQuePedemOlhar`. Uma sessão `grave` É deterioração — a razão escrita lá
+("são sinais de engajamento, não de deterioração") nasceu quando o evento só
+carregava a contagem, e com a duração ela deixou de ser inteiramente verdadeira.
+Mexer em qual evento clínico entra na fila do consultório é escolha dele; o
+argumento dos dois lados está aqui, e reverter é uma linha (`"movimento"` no
+`.in()`). O contra: a fila tem `TETO_FILA = 1200` aplicado DEPOIS do filtro da
+consulta, e o precedente de `contracao` mostra que encher o teto empurra para
+fora a pressão alterada de outra paciente — o risco é muito menor aqui (uma
+linha por sessão, contra centenas por noite), e é real.
+
+⚠️ **E uma armadilha de JSX pela segunda vez:** um comentário `{/* */}` não pode
+ser o primeiro filho do ramo de um ternário — custou nove erros de sintaxe
+apontando para linhas que não eram a do comentário. Ele vai ANTES do bloco.
+
+**Bancada:** `/preview-saude-clinica?estado=campovelho` · `?estado=semcoluna` ·
+`?estado=fora` · `?estado=vazio` · `?estado=semview` — os cinco entraram na
+varredura da CI (a varredura de disco abre só o padrão).
