@@ -3197,6 +3197,12 @@ function MinhaContaPage() {
                           p ? ({ ...p, food_preferences: v || null } as Profile) : p,
                         )
                       }
+                      /* ⚠️ A MESMA folha da barra de baixo, por PROP — nunca um
+                         evento global nem uma segunda Central. Quem governa este
+                         estado é esta tela, e um segundo dono é o defeito que
+                         `voltarDaBarra` já pagou. É a mesma porta que a caixinha
+                         da Comunidade usa. */
+                      onAbrirSOS={() => setEmergencyOpen(true)}
                     />
                   </div>
                 )}

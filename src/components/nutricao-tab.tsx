@@ -26,6 +26,7 @@ import {
   Pill,
   Plus,
   Refrigerator,
+  Phone,
   ScanLine,
   Search,
   Send,
@@ -34,6 +35,7 @@ import {
   UtensilsCrossed,
 } from "lucide-react";
 import { podeComprarAqui } from "@/lib/canal-de-venda";
+import { pedeSocorro, RESPOSTA_DO_SOCORRO, TITULO_DO_SOCORRO } from "@/lib/socorro-na-nutricao";
 import { ehNativo } from "@/lib/nativo";
 import { recadoDaAmostra, recadoDoBloqueio, type MotivoDoBloqueio } from "@/lib/nutricao-premium";
 import { useEffect, useRef, useState } from "react";
@@ -333,6 +335,7 @@ export function NutricaoTab({
   careMode = false,
   aoAssinar,
   aoSalvarPreferencias,
+  onAbrirSOS,
   bancada,
 }: {
   profile: Profile | null;
@@ -347,6 +350,12 @@ export function NutricaoTab({
   /** Avisa quem guarda o perfil que `food_preferences` mudou. ⚠️ Sem isto a
       aba, que DESMONTA ao trocar de aba, reabre com o valor antigo. */
   aoSalvarPreferencias?: (valor: string) => void;
+  /** Abre a Central de Emergência. ⚠️ Por PROP, e nunca por evento global: quem
+      governa esse estado é `minha-conta`, e um segundo dono é o defeito que
+      `voltarDaBarra` já pagou. É a mesma porta que a caixinha da Comunidade usa.
+      Sem ela o cartão do socorro continua desenhando o 192 — o telefone não
+      depende de tela nenhuma. */
+  onAbrirSOS?: () => void;
   /* ⚠️ A bancada injeta o DADO nos MESMOS `useState` da produção, nunca o
      desenho: é a lição do `?streak=41` da folha da chama. Sem ela, a bolha
      vazia do "…", o erro do fluxo e os TRÊS desfechos do 👎 exigiriam uma
@@ -378,6 +387,11 @@ export function NutricaoTab({
     /** A porta fechada — ela só nasce de um 402 do servidor, e por isso era
         impossível de fotografar sem gastar o teto de uma conta real. */
     bloqueio?: MotivoDoBloqueio;
+    /** ⚠️ O caminho de socorro: ele só existe depois de ela escrever uma
+        bandeira vermelha na caixa, e fotografá-lo sem a bancada exigiria
+        digitar "estou vendo pontinhos" numa conta de verdade. Os índices são
+        os das mensagens marcadas — o par (a pergunta dela, a resposta do app). */
+    socorros?: number[];
     /** Quantas perguntas grátis sobram — o número chega num cabeçalho de
         resposta, então ele só existe depois de uma conversa de verdade. */
     amostra?: number;
@@ -556,6 +570,13 @@ export function NutricaoTab({
      oferece a assinatura. Um cartão só, genérico, faria a assinante que bateu
      no teto ver um convite para assinar o que ela já assina. */
   const [bloqueio, setBloqueio] = useState<MotivoDoBloqueio | null>(bancada?.bloqueio ?? null);
+
+  /* ⚠️ OS ÍNDICES DO SOCORRO, e não um campo em `ChatMsg`.
+     `ChatMsg` é o tipo do Chat IA (vive em `minha-conta`), e pendurar nele um
+     campo que só esta aba entende faria as duas telas dividirem uma forma que
+     uma delas ignora. O padrão daqui já é este: `votos` e `fotos` são mapas por
+     índice, e o índice é estável porque a lista só CRESCE. */
+  const [socorros, setSocorros] = useState<Set<number>>(new Set(bancada?.socorros ?? []));
   /* Quantas ainda sobram da amostra grátis. `null` é "não sei" — e "não sei"
      não fala (ver `recadoDaAmostra`). A assinante também fica em `null`: o
      servidor só manda o número quando a resposta veio da amostra. */
@@ -820,6 +841,29 @@ export function NutricaoTab({
   async function send(text?: string) {
     const msg = (text ?? input).trim();
     if (!msg || loading) return;
+
+    /* ─── O SOCORRO VEM ANTES DE TUDO ────────────────────────────────────
+       ⚠️ Antes da rede, antes da cota, antes do portão do Premium — e por isso
+       ele funciona com o telefone sem sinal, que é exatamente quando ela pode
+       estar num pronto-socorro. A régua e as quatro razões estão em
+       `socorro-na-nutricao.ts`; o que importa aqui é que **a mensagem não
+       chega a sair do aparelho**: nenhum `fetch`, nenhum modelo, nenhuma
+       chance de a resposta a "estou vendo pontinhos" ser uma sugestão de
+       cardápio. E ele NÃO passa por `careMode` nem por `bloqueio`. */
+    if (pedeSocorro(msg)) {
+      const i = messages.length;
+      setMessages([
+        ...messages,
+        { role: "user", content: msg },
+        { role: "assistant", content: RESPOSTA_DO_SOCORRO },
+      ]);
+      setSocorros((v) => new Set(v).add(i).add(i + 1));
+      setInput("");
+      setFerramenta(null);
+      abrirConversa();
+      return;
+    }
+
     const next: ChatMsg[] = [...messages, { role: "user", content: msg }];
     setMessages(next);
     setInput("");
@@ -829,14 +873,21 @@ export function NutricaoTab({
          turno do assistente (é assim que a forja continua fechada) — e sem as
          próprias respostas o modelo recebia três perguntas dela em fila,
          saudava de novo e respondia a PRIMEIRA. Ver `turno-assinado.server.ts`. */
-      const uiMessages = next.map((m, i) => ({
-        id: String(i),
-        role: m.role,
-        parts: [{ type: "text", text: m.content }],
-        ...(m.role === "assistant" && m.assinatura
-          ? { metadata: { assinatura: m.assinatura } }
-          : {}),
-      }));
+      /* ⚠️ O PAR DO SOCORRO NÃO SOBE. A resposta dele não tem assinatura, então
+         o servidor a descartaria de qualquer forma (`turno-assinado.server.ts`)
+         — mas depender disso deixaria a garantia "a mensagem não vai para o
+         modelo" morando no OUTRO lado da rede. Aqui ela é estrutural: o texto
+         do sintoma não entra no corpo do pedido. */
+      const uiMessages = next
+        .filter((_, i) => !socorros.has(i))
+        .map((m, i) => ({
+          id: String(i),
+          role: m.role,
+          parts: [{ type: "text", text: m.content }],
+          ...(m.role === "assistant" && m.assinatura
+            ? { metadata: { assinatura: m.assinatura } }
+            : {}),
+        }));
       const { data: sess } = await supabase.auth.getSession();
       const res = await fetch("/api/nutrition", {
         method: "POST",
@@ -1505,96 +1556,101 @@ export function NutricaoTab({
             /* A bolha VAZIA enquanto a resposta não chegou: era um "…" parado,
                que lê como travou. Vira a mesma varredura de luz do Chat IA. */
             const pensando = !dela && !m.content && loading && i === messages.length - 1;
+            /* A resposta do app a uma bandeira vermelha — a bolha ganha o
+               cartão do socorro logo abaixo. */
+            const socorro = !dela && socorros.has(i);
             return (
-              <div
-                key={i}
-                className={`flex items-end gap-1.5 ${dela ? "flex-row-reverse" : "flex-row"}`}
-              >
-                {!dela && <Avatar tamanho={28} />}
-                <div
-                  /* ⚠️ `whitespace-pre-wrap`: o modelo responde em LINHAS —
+              <div key={i}>
+                <div className={`flex items-end gap-1.5 ${dela ? "flex-row-reverse" : "flex-row"}`}>
+                  {!dela && <Avatar tamanho={28} />}
+                  <div
+                    /* ⚠️ `whitespace-pre-wrap`: o modelo responde em LINHAS —
                      "para a próxima, duas ideias:" e depois duas linhas com
                      marcador. Sem isto elas colavam num parágrafo só, e a foto
                      da bancada mostrou a lista virando uma parede de texto com
                      os "•" no meio da frase. O Chat IA já rendia assim; esta
                      bolha ficou de fora. */
-                  /* A bolha DELA é um tom suave com texto escuro, e não o
+                    /* A bolha DELA é um tom suave com texto escuro, e não o
                      bloco verde-escuro cheio: a pergunta dela costuma ser um
                      parágrafo, e o que ela veio ler é a resposta. Texto escuro
                      sobre lime-100 passa folgado — descer o fundo cheio de 700
                      é onde o branco começaria a reprovar. */
-                  className={`max-w-[80%] whitespace-pre-wrap px-4 py-2.5 text-[15px] leading-relaxed ${
-                    dela
-                      ? "rounded-3xl rounded-br-md bg-lime-100 text-lime-950 ring-1 ring-lime-200/80"
-                      : "card-material rounded-3xl rounded-bl-md text-foreground"
-                  } ${pensando ? "relative overflow-hidden" : ""}`}
-                >
-                  {pensando ? (
-                    <>
-                      <span
-                        aria-hidden
-                        className="dc-think-sweep absolute inset-y-0 -left-1/3 w-1/3 bg-[linear-gradient(90deg,transparent,rgba(77,124,15,0.28),transparent)]"
-                      />
-                      <span role="status" className="sr-only">
-                        Pensando
-                      </span>
-                      <span
-                        aria-hidden
-                        className="relative block h-2 w-12 rounded-full bg-foreground/12"
-                      />
-                    </>
-                  ) : dela ? (
-                    <>
-                      {/* A foto que ela mandou, em cima do título — para ela
-                          saber QUAL prato a resposta comenta. Só em memória. */}
-                      {dela && fotos[i] && (
-                        <img
-                          src={fotos[i]}
-                          alt="A foto que você mandou"
-                          className="mb-1.5 block max-h-44 w-full rounded-2xl object-cover"
+                    className={`max-w-[80%] whitespace-pre-wrap px-4 py-2.5 text-[15px] leading-relaxed ${
+                      dela
+                        ? "rounded-3xl rounded-br-md bg-lime-100 text-lime-950 ring-1 ring-lime-200/80"
+                        : "card-material rounded-3xl rounded-bl-md text-foreground"
+                    } ${pensando ? "relative overflow-hidden" : ""}`}
+                  >
+                    {pensando ? (
+                      <>
+                        <span
+                          aria-hidden
+                          className="dc-think-sweep absolute inset-y-0 -left-1/3 w-1/3 bg-[linear-gradient(90deg,transparent,rgba(77,124,15,0.28),transparent)]"
                         />
-                      )}
-                      {m.content || "…"}
-                    </>
-                  ) : m.content ? (
-                    /* Negrito e lista em nós de React — a resposta vem em
+                        <span role="status" className="sr-only">
+                          Pensando
+                        </span>
+                        <span
+                          aria-hidden
+                          className="relative block h-2 w-12 rounded-full bg-foreground/12"
+                        />
+                      </>
+                    ) : dela ? (
+                      <>
+                        {/* A foto que ela mandou, em cima do título — para ela
+                          saber QUAL prato a resposta comenta. Só em memória. */}
+                        {dela && fotos[i] && (
+                          <img
+                            src={fotos[i]}
+                            alt="A foto que você mandou"
+                            className="mb-1.5 block max-h-44 w-full rounded-2xl object-cover"
+                          />
+                        )}
+                        {m.content || "…"}
+                      </>
+                    ) : m.content ? (
+                      /* Negrito e lista em nós de React — a resposta vem em
                        linhas com "•" e, às vezes, um `**assim**`; crua, a bolha
                        mostrava os asteriscos. */
-                    <TextoLeve texto={m.content} />
-                  ) : (
-                    "…"
-                  )}
-                  {/* Só nas respostas da IA, e não na saudação (i > 0). */}
-                  {m.role === "assistant" && i > 0 && m.content && (
-                    <div className="mt-1.5 flex items-center gap-2">
-                      {votos[i] !== undefined ? (
-                        /* O voto dado fica DESENHADO, e não só dito: o polegar
+                      <TextoLeve texto={m.content} />
+                    ) : (
+                      "…"
+                    )}
+                    {/* Só nas respostas da IA, e não na saudação (i > 0).
+                      ⚠️ E nunca no SOCORRO: o 👎 dele enfileira a pergunta para
+                      o médico ler DEPOIS, e este texto não é uma resposta da
+                      IA — oferecer "seu médico vai ver" ao lado de um caminho
+                      de emergência trocaria socorro agora por leitura amanhã. */}
+                    {m.role === "assistant" && i > 0 && m.content && !socorro && (
+                      <div className="mt-1.5 flex items-center gap-2">
+                        {votos[i] !== undefined ? (
+                          /* O voto dado fica DESENHADO, e não só dito: o polegar
                            preenchido é o estado; a frase é o agradecimento. */
-                        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          {votos[i] === true ? (
-                            <ThumbsUp
-                              className="h-[15px] w-[15px] text-lime-700"
-                              fill="currentColor"
-                              strokeWidth={1.8}
-                              aria-hidden
-                            />
-                          ) : (
-                            <ThumbsDown
-                              className="h-[15px] w-[15px] text-lime-700"
-                              fill="currentColor"
-                              strokeWidth={1.8}
-                              aria-hidden
-                            />
-                          )}
-                          {votos[i] === true
-                            ? "Obrigada 💛"
-                            : votos[i] === "fila"
-                              ? "Anotado — seu médico vai ver"
-                              : "Anotado 💛"}
-                        </span>
-                      ) : (
-                        <>
-                          {/* ⚠️ ALVO DE 44px, e aqui ele NÃO pode sair de um
+                          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            {votos[i] === true ? (
+                              <ThumbsUp
+                                className="h-[15px] w-[15px] text-lime-700"
+                                fill="currentColor"
+                                strokeWidth={1.8}
+                                aria-hidden
+                              />
+                            ) : (
+                              <ThumbsDown
+                                className="h-[15px] w-[15px] text-lime-700"
+                                fill="currentColor"
+                                strokeWidth={1.8}
+                                aria-hidden
+                              />
+                            )}
+                            {votos[i] === true
+                              ? "Obrigada 💛"
+                              : votos[i] === "fila"
+                                ? "Anotado — seu médico vai ver"
+                                : "Anotado 💛"}
+                          </span>
+                        ) : (
+                          <>
+                            {/* ⚠️ ALVO DE 44px, e aqui ele NÃO pode sair de um
                               `after:-inset`: são dois VIZINHOS e opostos, e
                               estendê-los faria os alvos se encavalarem —
                               tocar entre eles acertaria o contrário do que
@@ -1603,25 +1659,54 @@ export function NutricaoTab({
                               ⚠️ E são DESENHADOS, não emoji: 👍 tem cor
                               própria em cada sistema, e a 50% de opacidade
                               lia como desabilitado. */}
-                          <button
-                            onClick={() => votar(i, true)}
-                            aria-label="Esta resposta ajudou"
-                            className="-my-2 -ml-2 flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-lime-700"
-                          >
-                            <ThumbsUp className="h-[18px] w-[18px]" strokeWidth={1.9} />
-                          </button>
-                          <button
-                            onClick={() => votar(i, false)}
-                            aria-label="Esta resposta não ajudou"
-                            className="-my-2 flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-lime-700"
-                          >
-                            <ThumbsDown className="h-[18px] w-[18px]" strokeWidth={1.9} />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  )}
+                            <button
+                              onClick={() => votar(i, true)}
+                              aria-label="Esta resposta ajudou"
+                              className="-my-2 -ml-2 flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-lime-700"
+                            >
+                              <ThumbsUp className="h-[18px] w-[18px]" strokeWidth={1.9} />
+                            </button>
+                            <button
+                              onClick={() => votar(i, false)}
+                              aria-label="Esta resposta não ajudou"
+                              className="-my-2 flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-lime-700"
+                            >
+                              <ThumbsDown className="h-[18px] w-[18px]" strokeWidth={1.9} />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
+                {socorro && (
+                  <div className="mt-2 rounded-3xl border border-red-200 bg-red-50 p-3.5">
+                    <p className="font-serif text-[15px] font-semibold leading-tight text-red-900">
+                      {TITULO_DO_SOCORRO}
+                    </p>
+                    {/* ⚠️ O botão da Central só existe quando há para onde ir —
+                        `onAbrirSOS` é opcional, e um botão que promete uma ação
+                        e não faz nada é o defeito que este repositório já pagou
+                        três vezes. O 192 fica SEMPRE: ele não depende de tela,
+                        de sessão nem de rede de dados. */}
+                    {onAbrirSOS && (
+                      <button
+                        type="button"
+                        onClick={onAbrirSOS}
+                        className="btn-3d press mt-2.5 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full bg-red-700 px-4 text-[15px] font-semibold text-white"
+                      >
+                        Pedir socorro agora
+                      </button>
+                    )}
+                    <a
+                      href="tel:192"
+                      className="pill-3d press mt-2 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full px-4 text-[15px] font-semibold text-red-800"
+                    >
+                      <Phone className="h-[18px] w-[18px]" strokeWidth={2.1} aria-hidden />
+                      Ligar 192 (SAMU)
+                    </a>
+                  </div>
+                )}
               </div>
             );
           })}

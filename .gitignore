@@ -64,3 +64,8 @@ restos-*.patch
 
 # Medição descartável na raiz (bancada, agente de auditoria). Nunca é produto.
 *-tmp.mjs
+
+# Medição descartável: as bancadas de medir de cada leva (fotos, baterias,
+# pipelines de arte). Elas dependem de URLs e caminhos efêmeros; o que vale é
+# o que sobe para `scripts/` e a prosa do CLAUDE.md.
+scratchpad/

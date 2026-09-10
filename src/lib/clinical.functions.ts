@@ -551,6 +551,17 @@ export type FichaClinica = {
   riscos: string[];
   observacoesPrevias: string | null;
   modoCuidado: boolean;
+  /**
+   * ⚠️ Ela já teve o bebê. Existe para GATEAR a régua de perda de peso: depois
+   * do parto o corpo perde peso, e é esperado — flagrar isso na tela clínica
+   * ensinaria o médico a ignorar o sinal. `sinalPerdaDePeso` declara no
+   * cabeçalho que quem gateia é o chamador.
+   *
+   * ⚠️ `gestDias` NÃO responde a esta pergunta: `computeGestation` conta para
+   * sempre (com teto em 42 semanas), então uma puérpera de duas semanas aparece
+   * como "41s" e não como alguém que pariu.
+   */
+  jaPariu: boolean;
   /** O banco não tinha as colunas do perfil rico: campos ausentes são
       DESCONHECIDOS, não vazios. */
   degradada: boolean;
@@ -560,7 +571,23 @@ const PERFIL_COLS =
   "display_name,baby_name,lmp_date,due_date,reference_date,reference_weeks,reference_days," +
   "pregnancy_number,prior_bp_elevated,prior_bp_week,prior_gestational_diabetes,prior_preterm," +
   "prior_cesarean,prior_notes,blood_type,allergies,medications,height_cm," +
-  "pre_pregnancy_weight_kg,emergency_contact,emergency_phone,care_mode,phone";
+  "pre_pregnancy_weight_kg,emergency_contact,emergency_phone,care_mode,phone,birth_date";
+
+/**
+ * ⚠️ **UM DEGRAU SÓ PARA `birth_date`, e ele é DERIVADO por remoção.**
+ *
+ * A coluna nasceu numa migration posterior às do perfil rico. Sem este degrau,
+ * um banco que ainda não a tem devolveria `42703` para a consulta INTEIRA e a
+ * ficha cairia direto no mínimo: alergias, medicações e a história de risco
+ * viravam DESCONHECIDAS por causa de uma coluna que a tela usa só para saber se
+ * a paciente já pariu. É a forma mais cara de defeito deste repositório — a
+ * coluna nova apagando o recurso antigo.
+ *
+ * ⚠️ E `degradada` NÃO acende aqui: o que falta é o dado do nascimento, e não o
+ * perfil. Acender faria a ficha inteira gritar "desconhecida" sobre campos que
+ * chegaram inteiros.
+ */
+const PERFIL_SEM_NASCIMENTO = PERFIL_COLS.replace(",birth_date", "");
 
 /**
  * Dias de gestação hoje.
@@ -614,8 +641,13 @@ export const fichaClinica = createServerFn({ method: "POST" })
        uma coluna ausente apagaria a ficha toda em vez de um campo. */
     let perfil: Record<string, unknown> | null = null;
     let degradada = false;
-    for (const cols of [PERFIL_COLS, "display_name,baby_name,lmp_date,due_date"]) {
-      if (cols !== PERFIL_COLS) degradada = true;
+    for (const cols of [
+      PERFIL_COLS,
+      PERFIL_SEM_NASCIMENTO,
+      "display_name,baby_name,lmp_date,due_date",
+    ]) {
+      /* Só o degrau MÍNIMO é "degradada" — ver `PERFIL_SEM_NASCIMENTO`. */
+      if (cols !== PERFIL_COLS && cols !== PERFIL_SEM_NASCIMENTO) degradada = true;
       const { data: row, error } = await sb
         .from("patient_profiles")
         .select(cols)
@@ -660,6 +692,11 @@ export const fichaClinica = createServerFn({ method: "POST" })
       riscos,
       observacoesPrevias: (perfil.prior_notes as string) ?? null,
       modoCuidado: !!perfil.care_mode,
+      /* Sem a coluna (degrau acima) o campo nem vem: "não sei" vale NÃO PARIU,
+         que é o lado que mantém a régua de perda de peso ligada. O falso
+         positivo aqui é um sinal a mais numa puérpera; o falso negativo é uma
+         perda de 5% calada numa gestante. */
+      jaPariu: !!perfil.birth_date,
       /* Sem isto a ficha reduzida era indistinguível de uma paciente sem
          alergias e sem história de risco — a tela afirmando o oposto por
          omissão, numa gestante com pré-eclâmpsia anterior. */

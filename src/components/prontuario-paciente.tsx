@@ -26,6 +26,7 @@ import {
   ESTILO_SINAL,
   baseDePressao,
   sinalGlicemia,
+  sinalPerdaDePeso,
   sinalPressao,
   sinalPressaoComBase,
   type Gravidade,
@@ -251,6 +252,29 @@ export function ProntuarioPaciente({
     ficha.pesoPreGestacional != null && peso.ultimo != null
       ? Math.round((peso.ultimo - Number(ficha.pesoPreGestacional)) * 10) / 10
       : null;
+  /**
+   * ⚠️ **O CARTÃO DE PESO AFIRMAVA "NORMAL" SOBRE UMA PERDA DE 5%.**
+   *
+   * Ele cravava `gravidade="normal"` sempre que houvesse os dois números — e o
+   * "normal" aqui é COR, na tela em que o médico decide. Uma paciente que caiu
+   * de 62 para 55 kg aparecia com "−6,8 kg na gestação" em cinza neutro, ao
+   * lado de uma pressão em âmbar. É a mesma família da glicemia que o prompt
+   * dizia estar "dentro do alvo": o app não estava calando um sinal, estava
+   * AFIRMANDO o contrário dele.
+   *
+   * `sinalPerdaDePeso` já existia em `sinais-clinicos.ts` — o limite mora lá e
+   * em nenhum outro lugar — e tinha **um leitor só: o prompt da
+   * nutricionista**. O médico nunca via.
+   *
+   * ⚠️ Os DOIS portões são do CHAMADOR, e a régua declara isso no cabeçalho: no
+   * luto e depois do parto o corpo perde peso, e é esperado. Marcar isso na tela
+   * clínica ensinaria a ignorar o sinal — que é o pior desfecho possível para
+   * um alarme.
+   */
+  const perda =
+    ficha.modoCuidado || ficha.jaPariu
+      ? null
+      : sinalPerdaDePeso(peso.ultimo, ficha.pesoPreGestacional);
 
   return (
     <div className="space-y-5">
@@ -409,8 +433,24 @@ export function ProntuarioPaciente({
             <Medida
               rotulo="Peso"
               valor={peso.ultimo != null ? `${peso.ultimo} kg` : "—"}
-              nota={ganho != null ? `${ganho > 0 ? "+" : ""}${ganho} kg na gestação` : undefined}
-              gravidade={ganho != null ? "normal" : undefined}
+              /* A perda VENCE o ganho: são a mesma pergunta, e a nota dela já
+                 traz os quilos e a porcentagem. Sem perda, o texto de sempre. */
+              nota={
+                perda?.gravidade === "atencao"
+                  ? perda.nota
+                  : ganho != null
+                    ? /* ⚠️ "na gestação" MENTE para quem já pariu, e a foto do
+                         estado de pós-parto mostrou isto: "−6,8 kg na gestação"
+                         numa puérpera. O número é o mesmo; o que muda é o que
+                         ele descreve. */
+                      `${ganho > 0 ? "+" : ""}${ganho} kg ${
+                        ficha.jaPariu ? "desde antes da gestação" : "na gestação"
+                      }`
+                    : undefined
+              }
+              gravidade={
+                perda?.gravidade === "atencao" ? "atencao" : ganho != null ? "normal" : undefined
+              }
             />
             <Medida
               rotulo="Registros"

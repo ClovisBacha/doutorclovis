@@ -15219,3 +15219,156 @@ tem como ver uma frase errada. Bancada que aprova o que o servidor não produz
 **Sem SQL.** As cinco correções saem de colunas e tabelas que já existem.
 **Bancada:** `/preview-nutricao?luto=1&estado=conversa&painel=1` (a resposta
 própria do Modo Cuidado) · `?estado=votou&luto=1`.
+
+## A aba de Nutrição ganhou caminho de socorro, e três defeitos calados (set/2026)
+
+Pedido do dono: _"oque mais ainda falta nessa aba para conseguirmos melhorar,
+aplique para ficar nota 10 com a ideia do app"_. A auditoria mediu antes de
+opinar — e **confirmou como NÃO-lacunas** duas coisas que eu ia listar (o 👎 já
+enfileira para o médico com três desfechos, e o silêncio da memória é
+deliberado). O que sobrou eram quatro defeitos, e três deles falhavam calados.
+
+### ⚠️ 1. A CONVERSA ERA A ÚNICA CAIXA DE TEXTO DO APP SEM RÉGUA DETERMINÍSTICA
+
+Post, story, comentário, caixinha, direct e bio passam por `triarTexto` desde
+ago/2026. A conversa da nutricionista — que fala de **vômito**, de **pressão** e
+de **peso**, as três coisas que mais aparecem numa pré-eclâmpsia e numa
+hiperêmese — não passava por nada: toda a segurança dela morava em UMA linha do
+prompt de sistema ("quando a paciente mencionar sintomas preocupantes … sempre
+oriente procurar o médico"). Ou seja, **a decisão de mandar alguém procurar
+atendimento estava delegada a um modelo**, num app que decidiu não delegar
+segurança a modelo.
+
+`src/lib/socorro-na-nutricao.ts` é a régua, e as quatro decisões que a tornam
+segura estão no cabeçalho dela:
+
+- ⚠️ **A RÉGUA É SÓ `BANDEIRA_VERMELHA + PRESSAO_EM_NUMEROS`, nunca `triarTexto`
+  inteiro.** Medido em 50 perguntas reais de nutrição: **`triarTexto` devolve
+  `clinica` em 10 delas** — "quantos cafés posso tomar por dia?", "estou com
+  azia toda noite", "minha glicemia deu 118, o que eu como?". É o comportamento
+  CERTO dele (a caixinha pública não pode virar consultório) e seria desastroso
+  aqui: uma em cada cinco perguntas de comida deixaria de chegar, e a paciente
+  aprenderia em três dias que a aba não responde. Na mesma bateria, a bandeira
+  acusou **zero** — e as 14 bandeiras de verdade, todas.
+- ⚠️ **RODA NO APARELHO, ANTES DE ENVIAR.** Funciona sem rede — que é exatamente
+  quando ela pode estar num pronto-socorro —, não gasta cota, não espera função
+  fria. O caminho de socorro não pode ser o único do app que precisa de 4G.
+- ⚠️ **A MENSAGEM NÃO SAI DO APARELHO.** Nenhum `fetch`, nenhum modelo. Não é
+  censura: é que a resposta a "estou vendo pontinhos" não é uma sugestão de
+  cardápio. E o par (a pergunta dela, a resposta do app) é **filtrado do
+  histórico** que sobe nas perguntas seguintes: sem o filtro, a garantia moraria
+  do OUTRO lado da rede, na régua de assinatura do servidor.
+- ⚠️ **NUNCA GATEADO POR MODO CUIDADO NEM PELO PREMIUM.** Quem perdeu a gestação
+  continua podendo passar mal, e quem não assina também. E o 👎 não é oferecido
+  na resposta do socorro — ele enfileira a pergunta para o médico ler DEPOIS, e
+  trocar socorro agora por leitura amanhã é o defeito que o portão impede.
+- ⚠️ **O 192 NÃO DEPENDE DE TELA NENHUMA.** O botão da Central só existe quando
+  `onAbrirSOS` existe (um botão que promete e não faz nada é o defeito que este
+  repositório já pagou três vezes); o telefone fica sempre.
+
+⚠️ **E `if (false && pedeSocorro(msg))` PASSAVA VERDE nos dois testes nomeados**
+— neutralizar a guarda não acrescenta nenhuma das palavras que eles procuram, e
+o caminho de socorro simplesmente deixa de existir. Hoje há um teste que extrai
+a CONDIÇÃO inteira do `if` e cobra que ela seja só a régua: um termo a mais,
+qualquer que seja, reprova.
+
+### ⚠️ 2. A RÉGUA DE BANDEIRA VERMELHA NÃO PEGAVA NOVE DE ONZE FORMAS REAIS
+
+Medido antes de ligar o caminho acima, contra as frases que a paciente escreve:
+
+| não acendia (e devia)                       | por quê                      |
+| ------------------------------------------- | ---------------------------- |
+| "minha visão **está** embaçada desde ontem" | `\w` não atravessa "está"    |
+| "estou com a visão meio turva"              | idem                         |
+| "estou vendo **pontinhos**"                 | a lista pedia "pontos"       |
+| "**não paro** de vomitar"                   | a lista tinha só a 3ª pessoa |
+| "não consigo parar de vomitar"              | idem                         |
+| "estou vomitando sem parar"                 | idem                         |
+
+⚠️ **`\w` do JavaScript é `[A-Za-z0-9_]`**: uma folga escrita com ele NUNCA
+atravessa "está", que é a palavra que separa o substantivo do adjetivo em
+praticamente toda frase real. É a mesma família da lição de `\b` ser ASCII e não
+ver fronteira depois de "ê" — e as duas moram no MESMO arquivo. A folga passou a
+ser `[a-zà-ÿ]+`, e `visão`/`vista` viraram UMA alternativa: eram duas listas de
+adjetivos que precisavam concordar, e a mais nova já divergia.
+
+Os dois primeiros são a apresentação visual da **pré-eclâmpsia**; o terceiro, a
+metade da **hiperêmese** que este app mede por texto (a outra, a perda de 5%, já
+tinha régua). Depois: **11 de 11 acendem, 0 de 13 frases de nutrição acendem**,
+e a bateria virou teste permanente.
+
+### ⚠️ 3. O CARTÃO DE PESO DO MÉDICO AFIRMAVA "NORMAL" SOBRE UMA PERDA DE 5%
+
+`sinalPerdaDePeso` existia desde set/2026 com **um leitor só: o prompt da
+nutricionista**. Do lado do médico, o cartão "Peso" do prontuário calculava o
+ganho e cravava `gravidade="normal"` sempre que houvesse os dois números — e o
+"normal" ali é COR, na tela em que ele decide. Uma paciente que caiu de 62 para
+55 kg aparecia com **"−6,8 kg na gestação" em cinza neutro**, ao lado de uma
+pressão em âmbar.
+
+⚠️ **Isso não é omissão, é AFIRMAÇÃO** — a mesma família da glicemia que o
+prompt dizia estar "dentro do alvo" sem saber se foi em jejum.
+
+- ⚠️ **Os DOIS portões são do CHAMADOR**, e a régua declara isso no cabeçalho:
+  no luto e depois do parto o corpo perde peso, e é esperado. Marcar isso na
+  tela clínica ensinaria o médico a ignorar o sinal.
+- ⚠️ **`gestDias` NÃO responde "ela já pariu?"**: `computeGestation` conta para
+  sempre (com teto em 42 semanas), então uma puérpera de duas semanas aparece
+  como "41s". A ficha ganhou `jaPariu`, de `birth_date`.
+- ⚠️ **E `birth_date` precisou de um degrau PRÓPRIO, derivado por remoção.** A
+  coluna nasceu numa migration posterior às do perfil rico: sem ele, um banco
+  atrasado devolveria `42703` para a consulta INTEIRA e a ficha cairia no
+  mínimo — alergias, medicações e a história de risco viravam DESCONHECIDAS por
+  causa de uma coluna que a tela usa só para saber se ela pariu. É a forma mais
+  cara de defeito deste repositório: a coluna nova apagando o recurso antigo. E
+  `degradada` **não** acende nesse degrau.
+- ⚠️ **E a foto pegou um segundo texto errado:** no pós-parto o cartão dizia
+  "−6,8 kg **na gestação**". O número é o mesmo; o que muda é o que ele descreve.
+
+⚠️ **O QUE NÃO FOI FEITO, e por quê:** a perda de peso **não** entrou na fila de
+trabalho do painel. Ela é um ESTADO, não um evento — enquanto ela não recuperar
+o peso, o item voltaria todo dia, e uma fila com item permanente é uma fila que
+o médico aprende a rolar. O cartão da paciente é onde um estado mora, e era lá
+que o app estava afirmando o contrário. Se o dono quiser o item na fila, o
+molde é `quemEstaQuieta` (nível "leitura", teto de seis, e uma janela de dias
+desde a última pesagem).
+
+### ⚠️ 4. O EXPORT DA LGPD PEDIA QUATRO COLUNAS QUE NÃO EXISTEM
+
+E não em silêncio, o que é pior: o exportador conta `42703` como **falha**,
+então o arquivo saía sem aqueles blocos e a tela dizia à paciente que parte dos
+dados dela não veio.
+
+| bloco                  | pedia                            | é                                |
+| ---------------------- | -------------------------------- | -------------------------------- |
+| o cadastro dela        | `pre_pregnancy_weight`           | `pre_pregnancy_weight_kg`        |
+| os resumos do médico   | `consultations.patient_id`       | `user_id`                        |
+| o extrato de moeda     | `razao, quantidade`              | `reason, amount`                 |
+| os pedidos de consulta | `requested_date, requested_time` | `preferred_date, preferred_time` |
+
+O do CADASTRO é o mais caro: nome, DUM, alergias, medicações e contato de
+emergência — ela baixa "todos os meus dados", lê que faltou, e apaga a conta
+confiando naquilo.
+
+⚠️ **`colunas-que-existem.test.ts` é cego para o export, e por um motivo de
+FORMA**: ele casa `select("…")` literal colado a um `.from()`, e aqui as colunas
+moram numa tabela de dados (`FONTES`) que um laço lê em tempo de execução.
+Nenhum `select` literal existe no arquivo.
+
+⚠️ **E a conferência tem de ser POR TABELA.** A primeira versão do conferidor
+procurava o nome no SQL inteiro e deixou `quantidade` passar — a palavra existe
+noutra tabela. **Coluna certa na tabela errada é exatamente o defeito que isto
+existe para pegar**, e há teste com esse nome.
+
+### ⚠️ E o portão reprovou por um motivo alheio ao código
+
+36 erros de formatação, todos em `scratchpad/` — a pasta das medições de cada
+leva (fotos, baterias de frases, pipelines de arte), que nunca é commitada.
+Portão que reprova por motivo alheio ao código é portão que se aprende a
+ignorar, e é a mesma lição que já pôs `*-tmp.mjs` no `.gitignore` e no
+`ignores` do eslint. `scratchpad/` entrou nos dois.
+
+**Sem SQL**: tudo sai de tabelas e colunas que já existem.
+**Bancadas:** `/preview-nutricao?estado=socorro&painel=1` (o par e o cartão) ·
+`/preview-prontuario?perdapeso=1` (a perda em âmbar) · `?perdapeso=1&pos=1` (o
+portão do pós-parto). As três entraram na varredura da CI.

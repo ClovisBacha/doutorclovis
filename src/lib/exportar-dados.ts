@@ -62,7 +62,7 @@ export const FONTES: FonteDoExport[] = [
     coluna: "id",
     chave: "perfil",
     colunas:
-      "display_name, baby_name, phone, lmp_date, due_date, height_cm, pre_pregnancy_weight, blood_type, allergies, medications, emergency_contact, emergency_phone, care_mode, created_at",
+      "display_name, baby_name, phone, lmp_date, due_date, height_cm, pre_pregnancy_weight_kg, blood_type, allergies, medications, emergency_contact, emergency_phone, care_mode, created_at",
     porque: "o cadastro que ela mesma preencheu",
   },
   {
@@ -181,7 +181,7 @@ export const FONTES: FonteDoExport[] = [
   },
   {
     tabela: "consultations",
-    coluna: "patient_id",
+    coluna: "user_id",
     chave: "resumos_de_consulta",
     /* ⚠️ Só `resumo_paciente`. Ver o cabeçalho: `achados` e `conduta` são o
        registro profissional do médico, e liberá-los por botão automático é
@@ -207,7 +207,7 @@ export const FONTES: FonteDoExport[] = [
     tabela: "sementinhas_ledger",
     coluna: "user_id",
     chave: "extrato_de_sementinhas",
-    colunas: "razao, quantidade, created_at",
+    colunas: "reason, amount, created_at",
     /* ⚠️ Sem `dedupe_key`: ela carrega o id de QUEM DEU o presente. */
     porque: "o extrato da moeda dela",
   },
@@ -222,7 +222,7 @@ export const FONTES: FonteDoExport[] = [
     tabela: "appointment_requests",
     coluna: "patient_user_id",
     chave: "consultas",
-    colunas: "requested_date, requested_time, confirmed_date, confirmed_time, status, notes",
+    colunas: "preferred_date, preferred_time, confirmed_date, confirmed_time, status, notes",
     porque: "os pedidos de consulta dela",
   },
   /* ─── A COMUNIDADE ─────────────────────────────────────────────────────────

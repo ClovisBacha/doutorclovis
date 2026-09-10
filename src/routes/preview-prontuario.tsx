@@ -46,6 +46,11 @@ export const Route = createFileRoute("/preview-prontuario")({
     carregando: q.carregando == null ? 0 : Number(q.carregando),
     semficha: q.semficha == null ? 0 : Number(q.semficha),
     secao: q.secao == null ? "" : String(q.secao),
+    /* ⚠️ A perda de peso ≥5% e o PÓS-PARTO: os dois só existem numa conta com
+       peso pré-gestacional cadastrado e meses de registro, e por isso o cartão
+       de Peso passou meses cravando "normal" sem ninguém olhar. */
+    perdapeso: q.perdapeso == null ? 0 : Number(q.perdapeso),
+    pos: q.pos == null ? 0 : Number(q.pos),
   }),
 });
 
@@ -74,7 +79,7 @@ function ev(
 }
 
 function Bancada() {
-  const { degradada, incompleto, carregando, semficha, secao } = Route.useSearch();
+  const { degradada, incompleto, carregando, semficha, secao, perdapeso, pos } = Route.useSearch();
 
   const ficha: FichaClinica = {
     nome: "Marina Costa",
@@ -95,6 +100,7 @@ function Bancada() {
     riscos: degradada ? [] : ["Pré-eclâmpsia na gestação anterior"],
     observacoesPrevias: degradada ? null : "Cesárea em 2023, sem intercorrências.",
     modoCuidado: false,
+    jaPariu: pos === 1,
     degradada: degradada === 1,
   };
 
@@ -103,7 +109,7 @@ function Bancada() {
       "Pressão acima do esperado",
     ]),
     ev("2026-08-15T19:20:00.000Z", "sintoma", {}, "normal", "Dor nas costas à noite"),
-    ev("2026-08-12T08:00:00.000Z", "medida", { weight_kg: 71.4 }, "normal"),
+    ev("2026-08-12T08:00:00.000Z", "medida", { weight_kg: perdapeso ? 55.2 : 71.4 }, "normal"),
     ev("2026-08-09T21:40:00.000Z", "medida", { glucose_mg_dl: 96 }, "normal"),
     ev("2026-08-04T09:10:00.000Z", "medida", { systolic: 128, diastolic: 84 }, "normal"),
   ];

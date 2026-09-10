@@ -6,6 +6,7 @@ import {
   ENTREGA_DE_CONDUTA,
   PEDIDO_DE_CONDUTA,
   PERGUNTAS_POR_DIA,
+  PRESSAO_EM_NUMEROS,
   recadoDoDesfecho,
   SINTOMA_EM_PRIMEIRA_PESSOA,
   temTermoClinicoAlemDaAbertura,
@@ -401,5 +402,76 @@ describe("⚠️ a régua contra 40 frases reais", () => {
   test("nenhum falso NEGATIVO — conduta perigosa não passa", () => {
     const maus = ROTEIA.filter((t) => triarTexto(t) === "publicavel");
     expect(maus).toEqual([]);
+  });
+});
+
+/**
+ * ⚠️ A SEGUNDA BATERIA — as formas em que a paciente de VERDADE escreve
+ * (set/2026).
+ *
+ * A bateria de cima provou a régua contra frases de POST. Esta prova as
+ * BANDEIRAS contra a caixa de texto da nutrição, e ela nasceu de uma medição
+ * que achou **nove das onze formas naturais passando batidas**:
+ *
+ *  · `\w` do JavaScript é `[A-Za-z0-9_]` e **não atravessa "está"** — a folga
+ *    escrita com ele nunca ligava "visão" a "embaçada", que é a distância
+ *    exata de quase toda frase real. Cousin da lição de `\b` ser ASCII.
+ *  · a lista pedia "pontos"; ela escreve **"pontinhos"**.
+ *  · e pedia "não **para** de vomitar" — a terceira pessoa. Ela fala do
+ *    próprio corpo: "não paro", "não consigo parar", "vomitando sem parar".
+ *
+ * Os dois primeiros são a apresentação visual da PRÉ-ECLÂMPSIA; o terceiro, a
+ * metade da hiperêmese que este app mede por texto.
+ *
+ * ⚠️ E a metade de baixo vale mais: nutrição fala de vômito, de visão e de
+ * pontinhos o tempo todo, sem nada de errado acontecendo. **Falso positivo
+ * aqui é a Central de Emergência abrindo por causa de um enjoo de manhã** — e
+ * é assim que a paciente aprende a fechar o alarme sem ler.
+ */
+describe("⚠️ as bandeiras contra as frases que ela escreve", () => {
+  const vermelha = (t: string) => BANDEIRA_VERMELHA.test(t) || PRESSAO_EM_NUMEROS.test(t);
+
+  const ACENDE = [
+    "estou com dor de cabeça forte e vendo pontinhos",
+    "estou vendo pontinhos luminosos",
+    "vendo pontos pretos na visão",
+    "minha visão está embaçada desde ontem",
+    "minha vista está turva",
+    "estou com a visão meio turva",
+    "não paro de vomitar desde ontem",
+    "não consigo parar de vomitar",
+    "vomito tudo o que como, não para",
+    "estou vomitando sem parar",
+    "não para de vomitar",
+  ];
+
+  const NAO_ACENDE = [
+    "vomitei o café da manhã hoje",
+    "vomitei uma vez ontem, o que como?",
+    "vomito de vez em quando de manhã",
+    "tenho enjoo e às vezes vomito",
+    "meu enjoo melhorou, não vomito mais",
+    "a comida me dá vontade de vomitar",
+    "estou com visão de futuro pra dieta",
+    "minha visão sobre alimentação mudou",
+    "estou com pontinhos vermelhos na pele depois do morango",
+    "vi umas manchinhas na banana, pode comer?",
+    "estou com dor de cabeça de fome",
+    "dor de cabeça quando fico sem comer",
+    "posso comer pontas de aspargo?",
+  ];
+
+  test("as onze formas naturais acendem", () => {
+    expect(ACENDE.filter((t) => !vermelha(t))).toEqual([]);
+  });
+
+  test("⚠️ e nenhuma frase de nutrição acende", () => {
+    expect(NAO_ACENDE.filter((t) => vermelha(t))).toEqual([]);
+  });
+
+  test("⚠️ a folga entre substantivo e adjetivo aceita ACENTO", () => {
+    /* Se alguém trocar `[a-zà-ÿ]` por `\w` aqui, este é o caso que morre. */
+    expect(BANDEIRA_VERMELHA.test("minha visão está embaçada")).toBe(true);
+    expect(BANDEIRA_VERMELHA.test("a vista está escurecendo")).toBe(true);
   });
 });

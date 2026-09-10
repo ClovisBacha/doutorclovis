@@ -47,13 +47,32 @@ export const BANDEIRA_VERMELHA = new RegExp(
       "perdi (?:o|a|meu|minha) (?:beb(?:ê|e)|gesta(?:ç|c)(?:ã|a)o|gravidez|filh\\w*)|perda gestacional",
       "convuls(?:ã|a)\\w*|desmai\\w*|desmaiei|apagu(?:ei|ou)|conv(?:ú|u)ls\\w*",
       "pr(?:é|e)[- ]?ecl(?:â|a)mps\\w*|ecl(?:â|a)mps\\w*|press(?:ã|a)o (?:alta|nas alturas)",
-      "vis(?:ã|a)o (?:embaçada|emba(?:ç|c)ada|turva|escura)|vendo (?:pontos|estrelas)",
+      /* ⚠️ **A FOLGA PRECISA ACEITAR ACENTO, e `\\w` do JavaScript não aceita.**
+         `\\w` é `[A-Za-z0-9_]`: uma folga escrita com ele NUNCA atravessa
+         "está", que é a palavra que separa o substantivo do adjetivo em
+         praticamente toda frase real ("minha visão **está** embaçada"). Medido
+         numa bateria de frases: as quatro formas de vista turva ficavam de
+         fora, e a régua só pegava "visão embaçada" colado. É a mesma família
+         da lição de `\\b` ser ASCII e não ver fronteira depois de "ê".
+         `visão` e `vista` viraram UMA alternativa: eram duas listas de
+         adjetivos que precisavam concordar, e a mais nova já divergia. */
+      "(?:vis(?:ã|a)o|vista)\\s+(?:[a-zà-ÿ]+\\s+){0,2}?(?:emba(?:ç|c)\\w*|turv\\w*|escur\\w*|estranha|dupla|nublad\\w*|borrad\\w*)",
+      /* ⚠️ "pontinhos", e não só "pontos": o diminutivo é como ela escreve. */
+      "vendo\\s+(?:[a-zà-ÿ]+\\s+){0,2}?(?:pont\\w*|estrel\\w*|luzes|manchas)",
       "falta de ar|n(?:ã|a)o (?:consigo|estou conseguindo) respirar|sufoca\\w*|dispnei\\w*",
       "trombos\\w*|emboli\\w*|infart\\w*|avc|derrame",
       "bolsa (?:rompeu|estourou|rota)|perdendo l(?:í|i)quido|contra(?:ç|c)(?:õ|o)es fortes",
       "beb(?:ê|e) n(?:ã|a)o (?:mexe|est(?:á|a) mexendo)|parou de mexer|n(?:ã|a)o sinto o beb",
       "quero morrer|me matar|me machucar|tirar minha vida|acabar com tudo|suic(?:í|i)d\\w*",
-      "febre alta|39 graus|40 graus|convulsion\\w*|n(?:ã|a)o para de vomitar",
+      "febre alta|39 graus|40 graus|convulsion\\w*",
+      /* ⚠️ **VÔMITO EM PRIMEIRA PESSOA.** A lista tinha só "não **para** de
+         vomitar" — a terceira pessoa, que é como se fala do vômito de outra
+         gente. Quem escreve na caixinha fala do PRÓPRIO corpo: "não paro",
+         "não consigo parar", "vomitando sem parar", "vomito tudo o que como".
+         As quatro passavam batidas, e vômito persistente é metade da definição
+         de hiperêmese — a outra metade, a perda de 5%, já tem régua. */
+      "n(?:ã|a)o (?:paro|para|consigo parar|estou conseguindo parar) de vomitar",
+      "vomit\\w*\\s+sem\\s+parar|vomitando (?:muito|demais)|vomito tudo",
       /* ⚠️ **MOVIMENTO REDUZIDO, e não só ausente.** A lista pegava "não mexe"
          e "parou de mexer" — e deixava passar "mexeu bem menos hoje", que é a
          frase que a paciente de verdade escreve e o motivo obstétrico número um
@@ -62,8 +81,6 @@ export const BANDEIRA_VERMELHA = new RegExp(
       "menos movimento|pouco movimento|quase n(?:ã|a)o (?:mexe|sinto)",
       /* ⚠️ "perdi líquido" — a lista tinha só "perdendo líquido". */
       "perdi\\s+(?:um pouco de\\s+)?l(?:í|i)quido|perdendo l(?:í|i)quido|molhou a calcinha",
-      /* ⚠️ A VISTA, em linguagem de gente: a lista pedia "embaçada/turva". */
-      "vista\\s+(?:\\w+\\s+){0,2}?(?:estranha|escura|escurec\\w*|emba(?:ç|c)\\w*|turva)",
       /* Ideação por eufemismo. ⚠️ "não aguento mais" fica de FORA de propósito:
          é hipérbole cotidiana ("não aguento mais essa azia"), e abrir a Central
          de Emergência nela ensinaria a ignorar o alarme. Só as inequívocas. */

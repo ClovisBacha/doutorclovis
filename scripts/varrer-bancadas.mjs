@@ -87,6 +87,9 @@ const EXTRAS = [
   "/preview-nutricao?estado=carregando&painel=1",
   "/preview-nutricao?estado=erro&painel=1",
   "/preview-nutricao?estado=foto&painel=1",
+  /* ⚠️ O caminho de socorro — ele só nasce depois de ela escrever uma bandeira
+     vermelha na caixa, e sem a bancada exigiria digitar isso numa conta real. */
+  "/preview-nutricao?estado=socorro&painel=1",
   /* As duas portas fechadas e o aviso da amostra — só nascem de um 402 e de
      um cabeçalho de resposta, ou seja de uma conta real com o teto gasto. */
   "/preview-nutricao?estado=conversa&painel=1&bloqueio=sem_premium",
@@ -242,6 +245,11 @@ const EXTRAS = [
   "/preview-conta?privacidade=1",
   "/preview-sos-medico?magro=1",
   "/preview-prontuario?degradada=1",
+  /* ⚠️ A perda de peso ≥5% e o pós-parto: o cartão "Peso" cravava `normal`
+     sobre os dois, e nenhum se fabrica sem uma conta com peso pré-gestacional
+     cadastrado e meses de registro. */
+  "/preview-prontuario?perdapeso=1",
+  "/preview-prontuario?perdapeso=1&pos=1",
   "/preview-registrar-consulta?primeira=1",
 ];
 

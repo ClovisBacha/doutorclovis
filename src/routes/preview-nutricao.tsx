@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { NutricaoTab } from "@/components/nutricao-tab";
 import type { ChatMsg } from "@/routes/_authenticated/minha-conta";
+import { RESPOSTA_DO_SOCORRO } from "@/lib/socorro-na-nutricao";
 
 /**
  * BANCADA DA NUTRICIONISTA VIRTUAL.
@@ -20,6 +21,10 @@ import type { ChatMsg } from "@/routes/_authenticated/minha-conta";
  *   `?estado=carregando` — ⚠️ a bolha vazia: ela renderiza "…" e é
  *                            indistinguível de um "…" que nunca termina
  *   `?estado=erro`       — o aviso do servidor virando bolha
+ *   `?estado=socorro`  — ⚠️ o caminho de socorro: ele só existe depois de
+ *                        ela escrever uma bandeira vermelha na caixa, e sem
+ *                        a bancada exigiria digitar "estou vendo pontinhos"
+ *                        numa conta de verdade
  *   `?estado=foto`       — ⚠️ a resposta da FOTO na conversa: ela nasce de um
  *                            seletor de arquivo e de uma chamada de visão, ou
  *                            seja, é impossível de fotografar sem tirar uma
@@ -182,6 +187,34 @@ const tresDe = (luto: boolean): ChatMsg[] => [
   },
 ];
 
+/**
+ * ⚠️ O SOCORRO — o par (a bandeira que ela escreveu, a resposta do app).
+ *
+ * O texto da resposta é o CONSTANTE da régua, e não uma cópia: uma segunda
+ * redação aqui faria a bancada aprovar uma frase que a produção não escreve —
+ * é o defeito que a saudação cravada já teve nesta mesma tela.
+ */
+const SOCORRO: { role: "user" | "assistant"; content: string }[] = [
+  { role: "user", content: "posso comer sushi?" },
+  {
+    role: "assistant",
+    content:
+      "Sushi com peixe cru é melhor evitar na gestação. Versões cozidas ou vegetarianas valem.",
+  },
+  { role: "user", content: "estou com dor de cabeça forte e vendo pontinhos" },
+  { role: "assistant", content: RESPOSTA_DO_SOCORRO },
+];
+
+/**
+ * ⚠️ **A SAUDAÇÃO OCUPA O ÍNDICE 0**, e `bancada.mensagens` é acrescentada
+ * DEPOIS dela — então o par do socorro cai em `length - 1` e `length`, e não em
+ * 1 e 2. A primeira versão desta bancada errou essa conta por um, e o cartão
+ * simplesmente não apareceu: a foto mostrou a resposta do socorro com o 👍👎
+ * ao lado, que é exatamente o estado que ele existe para não ter. Derivado do
+ * tamanho, e não escrito à mão, para não drifar quando a lista mudar.
+ */
+const INDICES_DO_SOCORRO = [SOCORRO.length - 1, SOCORRO.length];
+
 function Pagina() {
   const {
     w: wBruto,
@@ -207,28 +240,31 @@ function Pagina() {
     pos >= 0 ? new Date(Date.UTC(2026, 7, 1 + pos)).toISOString().slice(0, 10) : undefined;
 
   const bancada =
-    estado === "foto"
-      ? { mensagens: FOTO, fotos: { 1: MINIATURA } }
-      : estado === "conversa"
-        ? { mensagens: conversaDe(luto) }
-        : estado === "votou"
-          ? { mensagens: tresDe(luto), votos: { 2: true, 4: false, 6: "fila" as const } }
-          : estado === "carregando"
-            ? {
-                mensagens: [conversaDe(luto)[0], { role: "assistant" as const, content: "" }],
-                carregando: true,
-              }
-            : estado === "erro"
+    estado === "socorro"
+      ? { mensagens: SOCORRO, socorros: INDICES_DO_SOCORRO }
+      : estado === "foto"
+        ? { mensagens: FOTO, fotos: { 1: MINIATURA } }
+        : estado === "conversa"
+          ? { mensagens: conversaDe(luto) }
+          : estado === "votou"
+            ? { mensagens: tresDe(luto), votos: { 2: true, 4: false, 6: "fila" as const } }
+            : estado === "carregando"
               ? {
-                  mensagens: [
-                    conversaDe(luto)[0],
-                    {
-                      role: "assistant" as const,
-                      content: "Você atingiu o limite de mensagens de hoje. Tente de novo amanhã.",
-                    },
-                  ],
+                  mensagens: [conversaDe(luto)[0], { role: "assistant" as const, content: "" }],
+                  carregando: true,
                 }
-              : undefined;
+              : estado === "erro"
+                ? {
+                    mensagens: [
+                      conversaDe(luto)[0],
+                      {
+                        role: "assistant" as const,
+                        content:
+                          "Você atingiu o limite de mensagens de hoje. Tente de novo amanhã.",
+                      },
+                    ],
+                  }
+                : undefined;
   const extras = {
     agua,
     ferramenta: (["comer", "prato", "alivio", "casa"].includes(ferramenta)
@@ -280,6 +316,10 @@ function Pagina() {
            cai na régua de canal de verdade (hoje: "a compra ainda não está
            aberta"), que é o que a produção faz. */
         aoAssinar={() => {}}
+        /* ⚠️ SEM ISTO O CARTÃO DO SOCORRO SAI SÓ COM O 192 — o botão vermelho é
+           gateado por `onAbrirSOS` de propósito (ele só existe quando há para
+           onde ir), e a bancada estaria aprovando meio cartão. */
+        onAbrirSOS={() => {}}
         bancada={{ ...(bancada ?? {}), ...extras }}
       />
     </div>
