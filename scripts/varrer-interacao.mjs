@@ -126,14 +126,27 @@ const ROTEIRO = [
     nome: "contrações · corrigir a intensidade de uma linha",
     passos: [{ clique: /^\d{2}:\d{2}/ }, { clique: /^Forte$/ }],
   },
-  /* ⚠️ **E o mesmo caminho na aba irmã.** Apagar uma contagem é o conserto de
-     um ALARME FALSO no consultório (a sessão aberta sem querer, encerrada com
-     dois movimentos em duas horas, que sai âmbar e entra nos achados) — ou
-     seja, é um caminho que mexe em dado clínico e que só nasce de um toque. */
+  /* ⚠️ **E o mesmo caminho na aba irmã.** Corrigir a força é o conserto de um
+     dado clínico já gravado (o eixo com aOR 2,53 para desfecho ruim), e o
+     painel com os três níveis só nasce de um toque na linha.
+
+     ⚠️ **A CONTAGEM TOCADA É A DA FILA, e nunca uma do servidor — este roteiro
+     JÁ REPROVOU A CI por isso.** A primeira versão abria `?estado=historico`,
+     cujas linhas vêm do banco: o toque em "Mais fraco" chama o `update` em
+     `kick_sessions`, e sem sessão a bancada recebe **400** no console. A
+     varredura contou como problema, com razão — uma chamada não autenticada
+     saindo de uma bancada é justamente o que ela existe para acusar. É a mesma
+     armadilha que o roteiro da nutrição já tinha pago com um 401.
+
+     `?estado=pendente` é a contagem salva no aparelho que ainda não subiu, e a
+     correção dela acontece NA FILA (`fila-de-chutes.ts`), sem uma ida à rede. */
   {
-    q: "/preview-chutes?estado=historico&w=30",
-    nome: "chutes · corrigir a força de uma contagem",
-    passos: [{ clique: /em 2h/ }, { clique: /^Mais fraco$/ }],
+    q: "/preview-chutes?estado=pendente&w=30",
+    nome: "chutes · corrigir a força de uma contagem salva no aparelho",
+    passos: [
+      { dentro: "Salva no seu celular", clique: /min/ },
+      { dentro: "Salva no seu celular", clique: /^Mais fraco$/ },
+    ],
   },
   /* ⚠️ O desfazer do toque a mais: ele só existe com a contagem em curso, e é
      o conserto do erro que empurra para o lado de TRANQUILIZAR. */
@@ -199,7 +212,16 @@ for (const t of ROTEIRO) {
           await p.mouse.up();
           toques++;
         } else {
-          const alvo = p.getByRole("button", { name: s.clique }).first();
+          /* ⚠️ **`dentro` ESCOPA O TOQUE A UM CARTÃO.** Numa lista em que toda
+             linha tem o mesmo formato, um nome de botão não distingue a linha
+             que o roteiro precisa tocar da vizinha — e tocar a errada aqui não
+             é um roteiro fraco, é um roteiro que exercita OUTRO caminho (no
+             histórico de chutes, o da rede em vez do da fila). O filtro pega o
+             cartão que contém o texto e a busca do botão acontece dentro dele;
+             `.last()` é o `div` MAIS INTERNO que ainda contém o texto, que é o
+             cartão, e não a página inteira em volta. */
+          const raiz = s.dentro ? p.locator("div").filter({ hasText: s.dentro }).last() : p;
+          const alvo = raiz.getByRole("button", { name: s.clique }).first();
           if (await alvo.count()) {
             await alvo.click({ timeout: 4000 });
             toques++;

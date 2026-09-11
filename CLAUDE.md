@@ -16221,6 +16221,40 @@ correção · zero erros de console nos estados fotografados.
 **Bancada nova:** `/preview-chutes?estado=pendente` — a contagem salva no
 aparelho que ainda não subiu só existe entre um `insert` que falhou e o próximo
 que der certo, e não se fabrica numa conta de teste sem derrubar a rede na mão.
-**Roteiros novos:** `chutes · corrigir a força de uma contagem` e
-`chutes · tirar um toque contado a mais` — os dois caminhos que mexem em dado
-clínico e que só nascem de um toque.
+**Roteiros novos:** `chutes · corrigir a força de uma contagem salva no
+aparelho` e `chutes · tirar um toque contado a mais` — os dois caminhos que
+mexem em dado clínico e que só nascem de um toque.
+
+### ⚠️ E O ROTEIRO DE INTERAÇÃO REPROVOU A CI — pela SEGUNDA vez, por rede
+
+A primeira versão do roteiro da força abria `?estado=historico`, cujas linhas
+vêm do BANCO: o toque em "Mais fraco" chama o `update` em `kick_sessions`, e
+sem sessão a bancada recebe **400** no console. A varredura contou como
+problema, **com razão** — uma chamada não autenticada saindo de uma bancada é
+exatamente o que ela existe para acusar. É a mesma armadilha que o roteiro da
+nutrição já tinha pago com um 401, cometida de novo num roteiro novo, e a regra
+que já estava escrita aqui continua sendo a certa: **roteiro de interação toca
+em controle LOCAL; o que dispara rede se prova na MEDIÇÃO, com a rede forjada.**
+
+O conserto é `?estado=pendente` — a contagem salva no aparelho, cuja correção
+acontece NA FILA (`fila-de-chutes.ts`), sem uma ida à rede. ⚠️ **E o `RUIDO` da
+varredura NÃO foi alargado para engolir o 400:** o alarme estava certo; quem
+estava errado era o roteiro.
+
+⚠️ **DUAS LIÇÕES DE MEDIÇÃO, e a primeira quase me fez declarar conserto sem
+prova.** Rodado aqui, o roteiro ANTIGO passa **verde**: a chamada ao Supabase
+morre no proxy do contêiner com `ERR_CONNECTION_RESET`, que está no `RUIDO`; na
+CI a rede alcança o servidor e o 400 volta. **Uma varredura que passa na máquina
+de desenvolvimento não prova que o caminho é local.** O que prova é contar as
+requisições: com `page.on("request")`, o roteiro antigo emite
+`PATCH /rest/v1/kick_sessions?id=eq.…` e o novo emite **zero** — e a mesma
+medição, aplicada ao roteiro irmão das contrações, confirmou que ele já estava
+limpo.
+
+⚠️ **E O ESCOPO DO TOQUE VIROU PARTE DO ROTEIRO** (`dentro`). Numa lista em que
+toda linha tem o mesmo formato, um nome de botão não distingue a linha certa da
+vizinha — e tocar a errada aqui não é um roteiro fraco, é um roteiro que
+exercita OUTRO caminho (o da rede em vez do da fila). O filtro pega o cartão que
+contém o texto (`"Salva no seu celular"`) e procura o botão dentro dele.
+⚠️ E a contagem de toques do relatório é o que impede isso de passar em vazio:
+seletor que não casa sai com menos toques do que o roteiro tem passos.
