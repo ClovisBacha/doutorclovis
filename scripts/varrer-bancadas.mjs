@@ -47,6 +47,12 @@ const EXTRAS = [
   "/preview-contracoes?estado=parto&w=16",
   "/preview-contracoes?estado=normal&w=41",
   "/preview-contracoes?estado=normal&semdum=1",
+  /* ⚠️ Os dois estados da leva de set/2026: a tendência de intensidade (o
+     terceiro eixo da ACOG, que só este estado prova — todos os outros usam um
+     nível constante) e a falha de leitura que já NÃO apaga o que ela
+     cronometrou. */
+  "/preview-contracoes?estado=subindo&w=39",
+  "/preview-contracoes?estado=instavel-com-fila&w=39",
   /* ⚠️ Os chutes: a tela que MEDE um sintoma vermelho. `alerta` é o estado que
      a bancada existe para provar — duas horas com quatro movimentos, com o
      aviso e o botão do 192 na tela —, e `instavel` é a leitura que falhou, que

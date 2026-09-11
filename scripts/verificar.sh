@@ -101,6 +101,36 @@ if [ "$rc" != "0" ]; then
   falhou=1
 fi
 
+# ⚠️ **E O PASSO PODE SAIR 0 TENDO RODADO MENOS ARQUIVOS DO QUE EXISTEM — foi
+# assim que este portão imprimiu "tudo verde" sobre uma árvore com três testes
+# vermelhos (set/2026).** Medido: ele reportou `6160 pass · 0 fail` quando a
+# mesma árvore, rodada em seguida, deu `6335 pass · 3 fail`. Os arquivos que
+# continham os vermelhos simplesmente NÃO FORAM COLETADOS, e o `bun` saiu 0
+# porque nada do que rodou falhou.
+#
+# ⚠️ A causa da coleta parcial não foi reproduzida (pressão de memória com um
+# Chromium de varredura ainda vivo é a suspeita, e suspeita não é causa). O que
+# a trava faz não depende de saber a causa: ela compara o número de arquivos
+# RODADOS com os que existem no disco. Uma suíte que roda menos do que existe
+# nunca é "nenhum teste falhou".
+#
+# ⚠️ E o piso é CONTADO na hora, não escrito à mão: um número fixo aqui
+# envelheceria no primeiro arquivo de teste novo, e um portão que reprova o
+# estado correto é um portão que alguém desliga.
+noDisco=$(find src -name "*.test.ts" -o -name "*.test.tsx" | wc -l | tr -d ' ')
+# ⚠️ `files?` com o interrogativo: com UM arquivo o bun escreve "across 1 file",
+# no singular — e a primeira versão desta trava, pedindo "files", não casou nada
+# e aprovou uma execução de UM teste como "tudo verde". Catraca que passa em
+# vazio é catraca que mente, e esta quase nasceu assim.
+rodados=$(printf '%s\n' "$saida" | grep -oE "across [0-9]+ files?" | grep -oE "[0-9]+" | tail -1)
+if [ -n "$rodados" ] && [ "$rodados" -lt "$noDisco" ]; then
+  passo "cobertura"
+  echo "FALHOU — rodou $rodados de $noDisco arquivos de teste"
+  echo "  ⚠️  a suíte foi coletada pela METADE: '0 fail' aqui não quer dizer nada."
+  echo "      Rode de novo, sozinho (sem varredura nem servidor de dev competindo)."
+  falhou=1
+fi
+
 # ─── git: a árvore está ATRASADA? ────────────────────────────────────────────
 #
 # O contêiner restaura instantâneos antigos do espaço de trabalho — cinco vezes

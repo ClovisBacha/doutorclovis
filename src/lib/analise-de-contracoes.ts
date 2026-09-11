@@ -62,6 +62,16 @@ import { sinalContracoesFrequentes, sinalContracoesPrematuras } from "@/lib/sina
 export type ContracaoParaAnalise = {
   started_at: string;
   ended_at: string | null;
+  /**
+   * O autorrelato de dor (1–3), quando existe.
+   *
+   * ⚠️ **OPCIONAL de propósito, e ela NUNCA decide status.** Ver
+   * `tendenciaDaIntensidade` no fim deste arquivo: intensidade não tem corte em
+   * diretriz nenhuma e não mora em `sinais-clinicos.ts`. O que ela faz aqui é
+   * virar uma FRASE de tendência — o terceiro eixo que a ACOG ensina a
+   * reconhecer, ao lado de "mais juntas" e "mais longas".
+   */
+  intensity?: number | null;
 };
 
 /**
@@ -112,6 +122,15 @@ export type AnaliseDeContracoes = {
   intervaloMin: number | null;
   /** Duração média das contrações encerradas, em segundos. */
   duracaoSeg: number | null;
+  /**
+   * A frase da tendência de intensidade, quando há uma. `null` é o caso comum.
+   *
+   * ⚠️ Campo PRÓPRIO e não um pedaço do `detail`: ele é acrescentado uma vez
+   * só, no fim, por um invólucro que enxerga TODOS os caminhos de retorno — ver
+   * `analyzeContractions`. Colado à mão em cada `return` ele faltaria em um
+   * deles, que é como um recurso nasce pela metade neste repositório.
+   */
+  notaDaIntensidade: string | null;
 };
 
 const HORA = 3600000;
@@ -135,6 +154,19 @@ export function analyzeContractions(
   weeks: number | null,
   agora: number,
 ): AnaliseDeContracoes {
+  const r = analisar(list, weeks, agora);
+  /* ⚠️ **A NOTA NÃO ENTRA NO CASO `urgente`.** Ali o texto já manda ligar
+     agora, e uma cauda sobre tendência DILUI a única frase que importa — é a
+     mesma razão pela qual o botão do 192 não aparece em toda pintura. */
+  const nota = r.status === "urgente" ? null : tendenciaDaIntensidade(list);
+  return { ...r, notaDaIntensidade: nota };
+}
+
+function analisar(
+  list: ContracaoParaAnalise[],
+  weeks: number | null,
+  agora: number,
+): Omit<AnaliseDeContracoes, "notaDaIntensidade"> {
   const { fase, semanaConhecida } = faseDoCronometro(weeks);
 
   const ordenadas = [...list].sort(
@@ -433,4 +465,52 @@ function sustentado(inicios: number[], corteMin: number): number | null {
   while (i > 0 && (inicios[i] - inicios[i - 1]) / 60000 <= corteMin) i--;
   if (i === inicios.length - 1) return null;
   return min0((inicios[inicios.length - 1] - inicios[i]) / 60000);
+}
+
+/**
+ * A TENDÊNCIA DA INTENSIDADE — o terceiro eixo, e por que ele NÃO é alarme.
+ *
+ * ⚠️ **A ACOG ENSINA TRÊS SINAIS, e o cronômetro media dois.** O material dela
+ * distingue o trabalho de parto verdadeiro do falso por: as contrações ficam
+ * mais JUNTAS, ficam mais LONGAS e ficam mais FORTES — e as de treinamento
+ * (Braxton-Hicks) são irregulares e *não* aumentam de intensidade. O app
+ * coletava a intensidade a cada contração, desenhava-a como altura na fita, e
+ * não a LIA em lugar nenhum: sete "Forte" numa hora produziam exatamente o
+ * mesmo texto que sete "Leve".
+ *
+ * ⚠️ **E ELA NÃO MUDA O STATUS — nem para cima.** Intensidade é autorrelato de
+ * dor: não tem corte em diretriz nenhuma, varia com o limiar de cada mulher, e
+ * inventar aqui um "3 fortes seguidas = alerta" seria escrever limite clínico
+ * fora de `sinais-clinicos.ts`, que é o único lugar onde eles moram. O que esta
+ * função devolve é uma FRASE sobre um fato que ela mesma registrou.
+ *
+ * ⚠️ **PRECISA DE QUATRO, e compara metade com metade.** Com duas ou três
+ * contrações, "subiu" é ruído — uma contração pior que a anterior acontece o
+ * tempo todo. E o corte de meio nível é o menor que não dispara por uma única
+ * marcação fora da curva.
+ *
+ * ⚠️ **NÃO existe a frase inversa.** "Elas estão ficando mais fracas" seria
+ * tranquilização a partir de um dado que não sustenta tranquilização nenhuma —
+ * e é justamente na queda de intensidade que uma paciente para de cronometrar.
+ * O silêncio aqui é a decisão segura.
+ */
+export function tendenciaDaIntensidade(list: ContracaoParaAnalise[]): string | null {
+  const ordenadas = [...list]
+    .filter((c) => typeof c.intensity === "number" && c.intensity! >= 1 && c.intensity! <= 3)
+    .sort((a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime());
+  if (ordenadas.length < 4) return null;
+
+  const meio = Math.floor(ordenadas.length / 2);
+  const media = (xs: ContracaoParaAnalise[]) =>
+    xs.reduce((s, c) => s + (c.intensity as number), 0) / xs.length;
+  /* Com número ímpar a do meio fica de fora das duas pontas: ela é justamente
+     a que menos distingue começo de fim. */
+  const primeiras = media(ordenadas.slice(0, meio));
+  const ultimas = media(ordenadas.slice(ordenadas.length - meio));
+
+  if (ultimas - primeiras < 0.5) return null;
+  /* ⚠️ A frase diz o FATO e o que fazer com ele — e o "se também ficarem mais
+     juntas" é literalmente o par que a ACOG ensina. Um fato sem saída ensina a
+     paciente a olhar o app e não saber o que fazer. */
+  return "Elas estão ficando mais fortes — se também começarem a ficar mais juntas, ligue para o seu médico.";
 }

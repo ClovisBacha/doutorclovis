@@ -15822,3 +15822,187 @@ arranjo que a produção nunca produz.
 `{false && parciais.length > 0 && (`, porque a string está lá dentro. O teste
 passou a LER a condição do bloco (de trás para a frente, a partir do texto da
 ressalva) e a cobrar que nada a neutralize. Cinco mutantes em vermelho.
+
+## A nota do cronômetro de contrações, e os cinco caminhos até o 10 (set/2026)
+
+Pedido do dono: nota de 0 a 10 em cinco critérios, e depois _"aplicar com o
+objetivo de ficar nota 10 todos esses 5 pontos"_. A nota saiu de LER a régua, o
+componente, a fita, os dois lados do dado e de FOTOGRAFAR seis estados a 393px
+— e ela foi **6,2**: régua 9 · momento real 6 · qualidade do dado 5 · o que
+chega ao médico 4 · desenho 7.
+
+### ⚠️ 1. O BOTÃO DO CRONÔMETRO CAÍA FORA DA DOBRA
+
+Medido, e é o achado que mudou a ordem da tela: o botão ficava em **y=876, 864
+e 868** num viewport de 852 em três dos quatro estados — e na produção há ainda
+o cabeçalho da grade (`VoltarDaGrade`) acima desta aba, que empurra mais. **A
+paciente abre esta tela em trabalho de parto para TOCAR, e precisava rolar.**
+
+O cronômetro é o primeiro bloco agora (y=245..421 em todos os estados), a
+análise vem logo abaixo (y=495, dentro da dobra), e o aviso de uso — que era o
+PRIMEIRO bloco e repetia o 192 que já está em botão duas vezes mais abaixo —
+foi para o pé da tela.
+
+### ⚠️ 2. A CONTRAÇÃO SE PERDIA SEM REDE — e o cenário é o carro a caminho
+
+`startContraction` fazia `insert` e **esperava a resposta**: sem rede saía um
+toast e a contração não existia. Num 4G de elevador, de estacionamento de
+hospital ou de quarto nos fundos, o app que ela abriu para não perder a conta
+era o que perdia a conta. E com rede havia um segundo custo: o relógio só
+partia uma latência depois do dedo.
+
+`fila-de-contracoes.ts`: **toda contração nasce no aparelho e sobe quando
+FECHA**. Duas escritas de rede viraram uma, e o único ponto de falha passou a
+ficar depois do fim da dor — não no meio dela.
+
+- ⚠️ **A contração EM CURSO é retomada da FILA**, não do banco: o `started_at`
+  que vale é o do aparelho onde o dedo tocou. Ninguém troca de celular no meio
+  de uma contração. (A aberta que restou no BANCO, de uma versão anterior,
+  continua sendo retomada — senão ficaria para sempre sem `ended_at`.)
+- ⚠️ **A partir da SEGUNDA tentativa o envio confere antes de inserir.**
+  `contraction_logs` não tem chave única: um `insert` que deu certo com a
+  resposta perdida no caminho viraria uma segunda contração no mesmo instante,
+  e duas no mesmo minuto deslocam o INTERVALO, que é o número que decide ir à
+  maternidade. A chave natural é o `started_at`. Falha ao CONFERIR não insere.
+- ⚠️ **A chave NÃO leva o prefixo `dc-path-`** — aquele viaja no blob do
+  `journey_state` e dispara um push por gravação, e aqui a gravação acontece a
+  cada toque, em trabalho de parto. E leva o id da CONTA: aparelho
+  compartilhado.
+- ⚠️ **Sete dias de validade**, e o limite é pelo lado do `localStorage`: a
+  cota que estourar derruba a PRÓXIMA gravação de qualquer coisa, inclusive o
+  `journey_state`. Instante no FUTURO também vence — relógio adiantado e depois
+  corrigido deixaria uma pendente eterna.
+- ⚠️ **"Apagar histórico" limpa a fila junto**, senão as pendentes subiriam
+  depois, ressuscitando no banco o que ela mandou apagar.
+- ⚠️ **A ANÁLISE CONTINUA ESCONDIDA quando a leitura falha, e agora isso precisa
+  ser dito:** a lista deixou de sumir junto, e a tentação é rodar a régua sobre
+  o que está no aparelho. Seria errado — faltam as contrações do SERVIDOR, e
+  uma análise parcial pode devolver "ainda espaçadas" para quem tem doze na
+  última hora. Falsa tranquilização é o único desfecho que esta tela não pode
+  ter.
+
+### ⚠️ 3. A INTENSIDADE ERA UMA PREVISÃO, NÃO UMA MEDIDA
+
+O seletor vivia atrás de `{!active && …}`: ela escolhia a intensidade **antes**
+de a contração começar, o seletor sumia enquanto ela acontecia, e o encerrar
+gravava só `ended_at`. **Ninguém sabe a intensidade de uma dor que ainda não
+veio** — e é o oposto do que a tela irmã faz: no contador de movimentos a força
+é marcada DURANTE e gravada no fim.
+
+Agora o seletor fica, o rótulo muda com o estado ("Como costumam estar?" ·
+"Como está sendo esta?") e o valor vai no `update` do encerrar. ⚠️ E a
+contração RESTAURADA traz a intensidade dela de volta: sem isso, uma retomada
+seria encerrada com o padrão por cima do que ela marcou.
+
+**E a linha passou a ser corrigível.** Não havia como desfazer um toque sem
+querer a não ser apagando o histórico INTEIRO, nem como corrigir a intensidade
+depois. ⚠️ **A linha toda é o alvo** (309×48), e não um ✕ de canto: medido no
+chá de bebê, um ✕ com `-my-2` encavala a caixa com a da linha de baixo e o
+toque 10px abaixo do centro apaga o item ERRADO — numa lista que apaga dado
+clínico isso é inaceitável. ⚠️ E "Limpar sessão" virou **"Apagar histórico"**:
+`clearSession` faz `delete().eq("user_id", …)`, não é a sessão de hoje.
+
+### ⚠️ 4. O QUE CHEGAVA AO MÉDICO ERA "intensidade 2"
+
+Três buracos, e os três são a mesma família: a régua aplicada num lugar e
+esquecida no irmão.
+
+- **O número cru no prontuário.** O catálogo Leve/Moderada/Forte morava DENTRO
+  do componente da paciente: ela via a palavra, ele via o código. É palavra por
+  palavra o defeito que a FORÇA do movimento teve e que foi consertado na leva
+  anterior — duas linhas acima, no mesmo `resumo()`.
+  `intensidade-da-contracao.ts` é o catálogo único. ⚠️ **Os TRÊS níveis falam**,
+  ao contrário da força do movimento: lá o meio é "como sempre", a ausência de
+  notícia; aqui "Moderada" é uma medida que ela tomou.
+- ⚠️ **UMA NOITE AFOGAVA A LINHA DO TEMPO.** A view projeta uma linha POR
+  CONTRAÇÃO e o prontuário desenha as **quarenta primeiras**: catorze contrações
+  bastam para a pressão alterada e a pré-consulta da mesma semana saírem da tela
+  **sem nenhum sinal de que existiam**. É o mesmo mecanismo que tirou
+  `contracao` da FILA de trabalho; lá a resposta foi excluir, aqui excluir
+  esconderia dado dela — a resposta é AGRUPAR (`episodios-de-contracao.ts`).
+  ⚠️ A folga que separa dois episódios é **120 min**, a MESMA janela de análise
+  da tela dela: se o app já considera que uma contração de mais de duas horas
+  atrás não descreve o padrão de agora, duas separadas por esse tanto não são o
+  mesmo episódio. ⚠️ E a gravidade do episódio é a MAIOR das contrações dele —
+  hoje a view não classifica contração e todas saem `normal`, e cravar `normal`
+  faria o dia em que essa régua mudar passar em branco.
+  ⚠️ **A predominante só fala com MAIORIA (60%)**: quatro leves, três moderadas
+  e três fortes não é um episódio "leve". Empate cala.
+- **O rascunho de achados não tinha UMA PALAVRA sobre contrações** — medido,
+  `grep -ci contra` naquele arquivo dava ZERO. Agora entra como EPISÓDIO, no
+  máximo três e os mais recentes, com o que sobra DITO ("+2 episódios antes") —
+  nunca cortado em silêncio. ⚠️ E a emergência continua sendo a ÚLTIMA linha.
+
+⚠️ **E a régua saiu do componente para `linha-do-tempo-clinica.ts`** pela razão
+de sempre: enterrada num `.tsx`, a única forma de exercitá-la era ler o FONTE e
+procurar palavras. Pura, "agrupar" e "não agrupar" são duas listas diferentes, e
+o teste compara as duas.
+
+### ⚠️ 5. A LISTA NÃO TINHA COLUNAS, e o terceiro eixo da ACOG não era lido
+
+- **As colunas.** Medido a 393px: a pastilha andava conforme a PALAVRA (Leve
+  x=126, Forte x=129, Moderada x=110) e a última linha — a única sem intervalo —
+  jogava a pastilha para x=180 e o valor para a borda. Três larguras fixas
+  resolvem: agora todas as linhas saem em 54 / 134 / 226.
+- ⚠️ **A INTENSIDADE ERA COLETADA E NUNCA LIDA.** A ACOG ensina TRÊS sinais —
+  mais juntas, mais longas, mais FORTES — e o cronômetro media dois: sete
+  "Forte" numa hora produziam exatamente o mesmo texto que sete "Leve".
+  `tendenciaDaIntensidade` compara metade com metade e devolve uma FRASE.
+  ⚠️ **Ela NÃO muda o status — nem para cima**: intensidade é autorrelato de
+  dor, não tem corte em diretriz nenhuma, e um "3 fortes seguidas = alerta"
+  seria limite clínico escrito fora de `sinais-clinicos.ts`. ⚠️ **Precisa de
+  QUATRO** (com duas ou três, "subiu" é ruído). ⚠️ **Não existe a frase
+  inversa** — "ficando mais fracas" seria tranquilização a partir de um dado que
+  não a sustenta, e é na queda que ela para de cronometrar. ⚠️ E no caso
+  `urgente` a nota não entra: ali o texto já manda ligar, e uma cauda dilui.
+- **As quatro bandeiras vermelhas ganharam o 192 TOCÁVEL.** Elas são a régua de
+  IR AO HOSPITAL da ACOG e NENHUMA depende do cronômetro — então o telefone
+  delas não podia viver dentro do `urgente`, que é onde o 192 morava. ⚠️ E aqui
+  é o **192**, nunca "falar com o meu médico": dois botões com o mesmo rótulo e
+  destinos diferentes é o defeito que o contador de movimentos já pagou.
+
+### ⚠️ E um teste antigo travava a GRAFIA — décima sexta vez
+
+`retorno-ao-dedo.test.ts` cobrava `async function startContraction()` e a
+posição do `hapticTap` **contra a do primeiro `await`**. A função deixou de ir à
+rede, ou seja a garantia ficou ESTRITAMENTE MAIS FORTE — e o teste estourou,
+porque `indexOf("await ")` devolveu −1 e `x < -1` é falso. O que ele cobra agora
+é a garantia: **nenhuma ida à rede entre o dedo e o cronômetro.**
+
+⚠️ E uma asserção minha nasceu com a mesma doença: `not.toMatch(/intensidade
+\$\{[^}]*intensidade\}/)` reprovava o RECUO legítimo do prontuário (o número cru
+quando o valor está fora do catálogo). Cobre-se que o catálogo DECIDE, não que o
+número sumiu do arquivo.
+
+### ⚠️ E O PORTÃO DISSE "TUDO VERDE" SOBRE UMA SUÍTE COLETADA PELA METADE
+
+O achado mais caro desta leva, e ele é do INSTRUMENTO. `bun run verificar`
+imprimiu **`6160 pass · 0 fail · — tudo verde`**; a mesma árvore, rodada em
+seguida, deu **`6335 pass · 3 fail`**. Os arquivos que continham os vermelhos
+simplesmente **não foram coletados**, e o `bun` saiu 0 porque nada do que rodou
+falhou — ou seja, a regra "julgue pelo código de saída", que este portão já
+tinha aprendido três vezes, não cobre execução PARCIAL.
+
+⚠️ **A causa não foi reproduzida** (a suspeita é pressão de memória com um
+Chromium de varredura ainda vivo, e suspeita não é causa — este arquivo já
+registra uma vez em que atribuí causa sem testá-la). A trava não depende de
+saber a causa: o passo compara os arquivos RODADOS com os que existem no disco,
+e **o piso é contado na hora** — um número fixo envelheceria no primeiro teste
+novo, e portão que reprova o estado correto é portão que alguém desliga.
+
+⚠️ **E ela quase nasceu passando em vazio:** com UM arquivo o `bun` escreve
+`across 1 file`, no SINGULAR, e a primeira versão da regex pedia `files` —
+aprovou uma execução de um teste só como "tudo verde". Quem pegou foi a
+contraprova (apontar o portão para um arquivo e exigir vermelho), que é o que
+separa uma catraca de um enfeite.
+
+**Medido ao fim:** 6.334 → 6.338 testes verdes (362 de 362 arquivos) · 206 bancadas e 15
+roteiros de interação sem problema · 13 mutantes em vermelho · nenhum alvo abaixo de 44px e
+contraste mínimo de 5,22 nos três estados medidos.
+
+**Sem SQL:** tudo sai de `contraction_logs` e de colunas que já existem.
+**Bancadas novas:** `/preview-contracoes?estado=subindo&w=39` (o terceiro eixo —
+todos os outros estados usam intensidade constante, e foi por isso que a régua
+podia nascer sem nunca ter sido olhada) · `?estado=instavel-com-fila` (a falha
+de leitura que já não apaga o que ela cronometrou) · e a bancada do prontuário
+ganhou duas noites de contração, que ela nunca teve.

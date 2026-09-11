@@ -48,7 +48,11 @@ describe("⚠️ os DOIS leitores leem o mesmo catálogo", () => {
      de rótulo divergiriam no primeiro ajuste, e a divergência apareceria como
      o painel chamando de outra coisa o que ela marcou. */
   const paciente = semComentarios(fonte("src/components/kicks-tab.tsx"));
-  const medico = semComentarios(fonte("src/components/prontuario-paciente.tsx"));
+  /* ⚠️ **A RÉGUA MUDOU DE ARQUIVO, E A GARANTIA NÃO.** `resumo()` saiu de
+       `prontuario-paciente.tsx` para `linha-do-tempo-clinica.ts` (set/2026)
+       para poder ser EXECUTADA num teste em vez de lida por texto. O que estes
+       testes cobram continua sendo o mesmo: o que o médico lê. */
+  const medico = semComentarios(fonte("src/lib/linha-do-tempo-clinica.ts"));
 
   test("a tela dela monta os botões e o chip a partir do módulo", () => {
     expect(paciente).toContain("NIVEIS_DE_FORCA");
@@ -216,7 +220,7 @@ describe("⚠️ a DURAÇÃO chega ao médico, e com ela a noite do alarme", () 
   });
 
   test("o prontuário mostra a duração na mesma frase da contagem", () => {
-    const medico = semComentarios(fonte("src/components/prontuario-paciente.tsx"));
+    const medico = semComentarios(fonte("src/lib/linha-do-tempo-clinica.ts"));
     expect(medico).toMatch(/em \$\{d\.duracao_min\} min/);
   });
 });

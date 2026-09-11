@@ -100,7 +100,7 @@ describe("o SOS responde ao dedo", () => {
 });
 
 describe("a contração marca o instante do dedo", () => {
-  const corpo = corpoDe(CONTRACOES, "async function startContraction()");
+  const corpo = corpoDe(CONTRACOES, "function startContraction()");
 
   test("⚠️ `started_at` é carimbado no CLIENTE, não pelo relógio do servidor", () => {
     /* `ended_at` sempre foi o instante do dedo (`new Date()` dentro do
@@ -111,34 +111,49 @@ describe("a contração marca o instante do dedo", () => {
     expect(corpo).toContain("started_at:");
     const instante = corpo.indexOf("const agora = Date.now()");
     expect(instante).toBeGreaterThan(-1);
-    const primeiroAwait = corpo.indexOf("await ");
-    expect(instante).toBeLessThan(primeiroAwait);
-    /* E o que vai para o banco é ESSE instante, não um `Date.now()` novo. */
+    /* E o que vai para o registro é ESSE instante, não um `Date.now()` novo. */
     const carimbo = corpo.slice(corpo.indexOf("started_at:"));
     expect(carimbo.slice(0, 60)).toContain("agora");
   });
 
-  test("⚠️ o cronômetro da tela usa o MESMO instante do banco", () => {
+  test("⚠️ o cronômetro da tela usa o MESMO instante do registro", () => {
     /* Dois relógios fariam a tela contar uma coisa e o registro guardar
        outra — e é o registro que o médico lê depois. */
     expect(corpo).toContain("startRef.current = agora");
   });
 
-  test("o dedo recebe resposta antes de qualquer ida à rede", () => {
-    const toque = corpo.indexOf("hapticTap()");
-    expect(toque).toBeGreaterThan(-1);
-    expect(toque).toBeLessThan(corpo.indexOf("await "));
+  /**
+   * ⚠️ **ESTE BLOCO TRAVAVA A GRAFIA `async function startContraction()` e as
+   * asserções de "antes do primeiro `await`" — e ficou vermelho sobre uma
+   * mudança que só APERTOU a garantia.**
+   *
+   * A função deixou de ir à rede: a contração nasce no aparelho
+   * (`fila-de-contracoes.ts`) e sobe quando FECHA. "O dedo recebe resposta
+   * antes de qualquer espera" passou a ser trivialmente verdade, porque não há
+   * espera nenhuma — e a asserção antiga, que media a posição do `hapticTap`
+   * contra a do primeiro `await`, estourava com `indexOf` devolvendo −1.
+   *
+   * É a décima sexta vez desta armadilha neste repositório. O que se cobra
+   * agora é a GARANTIA: nenhuma ida à rede entre o toque e o cronômetro.
+   */
+  test("⚠️ NENHUMA ida à rede entre o dedo e o cronômetro", () => {
+    expect(corpo).not.toContain("await");
+    expect(corpo).not.toContain(".insert(");
+    /* E o toque continua sendo respondido. */
+    expect(corpo).toContain("hapticTap()");
   });
 
-  test("⚠️ a sessão vem do DISCO, não da rede", () => {
-    /* `getUser()` é uma ida ao servidor; `getSession()` lê o que já está no
-       aparelho. Uma espera a menos entre o toque e o cronômetro. */
-    expect(corpo).toContain("getSession()");
-    expect(corpo).not.toContain("getUser()");
+  test("a contração é gravada no aparelho ANTES de qualquer coisa mais", () => {
+    /* É isto que a faz sobreviver ao 4G do elevador do hospital. */
+    expect(corpo).toContain("gravarFila");
   });
 
-  test("e a falha também é sentida — ela pode não estar olhando", () => {
-    expect(corpo).toContain('hapticoDeAviso("erro")');
+  test("e a falha de rede continua sendo sentida no encerrar", () => {
+    /* O ponto de falha mudou de lugar: agora ele é depois do fim da dor, não
+       no meio dela. Mas continua existindo, e continua sendo sentido. */
+    const fim = corpoDe(CONTRACOES, "async function stopContraction()");
+    expect(fim).toContain('hapticoDeAviso("erro")');
+    expect(fim).toContain("hapticTap()");
   });
 });
 

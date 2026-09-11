@@ -152,6 +152,38 @@ function Bancada() {
       [],
       "kick_sessions",
     ),
+    /* ⚠️ **A NOITE DE CONTRAÇÕES EXISTE PARA PROVAR O AGRUPAMENTO — e sem ela
+       o defeito era invisível aqui.** A view projeta UMA LINHA POR CONTRAÇÃO e
+       este render mostra as quarenta primeiras: catorze contrações bastam para
+       empurrar a pressão alterada e a pré-consulta desta mesma bancada para
+       fora da tela. Com o agrupamento, as catorze viram UMA linha
+       ("14 contrações, em 39 min, a cada 3 min, ~62s, fortes") e o resto da
+       linha do tempo volta a caber.
+
+       São DOIS episódios separados por mais de duas horas, de propósito: é o
+       que prova que a régua não junta a tarde com a madrugada. */
+    ...Array.from({ length: 14 }, (_, i) =>
+      ev(
+        new Date(Date.UTC(2026, 7, 19, 2, 4 + i * 3)).toISOString(),
+        "contracao",
+        { intensidade: 3, duracao_seg: 58 + (i % 3) * 3 },
+        "normal",
+        null,
+        [],
+        "contraction_logs",
+      ),
+    ),
+    ...[0, 11, 22].map((m) =>
+      ev(
+        new Date(Date.UTC(2026, 7, 18, 21, 10 + m)).toISOString(),
+        "contracao",
+        { intensidade: 1, duracao_seg: 35 },
+        "normal",
+        null,
+        [],
+        "contraction_logs",
+      ),
+    ),
   ];
 
   const consultas: Consulta[] = [

@@ -117,6 +117,15 @@ const ROTEIRO = [
     nome: "moderação · ficha e desfechos",
     passos: [{ clique: "ver ficha" }, { clique: "Sem ação" }],
   },
+  /* ⚠️ **A CORREÇÃO DE UMA CONTRAÇÃO SÓ EXISTE DEPOIS DE UM TOQUE** — a linha
+     inteira é o alvo, e o painel com os três níveis e o "Apagar esta" nasce
+     dali. Sem este roteiro, o caminho que apaga DADO CLÍNICO nunca seria
+     exercitado por nenhuma varredura. */
+  {
+    q: "/preview-contracoes?estado=normal&w=39",
+    nome: "contrações · corrigir a intensidade de uma linha",
+    passos: [{ clique: /^\d{2}:\d{2}/ }, { clique: /^Forte$/ }],
+  },
 ];
 
 /** Ruído de ambiente, não da tela — a mesma lista da varredura de bancadas. */

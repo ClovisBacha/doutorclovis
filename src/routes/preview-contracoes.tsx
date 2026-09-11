@@ -86,6 +86,18 @@ function linha(minAtras: number, duracaoSeg: number | null, intensidade: number)
 function montar(estado: string) {
   const agora = ANCORA;
   if (estado === "instavel") return { contractions: [], instavel: true, agora };
+  if (estado === "instavel-com-fila")
+    /* ⚠️ **O QUE ELA CRONOMETROU NÃO SOME MAIS COM A FALHA DE LEITURA.** Antes
+       `data ?? []` transformava erro de rede em "ela não cronometrou nada" e a
+       lista sumia junto com o banner. Agora o que está no aparelho continua na
+       tela — e a ANÁLISE continua escondida de propósito, porque ela seria
+       parcial (faltam as do servidor) e poderia tranquilizar quem não pode ser
+       tranquilizada. Este estado é o único que prova as duas coisas juntas. */
+    return {
+      contractions: [0, 4, 8].map((m) => linha(m, 55, 3)),
+      instavel: true,
+      agora,
+    };
   if (estado === "parto")
     /* De 3 em 3 minutos, 65 s cada — o caso urgente, e o único caminho que
        desenha os dois botões de ligar. */
@@ -110,6 +122,24 @@ function montar(estado: string) {
     return { contractions: [linha(0, null, 2), linha(9, 45, 2), linha(19, 40, 2)], agora };
   if (estado === "normal")
     return { contractions: [linha(5, 35, 1), linha(35, 30, 1), linha(70, 28, 2)], agora };
+  if (estado === "subindo")
+    /* ⚠️ **O ÚNICO ESTADO QUE PROVA A LEITURA DA INTENSIDADE.** Todos os
+       outros usam um nível CONSTANTE — foi por isso que `tendenciaDaIntensidade`
+       podia nascer sem nunca ter sido olhada. Seis contrações espaçadas
+       (a cada 12 min, ou seja fora de qualquer corte de alarme) que vão de
+       leves a fortes: é exatamente o caso em que o status NÃO muda e a frase
+       do terceiro eixo da ACOG é a única coisa nova na tela. */
+    return {
+      contractions: [
+        linha(0, 45, 3),
+        linha(12, 42, 3),
+        linha(24, 40, 3),
+        linha(36, 35, 1),
+        linha(48, 32, 1),
+        linha(60, 30, 1),
+      ],
+      agora,
+    };
   if (estado === "episodios")
     /* ⚠️ **A LISTA MOSTRA AS DEZ ÚLTIMAS, E ELAS SÃO REGISTRADAS EM EPISÓDIOS.**
        Quem cronometrou uma noite de Braxton-Hicks anteontem e voltou a

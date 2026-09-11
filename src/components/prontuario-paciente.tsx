@@ -39,7 +39,7 @@ import {
   type FichaClinica,
   type Serie,
 } from "@/lib/clinical.functions";
-import { nivelDeForca } from "@/lib/forca-do-movimento";
+import { ROTULO_ESPECIE, itensDaLinha, resumo } from "@/lib/linha-do-tempo-clinica";
 import { formataTelefone, linkTel } from "@/lib/telefone";
 import { quando } from "@/lib/quando";
 import { GraficoClinico, daSerie, seriesDePressao } from "./grafico-clinico";
@@ -47,18 +47,6 @@ import { GraficoClinico, daSerie, seriesDePressao } from "./grafico-clinico";
 /* `idadeGestacional` mora em `modo-consulta.ts`. Estava duplicada aqui, e uma
    régua que arredonda em UM dos dois lugares faz a mesma paciente aparecer como
    36s numa tela e 36s6d noutra — e em obstetrícia os dias decidem conduta. */
-
-const ROTULO_ESPECIE: Record<string, string> = {
-  medida: "Medida",
-  sintoma: "Sintomas",
-  emergencia: "SOS",
-  exame: "Exame",
-  contracao: "Contração",
-  humor: "Humor",
-  movimento: "Movimentos",
-  consulta: "Pré-consulta",
-  pergunta: "Pergunta",
-};
 
 /** Um número com a etiqueta da própria régua clínica. */
 function Medida({
@@ -511,34 +499,36 @@ export function ProntuarioPaciente({
             </p>
           ) : (
             <ul className="mt-2 space-y-1.5">
-              {eventos.slice(0, 40).map((e) => (
-                <li
-                  key={`${e.fonte}-${e.fonte_id}`}
-                  className="flex items-start gap-3 rounded-2xl border border-border bg-card p-3"
-                >
-                  <span
-                    aria-hidden
-                    className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
-                      e.gravidade === "grave"
-                        ? "bg-rose-500"
-                        : e.gravidade === "atencao"
-                          ? "bg-amber-500"
-                          : "bg-muted-foreground/30"
-                    }`}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                      {ROTULO_ESPECIE[e.especie] ?? e.especie} · {quando(e.ocorrido_em)}
-                    </p>
-                    <p className="mt-0.5 text-[13px] leading-snug text-foreground">{resumo(e)}</p>
-                    {e.texto && (
-                      <p className="mt-0.5 line-clamp-3 text-[12px] leading-snug text-muted-foreground">
-                        {e.texto}
+              {itensDaLinha(eventos)
+                .slice(0, 40)
+                .map((i) => (
+                  <li
+                    key={i.chave}
+                    className="flex items-start gap-3 rounded-2xl border border-border bg-card p-3"
+                  >
+                    <span
+                      aria-hidden
+                      className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
+                        i.gravidade === "grave"
+                          ? "bg-rose-500"
+                          : i.gravidade === "atencao"
+                            ? "bg-amber-500"
+                            : "bg-muted-foreground/30"
+                      }`}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                        {i.rotulo} · {quando(i.em)}
                       </p>
-                    )}
-                  </div>
-                </li>
-              ))}
+                      <p className="mt-0.5 text-[13px] leading-snug text-foreground">{i.resumo}</p>
+                      {i.texto && (
+                        <p className="mt-0.5 line-clamp-3 text-[12px] leading-snug text-muted-foreground">
+                          {i.texto}
+                        </p>
+                      )}
+                    </div>
+                  </li>
+                ))}
             </ul>
           )}
         </div>
@@ -548,74 +538,6 @@ export function ProntuarioPaciente({
 }
 
 /** Uma linha que diz o que aconteceu, sem obrigar o médico a ler um objeto. */
-function resumo(e: EventoClinico): string {
-  const d = e.dados;
-  const partes: string[] = [];
-  if (d.systolic != null && d.diastolic != null) partes.push(`PA ${d.systolic}/${d.diastolic}`);
-  if (d.glucose_mg_dl != null) {
-    partes.push(`glicemia ${d.glucose_mg_dl}${d.momento ? ` (${d.momento})` : ""}`);
-  }
-  if (d.weight_kg != null) partes.push(`peso ${d.weight_kg} kg`);
-  if (d.spo2 != null) partes.push(`SpO₂ ${d.spo2}%`);
-  if (d.heart_rate_bpm != null) partes.push(`FC ${d.heart_rate_bpm} bpm`);
-  if (d.sintomas?.length) partes.push(d.sintomas.join(", "));
-  /* `nivel` CARREGA DOIS VOCABULÁRIOS. A view projeta na mesma chave o `level`
-     de `triage_logs` (vermelho/amarelo/verde) e o de `epds_logs`
-     (baixo/moderado/alto/urgente) — e isto imprimia "triagem urgente" para um
-     rastreio de DEPRESSÃO, nome de outro instrumento. Um EPDS 21 com ideação
-     de autoagressão aparecia no prontuário rotulado como triagem de sintomas.
-
-     A gravidade em si sempre esteve certa (sai de `epds_q10`, não daqui); o que
-     mentia era o rótulo. A fonte desempata. */
-  if (d.nivel) {
-    partes.push(e.fonte === "epds_logs" ? `rastreio ${d.nivel}` : `triagem ${d.nivel}`);
-  }
-  /* ⚠️ **A FORÇA CHEGA AQUI, e antes ela não chegava a lugar nenhum.** Ela é
-     escolhida pela paciente durante a sessão, gravada em
-     `kick_sessions.strength` e projetada pela view — e o prontuário mostrava
-     só a CONTAGEM. Metade de um recurso: ela via o chip, ele via um número.
-     Heazell 2017 dá aOR 2,53 para redução de FORÇA contra 2,97 da frequência,
-     ou seja quase o mesmo peso, e o eixo mais novo era o invisível.
-
-     ⚠️ O RÓTULO SAI DO CATÁLOGO ÚNICO, nunca de um `if` de número aqui: é o
-     mesmo que a tela dela usa, e duas tabelas divergiriam no primeiro ajuste
-     — com a divergência aparecendo como o painel chamando de outra coisa o
-     que ela marcou. E o nível do meio CALA (`frase` nula): "como sempre" em
-     toda linha afogaria as duas que carregam notícia.
-
-     ⚠️ E ela NÃO mexe na gravidade. O limite clínico mora em
-     `sinais-clinicos.ts` e não se reescreve aqui; o que este eixo faz é
-     APARECER na linha do tempo, que é o que faltava. */
-  if (d.chutes != null || d.forca != null || d.duracao_min != null) {
-    const forca = nivelDeForca(d.forca)?.frase;
-    /* ⚠️ A DURAÇÃO ENTRA NA MESMA FRASE, e ela é o que separa duas notícias
-       opostas: "4 movimentos" pode ser uma sessão de cinco minutos ou o alarme
-       vermelho de duas horas que a paciente acabou de ler na tela dela. */
-    const tempo = d.duracao_min != null ? ` em ${d.duracao_min} min` : "";
-    const base = (d.chutes != null ? `${d.chutes} movimentos` : "movimentos") + tempo;
-    partes.push(forca ? `${base} (${forca})` : base);
-  }
-  if (d.intensidade != null) {
-    partes.push(`intensidade ${d.intensidade}${d.duracao_seg ? ` · ${d.duracao_seg}s` : ""}`);
-  }
-  if (d.nome) partes.push(d.nome);
-  if (d.humor) partes.push(`humor: ${d.humor}`);
-  if (d.epds != null) partes.push(`EPDS ${d.epds}`);
-  if (d.medicamentos) partes.push(`medicações: ${d.medicamentos}`);
-  if (d.emocional) partes.push(`emocional: ${d.emocional}`);
-  if (e.especie === "emergencia") partes.push("acionou o SOS");
-  if (e.especie === "pergunta") partes.push(d.respondida ? "respondida" : "sem resposta");
-  return partes.join(" · ") || (ROTULO_ESPECIE[e.especie] ?? "Registro");
-}
-
-/**
- * O bloco das 13h50.
- *
- * Um valor isolado não decide nada: o que decide é o que ele já sabia contra o
- * que apareceu depois. Sem consulta registrada, este bloco convida a registrar
- * a primeira — porque a alternativa (não mostrar nada) esconde que a
- * funcionalidade existe.
- */
 function MudancasDesdeAConsulta({
   eventos,
   consultas,
