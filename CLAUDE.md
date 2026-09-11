@@ -8945,26 +8945,80 @@ amizade aceita − encerradas), falhando fechada. Minha consulta a uma tabela s�
 daria um número MENOR do que a lista que ela encontra ao abrir a porta — e
 emblema que não bate com a tela é pior que emblema nenhum.
 
-### ⚠️ A catraca de colunas NÃO É CONSTRUÍVEL HOJE, e isso é um achado
+### ⚠️ A CATRACA DE COLUNAS ERA CONSTRUÍVEL — pela via do SQL (set/2026)
 
-Tentei automatizar a conferência. A fonte natural é `types.ts`, que é gerado do
-banco. **Medido: ele conhece 27 tabelas de 112 e não sabe o que é
-`doctor_id`.** Uma varredura sobre ele acusou **37 falsos positivos**, entre
-eles `patient_profiles.doctor_id`, que o app inteiro usa.
+Esta seção dizia, com todas as letras, que a catraca "NÃO É CONSTRUÍVEL HOJE", e
+o número que sustentava isso era real: uma varredura sobre **`types.ts`** acusou
+**37 falsos positivos**, inclusive `patient_profiles.doctor_id`, que o app
+inteiro usa — porque o arquivo gerado conhece **27 tabelas de 131**.
 
-⚠️ **Catraca com falso positivo é catraca que alguém desliga** — e aí ela deixa
-de pegar o defeito de verdade. Preferi não ter a essa, e deixei escrito em
-`tabelas-que-existem.test.ts` o que destrava: **regenerar o `types.ts`**
-(`supabase gen types typescript`). Feito isso, a varredura vale a pena, e o
-recorte certo é só `.eq("col", …)` colado num `.from("tabela")` — casar qualquer
-coluna com qualquer tabela dá falso positivo em cascata.
+⚠️ **O erro não era o número: era a FONTE.** `colunas-que-existem.test.ts` já
+parseava os `supabase/**/*.sql` com sucesso — só que para seis tabelas escritas
+à mão e só do lado do `select`. Pela via do SQL, medido: **131 tabelas · 1.564
+colunas de `select` · 1.354 filtros literais · ZERO falsos positivos.**
 
-Enquanto isso a defesa é humana: **conferir a coluna no `supabase/*.sql` antes
-de escrever o filtro.** Foi assim que este erro foi achado.
+⚠️ **A lição de método é a mais cara:** a prosa daqui estava VENCIDA, e eu quase
+a aceitei como decisão tomada. É a quarta vez neste repositório que prosa
+desatualizada engana alguém — e a primeira em que ela quase impediu um conserto.
+**Medir antes de aceitar o que está escrito**, inclusive o que está escrito
+aqui.
 
-⚠️ **Isto entra na lista de coisas para o dono:** o `types.ts` desatualizado não
-é só um teste que não dá para escrever — é o autocompletar e a checagem de tipo
-do Supabase valendo para um quarto do banco.
+#### Os três defeitos que ela achou no mesmo dia, todos silenciosos
+
+| arquivo                          | filtro                       | o que existe                  | o que a paciente via                       |
+| -------------------------------- | ---------------------------- | ----------------------------- | ------------------------------------------ |
+| `estado-das-portas.functions.ts` | `family_album_posts.user_id` | `patient_user_id`             | a porta do Álbum nunca desenhou o número   |
+| `estado-das-portas.functions.ts` | `baby_name_entries.user_id`  | **nenhuma coluna de usuário** | idem, na porta "Nome do bebê"              |
+| `achievements.functions.ts`      | `kick_sessions.created_at`   | `started_at`                  | `first_kicks` e `kicks_10` **impossíveis** |
+
+Os dois primeiros são os mesmos nomes inventados que esta seção registra ter
+"consertado" — **o conserto cobriu um dos três e deixou dois de pé**, e pela
+régua que o próprio `estado-das-portas.ts` declara (contagem ilegível vira
+`null`, e `null` não desenha nada) eles eram **perfeitamente invisíveis**: a aba
+Comunidade prometia "12 fotos no álbum" e entregava o subtítulo desde o primeiro
+dia.
+
+⚠️ **O terceiro é o que prova por que a lista à mão não servia:** `kick_sessions`
+não estava entre as seis, e o defeito nasceu de um CONSERTO — quando as três
+conquistas passaram a contar DIAS DISTINTOS, as irmãs (`health_logs`,
+`journal_entries`) tinham `created_at` e esta não. **Catraca com lista à mão dá
+sensação de cobertura exatamente onde não há.**
+
+#### E a varredura mentiu uma vez, pelo motivo de sempre
+
+Ela acusou um QUARTO caso — `brain_feedback.status` — e ele é **falso**. A
+coluna existe, é filtrada em seis lugares e funciona em produção. A causa:
+a varredura de um `ALTER TABLE` vai até o `;` que fecha o comando (é o que faz
+ela enxergar os vários `ADD COLUMN` de um comando só), e o comentário daquele
+`ALTER` tem um ponto e vírgula dentro — _"`aberta` enquanto pede olhar dele;
+`resolvida` depois"_. A janela fechava no comentário e as colunas declaradas
+abaixo sumiam do conjunto conhecido.
+
+⚠️ **Tira-se o comentário antes de procurar — e isso vale para o SQL também.**
+Este repositório já registrava a regra nos dois sentidos no TypeScript (prosa
+aprovando função morta, prosa reprovando código certo); esta é a terceira forma,
+e a única em que ela produz uma acusação CONTRA código correto de produção.
+
+#### O que a catraca NÃO faz, e por quê
+
+- **As views ficam de fora**: as colunas delas nascem dos aliases do `SELECT`, e
+  `clinical_events` é montada dentro de uma string por um `DO` que escolhe as
+  fontes em tempo de execução. Deduzi-las faria a catraca acusar código certo.
+- **Junções (`a(b)`) e `*` ficam de fora** — não são colunas simples.
+- **Ela não vê consulta montada por variável**, e não conhece o banco de
+  produção. É uma REDE contra nome inventado, não uma prova de schema.
+- ⚠️ **A régua de acusação é UMA função**, usada pela asserção principal E pela
+  contraprova. A primeira versão repetia a expressão nos dois lugares, e a
+  mutação que neutraliza a asserção principal passou **VERDE** — a contraprova
+  continuava mordendo a própria cópia. Uma catraca com a régua duplicada prova
+  que a cópia funciona, nunca que a catraca funciona. Três mutantes em vermelho:
+  não tirar o comentário do SQL, apagar o lado do filtro, aceitar qualquer
+  coluna.
+
+⚠️ **E o `types.ts` continua sendo assunto do dono**, agora por outra razão: ele
+não é mais "um teste que não dá para escrever" — é o autocompletar e a checagem
+de tipo do Supabase valendo para um quarto do banco. Regenerar é
+`supabase gen types typescript`, com credencial que não mora no repositório.
 
 ## O `@` e a `#` (ago/2026)
 
