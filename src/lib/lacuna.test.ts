@@ -317,7 +317,14 @@ describe("o prompt do app informa antes de encaminhar", () => {
  */
 describe("a resposta nunca chega vazia", () => {
   const chat = readFileSync("src/routes/api/chat.ts", "utf8");
-  const app = readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8");
+  /* ⚠️ O chat (ChatTab, WABubble, buildPatientContext…) saiu de minha-conta.tsx
+     para src/components/chat-tab.tsx em set/2026. Este teste confere coisas dos
+     DOIS arquivos, então lê os dois juntos — uma asserção que procura texto do
+     chat aqui continua encontrando. */
+  const app =
+    readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8") +
+    "\n" +
+    readFileSync("src/components/chat-tab.tsx", "utf8");
 
   test("o raciocínio do modelo está desligado", () => {
     /* Ele não é necessário aqui — o trabalho é informar bem e encaminhar o

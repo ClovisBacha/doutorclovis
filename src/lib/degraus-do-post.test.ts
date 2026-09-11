@@ -1,0 +1,253 @@
+import { describe, test, expect } from "bun:test";
+import { readFileSync } from "node:fs";
+import { postsCrus } from "./rede-social.functions";
+
+/**
+ * ⚠️ **A ESCADA DA LEITURA, RODADA DE VERDADE.**
+ *
+ * `postsCrus` é o único caminho de TODA leitura de post — seis chamadores
+ * (`meuFeed`, `verPerfil`, `sugestoesDoFeed`, `verPost`, `meusSalvos`,
+ * `postsDaTag`). Ela tinha DUAS posições e nada no meio: tudo, ou o piso de
+ * sete colunas. Como `alt_texto` entrou no topo da lista e só existe no
+ * `APLICAR_COMENTARIOS_E_LIMITES.sql` — que o dono ainda não rodou —, o banco
+ * dele hoje derrubava ONZE colunas que ele TEM por causa de UMA que falta.
+ *
+ * ⚠️ E o dano passava de enfeite: post de vídeo tem `imagem_path` nulo, então
+ * com `video_path` nulado junto a publicação renderiza SEM MÍDIA NENHUMA, e a
+ * republicação sem texto próprio some inteira.
+ *
+ * Estes testes rodam a função contra um Supabase de mentira que conhece um
+ * conjunto de colunas escolhido — é a única forma de provar a escada, porque o
+ * defeito só existe num banco que rodou meio SQL.
+ */
+
+/** Um Supabase de mentira que só aceita as colunas que ele conhece. */
+function bancoCom(conhecidas: string[]) {
+  const pedidos: string[] = [];
+  const linha: Record<string, unknown> = {};
+  for (const c of conhecidas) linha[c] = `v:${c}`;
+  return {
+    pedidos,
+    from() {
+      return {
+        select(cols: string) {
+          pedidos.push(cols);
+          const faltando = cols
+            .split(",")
+            .map((c) => c.trim())
+            .filter((c) => !conhecidas.includes(c));
+          /* ⚠️ O Postgres reprova o select INTEIRO por uma coluna que falta, e
+             é isso que faz um recuo de dois passos apagar tudo. */
+          if (faltando.length) {
+            return { data: null, error: { code: "42703", message: `sem ${faltando[0]}` } };
+          }
+          return { data: [{ ...linha }], error: null };
+        },
+      };
+    },
+  };
+}
+
+/**
+ * Todas as colunas que a leitura pede — DERIVADAS do fonte, nunca escritas à
+ * mão.
+ *
+ * ⚠️ Uma cópia aqui divergiria da lista real no primeiro ajuste, e a
+ * divergência apareceria como o teste "banco em dia devolve tudo" reprovando
+ * uma coluna que acabou de nascer — que é a forma mais rápida de alguém editar
+ * o teste em vez de ler o que ele garante. Aconteceu na primeira versão deste
+ * arquivo.
+ */
+const TODAS = (() => {
+  const fonte = readFileSync("src/lib/rede-social.functions.ts", "utf8");
+  const i = fonte.indexOf("const COLUNAS_DO_POST =");
+  const lista = fonte.slice(i, fonte.indexOf(";", i));
+  return [...lista.matchAll(/"([^"]+)"/g)]
+    .flatMap((m) => m[1].split(","))
+    .map((c) => c.trim())
+    .filter(Boolean);
+})();
+
+const ler = (sb: any) => postsCrus(sb, (b: any) => b);
+
+/**
+ * Quantos degraus a escada tem hoje — lido do FONTE, nunca cravado.
+ *
+ * ⚠️ Um número à mão aqui reprovaria toda camada de SQL nova, e quem vê um
+ * teste vermelho sobre uma coluna que acabou de acrescentar troca o número sem
+ * ler o que ele garantia.
+ */
+const DEGRAUS = (() => {
+  /* ⚠️ **ANCORADO EM `DEGRAUS_DO_POST`, e não no arquivo inteiro.** A primeira
+     versão contava `aviso: "` solto — e `publicarPost` tem a própria escada
+     (`CAMADAS`), com o mesmo campo. O número saía somando LEITURA e ESCRITA, e
+     o teste reprovava sobre uma escada que estava certa. É a mesma armadilha de
+     substring que já pegou `const fora =` e `minhaColuna` nesta base. */
+  const fonte = readFileSync("src/lib/rede-social.functions.ts", "utf8");
+  const i = fonte.indexOf("const DEGRAUS_DO_POST");
+  const bloco = fonte.slice(i, fonte.indexOf("\n];", i));
+  return (bloco.match(/aviso: "/g) ?? []).length;
+})();
+
+describe("⚠️ postsCrus desce UM degrau por vez", () => {
+  test("banco em dia devolve tudo, com UMA consulta só", async () => {
+    const sb = bancoCom(TODAS);
+    const r = await ler(sb);
+    expect(sb.pedidos.length).toBe(1);
+    expect(r[0].alt_texto).toBe("v:alt_texto");
+  });
+
+  test("⚠️ SEM `alt_texto` (o banco do dono hoje) as outras onze SOBREVIVEM", async () => {
+    /* Este é o caso que motivou a escada. Com o recuo de dois passos, todas as
+       linhas abaixo davam `null`. */
+    const sb = bancoCom(TODAS.filter((c) => c !== "alt_texto"));
+    const [p] = await ler(sb);
+    expect(p.alt_texto).toBeNull();
+    for (const c of [
+      "video_path",
+      "repost_de",
+      "marco_tipo",
+      "enquete_opcoes",
+      "aula",
+      "miniatura_path",
+    ]) {
+      expect(p[c]).toBe(`v:${c}`);
+    }
+  });
+
+  test("⚠️ e o VÍDEO é o que dói: sem ele o post fica sem mídia nenhuma", async () => {
+    /* Post de vídeo tem `imagem_path` nulo. Com `video_path` nulado junto, o
+       carrossel e o player ficam os dois falsos. */
+    const sb = bancoCom(TODAS.filter((c) => c !== "alt_texto"));
+    const [p] = await ler(sb);
+    expect(p.video_path).not.toBeNull();
+    expect(p.repost_de).not.toBeNull();
+  });
+
+  test("sem vídeo/repost, o marco e a enquete sobrevivem", async () => {
+    const sb = bancoCom(TODAS.filter((c) => !["alt_texto", "video_path", "repost_de"].includes(c)));
+    const [p] = await ler(sb);
+    expect(p.video_path).toBeNull();
+    expect(p.marco_tipo).toBe("v:marco_tipo");
+    expect(p.enquete_opcoes).toBe("v:enquete_opcoes");
+  });
+
+  test("banco só com as sete originais chega ao piso, e não quebra", async () => {
+    const sb = bancoCom(TODAS.slice(0, 7));
+    const [p] = await ler(sb);
+    expect(p.id).toBe("v:id");
+    /**
+     * ⚠️ **O PISO DEVOLVE UM VALOR SEGURO, não necessariamente `null`.**
+     *
+     * Quase toda coluna nova é anulável, e ausente vira `null` — "não sei". A
+     * exceção é `sensivel`, que é booleana `NOT NULL`: sem a coluna, nenhum
+     * post está marcado, e `false` é o estado de antes do recurso. Devolver
+     * `null` ali faria `deveBorrar` receber um valor que ela não espera.
+     */
+    for (const c of TODAS.slice(7)) {
+      expect(c === "sensivel" ? p[c] : (p[c] ?? null)).toBe(c === "sensivel" ? false : null);
+    }
+    /* A lista cheia mais um pedido por degrau. ⚠️ DERIVADO, e não um número
+       cravado: acrescentar uma camada de SQL não pode reprovar um teste que
+       continua descrevendo a mesma garantia. */
+    expect(sb.pedidos.length).toBe(1 + DEGRAUS);
+  });
+
+  test("⚠️ remover uma coluna NÃO come o miolo de outra que a contém", async () => {
+    /**
+     * ⚠️ **ISTO FOI UM DEFEITO REAL, e ele veio com `sensivel`.**
+     *
+     * A remoção tem duas formas: `, alvo` (meio ou fim) e `alvo, ` (começo). A
+     * primeira sempre teve `\b`; a SEGUNDA não tinha. Ao remover `sensivel`,
+     * ela comia o miolo de `motivo_sensivel` e produzia `motivo_video_legenda`
+     * — uma coluna que não existe, fazendo TODOS os degraus abaixo falharem e
+     * a leitura chegar ao piso com tudo nulo.
+     *
+     * É a armadilha de substring que este repositório já pagou em
+     * `bloquear`/`bloquearPeriodo` e em `minhaColuna`/`minhaColunaDeLeitura`,
+     * agora dentro de um recuo — o lugar onde ela é mais cara, porque o sintoma
+     * é "recurso sumiu" e não "erro".
+     *
+     * A garantia: com o banco COMPLETO menos uma coluna do meio, as vizinhas
+     * cujo nome a contém sobrevivem.
+     */
+    const sb = bancoCom(TODAS.filter((c) => c !== "lugar"));
+    const [p] = await ler(sb);
+    expect(p.lugar ?? null).toBeNull();
+    /* `motivo_sensivel` contém `sensivel`; `video_legenda` vinha logo depois. */
+    expect(p.motivo_sensivel).toBe("v:motivo_sensivel");
+    expect(p.video_legenda).toBe("v:video_legenda");
+    expect(p.sensivel).toBe("v:sensivel");
+    expect(p.ciclo).toBe("v:ciclo");
+  });
+
+  test("⚠️ nem o piso responde → lista VAZIA, nunca uma exceção", async () => {
+    /* Aqui o banco não tem sequer as colunas originais. Estourar aqui deixaria
+       a aba preta com um erro; lista vazia é a resposta honesta. */
+    const sb = bancoCom(["id"]);
+    expect(await ler(sb)).toEqual([]);
+  });
+
+  test("⚠️ nenhum degrau manda select com vírgula solta", async () => {
+    /* A derivação é por remoção de texto: um `, ` sobrando faz o PostgREST
+       recusar a consulta inteira, e o recuo passaria a falhar por sintaxe em
+       vez de por coluna. */
+    const sb = bancoCom(TODAS.slice(0, 7));
+    await ler(sb);
+    for (const p of sb.pedidos) {
+      expect(p).not.toMatch(/,\s*,|,\s*$|^\s*,/);
+      expect(p.split(",").every((c) => c.trim().length > 0)).toBe(true);
+    }
+  });
+});
+
+/**
+ * ⚠️ O AUTOR DO POST, EM `postQueEuVejo` — a escada que faltava, e o vazamento
+ * que ela escondia.
+ *
+ * `foraDaRede` cruza TRÊS razões (luto, pausa e suspensão pela moderação), e o
+ * `select` do autor nunca pedia a terceira: mesmo num banco COM a coluna,
+ * `rede_suspensa_em` chegava `undefined` e **o post de uma autora suspensa
+ * continuava comentável**. É um dos vinte e seis pontos de decisão que o
+ * comentário da `foraDaRede` avisa que não podem ficar de fora — e ele ficou.
+ */
+describe("o autor do comentário desce um degrau por vez", () => {
+  const COM = readFileSync("src/lib/comentarios.functions.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/^\s*\/\/.*$/gm, " ");
+
+  const DEGRAUS = (() => {
+    const i = COM.indexOf("const DEGRAUS_DO_AUTOR");
+    expect(i).toBeGreaterThan(-1);
+    const j = COM.indexOf("];", i);
+    return COM.slice(i, j)
+      .split("\n")
+      .map((l) => l.match(/"([^"]+)"/)?.[1])
+      .filter((x): x is string => !!x);
+  })();
+
+  test("⚠️ pede a suspensão no topo", () => {
+    expect(DEGRAUS[0]).toContain("rede_suspensa_em");
+  });
+
+  test("⚠️ e são TRÊS — um por SQL, do mais novo para o mais antigo", () => {
+    /* Um recuo que só soubesse tirar a primeira coluna quebraria de novo assim
+       que a segunda faltasse num banco que rodou meio SQL. */
+    expect(DEGRAUS.length).toBe(3);
+    expect(DEGRAUS[1]).toContain("rede_pausada_em");
+    expect(DEGRAUS[1]).not.toContain("rede_suspensa_em");
+    expect(DEGRAUS[2]).not.toContain("rede_pausada_em");
+  });
+
+  test("⚠️ cada degrau é PREFIXO do de cima — descer só TIRA coluna", () => {
+    for (let i = 1; i < DEGRAUS.length; i++) {
+      expect(DEGRAUS[i - 1].startsWith(DEGRAUS[i])).toBe(true);
+    }
+  });
+
+  test("⚠️ e o laço para no primeiro que responde", () => {
+    const i = COM.indexOf("for (const colunas of DEGRAUS_DO_AUTOR)");
+    expect(i).toBeGreaterThan(-1);
+    expect(COM.slice(i, i + 220)).toMatch(/if \(!erroAutor\) break;/);
+  });
+});

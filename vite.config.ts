@@ -41,6 +41,69 @@ export default defineConfig({
        o preset, e o `vercel.functions.maxDuration` é honrado (conferido no
        `.vc-config.json` gerado). Sem o cast, `tsc --noEmit` reprova uma
        configuração que funciona. */
-    ...({ vercel: { functions: { maxDuration: 30 } } } as Record<string, unknown>),
+    /* ⚠️ **A CASCA DO APP É GUARDADA NA BORDA, e não montada a cada
+       abertura (set/2026).**
+
+       O dono: "a primeira tela está demorando muito para carregar quando abro
+       o app". O app instalado abre em `/minha-conta` (o `start_url` do
+       manifesto), e toda abertura acordava uma função em Washington para
+       montar um HTML que é IDÊNTICO para todo mundo — conferido: a rota não
+       tem `loader` nem `beforeLoad`, o `head()` é fixo, e o portão que
+       decide se ela está logada roda no TELEFONE (`getSession` lê o
+       armazenamento local, ver `_authenticated/route.tsx`). Não há nada por
+       usuária naquele HTML.
+
+       Com `isr`, a Vercel guarda a resposta na rede de distribuição — que tem
+       ponto em São Paulo — e passa a servi-la de lá. O ganho maior não é a
+       distância: é que **a borda nunca fica fria**. Função fria é o pior caso
+       da abertura, e é o que faz a demora ser às vezes muito maior que a
+       média: a paciente espera um Node subir do outro lado do continente
+       antes de o navegador saber sequer o que baixar.
+
+       ⚠️ **E continua em TEMPO REAL, que foi a condição do dono** ("acho que
+       tem que ser em tempo real"). O cache da borda é POR PUBLICAÇÃO: cada
+       deploy começa com ele vazio, então o que ela recebe é sempre o último
+       commit. Isto NÃO é o cache no telefone, que deixaria a paciente uma
+       abertura atrás — essa ideia foi levantada e recusada, e a diferença
+       entre as duas está registrada no CLAUDE.md.
+
+       ⚠️ **`allowQuery` fica sem valor de propósito** (o padrão guarda cada
+       query separadamente). O app recebe link profundo com `?tab=` do push,
+       e o router serializa a localização no HTML: uma casca guardada sem a
+       query servida para uma URL com query é a receita do erro de hidratação
+       que já deixou este app SEM ABRIR uma vez.
+
+       ⚠️ **Só a casca do app.** O site institucional é renderizado no servidor
+       de propósito (é o que os buscadores leem) e o painel do médico não é o
+       caminho que a paciente abre todo dia.
+
+       ⚠️ E `nitro.prerender` NÃO serve aqui, foi tentado: neste arranjo
+       (Vite 7 + TanStack Start) o prerenderer roda ANTES de o ambiente de
+       servidor ser construído, e a rota volta 404 — "Prerendered 0 routes". */
+    ...({
+      routeRules: { "/minha-conta": { isr: { expiration: false } } },
+      /* ⚠️ **A FUNÇÃO RODA EM SÃO PAULO, e não em Washington (set/2026).**
+
+         O banco está em `sa-east-1` (São Paulo) — conferido no painel do
+         Supabase, em Project Settings. A função de servidor rodava em `iad1`
+         (Washington), o padrão da Vercel. Então toda chamada de dado fazia o
+         caminho: telefone no Brasil → função nos EUA → banco no Brasil → volta
+         → volta. Duas travessias do continente para buscar um dado que estava
+         na mesma cidade da paciente.
+
+         E o custo se multiplica pelo número de idas ao banco DENTRO da função:
+         `claimDailyAndGetWallet`, que é quem devolve o saldo da fita do Jogo,
+         faz sete consultas em série. Cada uma pagava a ida e a volta
+         EUA↔Brasil.
+
+         ⚠️ **Não é ajuste fino, é a maior alavanca que sobrou** — bem maior
+         que qualquer corte de pacote, porque o número de idas ao banco é alto
+         e elas são em série.
+
+         ⚠️ E o SITE institucional passa a ser renderizado no Brasil também.
+         Para quem abre de fora do país isso é um pouco pior; o público é
+         brasileiro, então é o negócio certo. */
+      vercel: { functions: { maxDuration: 30, regions: ["gru1"] } },
+    } as Record<string, unknown>),
   },
 });

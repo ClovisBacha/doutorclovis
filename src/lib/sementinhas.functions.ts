@@ -93,6 +93,8 @@ function todayKeySaoPaulo(): string {
  * não há dado gestacional (pós-parto ou perfil incompleto) — aí não dá pra
  * validar por data e caímos no limite do conteúdo finito + dedupe.
  */
+import { cicloDoPerfil } from "./ciclo-da-gestacao";
+
 async function loadCycleAndGestation(
   admin: typeof import("@/integrations/supabase/client.server").supabaseAdmin,
   uid: string,
@@ -109,7 +111,10 @@ async function loadCycleAndGestation(
     reference_days?: number | null;
     birth_date?: string | null;
   } | null;
-  const cycle = p?.lmp_date ?? p?.reference_date ?? p?.birth_date ?? "x";
+  /* ⚠️ A expressão mora em `ciclo-da-gestacao.ts` desde que as MEMÓRIAS da
+     rede passaram a carimbar o ciclo na publicação. Duas cópias divergiriam, e
+     aqui a divergência aparece como troféu sumindo. */
+  const cycle = cicloDoPerfil(p);
   const gest = computeGestation({
     lmp: p?.lmp_date ?? null,
     referenceDate: p?.reference_date ?? null,

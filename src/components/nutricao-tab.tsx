@@ -1,0 +1,1824 @@
+/**
+ * A NUTRICIONISTA VIRTUAL — a única tela da grade da Saúde que é CONVERSA.
+ *
+ * Ela saiu de `minha-conta.tsx` byte a byte (conferido por SHA-256), e o corte
+ * veio antes de qualquer melhoria, pela razão de sempre: um move que também
+ * "melhora" é uma reescrita, e a mudança de comportamento se esconde num diff
+ * de quatrocentas linhas.
+ *
+ * ⚠️ **E O CORTE É O QUE PERMITE OLHÁ-LA.** Enquanto ela morava num arquivo de
+ * ROTA, importá-la de uma bancada poria o código dela no pedaço da árvore de
+ * rotas, que TODA página do site carrega (`rotas-sem-export-solto`). Sem
+ * bancada, conferir o estado de erro do fluxo, o "…" da bolha vazia ou os três
+ * desfechos do 👎 exigia uma conta real, cota de IA e provocar uma falha de
+ * rede na hora certa.
+ *
+ * `ChatMsg`, `Gest` e `Profile` viajam por `import type` — apagados na
+ * compilação, então não há dependência de execução do arquivo de rota.
+ */
+import {
+  Camera,
+  Check,
+  ChevronLeft,
+  Droplets,
+  Leaf,
+  Minus,
+  Pill,
+  Plus,
+  Refrigerator,
+  Phone,
+  ScanLine,
+  Search,
+  Send,
+  ThumbsDown,
+  ThumbsUp,
+  UtensilsCrossed,
+} from "lucide-react";
+import { podeComprarAqui } from "@/lib/canal-de-venda";
+import { pedeSocorro, RESPOSTA_DO_SOCORRO, TITULO_DO_SOCORRO } from "@/lib/socorro-na-nutricao";
+import { ehNativo } from "@/lib/nativo";
+import { recadoDaAmostra, recadoDoBloqueio, type MotivoDoBloqueio } from "@/lib/nutricao-premium";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import { colunaAusente, tabelaAusente } from "@/lib/postgrest";
+
+import type { ChatMsg, Gest, Profile } from "@/routes/_authenticated/minha-conta";
+import { supabase } from "@/integrations/supabase/client";
+import { avisoQuePodeAparecer, lerLinhaDoStream, passoDaDigitacao } from "@/lib/chat-stream";
+import icNutricao from "@/assets/saude/nutricao.webp";
+import { trimesterForWeek } from "@/lib/gestacao";
+import {
+  ALIVIOS,
+  META_COPOS,
+  REFEICOES,
+  chaveDaAgua,
+  chavesDeAguaVencidas,
+  chaveDosSuplementos,
+  chavesDeSuplementosVencidas,
+  itensDaPrescricao,
+  limparAlimento,
+  limparIngredientes,
+  perguntaDeAlivio,
+  perguntaDoPrato,
+  perguntaDoQueTenho,
+  perguntaPossoComer,
+  refeicaoDaHora,
+  resumoDosSuplementos,
+  type Refeicao,
+} from "@/lib/nutricao-ferramentas";
+import { FOTO_LADO_MAX, tituloDaFoto, type AssuntoDaFoto } from "@/lib/foto-da-nutricao";
+import { codificarFoto } from "@/lib/codificar-imagem";
+import { semMarcas } from "@/lib/texto-leve";
+import { TextoLeve } from "@/components/texto-leve";
+import { nutricaoDaSemana, nutricaoDoPosParto } from "@/lib/nutricao-da-semana";
+import { diasEntre } from "@/lib/filhos";
+import { conviteDoMomento, momentoDoDia } from "@/lib/nutricao-perfil";
+import {
+  PREFERENCIAS_MAX,
+  TURNOS_DA_MEMORIA,
+  limparPreferencias,
+  parParaGravar,
+  turnosDaMemoria,
+  type LinhaDaMemoria,
+} from "@/lib/nutricao-memoria";
+import { ymdLocal } from "@/lib/utils";
+import { useJanelaDoTeclado } from "@/lib/janela-do-teclado";
+import { useTravarRolagemDeFundo } from "@/lib/use-travar-rolagem";
+import { useVoltar } from "@/lib/use-voltar";
+import { submitBrainFeedback } from "@/lib/secondbrain.functions";
+
+const NUTRIENT_TIPS: Record<1 | 2 | 3, { nutrient: string; why: string; foods: string }[]> = {
+  1: [
+    {
+      nutrient: "Ácido Fólico",
+      why: "Previne defeitos do tubo neural",
+      foods: "Feijão, lentilha, espinafre, brócolis",
+    },
+    {
+      nutrient: "Ferro",
+      why: "Suporte ao volume de sangue",
+      foods: "Carne vermelha magra, feijão + vitamina C",
+    },
+    /* ⚠️ Sem atum, pela mesma razão da frase da semana: o app manda limitá-lo. */
+    {
+      nutrient: "Vitamina B6",
+      why: "Alivia enjoo matinal",
+      foods: "Banana, batata, frango, salmão",
+    },
+    {
+      nutrient: "Água",
+      why: "Hidratação e redução do enjoo",
+      foods: "8–10 copos/dia; água de coco, chás claros",
+    },
+  ],
+  2: [
+    {
+      nutrient: "Cálcio",
+      why: "Formação óssea do bebê",
+      foods: "Leite, iogurte, sardinha, brócolis",
+    },
+    {
+      nutrient: "Ômega-3",
+      why: "Desenvolvimento do cérebro fetal",
+      foods: "Salmão, sardinha, sementes de chia, linhaça",
+    },
+    {
+      nutrient: "Proteína",
+      why: "Crescimento muscular e placentário",
+      foods: "Ovos, frango, leguminosas, queijos pasteurizados",
+    },
+    {
+      nutrient: "Vitamina D",
+      why: "Absorção de cálcio e imunidade",
+      foods: "Ovos, cogumelos, exposição solar moderada",
+    },
+  ],
+  3: [
+    {
+      nutrient: "Fibras",
+      why: "Combate a constipação",
+      foods: "Aveia, ameixa, mamão, folhas verdes",
+    },
+    {
+      nutrient: "Magnésio",
+      why: "Reduz câimbras nas pernas",
+      foods: "Castanha-do-pará, banana, sementes de abóbora",
+    },
+    {
+      nutrient: "Ferro",
+      why: "Preparo para o parto",
+      foods: "Fígado (cozido), feijão preto, espinafre",
+    },
+    {
+      nutrient: "Vitamina C",
+      why: "Aumenta absorção do ferro",
+      foods: "Acerola, laranja, morango, kiwi",
+    },
+  ],
+};
+
+const NUTRITION_CHIPS: Record<1 | 2 | 3, string[]> = {
+  1: [
+    "Como controlar o enjoo com alimentação?",
+    "Quais alimentos evitar no 1º trimestre?",
+    "Posso tomar suplemento de ácido fólico junto com a alimentação?",
+    "O que comer quando não tenho apetite?",
+  ],
+  2: [
+    "Quanta proteína preciso por dia?",
+    "Posso comer salmão? Qual a frequência ideal?",
+    "Como garantir cálcio suficiente sem laticínios?",
+    "O que comer antes e depois de uma caminhada?",
+  ],
+  3: [
+    "Como evitar a constipação no final da gestação?",
+    "Tenho muita azia — o que posso comer?",
+    "Qual o melhor lanche noturno para não acordar com fome?",
+    "Posso comer tâmara para preparar o parto?",
+  ],
+};
+
+/* ⚠️ Os chips de trimestre são de gestação em curso ("Posso comer tâmara para
+   preparar o parto?"). Para quem já pariu, as perguntas são estas — e NENHUMA
+   afirma que ela amamenta: a de amamentação começa com "se". */
+const CHIPS_DO_POS_PARTO: string[] = [
+  "O que comer para recuperar do parto?",
+  "Se eu estiver amamentando, o que muda na minha alimentação?",
+  "Refeições rápidas de uma mão só para os dias com o bebê no colo",
+  "Estou sem tempo de comer — o que deixar pronto?",
+];
+
+/** Mesma preferência que o chat principal respeita. */
+function semAnimacaoNutricao(): boolean {
+  return (
+    typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
+
+/* ─── AS PEÇAS ─────────────────────────────────────────────────────────────
+   A identidade é a do ladrilho Nutrição da grade da Saúde (`lime-50 →
+   amber-50`, tinta `lime`): quem toca no verde-limão chega numa tela
+   verde-limão. As três "ferramentas" abrem um painel e mandam a pergunta
+   pronta para a MESMA conversa — nada responde fora do chat. */
+
+type Ferramenta = "comer" | "prato" | "alivio" | "casa";
+
+function Avatar({ tamanho }: { tamanho: number }) {
+  return (
+    <span
+      className="flex shrink-0 items-center justify-center rounded-full bg-white shadow-[0_6px_16px_-8px_rgba(77,124,15,0.55)] ring-1 ring-lime-200/80"
+      style={{ width: tamanho, height: tamanho }}
+    >
+      <img src={icNutricao} alt="" width={tamanho * 0.72} height={tamanho * 0.72} />
+    </span>
+  );
+}
+
+/**
+ * A foto reduzida no aparelho dela.
+ *
+ * ⚠️ Falha devolve `null`, e quem chama manda o arquivo ORIGINAL: o teto do
+ * servidor é folgado justamente para caber esse caso. Recusar aqui trocaria
+ * uma foto grande por uma ferramenta que não funciona no aparelho cujo canvas
+ * é bloqueado.
+ */
+/** O lado da miniatura que fica na conversa. Cabe numa bolha de 80% de 393px
+ *  e pesa poucos KB — é só para ela reconhecer QUAL foto a resposta comenta. */
+const MINIATURA_LADO = 320;
+
+async function reduzirParaAFoto(
+  file: File,
+): Promise<{ blob: Blob | null; miniatura: string | null }> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const desenhar = (ladoMax: number, qualidade: number) => {
+      const escala = Math.min(1, ladoMax / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(bitmap.width * escala));
+      canvas.height = Math.max(1, Math.round(bitmap.height * escala));
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
+      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      return codificarFoto(canvas, qualidade);
+    };
+    const grande = desenhar(FOTO_LADO_MAX, 0.82);
+    /* A miniatura sai do MESMO bitmap: decodificar uma foto de celular duas
+       vezes custaria o dobro no aparelho mais lento. E ela fica só em MEMÓRIA
+       (um data URL no estado da tela) — nada é gravado, nem aqui nem no
+       servidor, que continua sem guardar foto nenhuma. */
+    const miniatura = desenhar(MINIATURA_LADO, 0.7);
+    bitmap.close();
+    const blob = grande ? await (await fetch(grande)).blob() : null;
+    return { blob, miniatura };
+  } catch {
+    return { blob: null, miniatura: null };
+  }
+}
+
+/**
+ * ⚠️ CADA MOTIVO TEM RECADO PRÓPRIO, e o genérico não diz o que fazer
+ * diferente. "Muitas fotos" faz ela esperar; "não consegui ver" faz ela
+ * fotografar de novo com mais luz — e o mesmo texto para os dois faria ela
+ * tentar de novo justamente quando tentar de novo não adianta.
+ */
+function recadoDaFoto(motivo?: string): string {
+  if (motivo === "muitas")
+    return "Recebi bastante foto agora há pouco. Tente de novo em alguns minutos 💛";
+  if (motivo === "grande") return "Essa foto ficou pesada demais para eu abrir. Tente tirar outra.";
+  if (motivo === "formato")
+    return "Não consegui abrir esse arquivo. Vale uma foto tirada agora pela câmera.";
+  if (motivo === "vazio")
+    return "Não consegui enxergar o que tem aí. Tente de novo com mais luz e a foto mais de perto.";
+  /* ⚠️ Bloqueada pelo filtro do modelo NÃO é "mais luz": a foto tinha algo que
+     ele não comenta (gente, em geral). O que resolve é enquadrar só a comida. */
+  if (motivo === "bloqueada")
+    return "Não consigo comentar essa foto. Se for do prato, tente uma foto só da comida, sem pessoas.";
+  if (motivo === "demorou")
+    return "Demorei demais para ler essa foto e desisti. Tente uma vez mais — ou me conte por escrito o que tem no prato.";
+  if (motivo === "sem_ia")
+    return "A leitura de fotos está indisponível neste momento. Me conte por escrito o que tem no prato que eu ajudo do mesmo jeito.";
+  return "Não consegui ler essa foto agora. Tente de novo daqui a pouco — e, se preferir, me conte por escrito o que tem no prato.";
+}
+
+function CartaoFerramenta({
+  aberta,
+  icone,
+  titulo,
+  legenda,
+  onClick,
+}: {
+  aberta: boolean;
+  icone: React.ReactNode;
+  titulo: string;
+  legenda: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-expanded={aberta}
+      className={`press flex min-h-[92px] flex-col items-start gap-2 rounded-2xl border p-3 text-left transition-colors ${
+        aberta
+          ? "border-lime-500 bg-gradient-to-b from-lime-100 to-lime-50 shadow-[0_10px_22px_-14px_rgba(77,124,15,0.6)]"
+          : "card-material border-lime-200/70 bg-gradient-to-b from-lime-100/80 to-lime-50/40"
+      }`}
+    >
+      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-lime-700 ring-1 ring-lime-200/80">
+        {icone}
+      </span>
+      <span className="min-w-0">
+        <span className="block font-serif text-[15px] font-semibold leading-tight text-foreground">
+          {titulo}
+        </span>
+        <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">{legenda}</span>
+      </span>
+    </button>
+  );
+}
+
+function Chip({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="pill-3d press min-h-[44px] rounded-full px-4 py-2 text-[13px] font-semibold text-lime-800"
+    >
+      {children}
+    </button>
+  );
+}
+
+export function NutricaoTab({
+  profile,
+  gest,
+  careMode = false,
+  aoAssinar,
+  aoSalvarPreferencias,
+  onAbrirSOS,
+  bancada,
+}: {
+  profile: Profile | null;
+  gest: Gest;
+  /** Mesma razão do Chat IA: em Modo Cuidado, nada de semana nem trimestre. */
+  careMode?: boolean;
+  /** Abre a tela de assinatura. ⚠️ **Opcional de propósito**: sem ela o cartão
+      do Premium só explica, e nunca desenha um botão que não leva a lugar
+      nenhum — o defeito de "botão que promete uma ação e não faz nada" que
+      este repositório já pagou três vezes. */
+  aoAssinar?: () => void;
+  /** Avisa quem guarda o perfil que `food_preferences` mudou. ⚠️ Sem isto a
+      aba, que DESMONTA ao trocar de aba, reabre com o valor antigo. */
+  aoSalvarPreferencias?: (valor: string) => void;
+  /** Abre a Central de Emergência. ⚠️ Por PROP, e nunca por evento global: quem
+      governa esse estado é `minha-conta`, e um segundo dono é o defeito que
+      `voltarDaBarra` já pagou. É a mesma porta que a caixinha da Comunidade usa.
+      Sem ela o cartão do socorro continua desenhando o 192 — o telefone não
+      depende de tela nenhuma. */
+  onAbrirSOS?: () => void;
+  /* ⚠️ A bancada injeta o DADO nos MESMOS `useState` da produção, nunca o
+     desenho: é a lição do `?streak=41` da folha da chama. Sem ela, a bolha
+     vazia do "…", o erro do fluxo e os TRÊS desfechos do 👎 exigiriam uma
+     conta real, cota de IA e provocar uma falha de rede no instante certo. */
+  bancada?: {
+    /* ⚠️ SEM a saudação: ela é DERIVADA do perfil e do Modo Cuidado, e a
+       bancada tem de exercitar essa derivação em vez de cravar um texto.
+       A primeira versão cravava a saudação inteira e, com `?luto=1`, a foto
+       saiu dizendo "No 2º trimestre, vou focar nas necessidades da semana 24"
+       — a frase exata que o Modo Cuidado existe para apagar. Bancada que
+       aprova o que a produção não produz é pior que bancada nenhuma. */
+    mensagens?: ChatMsg[];
+    votos?: Record<number, boolean | "fila">;
+    carregando?: boolean;
+    /** A água do dia e a ferramenta aberta — os dois estados que dependem de
+        `localStorage` e de um toque, e por isso eram impossíveis de fotografar. */
+    agua?: number;
+    ferramenta?: Ferramenta;
+    /** Quais suplementos já foram marcados hoje, e a hora do relógio dela. */
+    suplementos?: string[];
+    hora?: number;
+    /** O painel da conversa aberto em tela cheia — o estado que só existe no
+        celular e depois de um toque, e por isso era impossível de fotografar. */
+    aberta?: boolean;
+    /** As miniaturas por índice da mensagem — a foto do prato só existe em
+        memória depois de um seletor de arquivo, e por isso era impossível de
+        fotografar. */
+    fotos?: Record<number, string>;
+    /** A porta fechada — ela só nasce de um 402 do servidor, e por isso era
+        impossível de fotografar sem gastar o teto de uma conta real. */
+    bloqueio?: MotivoDoBloqueio;
+    /** ⚠️ O caminho de socorro: ele só existe depois de ela escrever uma
+        bandeira vermelha na caixa, e fotografá-lo sem a bancada exigiria
+        digitar "estou vendo pontinhos" numa conta de verdade. Os índices são
+        os das mensagens marcadas — o par (a pergunta dela, a resposta do app). */
+    socorros?: number[];
+    /** Quantas perguntas grátis sobram — o número chega num cabeçalho de
+        resposta, então ele só existe depois de uma conversa de verdade. */
+    amostra?: number;
+    /** O "hoje" cravado, `YYYY-MM-DD`. A idade do bebê é `birth_date` contra
+        hoje; com o hoje do relógio a bancada mostraria outra frase a cada
+        semana — a mesma armadilha da bancada das contrações. */
+    hoje?: string;
+    /** As preferências já escritas — a coluna só existe depois do SQL. */
+    preferencias?: string;
+  };
+}) {
+  const ehBancada = bancada != null;
+  /* ⚠️ ELA JÁ PARIU. `birth_date` é o sinal que o resto do app usa (`faseDe`,
+     `ehPosParto`), e esta aba era a única que o ignorava: `gest` continua
+     vindo preenchido depois do parto (a DUM fica no perfil), então a saudação
+     dizia "vou focar nas necessidades da semana 42" e o cabeçalho, "Ele está
+     ganhando peso para nascer" — com o bebê no colo. O luto vence: no Modo
+     Cuidado `birth_date` pode estar preenchida (natimorto), e "pós-parto" com
+     "se estiver amamentando" seria a frase que ele existe para calar. */
+  const posParto = !careMode && !!profile?.birth_date;
+  const diasDoBebe = posParto
+    ? diasEntre(profile!.birth_date as string, bancada?.hoje ?? ymdLocal())
+    : null;
+  const gestEmCurso = posParto ? null : gest;
+  const trimester = gestEmCurso ? trimesterForWeek(gestEmCurso.weeks) : 2;
+  const tips = NUTRIENT_TIPS[trimester as 1 | 2 | 3];
+  const chips = posParto ? CHIPS_DO_POS_PARTO : NUTRITION_CHIPS[trimester as 1 | 2 | 3];
+  const firstName = profile?.display_name?.split(" ")[0];
+
+  const greeting = [
+    firstName ? `Olá, ${firstName}!` : "Olá!",
+    // Mesma regra do Chat IA: em Modo Cuidado, nada de semana nem trimestre.
+    !careMode && gestEmCurso
+      ? `No ${trimester}º trimestre, vou focar nas necessidades da semana ${gestEmCurso.weeks}.`
+      : "",
+    careMode
+      ? "Sou sua nutricionista virtual. Estou aqui para o que você precisar sobre alimentação."
+      : posParto
+        ? "Sou sua nutricionista virtual para o pós-parto. Como posso ajudar com a sua alimentação hoje?"
+        : "Sou sua nutricionista gestacional virtual. Como posso ajudar com sua alimentação hoje?",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const [messages, setMessages] = useState<ChatMsg[]>([
+    { role: "assistant", content: greeting },
+    ...(bancada?.mensagens ?? []),
+  ]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(bancada?.carregando ?? false);
+  /* A miniatura da foto que ela mandou, por índice da mensagem. SÓ em memória:
+     morre com a tela, nunca vai ao `localStorage` nem ao servidor. */
+  const [fotos, setFotos] = useState<Record<number, string>>(bancada?.fotos ?? {});
+
+  /* ─── AS PREFERÊNCIAS DELA ──────────────────────────────────────────────
+     O que ela não come e o que prefere, escrito por ela AQUI (é onde ela
+     pensa em comida), gravado em `patient_profiles.food_preferences` e lido
+     pelo servidor no bloco da paciente. Não é alergia — a alergia continua no
+     Perfil, com a instrução de segurança própria. */
+  const [preferencias, setPreferencias] = useState(
+    bancada?.preferencias ?? profile?.food_preferences ?? "",
+  );
+  const [prefsGravadas, setPrefsGravadas] = useState(preferencias);
+  const [gravandoPrefs, setGravandoPrefs] = useState(false);
+  async function gravarPreferencias() {
+    const limpa = limparPreferencias(preferencias) ?? "";
+    if (ehBancada) {
+      setPrefsGravadas(limpa);
+      return;
+    }
+    setGravandoPrefs(true);
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const uid = sess.session?.user.id;
+      if (!uid) throw new Error("sessao");
+      /* ⚠️ `upsert`, E NÃO `update`. Um `update` que não casa linha nenhuma
+         devolve `error: null` — indistinguível de sucesso —, e a linha pode
+         não existir: nada a cria no cadastro, e "Pular por agora" no ritual de
+         boas-vindas fecha sem gravar. Ela escrevia "vegetariana", lia
+         "Guardei", e a nutricionista continuava sugerindo frango. O Perfil já
+         usa `upsert` pela mesma razão. */
+      const { error } = await (supabase as any)
+        .from("patient_profiles")
+        .upsert({ id: uid, food_preferences: limpa || null });
+      /* ⚠️ PGRST204 é a coluna que ainda não nasceu (o SQL chega depois do
+         código): dizer "não foi possível" mandaria ela tentar de novo o que
+         não vai passar. Diz o que é. */
+      if (colunaAusente(error)) {
+        toast.error("Este campo ainda não está disponível — em breve.");
+        return;
+      }
+      if (error) throw error;
+      setPrefsGravadas(limpa);
+      /* ⚠️ O PERFIL DO PAI TAMBÉM. A aba é montada com
+         `{tab === "Nutrição" && <NutricaoTab …/>}` e DESMONTA ao trocar de
+         aba; sem avisar quem guarda o perfil, voltar aqui reinicializava o
+         campo com o `food_preferences` VELHO — e, como os dois estados nascem
+         iguais, o botão "Guardar" nem aparecia: a tela apresentava o valor
+         antigo como se fosse o gravado, enquanto o servidor já usava o novo. */
+      aoSalvarPreferencias?.(limpa);
+      toast.success("Guardei. A nutricionista passa a levar isso em conta.");
+    } catch (e) {
+      console.warn("[nutricao] preferências não gravaram", e);
+      toast.error("Não consegui guardar agora. Tente de novo.");
+    } finally {
+      setGravandoPrefs(false);
+    }
+  }
+
+  /* ─── A MEMÓRIA CURTA ───────────────────────────────────────────────────
+     Os últimos turnos voltam na abertura, e cada troca que CHEGA é gravada.
+     A régua (o que volta, o que se grava, e por que nada disso no luto) está
+     em `nutricao-memoria.ts`. Falha em silêncio: sem memória ela responde
+     como sempre respondeu. */
+  const memoriaLida = useRef(false);
+  useEffect(() => {
+    if (ehBancada || careMode || memoriaLida.current) return;
+    memoriaLida.current = true;
+    (async () => {
+      const { data: sess } = await supabase.auth.getSession();
+      const uid = sess.session?.user.id;
+      if (!uid) return;
+      const { data, error } = await (supabase as any)
+        .from("nutricao_mensagens")
+        .select("role,content,assinatura,created_at")
+        .eq("user_id", uid)
+        .order("created_at", { ascending: false })
+        .limit(TURNOS_DA_MEMORIA);
+      if (error || !data?.length) return;
+      const turnos = turnosDaMemoria(data as LinhaDaMemoria[]);
+      if (!turnos.length) return;
+      /* Só se ela ainda não começou a conversar nesta visita: uma pergunta
+         já feita não pode ser empurrada para baixo de ontem. */
+      setMessages((atual) => (atual.length <= 1 ? [atual[0], ...turnos] : atual));
+    })().catch((e) => console.warn("[nutricao] memória não veio", e));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  function guardarTroca(pergunta: string, resposta: { content: string; assinatura?: string }) {
+    if (ehBancada || careMode || !resposta.content.trim()) return;
+    (async () => {
+      const { data: sess } = await supabase.auth.getSession();
+      const uid = sess.session?.user.id;
+      if (!uid) return;
+      const { error } = await (supabase as any)
+        .from("nutricao_mensagens")
+        .insert(parParaGravar(uid, pergunta, resposta));
+      /* ⚠️ Tabela ausente é o banco atrás do SQL — normal, e cala. E quem
+         responde isso ao NAVEGADOR é **PGRST205**, nunca 42P01: o PostgREST
+         barra a tabela desconhecida no schema cache e o erro nem chega ao
+         Postgres. Com o teste escrito à mão só no 42P01, quem ainda não rodou
+         `APLICAR_MEMORIA_DA_NUTRICAO.sql` registrava um aviso a CADA resposta
+         da nutricionista — e alarme que grita sempre é alarme que se aprende a
+         ignorar. `tabelaAusente` conhece os dois. */
+      if (error && !tabelaAusente(error)) {
+        console.warn("[nutricao] troca não gravou", error);
+      }
+    })().catch((e) => console.warn("[nutricao] troca não gravou", e));
+  }
+  /* ─── A CONVERSA É UM PAINEL, NÃO UMA CAIXA NA PÁGINA ─────────────────────
+     Ela era uma caixa de 55vh DENTRO da página rolável: dois rolos disputando
+     o dedo, e a resposta cortada no meio da palavra na borda da caixa (a foto
+     do dono terminava em "como sal"). No celular a conversa passa a abrir em
+     TELA CHEIA — o MESMO invólucro do Chat IA: `fixed`, medindo a janela que
+     sobra quando o teclado sobe, a lista rolando por dentro, o compositor
+     pousado em cima do teclado e a página travada por baixo. A porta continua
+     na aba (a frase da semana, o campo, as ferramentas); mandar a primeira
+     pergunta é o que abre o painel, e a seta do cabeçalho o fecha SEM perder a
+     conversa. No computador ela continua uma caixa dentro da página.
+     ⚠️ A medição do teclado é a MESMA do Chat IA (`lib/janela-do-teclado.ts`):
+     a paciente usa os dois na mesma tela, e duas medições divergiriam. */
+  const [aberta, setAberta] = useState(bancada?.aberta ?? false);
+
+  /* ─── A PORTA DO PREMIUM ────────────────────────────────────────────────
+     `null` = aberta. Os dois motivos dizem coisas DIFERENTES e por isso não
+     podem virar um booleano: o teto do dia promete a volta amanhã; o Premium
+     oferece a assinatura. Um cartão só, genérico, faria a assinante que bateu
+     no teto ver um convite para assinar o que ela já assina. */
+  const [bloqueio, setBloqueio] = useState<MotivoDoBloqueio | null>(bancada?.bloqueio ?? null);
+
+  /* ⚠️ OS ÍNDICES DO SOCORRO, e não um campo em `ChatMsg`.
+     `ChatMsg` é o tipo do Chat IA (vive em `minha-conta`), e pendurar nele um
+     campo que só esta aba entende faria as duas telas dividirem uma forma que
+     uma delas ignora. O padrão daqui já é este: `votos` e `fotos` são mapas por
+     índice, e o índice é estável porque a lista só CRESCE. */
+  const [socorros, setSocorros] = useState<Set<number>>(new Set(bancada?.socorros ?? []));
+  /* Quantas ainda sobram da amostra grátis. `null` é "não sei" — e "não sei"
+     não fala (ver `recadoDaAmostra`). A assinante também fica em `null`: o
+     servidor só manda o número quando a resposta veio da amostra. */
+  const [amostra, setAmostra] = useState<number | null>(bancada?.amostra ?? null);
+  const janela = useJanelaDoTeclado();
+  const listaRef = useRef<HTMLDivElement>(null);
+  /* ⚠️ `janela` só existe no celular (o hook devolve `null` no computador),
+     então travar a página e registrar o voltar só acontecem onde o painel
+     cobre a tela. O voltar do Android FECHA o painel em vez de sair da aba. */
+  useTravarRolagemDeFundo(aberta && janela != null);
+  useVoltar(aberta && janela != null, () => setAberta(false));
+  /* A lista fica no fim ao abrir, a cada mensagem e quando o teclado encolhe o
+     painel — senão a última resposta some atrás do compositor. É `scrollTop`,
+     nunca o rolar-até-a-vista do elemento: este rolaria também a PÁGINA por
+     baixo. */
+  useEffect(() => {
+    const el = listaRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, aberta, janela?.h]);
+
+  /* ─── AS FERRAMENTAS ─────────────────────────────────────────────────────── */
+  const [ferramenta, setFerramenta] = useState<Ferramenta | null>(bancada?.ferramenta ?? null);
+  const [alimento, setAlimento] = useState("");
+  const [temEmCasa, setTemEmCasa] = useState("");
+  const conversaRef = useRef<HTMLDivElement>(null);
+  /* ⚠️ Estado PRÓPRIO, e não o `input` da caixa de baixo: dois campos ligados
+     ao mesmo estado se escreveriam um no outro enquanto ela digita. */
+  const [pergunta, setPergunta] = useState("");
+  /** Abre a conversa: em tela cheia no celular; no computador, rola até a caixa. */
+  function abrirConversa() {
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches) {
+      setAberta(true);
+      return;
+    }
+    conversaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  /** Manda a pergunta pronta e leva a paciente até a conversa. */
+  function perguntar(texto: string) {
+    setFerramenta(null);
+    setAlimento("");
+    void send(texto);
+    abrirConversa();
+  }
+
+  /* ─── A HORA DELA ─────────────────────────────────────────────────────────
+     ⚠️ Num EFEITO, nunca no render: o relógio do servidor não é o dela, e um
+     convite derivado da hora divergiria entre as duas execuções — é a
+     divergência de hidratação que já deixou este app sem abrir. `null` até
+     montar, e aí o convite não aparece. */
+  const [hora, setHora] = useState<number | null>(bancada?.hora ?? null);
+  useEffect(() => {
+    if (ehBancada) return;
+    setHora(new Date().getHours());
+  }, [ehBancada]);
+
+  /* ─── OS SUPLEMENTOS QUE O MÉDICO PRESCREVEU ──────────────────────────────
+     ⚠️ O app NÃO sugere suplemento — ele acompanha o que já foi prescrito. A
+     lista sai de `medications` do perfil; o "tomei hoje" mora no aparelho, um
+     dia por vez, pela mesma razão da água (a chave `dc-path-` viajaria no blob
+     da jornada e dispararia um push por toque). */
+  const suplementos = itensDaPrescricao(profile?.medications);
+  const [tomados, setTomados] = useState<string[]>(bancada?.suplementos ?? []);
+  useEffect(() => {
+    if (ehBancada || !suplementos.length) return;
+    try {
+      const cru = localStorage.getItem(chaveDosSuplementos(ymdLocal()));
+      const lidos: unknown = cru ? JSON.parse(cru) : [];
+      setTomados(
+        Array.isArray(lidos) ? lidos.filter((x): x is string => typeof x === "string") : [],
+      );
+    } catch {
+      setTomados([]);
+    }
+    /* `suplementos.length` e não a lista: um array remontado a cada render
+       faria o efeito re-rodar em toda pintura. */
+  }, [ehBancada, suplementos.length]);
+
+  /* ─── A FOTO ─────────────────────────────────────────────────────────────
+     ⚠️ A imagem NÃO passa pela conversa: ela vai por `/api/prato`, e o que
+     entra no histórico é o TÍTULO ("📷 Foto do meu prato") mais a resposta. É
+     o que mantém `/api/nutrition` recebendo só texto — a decisão que o
+     comentário dele explica — e o que permite ela continuar perguntando sobre
+     o mesmo prato na conversa depois. */
+  const entradaDaFoto = useRef<HTMLInputElement | null>(null);
+  const [assuntoDaFoto, setAssuntoDaFoto] = useState<AssuntoDaFoto>("prato");
+
+  function escolherFoto(assunto: AssuntoDaFoto) {
+    setAssuntoDaFoto(assunto);
+    /* O valor é limpo ANTES de abrir: sem isso, escolher a MESMA foto duas
+       vezes seguidas não dispara `change` e o toque não faz nada. */
+    if (entradaDaFoto.current) entradaDaFoto.current.value = "";
+    entradaDaFoto.current?.click();
+  }
+
+  async function mandarFoto(file: File, assunto: AssuntoDaFoto) {
+    if (loading) return;
+    const titulo = tituloDaFoto(assunto);
+    const next: ChatMsg[] = [...messages, { role: "user", content: titulo }];
+    setMessages(next);
+    setFerramenta(null);
+    setLoading(true);
+    abrirConversa();
+    try {
+      /* ⚠️ A REDUÇÃO ACONTECE NO APARELHO, e o lado é 1024 (e não os 512 do
+         avatar): o modelo precisa LER a tabela nutricional de um rótulo, que é
+         texto miúdo, e a 512 a leitura falha. */
+      const { blob: menor, miniatura } = await reduzirParaAFoto(file);
+      if (miniatura) setFotos((f) => ({ ...f, [next.length - 1]: miniatura }));
+      const corpo = new FormData();
+      corpo.append("foto", menor ?? file, "foto.webp");
+      corpo.append("assunto", assunto);
+      corpo.append("contexto", JSON.stringify(doAparelho()));
+      const { data: sess } = await supabase.auth.getSession();
+      const res = await fetch("/api/prato", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${sess.session?.access_token ?? ""}` },
+        body: corpo,
+      });
+      const r = (await res.json().catch(() => null)) as {
+        ok?: boolean;
+        texto?: string;
+        assinatura?: string;
+        motivo?: string;
+        restantesNaAmostra?: number | null;
+      } | null;
+      /* ⚠️ `{ ok: false }` chega numa resposta 200 NORMAL em alguns caminhos,
+         e um `catch` não o pega: quem decide é o VALOR. Sem isto a bolha
+         renderiza "…" para sempre — o defeito que a conversa já pagou aqui. */
+      /* A foto passa pelo MESMO portão, e o 402 dela é a mesma porta. Sem
+         este ramo, bater no teto com uma foto viraria "não consegui ler essa
+         foto" — um recado que manda ela tentar de novo o que não vai passar. */
+      if (res.status === 402) {
+        setBloqueio(r?.motivo === "bloqueado:teto_diario" ? "teto_diario" : "sem_premium");
+        setMessages(messages);
+        /* ⚠️ **A MINIATURA SAI JUNTO.** `fotos` é indexado pela POSIÇÃO da
+           mensagem, e o rollback devolve o histórico sem o turno dela: o
+           índice fica livre, e a PRÓXIMA mensagem — uma pergunta de texto —
+           passava a ser desenhada com a foto do prato que ela tentou mandar.
+           Os outros ramos de erro mantêm `next`, então o índice continua
+           valendo; só a porta fechada volta atrás. */
+        setFotos((f) => {
+          const { [next.length - 1]: _, ...resto } = f;
+          return resto;
+        });
+        return;
+      }
+      if (!res.ok || !r?.ok || !r.texto) {
+        /* O motivo fica LEGÍVEL no console: a paciente lê o recado, quem
+           investiga lê isto. Antes, cinco falhas do servidor viravam a mesma
+           frase e nada dizia qual tinha sido. */
+        console.warn("[prato] não leu a foto", { http: res.status, motivo: r?.motivo });
+        setMessages([...next, { role: "assistant", content: recadoDaFoto(r?.motivo) }]);
+        return;
+      }
+      setAmostra(r.restantesNaAmostra ?? null);
+      setMessages([...next, { role: "assistant", content: r.texto, assinatura: r.assinatura }]);
+      guardarTroca(next[next.length - 1]!.content, { content: r.texto, assinatura: r.assinatura });
+    } catch {
+      setMessages([...next, { role: "assistant", content: recadoDaFoto() }]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function alternarSuplemento(item: string) {
+    const proximo = tomados.includes(item) ? tomados.filter((x) => x !== item) : [...tomados, item];
+    setTomados(proximo);
+    if (ehBancada) return;
+    try {
+      const hoje = ymdLocal();
+      chavesDeSuplementosVencidas(Object.keys(localStorage), hoje).forEach((k) =>
+        localStorage.removeItem(k),
+      );
+      localStorage.setItem(chaveDosSuplementos(hoje), JSON.stringify(proximo));
+    } catch {
+      /* sem armazenamento, a marca vive só nesta abertura */
+    }
+  }
+
+  /* ─── A ÁGUA DO DIA ───────────────────────────────────────────────────────
+     ⚠️ Lida num EFEITO, nunca no render: `localStorage` não existe no servidor
+     e o dia local muda entre as duas execuções — é a divergência de hidratação
+     que já deixou este app sem abrir. `null` = ainda não li. */
+  const [agua, setAgua] = useState<number | null>(bancada?.agua ?? null);
+  /* O que a nutricionista ganha de HOJE: a água e os suplementos marcados. Só
+     existem no aparelho, então viajam com cada pedido — a conversa e a foto
+     mandam o MESMO objeto. O servidor sanea (`doAparelhoDe`). */
+  function doAparelho() {
+    return { agua: agua ?? undefined, meta: META_COPOS, tomados };
+  }
+  useEffect(() => {
+    if (ehBancada) return;
+    try {
+      const v = Number(localStorage.getItem(chaveDaAgua(ymdLocal())) ?? "0");
+      setAgua(Number.isFinite(v) ? v : 0);
+    } catch {
+      setAgua(0);
+    }
+  }, [ehBancada]);
+  function beber(delta: number) {
+    const proximo = Math.max(0, Math.min(99, (agua ?? 0) + delta));
+    setAgua(proximo);
+    if (ehBancada) return;
+    try {
+      const hoje = ymdLocal();
+      /* As chaves de outros dias saem a cada escrita — cota do localStorage. */
+      chavesDeAguaVencidas(Object.keys(localStorage), hoje).forEach((k) =>
+        localStorage.removeItem(k),
+      );
+      localStorage.setItem(chaveDaAgua(hoje), String(proximo));
+    } catch {
+      /* sem armazenamento, o contador vive só nesta abertura */
+    }
+  }
+  /* ─── O 👎 QUE NÃO EXISTIA AQUI ────────────────────────────────────────────
+     Este chat clínico não tinha nenhum caminho de correção: o que saísse errado
+     ficava entre a IA e a paciente, para sempre. O chat principal tem
+     `submitBrainFeedback` em três lugares; este tinha zero.
+     Mesma função, mesma fila de revisão do médico — o 👎 daqui chega no mesmo
+     lugar que o de lá, e é isso que fecha o ciclo. */
+  /* ⚠️ TRÊS ESTADOS, e não um booleano. `true` = 👍; `false` = 👎 que o
+     servidor NÃO confirmou ter enfileirado; `"fila"` = 👎 que chegou ao
+     médico. A tela prometia "seu médico vai ver" incondicionalmente — e
+     `submitBrainFeedback` devolve `{ ok: false }` numa resposta 200 NORMAL, e
+     só enfileira quando há `entryId` (a cota pode ter estourado, o cérebro
+     pode estar desligado, a pergunta pode ser suporte puro). Ela reclamava de
+     uma orientação alimentar errada, lia que o médico ia ver, e o item podia
+     não ter entrado em fila nenhuma.
+     ⚠️ O chat principal já tinha exatamente esta correção, com o comentário do
+     conserto à vista — a régua aplicada num lugar e deixada de pé no vizinho. */
+  const [votos, setVotos] = useState<Record<number, boolean | "fila">>(bancada?.votos ?? {});
+
+  async function votar(indice: number, gostou: boolean) {
+    if (votos[indice] !== undefined) return;
+    setVotos((v) => ({ ...v, [indice]: gostou }));
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      if (!sess.session) return;
+      const r = await submitBrainFeedback({
+        data: {
+          accessToken: sess.session.access_token,
+          /* A PERGUNTA DELA, não a resposta: é ela que o médico precisa ler
+             para entender o que foi perguntado e onde o cérebro falhou. */
+          question: messages[indice - 1]?.content ?? "",
+          answer: messages[indice]?.content ?? "",
+          helpful: gostou,
+        },
+      });
+      /* Só promete quando o servidor confirma que enfileirou. */
+      if (!gostou && r?.ok && "chegouAoMedico" in r && r.chegouAoMedico) {
+        setVotos((v) => ({ ...v, [indice]: "fila" }));
+        toast("Anotado — seu médico vai ver 💛");
+      } else if (!gostou) {
+        toast("Anotado 💛");
+      }
+    } catch {
+      /* O voto já está na tela; insistir com um erro sobre um 👍 seria pior
+         que perder o 👍. */
+    }
+  }
+
+  async function send(text?: string) {
+    const msg = (text ?? input).trim();
+    if (!msg || loading) return;
+
+    /* ─── O SOCORRO VEM ANTES DE TUDO ────────────────────────────────────
+       ⚠️ Antes da rede, antes da cota, antes do portão do Premium — e por isso
+       ele funciona com o telefone sem sinal, que é exatamente quando ela pode
+       estar num pronto-socorro. A régua e as quatro razões estão em
+       `socorro-na-nutricao.ts`; o que importa aqui é que **a mensagem não
+       chega a sair do aparelho**: nenhum `fetch`, nenhum modelo, nenhuma
+       chance de a resposta a "estou vendo pontinhos" ser uma sugestão de
+       cardápio. E ele NÃO passa por `careMode` nem por `bloqueio`. */
+    if (pedeSocorro(msg)) {
+      const i = messages.length;
+      setMessages([
+        ...messages,
+        { role: "user", content: msg },
+        { role: "assistant", content: RESPOSTA_DO_SOCORRO },
+      ]);
+      setSocorros((v) => new Set(v).add(i).add(i + 1));
+      setInput("");
+      setFerramenta(null);
+      abrirConversa();
+      return;
+    }
+
+    const next: ChatMsg[] = [...messages, { role: "user", content: msg }];
+    setMessages(next);
+    setInput("");
+    setLoading(true);
+    try {
+      /* ⚠️ A ASSINATURA VOLTA COM CADA RESPOSTA. Sem ela o servidor descarta o
+         turno do assistente (é assim que a forja continua fechada) — e sem as
+         próprias respostas o modelo recebia três perguntas dela em fila,
+         saudava de novo e respondia a PRIMEIRA. Ver `turno-assinado.server.ts`. */
+      /* ⚠️ O PAR DO SOCORRO NÃO SOBE. A resposta dele não tem assinatura, então
+         o servidor a descartaria de qualquer forma (`turno-assinado.server.ts`)
+         — mas depender disso deixaria a garantia "a mensagem não vai para o
+         modelo" morando no OUTRO lado da rede. Aqui ela é estrutural: o texto
+         do sintoma não entra no corpo do pedido. */
+      const uiMessages = next
+        .filter((_, i) => !socorros.has(i))
+        .map((m, i) => ({
+          id: String(i),
+          role: m.role,
+          parts: [{ type: "text", text: m.content }],
+          ...(m.role === "assistant" && m.assinatura
+            ? { metadata: { assinatura: m.assinatura } }
+            : {}),
+        }));
+      const { data: sess } = await supabase.auth.getSession();
+      const res = await fetch("/api/nutrition", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          // O endpoint agora exige sessão: era proxy aberto para o Gemini.
+          Authorization: `Bearer ${sess.session?.access_token ?? ""}`,
+        },
+        body: JSON.stringify({ messages: uiMessages, contexto: doAparelho() }),
+      });
+      /* `res.ok` ANTES do corpo — e isto era um "..." eterno.
+         O código checava só `!res.body`, e 429 (limitador), 401 (sessão) e o
+         500 de chave ausente TÊM corpo: o laço lia texto sem prefixo `data: `,
+         `acc` ficava vazio, e a bolha renderizava `{m.content || "…"}` para
+         sempre — sem erro, sem retry, sem nada dizendo o que houve. É o mesmo
+         defeito que o chat principal e o widget do site já corrigiram; este
+         ficou. */
+      /* ─── 402 É A PORTA, NÃO UM ERRO ────────────────────────────────
+         ⚠️ E ela DEVOLVE o que a paciente escreveu. Engolir a pergunta faria
+         ela perder o texto que acabou de digitar para ver um convite de
+         assinatura — e reescrevê-lo depois de assinar. A mensagem sai da lista
+         e volta para o campo, intacta. */
+      if (res.status === 402) {
+        const corpo = (await res.json().catch(() => null)) as { motivo?: string } | null;
+        setBloqueio(corpo?.motivo === "teto_diario" ? "teto_diario" : "sem_premium");
+        setMessages(messages);
+        setInput(msg);
+        return;
+      }
+      if (!res.ok) {
+        const corpo = await res.text().catch(() => "");
+        throw new Error(avisoQuePodeAparecer(corpo) ?? "");
+      }
+      /* ⚠️ O CABEÇALHO CHEGA ANTES DO PRIMEIRO BYTE do corpo, e é por isso que
+         ele é cabeçalho e não metadata do stream: a tela já sabe quantas
+         sobram enquanto a resposta ainda está digitando. Ausente = assinante
+         (ou leitura degradada), e aí a linha não aparece. */
+      const sobram = res.headers.get("X-Nutricionista-Amostra");
+      setAmostra(sobram === null ? null : Number(sobram));
+      if (!res.body) throw new Error("");
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let acc = "";
+      let erroNoFluxo = "";
+      let assinatura: string | undefined;
+      let buffer = "";
+      setMessages([...next, { role: "assistant", content: "" }]);
+
+      /* A MESMA CADÊNCIA DO CHAT PRINCIPAL.
+         A paciente usa Chat IA e Nutrição na MESMA tela, trocando de aba —
+         dois ritmos diferentes leem como dois produtos. E aqui o texto vinha
+         em bloco por pedaço, que é exatamente o "nada, nada, parágrafo
+         inteiro" que a régua existe para consertar. */
+      let mostrado = 0;
+      let aberto = true;
+      let quadro: number | null = null;
+      const desenhar = () => {
+        const passo = passoDaDigitacao(acc.length - mostrado, aberto);
+        if (passo > 0) {
+          mostrado = Math.min(acc.length, mostrado + passo);
+          setMessages([...next, { role: "assistant", content: acc.slice(0, mostrado) }]);
+        }
+        quadro = aberto || mostrado < acc.length ? requestAnimationFrame(desenhar) : null;
+      };
+      if (!semAnimacaoNutricao()) quadro = requestAnimationFrame(desenhar);
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        /* BUFFER de linha, como no chat principal. Sem `{stream: true}` e sem
+           carry-over, um `data:` partido entre dois `read()` some do meio da
+           resposta — e acento partido vira "�". */
+        buffer += decoder.decode(value, { stream: true });
+        const linhas = buffer.split("\n");
+        buffer = linhas.pop() ?? "";
+        /* O MESMO leitor do chat principal. Duas cópias de um parser divergem,
+           e foi assim que a parte `error` ficou sem ser lida aqui: falha do
+           provedor depois do HTTP 200 continuava virando bolha vazia. */
+        linhas.forEach((line) => {
+          const parte = lerLinhaDoStream(line);
+          if (parte.tipo === "texto") acc += parte.texto;
+          else if (parte.tipo === "erro") erroNoFluxo = parte.texto;
+          else if (parte.tipo === "assinatura") assinatura = parte.assinatura;
+        });
+        if (semAnimacaoNutricao()) {
+          mostrado = acc.length;
+          setMessages([...next, { role: "assistant", content: acc }]);
+        }
+      }
+      (buffer + decoder.decode()).split("\n").forEach((line) => {
+        const parte = lerLinhaDoStream(line);
+        if (parte.tipo === "texto") acc += parte.texto;
+        else if (parte.tipo === "erro") erroNoFluxo = parte.texto;
+        else if (parte.tipo === "assinatura") assinatura = parte.assinatura;
+      });
+      aberto = false;
+      if (erroNoFluxo && !acc.trim()) {
+        if (quadro !== null) cancelAnimationFrame(quadro);
+        throw new Error(erroNoFluxo);
+      }
+      /* Espera o texto terminar de aparecer antes de liberar o "digitando" —
+         senão o indicador some com a bolha pela metade. */
+      await new Promise<void>((r) => {
+        const conferir = () => (mostrado >= acc.length ? r() : setTimeout(conferir, 60));
+        conferir();
+      });
+      setMessages([...next, { role: "assistant", content: acc, assinatura }]);
+      guardarTroca(msg, { content: acc, assinatura });
+    } catch (e) {
+      setMessages([
+        ...next,
+        {
+          role: "assistant",
+          /* O aviso do servidor manda quando existe: ele sabe o que houve
+             (limite de mensagens, sessão vencida) e a tela não. */
+          content: (e as Error)?.message?.trim() || "Desculpe, ocorreu um erro. Tente novamente.",
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /* A frase da semana — régua pura, com as cinco proibições escritas lá. Depois
+     do parto a régua é OUTRA (por dias de vida do bebê), nunca a da semana 42. */
+  const daSemana = posParto
+    ? nutricaoDoPosParto(diasDoBebe, careMode)
+    : nutricaoDaSemana(gestEmCurso?.weeks ?? null, careMode);
+  /* ⚠️ O subtítulo era `truncate`, e o que ele cortava no aparelho era
+     justamente "não substitui avaliação nutricional individual" — a metade que
+     importa. Duas linhas, sempre. */
+  const subtitulo = careMode
+    ? "Orientações de alimentação — não substitui avaliação nutricional individual."
+    : posParto
+      ? "Orientações para o seu pós-parto — não substitui avaliação nutricional individual."
+      : "Orientações para a sua gestação — não substitui avaliação nutricional individual.";
+  const temConversa = messages.length > 1;
+  const ultimaResposta =
+    [...messages].reverse().find((m) => m.role === "assistant" && m.content.trim())?.content ??
+    greeting;
+
+  return (
+    <div className="space-y-5">
+      {/* ─── A PORTA: A PERGUNTA, E A SEMANA DELA ─────────────────────────
+          ⚠️ **O QUE SOBE PARA O TOPO É O CAMPO, e não a caixa de conversa
+          inteira.** A caixa tem 55vh; movida para cá, as quatro ferramentas —
+          que são as portas mais usadas — cairiam abaixo da dobra. O que a
+          paciente precisa ver primeiro é que dá para PERGUNTAR; a conversa
+          cresce a partir daí, no lugar onde ela já mora.
+
+          E o pedido do dono bate com o que se mede: a dúvida dominante da
+          gestante é de SEGURANÇA ("posso comer X?"), buscada online por 96%
+          delas — e o que elas encontram é ruim (30% dos sites sem fonte
+          nenhuma). O campo abre com essa pergunta escrita no placeholder. */}
+      <section aria-label="A sua semana e a sua pergunta" className="space-y-3">
+        {daSemana && (
+          /* ⚠️ O SUJEITO DA FRASE É O BEBÊ, e isso não é tom: 81,5% das
+             gestantes usam app de gestação para acompanhar o desenvolvimento
+             FETAL, contra 26,2% para nutrição. A nutrição pega carona no motor
+             que já existe em vez de competir com ele. */
+          <div className="rounded-3xl card-material p-4">
+            <p className="font-serif text-[15px] font-semibold text-lime-800">{daSemana.titulo}</p>
+            <p className="mt-1 text-sm leading-snug text-foreground">{daSemana.texto}</p>
+          </div>
+        )}
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const t = pergunta.trim();
+            if (!t) return;
+            setPergunta("");
+            void send(t);
+            abrirConversa();
+          }}
+          className="flex items-end gap-2"
+        >
+          <div className="card-material flex min-h-[52px] flex-1 items-center rounded-[26px] px-4">
+            <input
+              value={pergunta}
+              onChange={(e) => setPergunta(e.target.value)}
+              aria-label="Perguntar à nutricionista"
+              placeholder="Posso comer…?"
+              /* ⚠️ 16px, nunca menos — o zoom do Safari ao focar. A regra
+                 global já sobe campo no aparelho; aqui vai explícito porque
+                 este é o primeiro campo que a paciente toca na aba. */
+              className="min-h-[52px] w-full bg-transparent text-[16px] text-foreground outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={loading || !pergunta.trim()}
+            aria-label="Perguntar"
+            className="btn-3d press flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full bg-lime-700 text-white disabled:opacity-50"
+          >
+            <Send className="h-[21px] w-[21px] -translate-x-px translate-y-px" strokeWidth={1.9} />
+          </button>
+        </form>
+      </section>
+
+      {/* ─── AS FERRAMENTAS ─────────────────────────────────────────────
+          As três perguntas que só uma nutricionista recebe, prontas para
+          tocar. Cada uma abre um painel e manda a pergunta MONTADA para a
+          mesma conversa — nada responde fora do chat. Em Modo Cuidado elas
+          ficam (comer bem é dela), e o texto não diz "gestação". */}
+      <section aria-label="Ferramentas da nutrição">
+        <div className="grid grid-cols-2 gap-2">
+          <CartaoFerramenta
+            aberta={ferramenta === "comer"}
+            icone={<Search className="h-[18px] w-[18px]" strokeWidth={2} />}
+            titulo="Posso comer?"
+            legenda="Sushi, queijo, café…"
+            onClick={() => setFerramenta(ferramenta === "comer" ? null : "comer")}
+          />
+          <CartaoFerramenta
+            aberta={ferramenta === "prato"}
+            icone={<UtensilsCrossed className="h-[18px] w-[18px]" strokeWidth={2} />}
+            titulo="Meu prato"
+            legenda="A próxima refeição"
+            onClick={() => setFerramenta(ferramenta === "prato" ? null : "prato")}
+          />
+          <CartaoFerramenta
+            aberta={ferramenta === "alivio"}
+            icone={<Leaf className="h-[18px] w-[18px]" strokeWidth={2} />}
+            titulo="Alívio"
+            legenda="Enjoo, azia…"
+            onClick={() => setFerramenta(ferramenta === "alivio" ? null : "alivio")}
+          />
+          {/* ⚠️ A pergunta que nenhum app grande faz, e que é a do Brasil real:
+              fim do mês, a geladeira do jeito que está. Um app que só sabe
+              sugerir salmão e quinoa é um app que ela fecha. */}
+          <CartaoFerramenta
+            aberta={ferramenta === "casa"}
+            icone={<Refrigerator className="h-[18px] w-[18px]" strokeWidth={2} />}
+            titulo="O que tenho"
+            legenda="Cozinhar com o que há"
+            onClick={() => setFerramenta(ferramenta === "casa" ? null : "casa")}
+          />
+        </div>
+
+        {/* ─── A CÂMERA ────────────────────────────────────────────────────
+            ⚠️ Ela é uma faixa de LARGURA INTEIRA, e não um quinto quadrado:
+            cinco cartões numa grade de duas colunas deixam um sozinho na
+            última fileira, e as duas fotos são o MESMO gesto (abrir a câmera)
+            com dois assuntos — dois quadrados duplicariam a afordância da
+            câmera lado a lado.
+
+            ⚠️ E o `<input>` é UM só, com `capture="environment"`: no iPhone
+            ele abre a câmera traseira direto, que é o gesto de quem está com
+            o prato na frente ou o pote na mão. Dois inputs dariam duas caixas
+            de permissão para a mesma coisa. */}
+        <input
+          ref={entradaDaFoto}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void mandarFoto(f, assuntoDaFoto);
+          }}
+        />
+        <div className="card-material mt-2 rounded-2xl border border-lime-200/70 p-3">
+          <p className="text-sm font-semibold text-foreground">
+            <Camera
+              className="mr-1.5 inline h-4 w-4 -translate-y-px text-lime-700"
+              strokeWidth={2}
+            />
+            Me mostre por foto
+          </p>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => escolherFoto("prato")}
+              className="btn-3d press flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-lime-700 px-3 text-sm font-semibold text-white disabled:opacity-50"
+            >
+              <UtensilsCrossed className="h-4 w-4" strokeWidth={2} />
+              Meu prato
+            </button>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => escolherFoto("rotulo")}
+              className="pill-3d press flex min-h-[44px] items-center justify-center gap-2 rounded-full px-3 text-sm font-semibold text-lime-800 disabled:opacity-50"
+            >
+              <ScanLine className="h-4 w-4" strokeWidth={2} />
+              Um rótulo
+            </button>
+          </div>
+          {/* ⚠️ A frase da foto NÃO é política de privacidade escondida: ela é
+              dita ANTES do toque, no lugar onde a decisão acontece. É foto da
+              cozinha dela e do supermercado onde ela está. */}
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            A foto vira texto na hora e não fica guardada em lugar nenhum.
+          </p>
+        </div>
+
+        {ferramenta === "comer" && (
+          <form
+            className="card-material mt-2 rounded-2xl border border-lime-200/70 p-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const a = limparAlimento(alimento);
+              if (a) perguntar(perguntaPossoComer(a, careMode));
+            }}
+          >
+            <label htmlFor="alimento" className="block text-sm font-semibold text-foreground">
+              Qual alimento?
+            </label>
+            <div className="mt-2 flex gap-2">
+              <input
+                id="alimento"
+                value={alimento}
+                onChange={(e) => setAlimento(e.target.value)}
+                placeholder="Ex.: sushi, queijo brie, café…"
+                autoComplete="off"
+                maxLength={60}
+                /* ⚠️ 16px, nunca menos: abaixo disso o Safari do iPhone dá zoom
+                   ao focar. */
+                className="min-h-[44px] flex-1 rounded-full border border-lime-200 bg-white px-4 text-[16px] text-foreground outline-none placeholder:text-muted-foreground focus:border-lime-500"
+              />
+              <button
+                type="submit"
+                disabled={!limparAlimento(alimento) || loading}
+                className="btn-3d press min-h-[44px] rounded-full bg-lime-700 px-4 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                Perguntar
+              </button>
+            </div>
+          </form>
+        )}
+
+        {ferramenta === "prato" && (
+          <div className="card-material mt-2 rounded-2xl border border-lime-200/70 p-3">
+            <p className="text-sm font-semibold text-foreground">Qual refeição?</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {REFEICOES.map((r: Refeicao) => (
+                <Chip key={r} onClick={() => perguntar(perguntaDoPrato(r))}>
+                  {r}
+                </Chip>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {ferramenta === "casa" && (
+          <form
+            className="card-material mt-2 rounded-2xl border border-lime-200/70 p-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const ing = limparIngredientes(temEmCasa);
+              if (ing) perguntar(perguntaDoQueTenho(ing, momentoDoDia(hora ?? 12)));
+            }}
+          >
+            <label htmlFor="tem-em-casa" className="block text-sm font-semibold text-foreground">
+              O que você tem em casa?
+            </label>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Separe por vírgula. A receita sai só com o que você listar.
+            </p>
+            <textarea
+              id="tem-em-casa"
+              value={temEmCasa}
+              onChange={(e) => setTemEmCasa(e.target.value)}
+              rows={2}
+              maxLength={200}
+              placeholder="Ex.: ovo, arroz, feijão, cenoura, banana"
+              /* ⚠️ 16px, nunca menos — o zoom do Safari ao focar. */
+              className="mt-2 w-full resize-none rounded-2xl border border-lime-200 bg-white px-4 py-2.5 text-[16px] text-foreground outline-none placeholder:text-muted-foreground focus:border-lime-500"
+            />
+            <button
+              type="submit"
+              disabled={!limparIngredientes(temEmCasa) || loading}
+              className="btn-3d press mt-2 min-h-[44px] w-full rounded-full bg-lime-700 px-4 text-sm font-semibold text-white disabled:opacity-50"
+            >
+              Montar {momentoDoDia(hora ?? 12)} com isso
+            </button>
+          </form>
+        )}
+
+        {ferramenta === "alivio" && (
+          <div className="card-material mt-2 rounded-2xl border border-lime-200/70 p-3">
+            <p className="text-sm font-semibold text-foreground">O que está incomodando?</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {ALIVIOS.map((a) => (
+                <Chip key={a.rotulo} onClick={() => perguntar(perguntaDeAlivio(a.frase))}>
+                  {a.rotulo}
+                </Chip>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* ─── O CONVITE DA HORA ──────────────────────────────────────────
+          ⚠️ Só depois de montar (a `hora` nasce `null`), porque o relógio do
+          servidor não é o dela. E só fora do Modo Cuidado com a conversa ainda
+          no começo: um convite a cada abertura vira letreiro.
+
+          ⚠️ E ele SOME com uma ferramenta aberta — a foto da bancada mostrou
+          "Montar almoço com isso" e "Vamos montar um almoço equilibrado?" um em
+          cima do outro, dois convites para a mesma refeição. Quem abriu uma
+          ferramenta já escolheu por onde começar; o convite é o atalho de quem
+          ainda não escolheu nada. */}
+      {!careMode && hora != null && ferramenta === null && messages.length <= 1 && (
+        <button
+          type="button"
+          onClick={() => perguntar(perguntaDoPrato(refeicaoDaHora(hora)))}
+          className="card-material press flex w-full items-center gap-3 rounded-2xl border border-lime-200/70 bg-gradient-to-r from-lime-50 to-amber-50/60 p-3 text-left"
+        >
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-lime-700 ring-1 ring-lime-200/80">
+            <UtensilsCrossed className="h-5 w-5" strokeWidth={2} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-semibold leading-snug text-foreground">
+              {conviteDoMomento(hora)}
+            </span>
+            <span className="mt-0.5 block text-xs text-muted-foreground">
+              Toque para montar agora
+            </span>
+          </span>
+        </button>
+      )}
+
+      {/* ─── OS SUPLEMENTOS QUE O MÉDICO PRESCREVEU ─────────────────────
+          ⚠️ O app NUNCA sugere suplemento — ele acompanha o que já está no
+          perfil dela. Sem prescrição, a seção não existe: um checklist vazio
+          convidaria a inventar um. */}
+      {suplementos.length > 0 && (
+        <section
+          aria-label="Suplementos de hoje"
+          className="card-material rounded-2xl border border-lime-200/70 p-3"
+        >
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="font-serif text-[15px] font-semibold text-foreground">
+              <Pill
+                className="mr-1.5 inline h-4 w-4 -translate-y-px text-lime-700"
+                strokeWidth={2}
+              />
+              Do seu médico, hoje
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {resumoDosSuplementos(
+                tomados.filter((t) => suplementos.includes(t)).length,
+                suplementos.length,
+              )}
+            </p>
+          </div>
+          <ul className="mt-2 space-y-1.5">
+            {suplementos.map((item) => {
+              const feito = tomados.includes(item);
+              return (
+                <li key={item}>
+                  <button
+                    type="button"
+                    onClick={() => alternarSuplemento(item)}
+                    aria-pressed={feito}
+                    className="press flex min-h-[44px] w-full items-center gap-3 rounded-xl px-1 text-left"
+                  >
+                    <span
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                        feito
+                          ? "border-lime-700 bg-lime-700 text-white"
+                          : "border-lime-300 bg-white text-transparent"
+                      }`}
+                    >
+                      <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                    </span>
+                    <span
+                      className={`min-w-0 flex-1 text-[15px] ${
+                        feito ? "text-muted-foreground line-through" : "text-foreground"
+                      }`}
+                    >
+                      {item}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          {/* ⚠️ A frase existe para a marca não virar cobrança nem conduta. */}
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            Marcar aqui é só para você lembrar. Dose e horário são do seu médico.
+          </p>
+        </section>
+      )}
+
+      {/* ─── O QUE ELA NÃO COME, E O QUE PREFERE ─────────────────────────
+          Escrito por ela, aqui. Sobrevive ao Modo Cuidado (é sobre ela, não
+          sobre a gestação). NÃO é alergia, e a tela diz isso. */}
+      <section
+        aria-label="Suas preferências alimentares"
+        className="card-material rounded-2xl border border-lime-200/70 bg-gradient-to-r from-lime-50 to-amber-50/60 p-3.5"
+      >
+        <p className="font-serif text-[15px] font-semibold text-foreground">
+          O que você não come, e o que prefere
+        </p>
+        <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
+          Vegetariana, sem porco, não gosta de peixe, come muito arroz com feijão… A nutricionista
+          leva isso em conta em toda sugestão. Alergia é no Perfil.
+        </p>
+        <textarea
+          value={preferencias}
+          onChange={(e) => setPreferencias(e.target.value.slice(0, PREFERENCIAS_MAX))}
+          rows={2}
+          maxLength={PREFERENCIAS_MAX}
+          placeholder="Ex.: vegetariana; não como fígado; adoro fruta"
+          className="mt-2 w-full resize-none rounded-xl border border-lime-200/80 bg-white/80 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-lime-300"
+        />
+        {(limparPreferencias(preferencias) ?? "") !== prefsGravadas && (
+          <div className="mt-2 flex justify-end">
+            <button
+              type="button"
+              onClick={() => void gravarPreferencias()}
+              disabled={gravandoPrefs}
+              className="btn-3d press min-h-[44px] rounded-full bg-lime-700 px-5 text-sm font-semibold text-white disabled:opacity-40"
+            >
+              {gravandoPrefs ? "Guardando…" : "Guardar"}
+            </button>
+          </div>
+        )}
+      </section>
+
+      {/* ─── A ÁGUA DO DIA ──────────────────────────────────────────────
+          Contador, não meta clínica: 8 copos é REFERÊNCIA e a tela diz. */}
+      <section
+        aria-label="Água de hoje"
+        className="card-material flex items-center gap-3 rounded-2xl border border-lime-200/70 bg-gradient-to-r from-lime-50 to-amber-50/60 p-3"
+      >
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-sky-600 ring-1 ring-lime-200/80">
+          <Droplets className="h-5 w-5" strokeWidth={2} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline gap-1.5">
+            <span className="font-serif text-2xl font-semibold leading-none tabular-nums text-foreground">
+              {agua ?? "–"}
+            </span>
+            <span className="text-sm text-muted-foreground">de {META_COPOS} copos hoje</span>
+          </div>
+          <div className="mt-1.5 flex gap-1" aria-hidden>
+            {Array.from({ length: META_COPOS }, (_, i) => (
+              <span
+                key={i}
+                className={`h-1.5 flex-1 rounded-full ${
+                  agua != null && i < agua ? "bg-sky-500" : "bg-lime-200/70"
+                }`}
+              />
+            ))}
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Referência de cerca de 2 litros — quem ajusta é o seu médico.
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={() => beber(-1)}
+            disabled={!agua}
+            aria-label="Tirar um copo"
+            className="pill-3d press flex h-11 w-11 items-center justify-center rounded-full text-lime-800 disabled:opacity-40"
+          >
+            <Minus className="h-4 w-4" strokeWidth={2.2} />
+          </button>
+          <button
+            type="button"
+            onClick={() => beber(1)}
+            aria-label="Bebi um copo"
+            className="btn-3d press flex h-11 w-11 items-center justify-center rounded-full bg-lime-700 text-white"
+          >
+            <Plus className="h-5 w-5" strokeWidth={2.2} />
+          </button>
+        </div>
+      </section>
+
+      {/* ─── A CONVERSA ─────────────────────────────────────────────────
+          No celular ela tem duas formas. FECHADA é este cartão curto, na aba:
+          a saudação e as primeiras perguntas — ou, com conversa começada, a
+          última resposta e "Continuar a conversa". ABERTA é o painel em tela
+          cheia logo abaixo, o mesmo invólucro do Chat IA. No computador o
+          painel é a caixa de sempre, dentro da página, e o cartão não existe. */}
+      <div className="card-material rounded-3xl border border-lime-200/70 p-4 md:hidden">
+        <div className="flex items-center gap-3">
+          <Avatar tamanho={40} />
+          <div className="min-w-0 flex-1">
+            <p className="font-serif text-[17px] font-semibold leading-tight text-foreground">
+              Nutricionista virtual
+            </p>
+            <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{subtitulo}</p>
+          </div>
+        </div>
+        {temConversa ? (
+          <>
+            <p className="mt-3 line-clamp-3 whitespace-pre-wrap text-sm leading-snug text-foreground">
+              {semMarcas(ultimaResposta)}
+            </p>
+            <button
+              type="button"
+              onClick={() => setAberta(true)}
+              className="btn-3d press mt-3 flex min-h-[44px] w-full items-center justify-center rounded-full bg-lime-700 px-4 text-[15px] font-semibold text-white"
+            >
+              Continuar a conversa
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="mt-3 text-sm leading-snug text-foreground">{greeting}</p>
+            {/* Em Modo Cuidado somem: NUTRITION_CHIPS traz "Posso comer tâmara
+                para preparar o parto?" e coisas do tipo. */}
+            {!careMode && (
+              <div className="scrollbar-hide -mx-4 mt-3 flex gap-2 overflow-x-auto px-4">
+                {chips.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => {
+                      abrirConversa();
+                      void send(c);
+                    }}
+                    className="pill-3d press min-h-[44px] shrink-0 rounded-full px-3.5 py-2 text-[13px] font-semibold text-lime-800"
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      <div
+        ref={conversaRef}
+        role={aberta ? "dialog" : undefined}
+        aria-label="Conversa com a nutricionista"
+        className={`scroll-mt-4 ${
+          aberta ? "fixed inset-x-0 top-0 z-[45] flex h-[100dvh] flex-col bg-background" : "hidden"
+        } md:static md:z-auto md:flex md:h-[55vh] md:flex-col md:overflow-hidden md:rounded-3xl md:border md:border-lime-200/70 md:bg-card md:shadow-[var(--shadow-card)]`}
+        style={aberta && janela ? { height: janela.h, top: janela.top } : undefined}
+      >
+        <header className="flex items-center gap-3 border-b border-lime-100 bg-gradient-to-r from-lime-50 to-amber-50/60 px-3 pb-2.5 pt-[calc(env(safe-area-inset-top)+0.5rem)] md:px-4 md:py-3">
+          {/* A seta fecha o PAINEL e guarda a conversa — a barra de voltar da
+              página fica por baixo dele, e sem isto ela não teria como sair. */}
+          <button
+            type="button"
+            onClick={() => setAberta(false)}
+            aria-label="Voltar"
+            className="press -ml-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-foreground md:hidden"
+          >
+            <ChevronLeft className="h-6 w-6" strokeWidth={2} />
+          </button>
+          <Avatar tamanho={40} />
+          <div className="min-w-0 flex-1">
+            <p className="font-serif text-[17px] font-semibold leading-tight text-foreground">
+              Nutricionista virtual
+            </p>
+            <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{subtitulo}</p>
+          </div>
+        </header>
+
+        <div
+          ref={listaRef}
+          className="flex-1 space-y-2 overflow-y-auto overscroll-contain px-3 py-3"
+        >
+          {messages.map((m, i) => {
+            const dela = m.role === "user";
+            /* A bolha VAZIA enquanto a resposta não chegou: era um "…" parado,
+               que lê como travou. Vira a mesma varredura de luz do Chat IA. */
+            const pensando = !dela && !m.content && loading && i === messages.length - 1;
+            /* A resposta do app a uma bandeira vermelha — a bolha ganha o
+               cartão do socorro logo abaixo. */
+            const socorro = !dela && socorros.has(i);
+            return (
+              <div key={i}>
+                <div className={`flex items-end gap-1.5 ${dela ? "flex-row-reverse" : "flex-row"}`}>
+                  {!dela && <Avatar tamanho={28} />}
+                  <div
+                    /* ⚠️ `whitespace-pre-wrap`: o modelo responde em LINHAS —
+                     "para a próxima, duas ideias:" e depois duas linhas com
+                     marcador. Sem isto elas colavam num parágrafo só, e a foto
+                     da bancada mostrou a lista virando uma parede de texto com
+                     os "•" no meio da frase. O Chat IA já rendia assim; esta
+                     bolha ficou de fora. */
+                    /* A bolha DELA é um tom suave com texto escuro, e não o
+                     bloco verde-escuro cheio: a pergunta dela costuma ser um
+                     parágrafo, e o que ela veio ler é a resposta. Texto escuro
+                     sobre lime-100 passa folgado — descer o fundo cheio de 700
+                     é onde o branco começaria a reprovar. */
+                    className={`max-w-[80%] whitespace-pre-wrap px-4 py-2.5 text-[15px] leading-relaxed ${
+                      dela
+                        ? "rounded-3xl rounded-br-md bg-lime-100 text-lime-950 ring-1 ring-lime-200/80"
+                        : "card-material rounded-3xl rounded-bl-md text-foreground"
+                    } ${pensando ? "relative overflow-hidden" : ""}`}
+                  >
+                    {pensando ? (
+                      <>
+                        <span
+                          aria-hidden
+                          className="dc-think-sweep absolute inset-y-0 -left-1/3 w-1/3 bg-[linear-gradient(90deg,transparent,rgba(77,124,15,0.28),transparent)]"
+                        />
+                        <span role="status" className="sr-only">
+                          Pensando
+                        </span>
+                        <span
+                          aria-hidden
+                          className="relative block h-2 w-12 rounded-full bg-foreground/12"
+                        />
+                      </>
+                    ) : dela ? (
+                      <>
+                        {/* A foto que ela mandou, em cima do título — para ela
+                          saber QUAL prato a resposta comenta. Só em memória. */}
+                        {dela && fotos[i] && (
+                          <img
+                            src={fotos[i]}
+                            alt="A foto que você mandou"
+                            className="mb-1.5 block max-h-44 w-full rounded-2xl object-cover"
+                          />
+                        )}
+                        {m.content || "…"}
+                      </>
+                    ) : m.content ? (
+                      /* Negrito e lista em nós de React — a resposta vem em
+                       linhas com "•" e, às vezes, um `**assim**`; crua, a bolha
+                       mostrava os asteriscos. */
+                      <TextoLeve texto={m.content} />
+                    ) : (
+                      "…"
+                    )}
+                    {/* Só nas respostas da IA, e não na saudação (i > 0).
+                      ⚠️ E nunca no SOCORRO: o 👎 dele enfileira a pergunta para
+                      o médico ler DEPOIS, e este texto não é uma resposta da
+                      IA — oferecer "seu médico vai ver" ao lado de um caminho
+                      de emergência trocaria socorro agora por leitura amanhã. */}
+                    {m.role === "assistant" && i > 0 && m.content && !socorro && (
+                      <div className="mt-1.5 flex items-center gap-2">
+                        {votos[i] !== undefined ? (
+                          /* O voto dado fica DESENHADO, e não só dito: o polegar
+                           preenchido é o estado; a frase é o agradecimento. */
+                          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            {votos[i] === true ? (
+                              <ThumbsUp
+                                className="h-[15px] w-[15px] text-lime-700"
+                                fill="currentColor"
+                                strokeWidth={1.8}
+                                aria-hidden
+                              />
+                            ) : (
+                              <ThumbsDown
+                                className="h-[15px] w-[15px] text-lime-700"
+                                fill="currentColor"
+                                strokeWidth={1.8}
+                                aria-hidden
+                              />
+                            )}
+                            {votos[i] === true
+                              ? "Obrigada 💛"
+                              : votos[i] === "fila"
+                                ? "Anotado — seu médico vai ver"
+                                : "Anotado 💛"}
+                          </span>
+                        ) : (
+                          <>
+                            {/* ⚠️ ALVO DE 44px, e aqui ele NÃO pode sair de um
+                              `after:-inset`: são dois VIZINHOS e opostos, e
+                              estendê-los faria os alvos se encavalarem —
+                              tocar entre eles acertaria o contrário do que
+                              ela quis. É a lição do ✕ do chá de bebê. Os
+                              `-m` devolvem o espaço que o quadrado tomou.
+                              ⚠️ E são DESENHADOS, não emoji: 👍 tem cor
+                              própria em cada sistema, e a 50% de opacidade
+                              lia como desabilitado. */}
+                            <button
+                              onClick={() => votar(i, true)}
+                              aria-label="Esta resposta ajudou"
+                              className="-my-2 -ml-2 flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-lime-700"
+                            >
+                              <ThumbsUp className="h-[18px] w-[18px]" strokeWidth={1.9} />
+                            </button>
+                            <button
+                              onClick={() => votar(i, false)}
+                              aria-label="Esta resposta não ajudou"
+                              className="-my-2 flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-lime-700"
+                            >
+                              <ThumbsDown className="h-[18px] w-[18px]" strokeWidth={1.9} />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {socorro && (
+                  <div className="mt-2 rounded-3xl border border-red-200 bg-red-50 p-3.5">
+                    <p className="font-serif text-[15px] font-semibold leading-tight text-red-900">
+                      {TITULO_DO_SOCORRO}
+                    </p>
+                    {/* ⚠️ O botão da Central só existe quando há para onde ir —
+                        `onAbrirSOS` é opcional, e um botão que promete uma ação
+                        e não faz nada é o defeito que este repositório já pagou
+                        três vezes. O 192 fica SEMPRE: ele não depende de tela,
+                        de sessão nem de rede de dados. */}
+                    {onAbrirSOS && (
+                      <button
+                        type="button"
+                        onClick={onAbrirSOS}
+                        className="btn-3d press mt-2.5 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full bg-red-700 px-4 text-[15px] font-semibold text-white"
+                      >
+                        Pedir socorro agora
+                      </button>
+                    )}
+                    <a
+                      href="tel:192"
+                      className="pill-3d press mt-2 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full px-4 text-[15px] font-semibold text-red-800"
+                    >
+                      <Phone className="h-[18px] w-[18px]" strokeWidth={2.1} aria-hidden />
+                      Ligar 192 (SAMU)
+                    </a>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Sugestões: em Modo Cuidado somem. NUTRITION_CHIPS traz "Posso comer
+            tâmara para preparar o parto?" e coisas do tipo. */}
+        {!careMode && messages.length <= 1 && (
+          <div className="scrollbar-hide flex gap-2 overflow-x-auto border-t border-lime-100 px-3 py-2">
+            {chips.map((c) => (
+              <button
+                key={c}
+                onClick={() => send(c)}
+                className="pill-3d press min-h-[44px] shrink-0 rounded-full px-3.5 py-2 text-[13px] font-semibold text-lime-800"
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* ─── A PORTA DO PREMIUM ────────────────────────────────────────
+            ⚠️ Acima do compositor, e não no lugar dele: o campo continua na
+            tela com o que ela escreveu dentro. Tirá-lo faria a pergunta sumir
+            junto com a resposta que ela não teve. */}
+        {bloqueio && (
+          <div className="border-t border-lime-100 bg-lime-50/70 px-4 py-3">
+            <p className="font-serif text-[15px] font-semibold text-lime-950">
+              {recadoDoBloqueio(bloqueio).titulo}
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-lime-900">
+              {recadoDoBloqueio(bloqueio).texto}
+            </p>
+            {/* ⚠️ O botão só existe no cartão do PREMIUM. Oferecer assinatura a
+                quem bateu no teto seria vender o que ela já comprou. */}
+            {bloqueio === "sem_premium" && aoAssinar && (
+              <button
+                onClick={() => {
+                  const v = podeComprarAqui("premium_paciente", ehNativo());
+                  /* ⚠️ O veredito vem da régua de canal, nunca de um `if`
+                     local: a paciente assina pela loja, e com o IAP desligado
+                     não há compra em canal nenhum. O mesmo botão vira a compra
+                     de verdade no dia em que ele ligar, sem tela nova. */
+                  if (v.pode) aoAssinar?.();
+                  else toast(v.texto);
+                }}
+                className="btn-3d press mt-3 min-h-[44px] w-full rounded-full bg-lime-700 px-4 text-[15px] font-semibold text-white"
+              >
+                Conhecer o Premium
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* ─── A AMOSTRA CONTA EM VOZ ALTA ─────────────────────────────
+            ⚠️ Só quando a porta está ABERTA: com o cartão do Premium na tela,
+            "resta 1" seria a contagem de uma coisa que já acabou. E o texto
+            sai da régua, nunca daqui — é o que o dono relê. */}
+        {!bloqueio && recadoDaAmostra(amostra) && (
+          <p className="border-t border-lime-100 bg-lime-50/50 px-4 py-2 text-xs text-lime-900">
+            {recadoDaAmostra(amostra)}
+          </p>
+        )}
+
+        <div className="flex items-end gap-2 border-t border-lime-100 bg-card/92 px-3 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 md:pb-2">
+          <div className="card-material flex min-h-[44px] flex-1 items-center rounded-[22px] px-4">
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && send()}
+              aria-label="Mensagem"
+              placeholder="Pergunte sobre alimentação…"
+              /* ⚠️ 16px, nunca menos — o zoom do Safari ao focar. */
+              className="min-h-[44px] w-full bg-transparent text-[16px] text-foreground outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+          <button
+            onClick={() => send()}
+            disabled={loading || !input.trim()}
+            aria-label="Enviar"
+            className="btn-3d press flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-lime-700 text-white disabled:opacity-50"
+          >
+            <Send className="h-[21px] w-[21px] -translate-x-px translate-y-px" strokeWidth={1.9} />
+          </button>
+        </div>
+      </div>
+
+      {/* ─── O FOCO DO TRIMESTRE ───────────────────────────────────────
+          Some em Modo Cuidado: "Formação óssea do bebê" e "Desenvolvimento do
+          cérebro fetal" são o conteúdo dele. */}
+      {!careMode && !posParto && (
+        <section aria-label="Nutrientes em foco">
+          <div className="mb-2 flex items-baseline justify-between px-1">
+            <p className="font-serif text-[17px] font-semibold text-foreground">
+              Foco do {trimester}º trimestre
+            </p>
+            <p className="text-xs text-muted-foreground">deslize →</p>
+          </div>
+          <div className="scrollbar-hide -mx-1 flex snap-x snap-mandatory gap-2 overflow-x-auto px-1 pb-1">
+            {tips.map((t) => (
+              <article
+                key={t.nutrient}
+                className="card-material w-[210px] shrink-0 snap-start rounded-2xl border border-lime-200/70 bg-gradient-to-b from-lime-50 to-amber-50/60 p-3.5"
+              >
+                <p className="font-serif text-[15px] font-semibold text-lime-800">{t.nutrient}</p>
+                <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{t.why}</p>
+                <p className="mt-2 text-[13px] leading-snug text-foreground">{t.foods}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}

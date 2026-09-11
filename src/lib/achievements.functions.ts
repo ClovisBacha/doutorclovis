@@ -122,13 +122,23 @@ export const checkAndAwardAchievements = createServerFn({ method: "POST" })
     if (journalLinhas.length >= 1) toAward.push("first_journal");
     if (diasDistintos(journalLinhas.map((r) => r.created_at)) >= 10) toAward.push("journal_10");
 
+    /* ⚠️ **`started_at`, e NÃO `created_at` — `kick_sessions` não tem essa
+       coluna.** Ela nasceu com `id`, `user_id`, `started_at`, `ended_at`,
+       `kick_count` e `notes`, e o defeito entrou quando estas três conquistas
+       passaram a contar DIAS DISTINTOS em vez de linhas: as irmãs
+       (`health_logs`, `journal_entries`) têm `created_at`, esta não. O
+       PostgREST devolvia `42703`, `data` vinha `null`, `?? []` virava lista
+       vazia — e **`first_kicks` e `kicks_10` eram conquistas permanentemente
+       impossíveis**, aparecendo "🔒 bloqueada" para sempre numa grade que a
+       paciente lê como "o que ainda dá pra fazer". É a mesma família das três
+       conquistas da Escola do Bebê, chegando por um conserto. */
     const { data: kickRows } = await db
       .from("kick_sessions")
-      .select("created_at")
+      .select("started_at")
       .eq("user_id", uid);
-    const kickLinhas = (kickRows ?? []) as { created_at: string | null }[];
+    const kickLinhas = (kickRows ?? []) as { started_at: string | null }[];
     if (kickLinhas.length >= 1) toAward.push("first_kicks");
-    if (diasDistintos(kickLinhas.map((r) => r.created_at)) >= 10) toAward.push("kicks_10");
+    if (diasDistintos(kickLinhas.map((r) => r.started_at)) >= 10) toAward.push("kicks_10");
 
     const { count: inviteCount } = await db
       .from("companion_invites")

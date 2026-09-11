@@ -20,6 +20,9 @@ import { Route as PreviewSosMedicoRouteImport } from './routes/preview-sos-medic
 import { Route as PreviewSosRouteImport } from './routes/preview-sos'
 import { Route as PreviewSonsRouteImport } from './routes/preview-sons'
 import { Route as PreviewSomRouteImport } from './routes/preview-som'
+import { Route as PreviewSaudeRegistrosRouteImport } from './routes/preview-saude-registros'
+import { Route as PreviewSaudeMulherRouteImport } from './routes/preview-saude-mulher'
+import { Route as PreviewSaudeClinicaRouteImport } from './routes/preview-saude-clinica'
 import { Route as PreviewSaudeRouteImport } from './routes/preview-saude'
 import { Route as PreviewReguaRouteImport } from './routes/preview-regua'
 import { Route as PreviewRegistrarConsultaRouteImport } from './routes/preview-registrar-consulta'
@@ -28,9 +31,13 @@ import { Route as PreviewProntuarioRouteImport } from './routes/preview-prontuar
 import { Route as PreviewPresentesRouteImport } from './routes/preview-presentes'
 import { Route as PreviewOnboardingRouteImport } from './routes/preview-onboarding'
 import { Route as PreviewOfertaRouteImport } from './routes/preview-oferta'
+import { Route as PreviewNutricaoRouteImport } from './routes/preview-nutricao'
+import { Route as PreviewNpsRouteImport } from './routes/preview-nps'
 import { Route as PreviewNotificacoesRouteImport } from './routes/preview-notificacoes'
 import { Route as PreviewMomentoRouteImport } from './routes/preview-momento'
+import { Route as PreviewModeracaoRouteImport } from './routes/preview-moderacao'
 import { Route as PreviewMeditacaoRouteImport } from './routes/preview-meditacao'
+import { Route as PreviewMapaRouteImport } from './routes/preview-mapa'
 import { Route as PreviewLojaSementinhasRouteImport } from './routes/preview-loja-sementinhas'
 import { Route as PreviewJogoRouteImport } from './routes/preview-jogo'
 import { Route as PreviewInstagramRouteImport } from './routes/preview-instagram'
@@ -38,17 +45,27 @@ import { Route as PreviewHomeRouteImport } from './routes/preview-home'
 import { Route as PreviewGratidaoRouteImport } from './routes/preview-gratidao'
 import { Route as PreviewGradesRouteImport } from './routes/preview-grades'
 import { Route as PreviewExercicioRouteImport } from './routes/preview-exercicio'
+import { Route as PreviewEmissoesRouteImport } from './routes/preview-emissoes'
+import { Route as PreviewCustoRouteImport } from './routes/preview-custo'
+import { Route as PreviewConvitesRouteImport } from './routes/preview-convites'
 import { Route as PreviewConviteRouteImport } from './routes/preview-convite'
+import { Route as PreviewContracoesRouteImport } from './routes/preview-contracoes'
 import { Route as PreviewContaRouteImport } from './routes/preview-conta'
+import { Route as PreviewConsultoriosRouteImport } from './routes/preview-consultorios'
 import { Route as PreviewConquistasRouteImport } from './routes/preview-conquistas'
 import { Route as PreviewComunidadeRouteImport } from './routes/preview-comunidade'
+import { Route as PreviewChutesRouteImport } from './routes/preview-chutes'
 import { Route as PreviewChatRouteImport } from './routes/preview-chat'
 import { Route as PreviewCasalRouteImport } from './routes/preview-casal'
+import { Route as PreviewCantinhoRouteImport } from './routes/preview-cantinho'
 import { Route as PreviewBolhaRouteImport } from './routes/preview-bolha'
+import { Route as PreviewBebeTabRouteImport } from './routes/preview-bebe-tab'
 import { Route as PreviewBebeRouteImport } from './routes/preview-bebe'
+import { Route as PreviewBancoRouteImport } from './routes/preview-banco'
 import { Route as PreviewAssinaturaRouteImport } from './routes/preview-assinatura'
 import { Route as PreviewAmigasRouteImport } from './routes/preview-amigas'
 import { Route as PreviewAgendaRouteImport } from './routes/preview-agenda'
+import { Route as PreviewAberturaRouteImport } from './routes/preview-abertura'
 import { Route as MuralRouteImport } from './routes/mural'
 import { Route as ModoAcompanhanteRouteImport } from './routes/modo-acompanhante'
 import { Route as MitosRouteImport } from './routes/mitos'
@@ -74,6 +91,7 @@ import { Route as AcompanhanteRouteImport } from './routes/acompanhante'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VotarNomeTokenRouteImport } from './routes/votar-nome.$token'
+import { Route as PubCodigoRouteImport } from './routes/pub.$codigo'
 import { Route as PresenteTokenRouteImport } from './routes/presente.$token'
 import { Route as PCodigoRouteImport } from './routes/p.$codigo'
 import { Route as MedicosGoogleCallbackRouteImport } from './routes/medicos_.google-callback'
@@ -84,6 +102,7 @@ import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 import { Route as ApiTranscreverDiarioRouteImport } from './routes/api/transcrever-diario'
 import { Route as ApiStripeWebhookRouteImport } from './routes/api/stripe-webhook'
 import { Route as ApiPushWeeklyTickRouteImport } from './routes/api/push-weekly-tick'
+import { Route as ApiPratoRouteImport } from './routes/api/prato'
 import { Route as ApiNutritionRouteImport } from './routes/api/nutrition'
 import { Route as ApiMpWebhookRouteImport } from './routes/api/mp-webhook'
 import { Route as ApiMeditacaoTickRouteImport } from './routes/api/meditacao-tick'
@@ -155,6 +174,21 @@ const PreviewSomRoute = PreviewSomRouteImport.update({
   path: '/preview-som',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PreviewSaudeRegistrosRoute = PreviewSaudeRegistrosRouteImport.update({
+  id: '/preview-saude-registros',
+  path: '/preview-saude-registros',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewSaudeMulherRoute = PreviewSaudeMulherRouteImport.update({
+  id: '/preview-saude-mulher',
+  path: '/preview-saude-mulher',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewSaudeClinicaRoute = PreviewSaudeClinicaRouteImport.update({
+  id: '/preview-saude-clinica',
+  path: '/preview-saude-clinica',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PreviewSaudeRoute = PreviewSaudeRouteImport.update({
   id: '/preview-saude',
   path: '/preview-saude',
@@ -196,6 +230,16 @@ const PreviewOfertaRoute = PreviewOfertaRouteImport.update({
   path: '/preview-oferta',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PreviewNutricaoRoute = PreviewNutricaoRouteImport.update({
+  id: '/preview-nutricao',
+  path: '/preview-nutricao',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewNpsRoute = PreviewNpsRouteImport.update({
+  id: '/preview-nps',
+  path: '/preview-nps',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PreviewNotificacoesRoute = PreviewNotificacoesRouteImport.update({
   id: '/preview-notificacoes',
   path: '/preview-notificacoes',
@@ -206,9 +250,19 @@ const PreviewMomentoRoute = PreviewMomentoRouteImport.update({
   path: '/preview-momento',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PreviewModeracaoRoute = PreviewModeracaoRouteImport.update({
+  id: '/preview-moderacao',
+  path: '/preview-moderacao',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PreviewMeditacaoRoute = PreviewMeditacaoRouteImport.update({
   id: '/preview-meditacao',
   path: '/preview-meditacao',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewMapaRoute = PreviewMapaRouteImport.update({
+  id: '/preview-mapa',
+  path: '/preview-mapa',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewLojaSementinhasRoute = PreviewLojaSementinhasRouteImport.update({
@@ -246,14 +300,39 @@ const PreviewExercicioRoute = PreviewExercicioRouteImport.update({
   path: '/preview-exercicio',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PreviewEmissoesRoute = PreviewEmissoesRouteImport.update({
+  id: '/preview-emissoes',
+  path: '/preview-emissoes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewCustoRoute = PreviewCustoRouteImport.update({
+  id: '/preview-custo',
+  path: '/preview-custo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewConvitesRoute = PreviewConvitesRouteImport.update({
+  id: '/preview-convites',
+  path: '/preview-convites',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PreviewConviteRoute = PreviewConviteRouteImport.update({
   id: '/preview-convite',
   path: '/preview-convite',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PreviewContracoesRoute = PreviewContracoesRouteImport.update({
+  id: '/preview-contracoes',
+  path: '/preview-contracoes',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PreviewContaRoute = PreviewContaRouteImport.update({
   id: '/preview-conta',
   path: '/preview-conta',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewConsultoriosRoute = PreviewConsultoriosRouteImport.update({
+  id: '/preview-consultorios',
+  path: '/preview-consultorios',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewConquistasRoute = PreviewConquistasRouteImport.update({
@@ -266,6 +345,11 @@ const PreviewComunidadeRoute = PreviewComunidadeRouteImport.update({
   path: '/preview-comunidade',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PreviewChutesRoute = PreviewChutesRouteImport.update({
+  id: '/preview-chutes',
+  path: '/preview-chutes',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PreviewChatRoute = PreviewChatRouteImport.update({
   id: '/preview-chat',
   path: '/preview-chat',
@@ -276,14 +360,29 @@ const PreviewCasalRoute = PreviewCasalRouteImport.update({
   path: '/preview-casal',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PreviewCantinhoRoute = PreviewCantinhoRouteImport.update({
+  id: '/preview-cantinho',
+  path: '/preview-cantinho',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PreviewBolhaRoute = PreviewBolhaRouteImport.update({
   id: '/preview-bolha',
   path: '/preview-bolha',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PreviewBebeTabRoute = PreviewBebeTabRouteImport.update({
+  id: '/preview-bebe-tab',
+  path: '/preview-bebe-tab',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PreviewBebeRoute = PreviewBebeRouteImport.update({
   id: '/preview-bebe',
   path: '/preview-bebe',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewBancoRoute = PreviewBancoRouteImport.update({
+  id: '/preview-banco',
+  path: '/preview-banco',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewAssinaturaRoute = PreviewAssinaturaRouteImport.update({
@@ -299,6 +398,11 @@ const PreviewAmigasRoute = PreviewAmigasRouteImport.update({
 const PreviewAgendaRoute = PreviewAgendaRouteImport.update({
   id: '/preview-agenda',
   path: '/preview-agenda',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewAberturaRoute = PreviewAberturaRouteImport.update({
+  id: '/preview-abertura',
+  path: '/preview-abertura',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MuralRoute = MuralRouteImport.update({
@@ -425,6 +529,11 @@ const VotarNomeTokenRoute = VotarNomeTokenRouteImport.update({
   path: '/votar-nome/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PubCodigoRoute = PubCodigoRouteImport.update({
+  id: '/pub/$codigo',
+  path: '/pub/$codigo',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PresenteTokenRoute = PresenteTokenRouteImport.update({
   id: '/presente/$token',
   path: '/presente/$token',
@@ -473,6 +582,11 @@ const ApiStripeWebhookRoute = ApiStripeWebhookRouteImport.update({
 const ApiPushWeeklyTickRoute = ApiPushWeeklyTickRouteImport.update({
   id: '/api/push-weekly-tick',
   path: '/api/push-weekly-tick',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPratoRoute = ApiPratoRouteImport.update({
+  id: '/api/prato',
+  path: '/api/prato',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiNutritionRoute = ApiNutritionRouteImport.update({
@@ -575,17 +689,27 @@ export interface FileRoutesByFullPath {
   '/mitos': typeof MitosRoute
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
+  '/preview-abertura': typeof PreviewAberturaRoute
   '/preview-agenda': typeof PreviewAgendaRoute
   '/preview-amigas': typeof PreviewAmigasRoute
   '/preview-assinatura': typeof PreviewAssinaturaRoute
+  '/preview-banco': typeof PreviewBancoRoute
   '/preview-bebe': typeof PreviewBebeRoute
+  '/preview-bebe-tab': typeof PreviewBebeTabRoute
   '/preview-bolha': typeof PreviewBolhaRoute
+  '/preview-cantinho': typeof PreviewCantinhoRoute
   '/preview-casal': typeof PreviewCasalRoute
   '/preview-chat': typeof PreviewChatRoute
+  '/preview-chutes': typeof PreviewChutesRoute
   '/preview-comunidade': typeof PreviewComunidadeRoute
   '/preview-conquistas': typeof PreviewConquistasRoute
+  '/preview-consultorios': typeof PreviewConsultoriosRoute
   '/preview-conta': typeof PreviewContaRoute
+  '/preview-contracoes': typeof PreviewContracoesRoute
   '/preview-convite': typeof PreviewConviteRoute
+  '/preview-convites': typeof PreviewConvitesRoute
+  '/preview-custo': typeof PreviewCustoRoute
+  '/preview-emissoes': typeof PreviewEmissoesRoute
   '/preview-exercicio': typeof PreviewExercicioRoute
   '/preview-grades': typeof PreviewGradesRoute
   '/preview-gratidao': typeof PreviewGratidaoRoute
@@ -593,9 +717,13 @@ export interface FileRoutesByFullPath {
   '/preview-instagram': typeof PreviewInstagramRoute
   '/preview-jogo': typeof PreviewJogoRoute
   '/preview-loja-sementinhas': typeof PreviewLojaSementinhasRoute
+  '/preview-mapa': typeof PreviewMapaRoute
   '/preview-meditacao': typeof PreviewMeditacaoRoute
+  '/preview-moderacao': typeof PreviewModeracaoRoute
   '/preview-momento': typeof PreviewMomentoRoute
   '/preview-notificacoes': typeof PreviewNotificacoesRoute
+  '/preview-nps': typeof PreviewNpsRoute
+  '/preview-nutricao': typeof PreviewNutricaoRoute
   '/preview-oferta': typeof PreviewOfertaRoute
   '/preview-onboarding': typeof PreviewOnboardingRoute
   '/preview-presentes': typeof PreviewPresentesRoute
@@ -604,6 +732,9 @@ export interface FileRoutesByFullPath {
   '/preview-registrar-consulta': typeof PreviewRegistrarConsultaRoute
   '/preview-regua': typeof PreviewReguaRoute
   '/preview-saude': typeof PreviewSaudeRoute
+  '/preview-saude-clinica': typeof PreviewSaudeClinicaRoute
+  '/preview-saude-mulher': typeof PreviewSaudeMulherRoute
+  '/preview-saude-registros': typeof PreviewSaudeRegistrosRoute
   '/preview-som': typeof PreviewSomRoute
   '/preview-sons': typeof PreviewSonsRoute
   '/preview-sos': typeof PreviewSosRoute
@@ -628,6 +759,7 @@ export interface FileRoutesByFullPath {
   '/api/meditacao-tick': typeof ApiMeditacaoTickRoute
   '/api/mp-webhook': typeof ApiMpWebhookRoute
   '/api/nutrition': typeof ApiNutritionRoute
+  '/api/prato': typeof ApiPratoRoute
   '/api/push-weekly-tick': typeof ApiPushWeeklyTickRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/api/transcrever-diario': typeof ApiTranscreverDiarioRoute
@@ -638,6 +770,7 @@ export interface FileRoutesByFullPath {
   '/medicos/google-callback': typeof MedicosGoogleCallbackRoute
   '/p/$codigo': typeof PCodigoRoute
   '/presente/$token': typeof PresenteTokenRoute
+  '/pub/$codigo': typeof PubCodigoRoute
   '/votar-nome/$token': typeof VotarNomeTokenRoute
   '/api/doctorthink/ask': typeof ApiDoctorthinkAskRoute
   '/api/doctorthink/train': typeof ApiDoctorthinkTrainRoute
@@ -666,17 +799,27 @@ export interface FileRoutesByTo {
   '/mitos': typeof MitosRoute
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
+  '/preview-abertura': typeof PreviewAberturaRoute
   '/preview-agenda': typeof PreviewAgendaRoute
   '/preview-amigas': typeof PreviewAmigasRoute
   '/preview-assinatura': typeof PreviewAssinaturaRoute
+  '/preview-banco': typeof PreviewBancoRoute
   '/preview-bebe': typeof PreviewBebeRoute
+  '/preview-bebe-tab': typeof PreviewBebeTabRoute
   '/preview-bolha': typeof PreviewBolhaRoute
+  '/preview-cantinho': typeof PreviewCantinhoRoute
   '/preview-casal': typeof PreviewCasalRoute
   '/preview-chat': typeof PreviewChatRoute
+  '/preview-chutes': typeof PreviewChutesRoute
   '/preview-comunidade': typeof PreviewComunidadeRoute
   '/preview-conquistas': typeof PreviewConquistasRoute
+  '/preview-consultorios': typeof PreviewConsultoriosRoute
   '/preview-conta': typeof PreviewContaRoute
+  '/preview-contracoes': typeof PreviewContracoesRoute
   '/preview-convite': typeof PreviewConviteRoute
+  '/preview-convites': typeof PreviewConvitesRoute
+  '/preview-custo': typeof PreviewCustoRoute
+  '/preview-emissoes': typeof PreviewEmissoesRoute
   '/preview-exercicio': typeof PreviewExercicioRoute
   '/preview-grades': typeof PreviewGradesRoute
   '/preview-gratidao': typeof PreviewGratidaoRoute
@@ -684,9 +827,13 @@ export interface FileRoutesByTo {
   '/preview-instagram': typeof PreviewInstagramRoute
   '/preview-jogo': typeof PreviewJogoRoute
   '/preview-loja-sementinhas': typeof PreviewLojaSementinhasRoute
+  '/preview-mapa': typeof PreviewMapaRoute
   '/preview-meditacao': typeof PreviewMeditacaoRoute
+  '/preview-moderacao': typeof PreviewModeracaoRoute
   '/preview-momento': typeof PreviewMomentoRoute
   '/preview-notificacoes': typeof PreviewNotificacoesRoute
+  '/preview-nps': typeof PreviewNpsRoute
+  '/preview-nutricao': typeof PreviewNutricaoRoute
   '/preview-oferta': typeof PreviewOfertaRoute
   '/preview-onboarding': typeof PreviewOnboardingRoute
   '/preview-presentes': typeof PreviewPresentesRoute
@@ -695,6 +842,9 @@ export interface FileRoutesByTo {
   '/preview-registrar-consulta': typeof PreviewRegistrarConsultaRoute
   '/preview-regua': typeof PreviewReguaRoute
   '/preview-saude': typeof PreviewSaudeRoute
+  '/preview-saude-clinica': typeof PreviewSaudeClinicaRoute
+  '/preview-saude-mulher': typeof PreviewSaudeMulherRoute
+  '/preview-saude-registros': typeof PreviewSaudeRegistrosRoute
   '/preview-som': typeof PreviewSomRoute
   '/preview-sons': typeof PreviewSonsRoute
   '/preview-sos': typeof PreviewSosRoute
@@ -719,6 +869,7 @@ export interface FileRoutesByTo {
   '/api/meditacao-tick': typeof ApiMeditacaoTickRoute
   '/api/mp-webhook': typeof ApiMpWebhookRoute
   '/api/nutrition': typeof ApiNutritionRoute
+  '/api/prato': typeof ApiPratoRoute
   '/api/push-weekly-tick': typeof ApiPushWeeklyTickRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/api/transcrever-diario': typeof ApiTranscreverDiarioRoute
@@ -729,6 +880,7 @@ export interface FileRoutesByTo {
   '/medicos/google-callback': typeof MedicosGoogleCallbackRoute
   '/p/$codigo': typeof PCodigoRoute
   '/presente/$token': typeof PresenteTokenRoute
+  '/pub/$codigo': typeof PubCodigoRoute
   '/votar-nome/$token': typeof VotarNomeTokenRoute
   '/api/doctorthink/ask': typeof ApiDoctorthinkAskRoute
   '/api/doctorthink/train': typeof ApiDoctorthinkTrainRoute
@@ -759,17 +911,27 @@ export interface FileRoutesById {
   '/mitos': typeof MitosRoute
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
+  '/preview-abertura': typeof PreviewAberturaRoute
   '/preview-agenda': typeof PreviewAgendaRoute
   '/preview-amigas': typeof PreviewAmigasRoute
   '/preview-assinatura': typeof PreviewAssinaturaRoute
+  '/preview-banco': typeof PreviewBancoRoute
   '/preview-bebe': typeof PreviewBebeRoute
+  '/preview-bebe-tab': typeof PreviewBebeTabRoute
   '/preview-bolha': typeof PreviewBolhaRoute
+  '/preview-cantinho': typeof PreviewCantinhoRoute
   '/preview-casal': typeof PreviewCasalRoute
   '/preview-chat': typeof PreviewChatRoute
+  '/preview-chutes': typeof PreviewChutesRoute
   '/preview-comunidade': typeof PreviewComunidadeRoute
   '/preview-conquistas': typeof PreviewConquistasRoute
+  '/preview-consultorios': typeof PreviewConsultoriosRoute
   '/preview-conta': typeof PreviewContaRoute
+  '/preview-contracoes': typeof PreviewContracoesRoute
   '/preview-convite': typeof PreviewConviteRoute
+  '/preview-convites': typeof PreviewConvitesRoute
+  '/preview-custo': typeof PreviewCustoRoute
+  '/preview-emissoes': typeof PreviewEmissoesRoute
   '/preview-exercicio': typeof PreviewExercicioRoute
   '/preview-grades': typeof PreviewGradesRoute
   '/preview-gratidao': typeof PreviewGratidaoRoute
@@ -777,9 +939,13 @@ export interface FileRoutesById {
   '/preview-instagram': typeof PreviewInstagramRoute
   '/preview-jogo': typeof PreviewJogoRoute
   '/preview-loja-sementinhas': typeof PreviewLojaSementinhasRoute
+  '/preview-mapa': typeof PreviewMapaRoute
   '/preview-meditacao': typeof PreviewMeditacaoRoute
+  '/preview-moderacao': typeof PreviewModeracaoRoute
   '/preview-momento': typeof PreviewMomentoRoute
   '/preview-notificacoes': typeof PreviewNotificacoesRoute
+  '/preview-nps': typeof PreviewNpsRoute
+  '/preview-nutricao': typeof PreviewNutricaoRoute
   '/preview-oferta': typeof PreviewOfertaRoute
   '/preview-onboarding': typeof PreviewOnboardingRoute
   '/preview-presentes': typeof PreviewPresentesRoute
@@ -788,6 +954,9 @@ export interface FileRoutesById {
   '/preview-registrar-consulta': typeof PreviewRegistrarConsultaRoute
   '/preview-regua': typeof PreviewReguaRoute
   '/preview-saude': typeof PreviewSaudeRoute
+  '/preview-saude-clinica': typeof PreviewSaudeClinicaRoute
+  '/preview-saude-mulher': typeof PreviewSaudeMulherRoute
+  '/preview-saude-registros': typeof PreviewSaudeRegistrosRoute
   '/preview-som': typeof PreviewSomRoute
   '/preview-sons': typeof PreviewSonsRoute
   '/preview-sos': typeof PreviewSosRoute
@@ -812,6 +981,7 @@ export interface FileRoutesById {
   '/api/meditacao-tick': typeof ApiMeditacaoTickRoute
   '/api/mp-webhook': typeof ApiMpWebhookRoute
   '/api/nutrition': typeof ApiNutritionRoute
+  '/api/prato': typeof ApiPratoRoute
   '/api/push-weekly-tick': typeof ApiPushWeeklyTickRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/api/transcrever-diario': typeof ApiTranscreverDiarioRoute
@@ -822,6 +992,7 @@ export interface FileRoutesById {
   '/medicos_/google-callback': typeof MedicosGoogleCallbackRoute
   '/p/$codigo': typeof PCodigoRoute
   '/presente/$token': typeof PresenteTokenRoute
+  '/pub/$codigo': typeof PubCodigoRoute
   '/votar-nome/$token': typeof VotarNomeTokenRoute
   '/api/doctorthink/ask': typeof ApiDoctorthinkAskRoute
   '/api/doctorthink/train': typeof ApiDoctorthinkTrainRoute
@@ -852,17 +1023,27 @@ export interface FileRouteTypes {
     | '/mitos'
     | '/modo-acompanhante'
     | '/mural'
+    | '/preview-abertura'
     | '/preview-agenda'
     | '/preview-amigas'
     | '/preview-assinatura'
+    | '/preview-banco'
     | '/preview-bebe'
+    | '/preview-bebe-tab'
     | '/preview-bolha'
+    | '/preview-cantinho'
     | '/preview-casal'
     | '/preview-chat'
+    | '/preview-chutes'
     | '/preview-comunidade'
     | '/preview-conquistas'
+    | '/preview-consultorios'
     | '/preview-conta'
+    | '/preview-contracoes'
     | '/preview-convite'
+    | '/preview-convites'
+    | '/preview-custo'
+    | '/preview-emissoes'
     | '/preview-exercicio'
     | '/preview-grades'
     | '/preview-gratidao'
@@ -870,9 +1051,13 @@ export interface FileRouteTypes {
     | '/preview-instagram'
     | '/preview-jogo'
     | '/preview-loja-sementinhas'
+    | '/preview-mapa'
     | '/preview-meditacao'
+    | '/preview-moderacao'
     | '/preview-momento'
     | '/preview-notificacoes'
+    | '/preview-nps'
+    | '/preview-nutricao'
     | '/preview-oferta'
     | '/preview-onboarding'
     | '/preview-presentes'
@@ -881,6 +1066,9 @@ export interface FileRouteTypes {
     | '/preview-registrar-consulta'
     | '/preview-regua'
     | '/preview-saude'
+    | '/preview-saude-clinica'
+    | '/preview-saude-mulher'
+    | '/preview-saude-registros'
     | '/preview-som'
     | '/preview-sons'
     | '/preview-sos'
@@ -905,6 +1093,7 @@ export interface FileRouteTypes {
     | '/api/meditacao-tick'
     | '/api/mp-webhook'
     | '/api/nutrition'
+    | '/api/prato'
     | '/api/push-weekly-tick'
     | '/api/stripe-webhook'
     | '/api/transcrever-diario'
@@ -915,6 +1104,7 @@ export interface FileRouteTypes {
     | '/medicos/google-callback'
     | '/p/$codigo'
     | '/presente/$token'
+    | '/pub/$codigo'
     | '/votar-nome/$token'
     | '/api/doctorthink/ask'
     | '/api/doctorthink/train'
@@ -943,17 +1133,27 @@ export interface FileRouteTypes {
     | '/mitos'
     | '/modo-acompanhante'
     | '/mural'
+    | '/preview-abertura'
     | '/preview-agenda'
     | '/preview-amigas'
     | '/preview-assinatura'
+    | '/preview-banco'
     | '/preview-bebe'
+    | '/preview-bebe-tab'
     | '/preview-bolha'
+    | '/preview-cantinho'
     | '/preview-casal'
     | '/preview-chat'
+    | '/preview-chutes'
     | '/preview-comunidade'
     | '/preview-conquistas'
+    | '/preview-consultorios'
     | '/preview-conta'
+    | '/preview-contracoes'
     | '/preview-convite'
+    | '/preview-convites'
+    | '/preview-custo'
+    | '/preview-emissoes'
     | '/preview-exercicio'
     | '/preview-grades'
     | '/preview-gratidao'
@@ -961,9 +1161,13 @@ export interface FileRouteTypes {
     | '/preview-instagram'
     | '/preview-jogo'
     | '/preview-loja-sementinhas'
+    | '/preview-mapa'
     | '/preview-meditacao'
+    | '/preview-moderacao'
     | '/preview-momento'
     | '/preview-notificacoes'
+    | '/preview-nps'
+    | '/preview-nutricao'
     | '/preview-oferta'
     | '/preview-onboarding'
     | '/preview-presentes'
@@ -972,6 +1176,9 @@ export interface FileRouteTypes {
     | '/preview-registrar-consulta'
     | '/preview-regua'
     | '/preview-saude'
+    | '/preview-saude-clinica'
+    | '/preview-saude-mulher'
+    | '/preview-saude-registros'
     | '/preview-som'
     | '/preview-sons'
     | '/preview-sos'
@@ -996,6 +1203,7 @@ export interface FileRouteTypes {
     | '/api/meditacao-tick'
     | '/api/mp-webhook'
     | '/api/nutrition'
+    | '/api/prato'
     | '/api/push-weekly-tick'
     | '/api/stripe-webhook'
     | '/api/transcrever-diario'
@@ -1006,6 +1214,7 @@ export interface FileRouteTypes {
     | '/medicos/google-callback'
     | '/p/$codigo'
     | '/presente/$token'
+    | '/pub/$codigo'
     | '/votar-nome/$token'
     | '/api/doctorthink/ask'
     | '/api/doctorthink/train'
@@ -1035,17 +1244,27 @@ export interface FileRouteTypes {
     | '/mitos'
     | '/modo-acompanhante'
     | '/mural'
+    | '/preview-abertura'
     | '/preview-agenda'
     | '/preview-amigas'
     | '/preview-assinatura'
+    | '/preview-banco'
     | '/preview-bebe'
+    | '/preview-bebe-tab'
     | '/preview-bolha'
+    | '/preview-cantinho'
     | '/preview-casal'
     | '/preview-chat'
+    | '/preview-chutes'
     | '/preview-comunidade'
     | '/preview-conquistas'
+    | '/preview-consultorios'
     | '/preview-conta'
+    | '/preview-contracoes'
     | '/preview-convite'
+    | '/preview-convites'
+    | '/preview-custo'
+    | '/preview-emissoes'
     | '/preview-exercicio'
     | '/preview-grades'
     | '/preview-gratidao'
@@ -1053,9 +1272,13 @@ export interface FileRouteTypes {
     | '/preview-instagram'
     | '/preview-jogo'
     | '/preview-loja-sementinhas'
+    | '/preview-mapa'
     | '/preview-meditacao'
+    | '/preview-moderacao'
     | '/preview-momento'
     | '/preview-notificacoes'
+    | '/preview-nps'
+    | '/preview-nutricao'
     | '/preview-oferta'
     | '/preview-onboarding'
     | '/preview-presentes'
@@ -1064,6 +1287,9 @@ export interface FileRouteTypes {
     | '/preview-registrar-consulta'
     | '/preview-regua'
     | '/preview-saude'
+    | '/preview-saude-clinica'
+    | '/preview-saude-mulher'
+    | '/preview-saude-registros'
     | '/preview-som'
     | '/preview-sons'
     | '/preview-sos'
@@ -1088,6 +1314,7 @@ export interface FileRouteTypes {
     | '/api/meditacao-tick'
     | '/api/mp-webhook'
     | '/api/nutrition'
+    | '/api/prato'
     | '/api/push-weekly-tick'
     | '/api/stripe-webhook'
     | '/api/transcrever-diario'
@@ -1098,6 +1325,7 @@ export interface FileRouteTypes {
     | '/medicos_/google-callback'
     | '/p/$codigo'
     | '/presente/$token'
+    | '/pub/$codigo'
     | '/votar-nome/$token'
     | '/api/doctorthink/ask'
     | '/api/doctorthink/train'
@@ -1128,17 +1356,27 @@ export interface RootRouteChildren {
   MitosRoute: typeof MitosRoute
   ModoAcompanhanteRoute: typeof ModoAcompanhanteRoute
   MuralRoute: typeof MuralRoute
+  PreviewAberturaRoute: typeof PreviewAberturaRoute
   PreviewAgendaRoute: typeof PreviewAgendaRoute
   PreviewAmigasRoute: typeof PreviewAmigasRoute
   PreviewAssinaturaRoute: typeof PreviewAssinaturaRoute
+  PreviewBancoRoute: typeof PreviewBancoRoute
   PreviewBebeRoute: typeof PreviewBebeRoute
+  PreviewBebeTabRoute: typeof PreviewBebeTabRoute
   PreviewBolhaRoute: typeof PreviewBolhaRoute
+  PreviewCantinhoRoute: typeof PreviewCantinhoRoute
   PreviewCasalRoute: typeof PreviewCasalRoute
   PreviewChatRoute: typeof PreviewChatRoute
+  PreviewChutesRoute: typeof PreviewChutesRoute
   PreviewComunidadeRoute: typeof PreviewComunidadeRoute
   PreviewConquistasRoute: typeof PreviewConquistasRoute
+  PreviewConsultoriosRoute: typeof PreviewConsultoriosRoute
   PreviewContaRoute: typeof PreviewContaRoute
+  PreviewContracoesRoute: typeof PreviewContracoesRoute
   PreviewConviteRoute: typeof PreviewConviteRoute
+  PreviewConvitesRoute: typeof PreviewConvitesRoute
+  PreviewCustoRoute: typeof PreviewCustoRoute
+  PreviewEmissoesRoute: typeof PreviewEmissoesRoute
   PreviewExercicioRoute: typeof PreviewExercicioRoute
   PreviewGradesRoute: typeof PreviewGradesRoute
   PreviewGratidaoRoute: typeof PreviewGratidaoRoute
@@ -1146,9 +1384,13 @@ export interface RootRouteChildren {
   PreviewInstagramRoute: typeof PreviewInstagramRoute
   PreviewJogoRoute: typeof PreviewJogoRoute
   PreviewLojaSementinhasRoute: typeof PreviewLojaSementinhasRoute
+  PreviewMapaRoute: typeof PreviewMapaRoute
   PreviewMeditacaoRoute: typeof PreviewMeditacaoRoute
+  PreviewModeracaoRoute: typeof PreviewModeracaoRoute
   PreviewMomentoRoute: typeof PreviewMomentoRoute
   PreviewNotificacoesRoute: typeof PreviewNotificacoesRoute
+  PreviewNpsRoute: typeof PreviewNpsRoute
+  PreviewNutricaoRoute: typeof PreviewNutricaoRoute
   PreviewOfertaRoute: typeof PreviewOfertaRoute
   PreviewOnboardingRoute: typeof PreviewOnboardingRoute
   PreviewPresentesRoute: typeof PreviewPresentesRoute
@@ -1157,6 +1399,9 @@ export interface RootRouteChildren {
   PreviewRegistrarConsultaRoute: typeof PreviewRegistrarConsultaRoute
   PreviewReguaRoute: typeof PreviewReguaRoute
   PreviewSaudeRoute: typeof PreviewSaudeRoute
+  PreviewSaudeClinicaRoute: typeof PreviewSaudeClinicaRoute
+  PreviewSaudeMulherRoute: typeof PreviewSaudeMulherRoute
+  PreviewSaudeRegistrosRoute: typeof PreviewSaudeRegistrosRoute
   PreviewSomRoute: typeof PreviewSomRoute
   PreviewSonsRoute: typeof PreviewSonsRoute
   PreviewSosRoute: typeof PreviewSosRoute
@@ -1178,6 +1423,7 @@ export interface RootRouteChildren {
   ApiMeditacaoTickRoute: typeof ApiMeditacaoTickRoute
   ApiMpWebhookRoute: typeof ApiMpWebhookRoute
   ApiNutritionRoute: typeof ApiNutritionRoute
+  ApiPratoRoute: typeof ApiPratoRoute
   ApiPushWeeklyTickRoute: typeof ApiPushWeeklyTickRoute
   ApiStripeWebhookRoute: typeof ApiStripeWebhookRoute
   ApiTranscreverDiarioRoute: typeof ApiTranscreverDiarioRoute
@@ -1188,6 +1434,7 @@ export interface RootRouteChildren {
   MedicosGoogleCallbackRoute: typeof MedicosGoogleCallbackRoute
   PCodigoRoute: typeof PCodigoRoute
   PresenteTokenRoute: typeof PresenteTokenRoute
+  PubCodigoRoute: typeof PubCodigoRoute
   VotarNomeTokenRoute: typeof VotarNomeTokenRoute
   ApiDoctorthinkAskRoute: typeof ApiDoctorthinkAskRoute
   ApiDoctorthinkTrainRoute: typeof ApiDoctorthinkTrainRoute
@@ -1272,6 +1519,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PreviewSomRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/preview-saude-registros': {
+      id: '/preview-saude-registros'
+      path: '/preview-saude-registros'
+      fullPath: '/preview-saude-registros'
+      preLoaderRoute: typeof PreviewSaudeRegistrosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-saude-mulher': {
+      id: '/preview-saude-mulher'
+      path: '/preview-saude-mulher'
+      fullPath: '/preview-saude-mulher'
+      preLoaderRoute: typeof PreviewSaudeMulherRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-saude-clinica': {
+      id: '/preview-saude-clinica'
+      path: '/preview-saude-clinica'
+      fullPath: '/preview-saude-clinica'
+      preLoaderRoute: typeof PreviewSaudeClinicaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/preview-saude': {
       id: '/preview-saude'
       path: '/preview-saude'
@@ -1328,6 +1596,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PreviewOfertaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/preview-nutricao': {
+      id: '/preview-nutricao'
+      path: '/preview-nutricao'
+      fullPath: '/preview-nutricao'
+      preLoaderRoute: typeof PreviewNutricaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-nps': {
+      id: '/preview-nps'
+      path: '/preview-nps'
+      fullPath: '/preview-nps'
+      preLoaderRoute: typeof PreviewNpsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/preview-notificacoes': {
       id: '/preview-notificacoes'
       path: '/preview-notificacoes'
@@ -1342,11 +1624,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PreviewMomentoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/preview-moderacao': {
+      id: '/preview-moderacao'
+      path: '/preview-moderacao'
+      fullPath: '/preview-moderacao'
+      preLoaderRoute: typeof PreviewModeracaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/preview-meditacao': {
       id: '/preview-meditacao'
       path: '/preview-meditacao'
       fullPath: '/preview-meditacao'
       preLoaderRoute: typeof PreviewMeditacaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-mapa': {
+      id: '/preview-mapa'
+      path: '/preview-mapa'
+      fullPath: '/preview-mapa'
+      preLoaderRoute: typeof PreviewMapaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview-loja-sementinhas': {
@@ -1398,6 +1694,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PreviewExercicioRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/preview-emissoes': {
+      id: '/preview-emissoes'
+      path: '/preview-emissoes'
+      fullPath: '/preview-emissoes'
+      preLoaderRoute: typeof PreviewEmissoesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-custo': {
+      id: '/preview-custo'
+      path: '/preview-custo'
+      fullPath: '/preview-custo'
+      preLoaderRoute: typeof PreviewCustoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-convites': {
+      id: '/preview-convites'
+      path: '/preview-convites'
+      fullPath: '/preview-convites'
+      preLoaderRoute: typeof PreviewConvitesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/preview-convite': {
       id: '/preview-convite'
       path: '/preview-convite'
@@ -1405,11 +1722,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PreviewConviteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/preview-contracoes': {
+      id: '/preview-contracoes'
+      path: '/preview-contracoes'
+      fullPath: '/preview-contracoes'
+      preLoaderRoute: typeof PreviewContracoesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/preview-conta': {
       id: '/preview-conta'
       path: '/preview-conta'
       fullPath: '/preview-conta'
       preLoaderRoute: typeof PreviewContaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-consultorios': {
+      id: '/preview-consultorios'
+      path: '/preview-consultorios'
+      fullPath: '/preview-consultorios'
+      preLoaderRoute: typeof PreviewConsultoriosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview-conquistas': {
@@ -1426,6 +1757,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PreviewComunidadeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/preview-chutes': {
+      id: '/preview-chutes'
+      path: '/preview-chutes'
+      fullPath: '/preview-chutes'
+      preLoaderRoute: typeof PreviewChutesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/preview-chat': {
       id: '/preview-chat'
       path: '/preview-chat'
@@ -1440,6 +1778,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PreviewCasalRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/preview-cantinho': {
+      id: '/preview-cantinho'
+      path: '/preview-cantinho'
+      fullPath: '/preview-cantinho'
+      preLoaderRoute: typeof PreviewCantinhoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/preview-bolha': {
       id: '/preview-bolha'
       path: '/preview-bolha'
@@ -1447,11 +1792,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PreviewBolhaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/preview-bebe-tab': {
+      id: '/preview-bebe-tab'
+      path: '/preview-bebe-tab'
+      fullPath: '/preview-bebe-tab'
+      preLoaderRoute: typeof PreviewBebeTabRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/preview-bebe': {
       id: '/preview-bebe'
       path: '/preview-bebe'
       fullPath: '/preview-bebe'
       preLoaderRoute: typeof PreviewBebeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-banco': {
+      id: '/preview-banco'
+      path: '/preview-banco'
+      fullPath: '/preview-banco'
+      preLoaderRoute: typeof PreviewBancoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview-assinatura': {
@@ -1473,6 +1832,13 @@ declare module '@tanstack/react-router' {
       path: '/preview-agenda'
       fullPath: '/preview-agenda'
       preLoaderRoute: typeof PreviewAgendaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-abertura': {
+      id: '/preview-abertura'
+      path: '/preview-abertura'
+      fullPath: '/preview-abertura'
+      preLoaderRoute: typeof PreviewAberturaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mural': {
@@ -1650,6 +2016,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VotarNomeTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pub/$codigo': {
+      id: '/pub/$codigo'
+      path: '/pub/$codigo'
+      fullPath: '/pub/$codigo'
+      preLoaderRoute: typeof PubCodigoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/presente/$token': {
       id: '/presente/$token'
       path: '/presente/$token'
@@ -1718,6 +2091,13 @@ declare module '@tanstack/react-router' {
       path: '/api/push-weekly-tick'
       fullPath: '/api/push-weekly-tick'
       preLoaderRoute: typeof ApiPushWeeklyTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/prato': {
+      id: '/api/prato'
+      path: '/api/prato'
+      fullPath: '/api/prato'
+      preLoaderRoute: typeof ApiPratoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/nutrition': {
@@ -1868,17 +2248,27 @@ const rootRouteChildren: RootRouteChildren = {
   MitosRoute: MitosRoute,
   ModoAcompanhanteRoute: ModoAcompanhanteRoute,
   MuralRoute: MuralRoute,
+  PreviewAberturaRoute: PreviewAberturaRoute,
   PreviewAgendaRoute: PreviewAgendaRoute,
   PreviewAmigasRoute: PreviewAmigasRoute,
   PreviewAssinaturaRoute: PreviewAssinaturaRoute,
+  PreviewBancoRoute: PreviewBancoRoute,
   PreviewBebeRoute: PreviewBebeRoute,
+  PreviewBebeTabRoute: PreviewBebeTabRoute,
   PreviewBolhaRoute: PreviewBolhaRoute,
+  PreviewCantinhoRoute: PreviewCantinhoRoute,
   PreviewCasalRoute: PreviewCasalRoute,
   PreviewChatRoute: PreviewChatRoute,
+  PreviewChutesRoute: PreviewChutesRoute,
   PreviewComunidadeRoute: PreviewComunidadeRoute,
   PreviewConquistasRoute: PreviewConquistasRoute,
+  PreviewConsultoriosRoute: PreviewConsultoriosRoute,
   PreviewContaRoute: PreviewContaRoute,
+  PreviewContracoesRoute: PreviewContracoesRoute,
   PreviewConviteRoute: PreviewConviteRoute,
+  PreviewConvitesRoute: PreviewConvitesRoute,
+  PreviewCustoRoute: PreviewCustoRoute,
+  PreviewEmissoesRoute: PreviewEmissoesRoute,
   PreviewExercicioRoute: PreviewExercicioRoute,
   PreviewGradesRoute: PreviewGradesRoute,
   PreviewGratidaoRoute: PreviewGratidaoRoute,
@@ -1886,9 +2276,13 @@ const rootRouteChildren: RootRouteChildren = {
   PreviewInstagramRoute: PreviewInstagramRoute,
   PreviewJogoRoute: PreviewJogoRoute,
   PreviewLojaSementinhasRoute: PreviewLojaSementinhasRoute,
+  PreviewMapaRoute: PreviewMapaRoute,
   PreviewMeditacaoRoute: PreviewMeditacaoRoute,
+  PreviewModeracaoRoute: PreviewModeracaoRoute,
   PreviewMomentoRoute: PreviewMomentoRoute,
   PreviewNotificacoesRoute: PreviewNotificacoesRoute,
+  PreviewNpsRoute: PreviewNpsRoute,
+  PreviewNutricaoRoute: PreviewNutricaoRoute,
   PreviewOfertaRoute: PreviewOfertaRoute,
   PreviewOnboardingRoute: PreviewOnboardingRoute,
   PreviewPresentesRoute: PreviewPresentesRoute,
@@ -1897,6 +2291,9 @@ const rootRouteChildren: RootRouteChildren = {
   PreviewRegistrarConsultaRoute: PreviewRegistrarConsultaRoute,
   PreviewReguaRoute: PreviewReguaRoute,
   PreviewSaudeRoute: PreviewSaudeRoute,
+  PreviewSaudeClinicaRoute: PreviewSaudeClinicaRoute,
+  PreviewSaudeMulherRoute: PreviewSaudeMulherRoute,
+  PreviewSaudeRegistrosRoute: PreviewSaudeRegistrosRoute,
   PreviewSomRoute: PreviewSomRoute,
   PreviewSonsRoute: PreviewSonsRoute,
   PreviewSosRoute: PreviewSosRoute,
@@ -1918,6 +2315,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMeditacaoTickRoute: ApiMeditacaoTickRoute,
   ApiMpWebhookRoute: ApiMpWebhookRoute,
   ApiNutritionRoute: ApiNutritionRoute,
+  ApiPratoRoute: ApiPratoRoute,
   ApiPushWeeklyTickRoute: ApiPushWeeklyTickRoute,
   ApiStripeWebhookRoute: ApiStripeWebhookRoute,
   ApiTranscreverDiarioRoute: ApiTranscreverDiarioRoute,
@@ -1928,6 +2326,7 @@ const rootRouteChildren: RootRouteChildren = {
   MedicosGoogleCallbackRoute: MedicosGoogleCallbackRoute,
   PCodigoRoute: PCodigoRoute,
   PresenteTokenRoute: PresenteTokenRoute,
+  PubCodigoRoute: PubCodigoRoute,
   VotarNomeTokenRoute: VotarNomeTokenRoute,
   ApiDoctorthinkAskRoute: ApiDoctorthinkAskRoute,
   ApiDoctorthinkTrainRoute: ApiDoctorthinkTrainRoute,

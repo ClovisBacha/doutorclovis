@@ -113,6 +113,11 @@ $indices$;
 -- As faixas são as MESMAS de `src/lib/sinais-clinicos.ts`. Se divergirem, a
 -- paciente vê "confira o número" e o banco aceita, ou o contrário — e o
 -- contrário é o pior: um erro genérico que a faz desistir de registrar.
+--
+-- ⚠️ SÃO PISOS, E NÃO FAIXAS (set/2026). Não há teto de plausibilidade em peso,
+-- pressão, glicemia nem frequência: um teto chutado RECUSA o número de uma
+-- paciente real, e o app é que estaria errado. Sobrevivem só os dois máximos
+-- que são DEFINIÇÃO da grandeza — saturação em 100% e sono em 24 h.
 -- ────────────────────────────────────────────────────────────────────────────
 DO $faixas$
 DECLARE
@@ -120,18 +125,18 @@ DECLARE
 BEGIN
   FOR alvo IN
     SELECT * FROM (VALUES
-      ('health_logs',      'systolic',        'systolic IS NULL OR systolic BETWEEN 50 AND 300'),
-      ('health_logs',      'diastolic',       'diastolic IS NULL OR diastolic BETWEEN 20 AND 200'),
-      ('health_logs',      'glucose_mg_dl',   'glucose_mg_dl IS NULL OR glucose_mg_dl BETWEEN 20 AND 900'),
-      ('health_logs',      'weight_kg',       'weight_kg IS NULL OR weight_kg BETWEEN 25 AND 350'),
+      ('health_logs',      'systolic',        'systolic IS NULL OR systolic >= 50'),
+      ('health_logs',      'diastolic',       'diastolic IS NULL OR diastolic >= 20'),
+      ('health_logs',      'glucose_mg_dl',   'glucose_mg_dl IS NULL OR glucose_mg_dl >= 20'),
+      ('health_logs',      'weight_kg',       'weight_kg IS NULL OR weight_kg > 0'),
       ('health_logs',      'spo2',            'spo2 IS NULL OR spo2 BETWEEN 50 AND 100'),
-      ('health_logs',      'heart_rate_bpm',  'heart_rate_bpm IS NULL OR heart_rate_bpm BETWEEN 30 AND 250'),
+      ('health_logs',      'heart_rate_bpm',  'heart_rate_bpm IS NULL OR heart_rate_bpm >= 30'),
       ('health_logs',      'sleep_hours',     'sleep_hours IS NULL OR sleep_hours BETWEEN 0 AND 24'),
-      ('preconsulta_forms','systolic',        'systolic IS NULL OR systolic BETWEEN 50 AND 300'),
-      ('preconsulta_forms','diastolic',       'diastolic IS NULL OR diastolic BETWEEN 20 AND 200'),
-      ('preconsulta_forms','current_weight',  'current_weight IS NULL OR current_weight BETWEEN 25 AND 350'),
-      ('triage_logs',      'systolic',        'systolic IS NULL OR systolic BETWEEN 50 AND 300'),
-      ('triage_logs',      'diastolic',       'diastolic IS NULL OR diastolic BETWEEN 20 AND 200')
+      ('preconsulta_forms','systolic',        'systolic IS NULL OR systolic >= 50'),
+      ('preconsulta_forms','diastolic',       'diastolic IS NULL OR diastolic >= 20'),
+      ('preconsulta_forms','current_weight',  'current_weight IS NULL OR current_weight > 0'),
+      ('triage_logs',      'systolic',        'systolic IS NULL OR systolic >= 50'),
+      ('triage_logs',      'diastolic',       'diastolic IS NULL OR diastolic >= 20')
     ) AS t(tabela, coluna, regra)
   LOOP
     -- Tabela ou coluna ausente (migration pendente) simplesmente não ganha a
@@ -142,10 +147,14 @@ BEGIN
        WHERE table_schema = 'public' AND table_name = alvo.tabela
          AND column_name = alvo.coluna
     );
-    CONTINUE WHEN EXISTS (
-      SELECT 1 FROM pg_constraint
-       WHERE conrelid = ('public.' || alvo.tabela)::regclass
-         AND conname = alvo.tabela || '_' || alvo.coluna || '_faixa'
+    -- ⚠️ DROP ANTES DE ADD, e nunca `CONTINUE WHEN EXISTS`. Com o CONTINUE este
+    -- arquivo era no-op para quem já o tinha rodado: o CHECK ANTIGO (com o teto
+    -- de 350 kg) ficaria de pé para sempre, e a paciente veria o app aceitar o
+    -- peso dela e o banco recusar com 23514. Idempotente continua sendo — o
+    -- DROP é `IF EXISTS` e o ADD reescreve a regra da versão de hoje.
+    EXECUTE format(
+      'ALTER TABLE public.%I DROP CONSTRAINT IF EXISTS %I',
+      alvo.tabela, alvo.tabela || '_' || alvo.coluna || '_faixa'
     );
     EXECUTE format(
       'ALTER TABLE public.%I ADD CONSTRAINT %I CHECK (%s) NOT VALID',
@@ -343,6 +352,9 @@ $tc$;
 DO $view$
 DECLARE
   partes text[] := ARRAY[]::text[];
+  /* Qual expressão usar para a força do movimento — ver o bloco de
+     `kick_sessions`: a coluna nasce num `APLICAR_` que pode não ter rodado. */
+  forca_col text := 'NULL::smallint';
   pares  text[];
   sql    text;
 BEGIN
@@ -451,13 +463,44 @@ BEGIN
   END IF;
 
   IF to_regclass('public.kick_sessions') IS NOT NULL THEN
-    partes := array_append(partes, $sql$
+    -- `strength` nasce em APLICAR_FORCA_DO_MOVIMENTO.sql, que pode não ter
+    -- rodado ainda: sem este teste, o CREATE VIEW falharia INTEIRO e as onze
+    -- fontes cairiam junto por causa de uma coluna nova.
+    SELECT CASE WHEN EXISTS (
+             SELECT 1 FROM information_schema.columns
+              WHERE table_schema = 'public' AND table_name = 'kick_sessions'
+                AND column_name = 'strength'
+           ) THEN 'k.strength' ELSE 'NULL::smallint' END
+      INTO forca_col;
+    partes := array_append(partes, replace($sql$
       SELECT 'kick_sessions'::text, k.id, k.user_id, k.started_at,
              'movimento'::text,
-             jsonb_build_object('chutes', k.kick_count),
+             -- A FORÇA entra junto quando a coluna existe. `to_jsonb` de uma
+             -- coluna ausente quebraria o CREATE VIEW inteiro, então ela é
+             -- montada por `jsonb_strip_nulls` sobre um SELECT que só a lê se o
+             -- `APLICAR_FORCA_DO_MOVIMENTO.sql` já rodou — a mesma razão pela
+             -- qual esta view é montada dinamicamente.
+             jsonb_strip_nulls(jsonb_build_object(
+               'chutes', k.kick_count,
+               'forca', $FORCA$,
+               -- ⚠️ A DURAÇÃO É O DADO CLÍNICO, e ela não vinha. O que se mede
+               -- aqui é o TEMPO ATÉ 10 MOVIMENTOS: "4 movimentos" no prontuário
+               -- era indistinguível de uma sessão que ela encerrou em cinco
+               -- minutos E do alarme vermelho que a tela dela mostra a partir
+               -- de duas horas. Sem esta linha o painel não tinha como saber a
+               -- diferença — e a régua de movimentos reduzidos, que é um dos
+               -- nove sintomas VERMELHOS, não tinha em que se apoiar.
+               --
+               -- Sessão aberta (`ended_at` nulo) ou instante invertido por
+               -- relógio torto viram NULL e o `strip_nulls` os descarta: um
+               -- "-3 min" no prontuário é pior que campo ausente.
+               'duracao_min', CASE WHEN k.ended_at > k.started_at
+                 THEN ROUND(EXTRACT(EPOCH FROM (k.ended_at - k.started_at)) / 60)::int
+               END
+             )),
              k.notes
         FROM public.kick_sessions k
-    $sql$);
+    $sql$, '$FORCA$', forca_col));
   END IF;
 
   IF to_regclass('public.journal_entries') IS NOT NULL THEN

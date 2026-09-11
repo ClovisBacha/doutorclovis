@@ -5,7 +5,7 @@ import { MeditationBlock } from "@/components/gestacao-path";
  * Bancada da MEDITAÇÃO.
  *
  * Nasceu de um defeito difícil de olhar: a paciente relatou uma frase do
- * fechamento ("Vamos voltar devagar...") que apareceu na tela e não foi
+ * fechamento ("Vamos voltar devagar…") que apareceu na tela e não foi
  * falada. `MeditationBlock` não busca nada do servidor para renderizar a
  * sessão em si — `log` vem do `localStorage` e o plano é montado no cliente
  * — então dá para abrir a sessão inteira, do relógio ao sheet de sons, sem

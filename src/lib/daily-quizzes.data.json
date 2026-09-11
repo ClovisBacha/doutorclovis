@@ -8527,7 +8527,7 @@
     ]
   },
   "189": {
-    "teach": "A partir de cerca de 28 semanas começa a valer a contagem de movimentos, um jeito simples de acompanhar o bem-estar do bebê. Uma referência prática é sentir 10 movimentos em até 2 horas, num período em que ele costuma estar ativo (muitas vezes depois de comer ou à noite). Se em duas horas você não sentir 10, coma algo, deite de lado num ambiente calmo e conte de novo. O importante é conhecer o padrão do seu bebê: uma redução clara e persistente dos movimentos pede procurar orientação no mesmo dia.",
+    "teach": "A partir de cerca de 28 semanas começa a valer a contagem de movimentos, um jeito simples de acompanhar o bem-estar do bebê. O método com melhor base é cronometrar quanto TEMPO ele leva para fazer 10 movimentos, deitada de lado, no começo da noite — que é quando ele costuma estar mais ativo. Para a maioria das gestantes isso leva cerca de 20 minutos. Se passarem 2 horas sem 10 movimentos, ligue para o seu médico ou procure a maternidade: não conte de novo nem tente 'acordar' o bebê antes, porque isso só adia a avaliação. E o mais importante não é o número — é o padrão do SEU bebê. Uma mudança clara em relação ao normal dele pede avaliação no mesmo dia.",
     "funFact": "Cada bebê tem seu próprio ritmo de atividade, e muitos ficam mais agitados justamente quando a mãe deita para descansar.",
     "questions": [
       {
@@ -8542,16 +8542,15 @@
         "why": "Sentir 10 movimentos em até 2 horas, num momento ativo, é uma referência tranquilizadora."
       },
       {
-        "type": "multi",
-        "q": "Se você quase não sentiu o bebê, o que fazer antes de contar de novo? Marque tudo que ajuda.",
+        "type": "choice",
+        "q": "Passaram 2 horas e você não sentiu 10 movimentos. Qual é o próximo passo?",
         "o": [
-          "Comer algo",
-          "Fazer exercício intenso para 'acordar' o bebê",
-          "Prestar atenção por até 2 horas",
-          "Deitar de lado num lugar calmo"
+          "Comer algo e contar de novo mais tarde",
+          "Ligar para o seu médico ou procurar a maternidade agora",
+          "Esperar até amanhã para ver se melhora"
         ],
-        "a": [0, 2, 3],
-        "why": "Comer, deitar de lado e observar com calma ajudam a perceber os movimentos; exercício intenso não é o recomendado."
+        "a": 1,
+        "why": "Duas horas sem 10 movimentos é o único limite numérico que vale como piso de segurança — e ele é um gatilho de LIGAR, não de contar de novo. Tentar 'acordar' o bebê antes só adia a avaliação."
       },
       {
         "type": "choice",
@@ -8565,11 +8564,11 @@
         "q": "Qual é o melhor momento para contar os movimentos?",
         "o": [
           "Só de madrugada, dormindo",
-          "Quando o bebê costuma estar ativo, como após comer",
+          "No começo da noite, quando ele costuma estar mais ativo",
           "Nunca, não faz diferença"
         ],
         "a": 1,
-        "why": "Contar quando o bebê costuma se mexer dá uma leitura mais confiável do padrão dele."
+        "why": "O pico de movimentação fica por volta das 21h; contar nessa faixa, deitada de lado, dá a leitura mais confiável do padrão dele."
       }
     ]
   },
@@ -9236,42 +9235,42 @@
     ]
   },
   "206": {
-    "teach": "Um lembrete carinhoso sobre a contagem de movimentos: cada bebê tem seu próprio padrão, e você já o conhece melhor do que ninguém. Se notar uma diminuição clara, coma algo, deite de lado e preste atenção nos movimentos por um tempinho. Se ainda estiverem reduzidos, procure orientação no mesmo dia — não deixe para amanhã. Na maioria das vezes está tudo bem, mas verificar é sempre a atitude certa e tranquilizadora.",
-    "funFact": "Muitos bebês ficam mais ativos depois que a mãe come ou toma algo gelado — é um ótimo momento para 'chamar' os movimentos.",
+    "teach": "Um lembrete carinhoso sobre a contagem de movimentos: cada bebê tem seu próprio padrão, e você já o conhece melhor do que ninguém. É a MUDANÇA que importa — se ele passou a se mexer menos, ou mais fraco, ou se um dia foi diferente de todos os outros, procure orientação no mesmo dia. Não deixe para amanhã e não tente antes 'acordá-lo' com comida ou bebida: isso só adia a avaliação. Na maioria das vezes está tudo bem, mas verificar é sempre a atitude certa e tranquilizadora.",
+    "funFact": "O bebê tem picos e vales de atividade ao longo do dia: costuma se mexer mais entre 21h e 22h e menos entre 1h e 5h da manhã.",
     "questions": [
       {
         "type": "choice",
         "q": "Você percebeu os movimentos diminuídos. Qual o primeiro passo?",
         "o": [
-          "Comer algo, deitar de lado e contar os movimentos",
-          "Ignorar e seguir o dia",
-          "Esperar 2 dias"
+          "Ligar para o seu médico ou ir à maternidade no mesmo dia",
+          "Comer algo, deitar de lado e ver se ele acorda",
+          "Esperar 2 dias para ver se melhora sozinho"
         ],
         "a": 0,
-        "why": "Esse teste simples ajuda; se seguir reduzido, procure orientação no mesmo dia."
+        "why": "Movimento claramente diminuído pede avaliação no mesmo dia. Tentar estimular o bebê antes de ligar só adia o cuidado."
       },
       {
         "type": "choice",
-        "q": "Se os movimentos continuarem reduzidos após o teste, você deve...",
+        "q": "O que vale mais como alerta: o número de chutes ou a mudança no padrão do seu bebê?",
         "o": [
-          "Procurar orientação no mesmo dia",
-          "Tomar um remédio por conta própria",
-          "Esperar a próxima consulta"
+          "O número exato de chutes, sempre",
+          "A mudança no padrão dele — menos, mais fraco ou diferente do normal",
+          "Nenhum dos dois importa antes das 37 semanas"
         ],
-        "a": 0,
-        "why": "Movimentos persistentemente reduzidos precisam de avaliação no mesmo dia."
+        "a": 1,
+        "why": "A sua percepção de mudança vale mais que qualquer número, e é ela que pede avaliação. O limite de 10 em 2 horas é só o piso de segurança."
       },
       {
         "type": "multi",
-        "q": "O que pode ajudar a estimular e sentir os movimentos do bebê? (marque todos)",
+        "q": "O que ajuda a sentir e a contar os movimentos do bebê? (marque todos)",
         "o": [
-          "Deitar de lado com atenção",
+          "Deitar de lado, com atenção só nisso",
+          "Escolher o começo da noite, quando ele costuma ser mais ativo",
           "Correr uma maratona",
-          "Comer ou beber algo",
-          "Tomar algo gelado"
+          "Contar enquanto faz outra coisa"
         ],
-        "a": [0, 2, 3],
-        "why": "Comer, deitar-se com atenção e algo gelado costumam despertar o bebê; exercício intenso não é o método."
+        "a": [0, 1],
+        "why": "Deitada de lado e no começo da noite — o pico de atividade dele — é o método com melhor base. Contar distraída subestima os movimentos, e exercício intenso não é o método."
       },
       {
         "type": "choice",
@@ -11558,7 +11557,7 @@
     ]
   },
   "255": {
-    "teach": "Uma regra de ouro que vale até o fim: seu bebê continua se mexendo todos os dias, até o parto. A ideia de que ele 'fica quieto' porque vai nascer é um mito perigoso, que pode atrasar um cuidado importante. Aprenda o padrão de movimentos dele ao longo do dia. Se você perceber uma diminuição clara, deite de lado, beba algo gelado e preste atenção; se ainda assim os movimentos não voltarem ao normal, vá à maternidade no mesmo dia. Quase sempre está tudo bem, mas é preciso verificar.",
+    "teach": "Uma regra de ouro que vale até o fim: seu bebê continua se mexendo todos os dias, até o parto — inclusive durante o trabalho de parto. A ideia de que ele 'fica quieto' porque vai nascer é um mito perigoso, que atrasa cuidado. Com menos espaço os movimentos mudam de caráter — mais rolar e empurrar do que chutar —, mas não ficam mais fracos nem mais raros. Se você perceber uma diminuição clara, procure a maternidade ou o seu médico no mesmo dia, sem esperar: não tente antes 'acordar' o bebê com comida ou bebida gelada, porque isso só adia a avaliação. Quase sempre está tudo bem, mas é preciso verificar.",
     "funFact": "Os bebês têm ciclos de sono e vigília dentro da barriga, e por isso é normal ter horas mais calmas — mas uma queda clara e prolongada no padrão habitual merece atenção.",
     "questions": [
       {
@@ -12502,8 +12501,8 @@
     ]
   },
   "276": {
-    "teach": "Mesmo com tudo pronto para o parto, uma regra não muda: seu bebê deve continuar se mexendo todos os dias. A ideia de que ele 'fica quieto' antes de nascer é um mito perigoso. Se os movimentos diminuírem de forma clara, tome um líquido gelado, deite de lado e observe; se ainda assim estiverem reduzidos, vá à maternidade no mesmo dia — na maioria das vezes está tudo bem, mas é preciso verificar. Cada bebê tem seu padrão; o alerta é a mudança clara em relação ao normal dele.",
-    "funFact": "Muitos bebês ficam mais ativos depois que a mãe come algo doce ou gelado — um truque simples para 'acordar' e contar os movimentos.",
+    "teach": "Mesmo com tudo pronto para o parto, uma regra não muda: seu bebê deve continuar se mexendo todos os dias. A ideia de que ele 'fica quieto' antes de nascer é um mito perigoso. Se os movimentos diminuírem de forma clara, ligue para o seu médico ou vá à maternidade no mesmo dia — sem tentar antes 'acordá-lo' com algo gelado ou doce, porque isso só atrasa a avaliação. Na maioria das vezes está tudo bem, mas é preciso verificar. Cada bebê tem seu padrão; o alerta é a mudança clara em relação ao normal dele.",
+    "funFact": "A movimentação do bebê tem hora: o pico costuma ficar entre 21h e 22h, e o vale entre 1h e 5h. Por isso contar é mais fácil no começo da noite, deitada de lado.",
     "questions": [
       {
         "type": "choice",
@@ -12525,14 +12524,15 @@
       },
       {
         "type": "multi",
-        "q": "Você sentiu o bebê mais quieto. Quais atitudes fazem sentido? (marque todas)",
+        "q": "Você sentiu o bebê mais quieto que o normal. Quais atitudes fazem sentido? (marque todas)",
         "o": [
-          "Se os movimentos seguirem reduzidos, ir à maternidade no mesmo dia",
-          "Ignorar, pois bebê quieto é sinal de que o parto vem",
-          "Tomar um líquido gelado e deitar de lado para observar"
+          "Ligar para o seu médico ou ir à maternidade hoje",
+          "Contar que você percebeu uma MUDANÇA, e não só o número de chutes",
+          "Tomar algo gelado e esperar ele acordar antes de ligar",
+          "Ignorar, pois bebê quieto é sinal de que o parto vem"
         ],
-        "a": [0, 2],
-        "why": "Estimular e observar é o primeiro passo; se a redução persistir, procure a maternidade no dia. Ignorar é o mito perigoso."
+        "a": [0, 1],
+        "why": "Procurar no mesmo dia é o certo, e a sua percepção de mudança vale mais que qualquer número. Tentar 'acordar' o bebê com algo gelado só adia a avaliação; ignorar é o mito perigoso."
       },
       {
         "type": "choice",

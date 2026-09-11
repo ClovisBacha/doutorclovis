@@ -46,6 +46,11 @@ export const Route = createFileRoute("/preview-prontuario")({
     carregando: q.carregando == null ? 0 : Number(q.carregando),
     semficha: q.semficha == null ? 0 : Number(q.semficha),
     secao: q.secao == null ? "" : String(q.secao),
+    /* ⚠️ A perda de peso ≥5% e o PÓS-PARTO: os dois só existem numa conta com
+       peso pré-gestacional cadastrado e meses de registro, e por isso o cartão
+       de Peso passou meses cravando "normal" sem ninguém olhar. */
+    perdapeso: q.perdapeso == null ? 0 : Number(q.perdapeso),
+    pos: q.pos == null ? 0 : Number(q.pos),
   }),
 });
 
@@ -58,9 +63,13 @@ function ev(
   gravidade: EventoClinico["gravidade"],
   texto: string | null = null,
   notas: string[] = [],
+  /* A FONTE importa: `resumo` desempata por ela o vocabulário de `nivel`
+     (triagem × rastreio), e uma bancada que carimba tudo como `health_logs`
+     desenharia um estado que o servidor não produz. */
+  fonte = "health_logs",
 ): EventoClinico {
   return {
-    fonte: "health_logs",
+    fonte,
     fonte_id: ocorrido_em,
     user_id: "00000000-0000-4000-8000-000000000001",
     ocorrido_em,
@@ -74,7 +83,7 @@ function ev(
 }
 
 function Bancada() {
-  const { degradada, incompleto, carregando, semficha, secao } = Route.useSearch();
+  const { degradada, incompleto, carregando, semficha, secao, perdapeso, pos } = Route.useSearch();
 
   const ficha: FichaClinica = {
     nome: "Marina Costa",
@@ -95,6 +104,7 @@ function Bancada() {
     riscos: degradada ? [] : ["Pré-eclâmpsia na gestação anterior"],
     observacoesPrevias: degradada ? null : "Cesárea em 2023, sem intercorrências.",
     modoCuidado: false,
+    jaPariu: pos === 1,
     degradada: degradada === 1,
   };
 
@@ -103,9 +113,77 @@ function Bancada() {
       "Pressão acima do esperado",
     ]),
     ev("2026-08-15T19:20:00.000Z", "sintoma", {}, "normal", "Dor nas costas à noite"),
-    ev("2026-08-12T08:00:00.000Z", "medida", { weight_kg: 71.4 }, "normal"),
+    ev("2026-08-12T08:00:00.000Z", "medida", { weight_kg: perdapeso ? 55.2 : 71.4 }, "normal"),
     ev("2026-08-09T21:40:00.000Z", "medida", { glucose_mg_dl: 96 }, "normal"),
     ev("2026-08-04T09:10:00.000Z", "medida", { systolic: 128, diastolic: 84 }, "normal"),
+    /* ⚠️ AS DUAS SESSÕES DE MOVIMENTO EXISTEM PARA PROVAR A FORÇA, e ela nunca
+       tinha sido fotografada: a bancada não trazia nenhum evento `movimento`,
+       então a coluna era escrita, projetada pela view e DESCARTADA no caminho
+       sem que nenhuma tela mostrasse isso. A de baixo é o nível do meio, e ela
+       tem de sair SEM adjetivo nenhum — "como sempre" em toda linha afogaria
+       a de cima, que é a única que carrega notícia. */
+    /* ⚠️ E A NOITE DO ALARME: duas horas sem chegar a dez é o cartão vermelho
+       que a paciente lê na tela dela, e o prontuário mostrava a mesma linha
+       cinzenta de qualquer outra noite. */
+    ev(
+      "2026-08-17T23:40:00.000Z",
+      "movimento",
+      { chutes: 4, duracao_min: 130 },
+      "grave",
+      null,
+      ["4 movimentos em 130 min de contagem"],
+      "kick_sessions",
+    ),
+    ev(
+      "2026-08-16T22:05:00.000Z",
+      "movimento",
+      { chutes: 10, forca: 1, duracao_min: 34 },
+      "normal",
+      null,
+      [],
+      "kick_sessions",
+    ),
+    ev(
+      "2026-08-14T21:50:00.000Z",
+      "movimento",
+      { chutes: 10, forca: 2, duracao_min: 11 },
+      "normal",
+      null,
+      [],
+      "kick_sessions",
+    ),
+    /* ⚠️ **A NOITE DE CONTRAÇÕES EXISTE PARA PROVAR O AGRUPAMENTO — e sem ela
+       o defeito era invisível aqui.** A view projeta UMA LINHA POR CONTRAÇÃO e
+       este render mostra as quarenta primeiras: catorze contrações bastam para
+       empurrar a pressão alterada e a pré-consulta desta mesma bancada para
+       fora da tela. Com o agrupamento, as catorze viram UMA linha
+       ("14 contrações, em 39 min, a cada 3 min, ~62s, fortes") e o resto da
+       linha do tempo volta a caber.
+
+       São DOIS episódios separados por mais de duas horas, de propósito: é o
+       que prova que a régua não junta a tarde com a madrugada. */
+    ...Array.from({ length: 14 }, (_, i) =>
+      ev(
+        new Date(Date.UTC(2026, 7, 19, 2, 4 + i * 3)).toISOString(),
+        "contracao",
+        { intensidade: 3, duracao_seg: 58 + (i % 3) * 3 },
+        "normal",
+        null,
+        [],
+        "contraction_logs",
+      ),
+    ),
+    ...[0, 11, 22].map((m) =>
+      ev(
+        new Date(Date.UTC(2026, 7, 18, 21, 10 + m)).toISOString(),
+        "contracao",
+        { intensidade: 1, duracao_seg: 35 },
+        "normal",
+        null,
+        [],
+        "contraction_logs",
+      ),
+    ),
   ];
 
   const consultas: Consulta[] = [

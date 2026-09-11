@@ -111,11 +111,35 @@ export const minhaCaixinha = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin as any;
 
-    const { data: perfil } = await sb
+    /**
+     * ⚠️ **DEGRAU, E ELE GUARDA O PORTÃO DO MODO CUIDADO.**
+     *
+     * `aceita_perguntas` nasce num `APLICAR_` que o dono roda à mão, e o deploy
+     * chega antes. Sem a coluna, este `select` inteiro devolve `42703`,
+     * `perfil` fica `null` — e `?.care_mode` vira `false`: **o portão do Modo
+     * Cuidado era PULADO**, e a caixa abria com as perguntas para quem acabou
+     * de perder a gestação. Um portão que falha aberto é o mesmo que não
+     * existir; é a mesma lição da capa da caixa ♡.
+     *
+     * O recuo lê só `care_mode` (que existe desde a primeira migration) e trata
+     * a chave como DESLIGADA — a caixa é opt-in, e "não sei" tem de significar
+     * o padrão, nunca o consentimento.
+     */
+    let { data: perfil, error: erroPerfil } = await sb
       .from("patient_profiles")
       .select("aceita_perguntas, care_mode")
       .eq("id", eu)
       .maybeSingle();
+    if (erroPerfil) {
+      console.warn("[caixinha] sem aceita_perguntas — rode APLICAR_REDE_SOCIAL.sql");
+      ({ data: perfil, error: erroPerfil } = await sb
+        .from("patient_profiles")
+        .select("care_mode")
+        .eq("id", eu)
+        .maybeSingle());
+    }
+    /* ⚠️ E se nem `care_mode` responder, a caixa NÃO abre: sem saber, fecha. */
+    if (erroPerfil) return { ok: false as const, motivo: "banco" as const };
 
     /* ⚠️ Modo Cuidado: a caixa não existe, e a tela não conta por quê. Ela
        volta inteira quando o modo sair — nada é apagado. */
@@ -262,19 +286,39 @@ export const perguntar = createServerFn({ method: "POST" })
     ]);
 
     const desde = inicioDoDia();
-    const [{ count: hoje }, { count: paraEla }] = await Promise.all([
-      sb
-        .from("rede_perguntas")
-        .select("id", { count: "exact", head: true })
-        .eq("quem_id", eu)
-        .gte("criado_em", desde),
-      sb
-        .from("rede_perguntas")
-        .select("id", { count: "exact", head: true })
-        .eq("quem_id", eu)
-        .eq("dona_id", data.donaId)
-        .gte("criado_em", desde),
-    ]);
+    /* ⚠️ **OS DOIS TETOS FALHAVAM ABERTOS, e sao os anti-assedio.** Os erros
+       eram destruturados para fora (so `count` era lido): numa falha de leitura
+       os dois viravam `undefined`, o `?? 0` os zerava, e `decidirPergunta`
+       recebia "ela nao mandou nada hoje" — liberando tanto o teto GLOBAL quanto
+       o POR PESSOA. O CLAUDE.md diz por que o segundo existe: "o teto global nao
+       protege contra assedio dirigido, e o precedente e o ask.fm". Numa caixa
+       ANONIMA, isso e o recurso inteiro perdendo a unica trava que ele tem. */
+    const [{ count: hoje, error: erroHoje }, { count: paraEla, error: erroParaEla }] =
+      await Promise.all([
+        sb
+          .from("rede_perguntas")
+          .select("id", { count: "exact", head: true })
+          .eq("quem_id", eu)
+          .gte("criado_em", desde),
+        sb
+          .from("rede_perguntas")
+          .select("id", { count: "exact", head: true })
+          .eq("quem_id", eu)
+          .eq("dona_id", data.donaId)
+          .gte("criado_em", desde),
+      ]);
+
+    /* ⚠️ Nao conseguir contar RECUSA, e com motivo PROPRIO: dizer "voce ja
+       mandou muitas perguntas hoje" sobre uma contagem que falhou faria ela
+       desistir por um dia inteiro de uma pergunta que o servidor aceitaria em
+       dez segundos. */
+    if (erroHoje || erroParaEla || hoje === null || paraEla === null) {
+      return {
+        ok: false as const,
+        motivo: "instavel" as const,
+        recado: "Nao consegui conferir suas perguntas de hoje — tente de novo.",
+      };
+    }
 
     const veredicto = decidirPergunta(
       {
@@ -406,7 +450,12 @@ export const responderPergunta = createServerFn({ method: "POST" })
     const veredicto = decidirResposta(
       {
         souADona: !!pergunta && (pergunta as any).dona_id === eu,
-        euEmCuidado: !!(meu as any)?.care_mode,
+        /* ⚠️ Sem `?.`: `meu` é o objeto que o bloco acima SEMPRE devolve, com
+           `care_mode: error ? true`. O `?.` dizia "pode ser indefinido" sobre
+           uma coisa que nunca é — e é essa mentira que faz a próxima pessoa
+           achar que o portão já trata a falha, quando quem trata é o `? true`
+           lá em cima. */
+        euEmCuidado: !!(meu as { care_mode: boolean }).care_mode,
         perguntaExiste: !!pergunta,
         jaRespondida: !!(pergunta as any)?.resposta,
         arquivada: !!(pergunta as any)?.arquivado_em,
@@ -652,5 +701,12 @@ export const resolverDenuncia = createServerFn({ method: "POST" })
       .update({ resolvido_em: new Date().toISOString() })
       .eq("id", data.perguntaId);
     if (error) return { ok: false as const, motivo: "banco" as const };
+    /* A MESMA linha de auditoria do resolver da REDE. As duas filas vivem na
+       mesma tela e sao a mesma classe de acao do admin - deixar uma com rastro
+       e a outra sem faria, numa disputa, a ausencia de linha da caixinha ser
+       lida como "ninguem nunca olhou". Best-effort, DEPOIS do update: antes,
+       registraria uma acao que pode nao ter acontecido. */
+    const { writeAudit } = await import("./audit.server");
+    await writeAudit({ id: u.user?.id, email }, "moderacao.resolver_caixinha", data.perguntaId);
     return { ok: true as const };
   });

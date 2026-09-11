@@ -136,11 +136,23 @@ export type AbaDoPerfil = (typeof ABAS_DO_PERFIL)[number]["chave"];
  * `publicacoes` aparece sempre — é sobre o que ela fez, não sobre quantas
  * pessoas a acham interessante.
  *
- * É a ÚNICA divergência deliberada do modelo. Reverter é trocar este `false`
- * por `true`, e o teste que a protege diz por que não.
+ * ⚠️ **ISTO ERA `false`, E O DONO REVERTEU — a decisão fica registrada porque
+ * o argumento contrário continua válido e alguém vai reabri-lo.**
+ *
+ * O argumento para esconder era clínico: um placar de audiência mede
+ * popularidade num momento em que a pessoa já está sendo medida clinicamente, e
+ * dá número objetivo a uma comparação que sem número seria só sensação.
+ *
+ * O argumento que venceu é de produto, e é do dono: *"é uma rede social, né?
+ * São amigos que a pessoa tem ali, são pessoas que vão seguir a pessoa, e é pra
+ * mostrar sim."* Uma rede social sem contador não lê como discrição — lê como
+ * versão incompleta, e a paciente conclui que o app é meia-boca.
+ *
+ * Se voltar a `false` um dia, que seja por uma paciente ter reclamado, não por
+ * alguém reencontrar o parágrafo de cima.
  */
 export const NUMEROS_PUBLICOS = {
   publicacoes: true,
-  seguidores: false,
-  seguindo: false,
+  seguidores: true,
+  seguindo: true,
 } as const;

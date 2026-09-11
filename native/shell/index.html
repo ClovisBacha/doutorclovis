@@ -91,11 +91,34 @@
       funcionam sem rede.
     </p>
 
+    <!--
+      ⚠️ ESTA TELA NÃO SABE DE QUEM É A PACIENTE — e por isso ela não pode
+      oferecer um consultório como se fosse o dela.
+
+      O app é multi-tenant (`patient_profiles.doctor_id`), e a casca do
+      Capacitor não tem acesso a nada da conta: ela é um arquivo estático
+      dentro do aparelho, sem sessão e sem banco. Aqui havia
+      `tel:+5531986342903` rotulado só "Consultório" — o número do consultório
+      FUNDADOR (`src/lib/doctor.config.ts`), oferecido a paciente de qualquer
+      médico da plataforma.
+
+      É exatamente o que `emergency-sheet.tsx` gastou uma decisão inteira para
+      não fazer, com a razão escrita lá: "um SOS que liga para o médico errado
+      é pior que um SOS que não liga para ninguém, porque ela vai esperar do
+      outro lado uma resposta que não vem".
+
+      O 192 fica, e é a melhor coisa desta tela: ele é certo para todo mundo,
+      em qualquer cidade, e funciona sem rede. O consultório vira uma
+      INSTRUÇÃO, não um número — quem sabe o telefone do próprio obstetra é
+      ela, e o telefone está na agenda dela.
+    -->
     <div class="telefones">
       <a class="samu" href="tel:192">Ligar para o SAMU · 192</a>
-      <a class="consultorio" href="tel:+5531986342903">Consultório · (31) 98634-2903</a>
     </div>
 
+    <p class="nota">
+      Se for com o seu obstetra, ligue direto para ele — o app não precisa estar aberto.
+    </p>
     <p class="nota">Assim que houver sinal, feche e abra o app.</p>
   </body>
 </html>

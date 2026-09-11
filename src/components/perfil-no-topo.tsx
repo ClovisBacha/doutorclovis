@@ -115,7 +115,7 @@ export function PerfilNoTopo({
             {nome || "Meu perfil"}
           </span>
           {rotuloPlano && (
-            <span className="block text-[11px] leading-tight text-muted-foreground">
+            <span className="block text-xs leading-tight text-muted-foreground">
               plano {rotuloPlano}
             </span>
           )}
@@ -130,23 +130,23 @@ export function PerfilNoTopo({
           )}
         </DropdownMenuLabel>
         {aviso && (
-          <p className="mx-2 mb-1 rounded-lg bg-amber-50 px-2.5 py-1.5 text-[11px] leading-snug text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
+          <p className="mx-2 mb-1 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs leading-snug text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
             {aviso}
           </p>
         )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onAbrirPerfil}>
           Meus dados e foto
-          <span className="ml-auto text-[11px] text-muted-foreground">perfil</span>
+          <span className="ml-auto text-xs text-muted-foreground">perfil</span>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onAbrirCobranca}>
           Plano, limite e cobrança
-          <span className="ml-auto text-[11px] text-muted-foreground">cartão</span>
+          <span className="ml-auto text-xs text-muted-foreground">cartão</span>
         </DropdownMenuItem>
         {onAbrirClinica && (
           <DropdownMenuItem onClick={onAbrirClinica}>
             Minha clínica
-            <span className="ml-auto text-[11px] text-muted-foreground">equipe</span>
+            <span className="ml-auto text-xs text-muted-foreground">equipe</span>
           </DropdownMenuItem>
         )}
         {onSair && (

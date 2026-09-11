@@ -6,7 +6,19 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", ".output", ".vinxi", ".vercel"] },
+  /* ⚠️ `*-tmp.mjs` na RAIZ é medição descartável, nunca produto. Eles nascem de
+     agente de auditoria e de bancada de medição rodando na árvore viva, e o
+     portão reprovava por formatação de arquivo que ninguém vai commitar —
+     portão que reprova por motivo alheio ao código é portão que se aprende a
+     ignorar. O `.gitignore` impede o commit; esta linha impede o falso
+     vermelho.
+
+     ⚠️ `scratchpad/**` entrou pela MESMA razão, medida de novo em set/2026: a
+     pasta das medições de cada leva (fotos, baterias de frases, pipelines de
+     arte) reprovou o portão com 36 erros de formatação em arquivos que nunca
+     serão commitados — e o que estava vermelho era `bun run verificar` sobre
+     um código de produção inteiro e correto. */
+  { ignores: ["dist", ".output", ".vinxi", ".vercel", "*-tmp.mjs", "scratchpad/**"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],

@@ -40,7 +40,16 @@ export function sinalPressao(sistolica?: number | null, diastolica?: number | nu
      ficha o lugar da última medida de verdade. Um número que não pode existir
      tem que dizer que não pode existir. */
   if (!Number.isFinite(sistolica) || !Number.isFinite(diastolica)) return null;
-  if (sistolica < 50 || sistolica > 300 || diastolica < 20 || diastolica > 200) {
+  /* ⚠️ SÓ O PISO É IMPLAUSÍVEL — NÃO HÁ TETO (set/2026, decisão do dono: "vai
+     que a pessoa tem mais de 350 kg, tire esse limite e outros que podem
+     existir").
+
+     E aqui o teto era pior que um formulário chato: com ele, um 320/190 REAL
+     caía nesta linha como "atenção — implausível" e era REBAIXADO abaixo de
+     qualquer vermelho na fila de trabalho do médico. Sem ele, cai em
+     `faixaPressao` e sai GRAVE, que é o que ele é. Errar para o lado de
+     alarmar é o único lado seguro de uma régua clínica. */
+  if (sistolica < 50 || diastolica < 20) {
     return { gravidade: "atencao", nota: "Valor de pressão implausível" };
   }
   /* Campos trocados: avalia o par NA ORDEM CERTA e mantém a gravidade dele.
@@ -107,7 +116,10 @@ export function sinalGlicemia(valor?: number | null): Sinal | null {
        três, que era o efeito de `atencao`. */
     return { gravidade: "grave", nota: "Valor implausível — confira a unidade (mg/dL)" };
   }
-  if (valor <= 0 || valor > 900) {
+  /* Sem teto, pela mesma razão da pressão: com `> 900`, uma glicemia de 950 —
+     que é cetoacidose — saía "implausível/atenção" e ordenava abaixo de um 185
+     rotulado GRAVE. O piso fica: zero e negativo não são medida. */
+  if (valor <= 0) {
     return { gravidade: "atencao", nota: "Valor de glicemia implausível" };
   }
   /* Hipoglicemia grave vem ANTES do teto alto: 25 mg/dL é neuroglicopenia,
@@ -118,6 +130,54 @@ export function sinalGlicemia(valor?: number | null): Sinal | null {
   if (valor >= 140) return { gravidade: "atencao", nota: "Glicemia acima do alvo" };
   if (valor < 60) return { gravidade: "atencao", nota: "Glicemia baixa" };
   return { gravidade: "normal", nota: "" };
+}
+
+/**
+ * PERDA DE PESO NA GESTAÇÃO EM CURSO.
+ *
+ * ⚠️ **A RÉGUA MORA AQUI PORQUE É UM LIMITE CLÍNICO**, e este arquivo declara
+ * que nenhum deles se escreve fora dele. A nutricionista é a primeira leitora;
+ * o painel do médico pode passar a ser a segunda, e aí as duas dizem a mesma
+ * coisa sobre o mesmo peso.
+ *
+ * O corte é **5% do peso pré-gestacional** — o número operacional que a
+ * literatura usa para separar o enjoo comum do primeiro trimestre do quadro
+ * que pede avaliação (é o mesmo 5% da definição de hiperêmese gravídica, ao
+ * lado de vômitos persistentes e desidratação, que este app não mede e não vai
+ * afirmar).
+ *
+ * ⚠️ **NUNCA `grave`.** Perda de peso isolada não é emergência de minutos: é
+ * motivo de a paciente falar com o médico dela. Marcar grave aqui poria uma
+ * queda de 3 kg acima de um sangramento na fila do consultório.
+ *
+ * ⚠️ **E ELA NÃO VALE DEPOIS DO PARTO NEM NO LUTO** — o corpo perde peso nos
+ * dois casos, e é esperado. Quem gateia isso é o chamador; a régua só sabe
+ * comparar dois números.
+ */
+export const PERDA_DE_PESO_PCT = 5;
+
+export function sinalPerdaDePeso(
+  pesoAtualKg?: number | null,
+  pesoPreGestacionalKg?: number | null,
+): Sinal | null {
+  if (pesoAtualKg == null || pesoPreGestacionalKg == null) return null;
+  if (!Number.isFinite(pesoAtualKg) || !Number.isFinite(pesoPreGestacionalKg)) return null;
+  /* Os dois pisos de `FAIXAS_PLAUSIVEIS` para peso: número que não pode ser
+     peso não vira perda de peso. */
+  if (pesoAtualKg <= 0 || pesoPreGestacionalKg <= 0) return null;
+  const perdaKg = pesoPreGestacionalKg - pesoAtualKg;
+  const pct = (perdaKg / pesoPreGestacionalKg) * 100;
+  /* ⚠️ Um `if (perdaKg <= 0)` acima disto seria CÓDIGO MORTO: quem ganhou peso
+     tem `pct` negativo, que já cai aqui e devolve o mesmo `normal`. Ele estava
+     escrito, a mutação que o apagava passou VERDE, e uma guarda que não muda
+     resposta nenhuma é armadilha para quem ler depois — a mesma lição do
+     adiamento do NPS. Quem responde por "ganhar peso não é perder" é esta
+     linha, e há teste com esse nome. */
+  if (pct < PERDA_DE_PESO_PCT) return { gravidade: "normal", nota: "" };
+  return {
+    gravidade: "atencao",
+    nota: `Perdeu ${perdaKg.toFixed(1)} kg desde antes da gestação (${pct.toFixed(0)}% do peso)`,
+  };
 }
 
 /**
@@ -182,6 +242,104 @@ export function sinalContracoesPrematuras(o: {
   return {
     gravidade: "grave",
     nota: `Contrações regulares antes das 37 semanas (você está com ${Math.floor(s)}). Ligue para o seu médico agora.`,
+  };
+}
+
+/**
+ * SEIS EM UMA HORA — o mesmo piso do NICHD, pela porta que o intervalo não vê.
+ *
+ * ⚠️ **A régua acima e esta NÃO são a mesma conta**, e há um caso real entre as
+ * duas. O NICHD publica os dois lados do mesmo número: sintoma de trabalho de
+ * parto prematuro é "contractions every 10 minutes or more often", e "it is not
+ * normal to have frequent uterine contractions, such as six or more in one
+ * hour". Aritmeticamente parecem equivalentes — e não são quando os intervalos
+ * ficam logo acima do corte: **seis contrações com 11 minutos entre elas cabem
+ * em 55 minutos**. O intervalo diz 11 (não dispara); a contagem da hora diz 6
+ * (dispara). É a paciente de 31 semanas que passou a hora inteira contraindo e
+ * cuja tela dizia que estava tudo dentro do esperado.
+ *
+ * A janela é de SESSENTA MINUTOS por definição da fonte, e é a mesma janela que
+ * o "1" final do padrão 5-1-1 significa. Média das últimas N contrações
+ * responde outra pergunta.
+ *
+ * Fonte: NICHD — What are the symptoms of preterm labor?
+ *
+ * ⚠️ Sem semana conhecida devolve `null`, como a irmã: quem decide o lado
+ * seguro quando a semana falta é o CHAMADOR (`faseDoCronometro`), e não esta
+ * função — inventar prematuridade aqui alarmaria quem está de 39.
+ */
+export function sinalContracoesFrequentes(o: {
+  semanas?: number | null;
+  /** Quantas contrações COMEÇARAM nos últimos 60 minutos. */
+  naUltimaHora?: number | null;
+}): Sinal | null {
+  const s = o.semanas;
+  const n = o.naUltimaHora;
+  if (s == null || !Number.isFinite(s) || n == null || !Number.isFinite(n)) return null;
+  if (s >= 37) return null;
+  if (n < 6) return null;
+  return {
+    gravidade: "grave",
+    nota: `${Math.floor(n)} contrações em uma hora antes das 37 semanas (você está com ${Math.floor(s)}) não é o esperado. Ligue para o seu médico agora.`,
+  };
+}
+
+/**
+ * MOVIMENTOS REDUZIDOS — a régua que o contador de chutes anunciava e não
+ * aplicava.
+ *
+ * ⚠️ Redução de movimentos fetais é um dos NOVE SINTOMAS VERMELHOS de
+ * `triage.ts`, e a tela que o mede era a única do app sem régua e sem caminho
+ * para socorro: ela escrevia "o ideal é sentir 10 em até 2 horas", contava até
+ * dez, e quando as duas horas passavam com quatro movimentos o cronômetro
+ * simplesmente seguia correndo. A paciente lia "4 / 10 chutes" e "02:15:00", e
+ * o app não dizia uma palavra sobre o que isso quer dizer nem sobre o que
+ * fazer.
+ *
+ * ⚠️ **O CORTE NÃO É INVENTADO AQUI: é o que a própria tela já anuncia**, e é o
+ * método de contagem até dez que se ensina no pré-natal. Esta função não cria
+ * critério novo — ela põe num lugar só o critério que estava escrito na
+ * interface e em nenhuma decisão.
+ *
+ * Antes da 28ª semana devolve `null`: a contagem formal começa ali, e o texto
+ * da tela diz isso. Alarmar antes é ensinar a ignorar o alarme.
+ */
+export function sinalMovimentosReduzidos(o: {
+  semanas?: number | null;
+  /** Movimentos contados na sessão. */
+  movimentos?: number | null;
+  /** Há quanto tempo a sessão está aberta, em minutos. */
+  minutos?: number | null;
+}): Sinal | null {
+  const s = o.semanas;
+  const mov = o.movimentos;
+  const min = o.minutos;
+  /**
+   * ⚠️ **SEM SEMANA, A RÉGUA VALE — e isto era uma FALHA ABERTA no eixo que
+   * mais importa.** A linha era `if (s == null || !Number.isFinite(s) || s <
+   * 28) return null`: sem DUM cadastrada, ou com o perfil ainda carregando, a
+   * paciente abria a tela, o botão continuava lá, o cronômetro corria, e
+   * passadas DUAS HORAS com três movimentos não aparecia nem o aviso nem o
+   * 192. O sintoma vermelho era MEDIDO e CALADO.
+   *
+   * ⚠️ E note a assimetria com as irmãs de prematuridade, que é deliberada:
+   * lá, sem semana, alarmar seria INVENTAR um quadro (prematuridade de quem
+   * pode estar de 39). Aqui não há quadro a inventar — os dois limites desta
+   * régua (dez movimentos, duas horas) não dependem da semana; a semana só
+   * decide se a contagem já COMEÇOU. Não saber quando começou não é motivo
+   * para calar sobre duas horas de contagem que já aconteceram.
+   *
+   * Com a semana CONHECIDA e abaixo de 28, ela continua calando: a contagem
+   * formal começa ali, e alarmar antes ensina a ignorar o alarme.
+   */
+  const semanaConhecida = s != null && Number.isFinite(s);
+  if (semanaConhecida && (s as number) < 28) return null;
+  if (mov == null || !Number.isFinite(mov)) return null;
+  if (min == null || !Number.isFinite(min) || min < 120) return null;
+  if (mov >= 10) return null;
+  return {
+    gravidade: "grave",
+    nota: `Você sentiu ${mov} ${mov === 1 ? "movimento" : "movimentos"} em 2 horas, e o esperado são 10. Ligue para o seu médico agora ou procure a maternidade.`,
   };
 }
 
@@ -331,16 +489,56 @@ export type CampoClinico =
   | "sleep_hours"
   | "steps";
 
-const FAIXAS: Record<CampoClinico, { min: number; max: number; nome: string; unidade: string }> = {
-  systolic: { min: 50, max: 300, nome: "A sistólica", unidade: "mmHg" },
-  diastolic: { min: 20, max: 200, nome: "A diastólica", unidade: "mmHg" },
-  glucose_mg_dl: { min: 20, max: 900, nome: "A glicemia", unidade: "mg/dL" },
-  weight_kg: { min: 25, max: 350, nome: "O peso", unidade: "kg" },
-  spo2: { min: 50, max: 100, nome: "A saturação", unidade: "%" },
-  heart_rate_bpm: { min: 30, max: 250, nome: "A frequência cardíaca", unidade: "bpm" },
-  sleep_hours: { min: 0, max: 24, nome: "O sono", unidade: "h" },
-  steps: { min: 0, max: 200000, nome: "Os passos", unidade: "" },
+export type FaixaDeEntrada = {
+  /** O piso, INCLUSIVO — salvo com `acimaDe`, que o torna exclusivo. */
+  min: number;
+  /** Torna o piso exclusivo: `> min` em vez de `>= min`. Serve ao peso. */
+  acimaDe?: true;
+  /**
+   * Ausente = SEM TETO, e isso é o padrão.
+   *
+   * ⚠️ Só existe onde o máximo é DEFINIÇÃO da grandeza, nunca plausibilidade:
+   * saturação não passa de 100% porque 100% é "todo o oxigênio", e um dia não
+   * tem mais de 24 horas. Peso, pressão, glicemia e passos não têm teto — o
+   * corpo de alguém não é um argumento para recusar o número dela.
+   */
+  max?: number;
+  nome: string;
+  unidade: string;
 };
+
+/* ⚠️ SEM TETO DE PLAUSIBILIDADE (set/2026). Os tetos daqui nasceram de chute
+   ("que peso é razoável?") e o dono os derrubou depois de a paciente ver
+   "O peso precisa ficar entre 25 e 350 kg" ao digitar o peso dela. Um app de
+   saúde que RECUSA o número de uma pessoa real está errado duas vezes: ela não
+   consegue registrar, e o médico não vê o dado que mais importaria. */
+export const FAIXAS: Record<CampoClinico, FaixaDeEntrada> = {
+  systolic: { min: 50, nome: "A sistólica", unidade: "mmHg" },
+  diastolic: { min: 20, nome: "A diastólica", unidade: "mmHg" },
+  glucose_mg_dl: { min: 20, nome: "A glicemia", unidade: "mg/dL" },
+  weight_kg: { min: 0, acimaDe: true, nome: "O peso", unidade: "kg" },
+  spo2: { min: 50, max: 100, nome: "A saturação", unidade: "%" },
+  heart_rate_bpm: { min: 30, nome: "A frequência cardíaca", unidade: "bpm" },
+  sleep_hours: { min: 0, max: 24, nome: "O sono", unidade: "h" },
+  steps: { min: 0, nome: "Os passos", unidade: "" },
+};
+
+/** A frase que a paciente lê. Sem teto ela fala só do piso. */
+export function fraseDaFaixa(f: FaixaDeEntrada): string {
+  const un = f.unidade ? ` ${f.unidade}` : "";
+  if (f.max != null) {
+    return `${f.nome} precisa ficar entre ${f.min} e ${f.max}${un}. Confira o número.`;
+  }
+  if (f.acimaDe) return `${f.nome} precisa ser maior que ${f.min}${un}. Confira o número.`;
+  return `${f.nome} precisa ser ${f.min}${un} ou mais. Confira o número.`;
+}
+
+/** A régua, num lugar só — a tela da paciente e a do médico leem esta. */
+export function foraDaFaixa(f: FaixaDeEntrada, n: number): boolean {
+  if (f.acimaDe ? n <= f.min : n < f.min) return true;
+  if (f.max != null && n > f.max) return true;
+  return false;
+}
 
 /** `null` quando está tudo bem; a frase para a paciente quando não está. */
 export function validaEntrada(campo: CampoClinico, bruto: string): string | null {
@@ -355,9 +553,7 @@ export function validaEntrada(campo: CampoClinico, bruto: string): string | null
   if (campo === "glucose_mg_dl" && n > 0 && n < 20) {
     return "Esse valor parece estar em mmol/L. O app usa mg/dL — multiplique por 18 (ex.: 5,4 → 97).";
   }
-  if (n < f.min || n > f.max) {
-    return `${f.nome} precisa ficar entre ${f.min} e ${f.max}${f.unidade ? ` ${f.unidade}` : ""}. Confira o número.`;
-  }
+  if (foraDaFaixa(f, n)) return fraseDaFaixa(f);
   return null;
 }
 

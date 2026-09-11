@@ -1,12 +1,26 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ehNativo } from "@/lib/nativo";
 
 /**
  * Puxar-para-atualizar estilo app nativo.
  *
- * De propósito SÓ ativa quando o app está instalado na Tela de Início
- * (display-mode: standalone). No navegador comum, o próprio browser já tem o
- * gesto — então aqui vira um passthrough (zero mudança, zero risco de brigar
- * com o scroll nativo). Também só reage quando a página está no topo.
+ * De propósito SÓ ativa onde o navegador NÃO oferece o gesto: app instalado na
+ * Tela de Início, ou a casca nativa. No navegador comum, o próprio browser já
+ * tem o gesto — então aqui vira um passthrough (zero mudança, zero risco de
+ * brigar com o scroll nativo). Também só reage quando a página está no topo.
+ *
+ * ⚠️ **`ehNativo()` NÃO É REDUNDANTE com `display-mode: standalone`** — ele é o
+ * caso que faltava. Dentro do WKWebView do Capacitor o display-mode é
+ * `browser` e `navigator.standalone` é indefinido, então o app NATIVO era o
+ * único lugar onde este gesto não existia: puxar no topo lá só fazia a página
+ * balançar. A prova de que standalone é falso na casca está em
+ * `src/lib/avisos.ts` — o botão de avisos dentro do app devolvia
+ * `ios-not-installed`, motivo que `push.ts` só dá quando `!standalone`.
+ *
+ * ⚠️ E a decisão continua num EFEITO, nunca no render: `ehNativo()` lê um
+ * global que não existe no servidor, e decidir no render trocaria um gesto
+ * faltando por uma quebra de hidratação — que é o que
+ * `capacidade-fora-do-render.test.ts` existe para barrar.
  */
 export function PullToRefresh({
   onRefresh,
@@ -28,7 +42,7 @@ export function PullToRefresh({
       window.matchMedia?.("(display-mode: standalone)").matches ||
       (navigator as unknown as { standalone?: boolean }).standalone === true;
     const touch = "ontouchstart" in window;
-    setEnabled(Boolean(standalone && touch));
+    setEnabled(Boolean((standalone || ehNativo()) && touch));
   }, []);
 
   if (!enabled) return <>{children}</>;

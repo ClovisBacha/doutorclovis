@@ -50,7 +50,7 @@ export function PhoneFrame({
         {/* tela — shine varre o vidro no hover */}
         <div className="shine relative h-[560px] overflow-hidden rounded-[2.1rem] bg-background">
           {/* status bar */}
-          <div className="relative z-10 flex items-center justify-between px-6 pt-3 text-[10px] font-semibold text-foreground">
+          <div className="relative z-10 flex items-center justify-between px-6 pt-3 text-xs font-semibold text-foreground">
             <span>9:41</span>
             <span className="flex items-center gap-1">
               <span className="inline-block h-2 w-3 rounded-[2px] bg-foreground/70" />
@@ -203,7 +203,7 @@ export function AppChatMockupScreen() {
           <MessageCircle className="h-4 w-4 text-primary" />
         </div>
         <div>
-          <p className="text-[10px] font-semibold text-foreground">Assistente Obstétrica</p>
+          <p className="text-xs font-semibold text-foreground">Assistente Obstétrica</p>
           <p className="flex items-center gap-1 text-[8px] text-emerald-600">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> disponível 24h
           </p>
@@ -232,7 +232,7 @@ export function AppChatMockupScreen() {
         </div>
       </div>
       <div className="mb-3 flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-2">
-        <p className="flex-1 text-[9px] text-muted-foreground">Escreva sua dúvida...</p>
+        <p className="flex-1 text-[9px] text-muted-foreground">Escreva sua dúvida…</p>
         <Mic className="h-3 w-3 text-muted-foreground" />
         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary">
           <Send className="h-2.5 w-2.5 text-primary-foreground" />
@@ -255,7 +255,7 @@ export function AppSaudeMockupScreen() {
     <div className="space-y-2.5 px-3 pt-2">
       <p className="font-serif text-base text-foreground">Minha saúde</p>
 
-      <div className="rounded-3xl border border-border bg-card p-3">
+      <div className="rounded-3xl card-material p-3">
         <div className="flex items-center justify-between">
           <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             Peso (kg)
@@ -287,14 +287,14 @@ export function AppSaudeMockupScreen() {
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-2xl border border-border bg-card p-2.5">
+        <div className="rounded-2xl card-material p-2.5">
           <p className="text-[8px] uppercase tracking-[0.14em] text-muted-foreground">Pressão</p>
           <p className="mt-0.5 font-serif text-lg text-foreground">
             110<span className="text-xs text-muted-foreground">/</span>72
           </p>
           <p className="text-[8px] text-emerald-600">✓ dentro do esperado</p>
         </div>
-        <div className="rounded-2xl border border-border bg-card p-2.5">
+        <div className="rounded-2xl card-material p-2.5">
           <p className="text-[8px] uppercase tracking-[0.14em] text-muted-foreground">
             Chutes hoje
           </p>
@@ -327,7 +327,7 @@ export function AppJogoMockupScreen() {
       <p className="font-serif text-base text-foreground">Minha jornada</p>
 
       {/* Stats: chama · dia · figurinhas */}
-      <div className="flex items-center justify-around rounded-2xl border border-border bg-card px-2 py-1.5">
+      <div className="flex items-center justify-around rounded-2xl card-material px-2 py-1.5">
         <span className="flex items-center gap-1 text-[9px] font-bold text-amber-500">
           🔥 12 <span className="font-medium text-muted-foreground">dias</span>
         </span>
@@ -340,25 +340,25 @@ export function AppJogoMockupScreen() {
       </div>
 
       {/* Banner da fase */}
-      <div className="flex items-center justify-between rounded-2xl bg-amber-500 px-3 py-2 text-white">
+      <div className="flex items-center justify-between rounded-2xl bg-amber-700 px-3 py-2 text-white">
         <div>
           <p className="text-[7px] font-bold uppercase tracking-wider text-white/80">
             Fase 4 · Semanas 22–28
           </p>
-          <p className="text-[11px] font-extrabold">Crescendo forte</p>
+          <p className="text-xs font-extrabold">Crescendo forte</p>
         </div>
         <span className="text-lg">🌈</span>
       </div>
 
       {/* Caminho: figurinhas conquistadas → baú de hoje → dias travados */}
-      <div className="relative rounded-3xl border border-border bg-card px-3 pb-2 pt-1.5">
+      <div className="relative rounded-3xl card-material px-3 pb-2 pt-1.5">
         <p className="text-center text-[7px] font-bold uppercase tracking-wider text-muted-foreground">
           Semana 24 🌽
         </p>
         <div className="mt-1 flex flex-col items-center gap-1">
           <div className="ml-[-40%]">
             <div
-              className="flex h-8 w-8 items-center justify-center rounded-full text-[11px]"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-xs"
               style={node3d("#f59e0b", "#b45309")}
             >
               🍓
@@ -371,7 +371,7 @@ export function AppJogoMockupScreen() {
           </div>
           <div className="ml-[20%]">
             <div
-              className="flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-black text-white"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-black text-white"
               style={node3d("#f59e0b", "#b45309")}
             >
               ✓

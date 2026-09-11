@@ -1,6 +1,21 @@
 import { Bell, ChevronRight, X } from "lucide-react";
+/* As peças da família do coração no lugar dos emojis das quatro
+   notificações derivadas (set/2026). O mapa é por EMOJI porque é o campo que
+   `Notificacao.icone` carrega: uma notificação nova nasce com emoji e
+   aparece com ele até ganhar peça — nunca com um buraco. */
+import icMedico from "@/assets/avisos/medico.webp";
+import icPresente from "@/assets/avisos/presente.webp";
+import icLocalizacao from "@/assets/avisos/localizacao.webp";
+import icContato from "@/assets/avisos/contato.webp";
+const ARTE_DO_AVISO: Readonly<Record<string, string>> = {
+  "👩‍⚕️": icMedico,
+  "🎁": icPresente,
+  "📍": icLocalizacao,
+  "🆘": icContato,
+};
 import type { Lidas, Notificacao } from "@/lib/notificacoes";
 import { useVoltar } from "@/lib/use-voltar";
+import { useTravarRolagemDeFundo } from "@/lib/use-travar-rolagem";
 
 /**
  * A caixa de entrada do app.
@@ -38,6 +53,9 @@ export function NotificacoesSheet({
 }) {
   /* Voltar (Android) e Escape fecham a folha, não o app. */
   useVoltar(true, onFechar);
+  /* A página de trás não anda enquanto esta folha está aberta — ver
+     `useTravarRolagemDeFundo`, que guarda e restaura o valor anterior. */
+  useTravarRolagemDeFundo(true);
   return (
     <div
       className="fixed inset-0 z-[80] flex items-end justify-center bg-black/35 backdrop-blur-sm sm:items-center"
@@ -103,7 +121,16 @@ export function NotificacoesSheet({
                   className="flex w-full items-start gap-3 rounded-2xl px-3.5 py-3.5 text-left transition-colors hover:bg-primary/8 active:bg-primary/12"
                 >
                   <span className="relative mt-0.5 shrink-0 text-xl leading-none">
-                    {n.icone}
+                    {ARTE_DO_AVISO[n.icone] ? (
+                      <img
+                        src={ARTE_DO_AVISO[n.icone]}
+                        alt=""
+                        aria-hidden
+                        className="h-9 w-9 object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,0.12)]"
+                      />
+                    ) : (
+                      n.icone
+                    )}
                     {/* O ponto no ITEM, além do ponto no ☰: sem ele, uma lista
                         de cinco avisos com um novo no meio não diz qual é o
                         novo. */}

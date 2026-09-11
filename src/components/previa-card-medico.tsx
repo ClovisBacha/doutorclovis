@@ -61,7 +61,7 @@ export function PreviaCardMedico({
       <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
         Como a paciente te vê
       </p>
-      <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      <div className="rounded-2xl card-material p-4">
         <div className="flex items-start gap-3">
           {/* Sem foto ainda: a inicial. É honesto sobre o que o card mostra
               hoje, em vez de desenhar um rosto que não existe. */}

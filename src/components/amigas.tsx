@@ -216,11 +216,16 @@ export function AmigasTab({
             ? "Não achei esse código. Confira com ela — são 7 letras e números."
             : r.error === "muitos_convites"
               ? "Você já mandou muitos convites hoje. Tente de novo amanhã."
-              : r.error === "termo_curto"
-                ? "Digite o código completo ou o e-mail dela."
-                : r.error === "indisponivel"
-                  ? "Não é possível agora."
-                  : "Não foi possível. O convite precisa do SQL aplicado no banco.",
+              : /* ⚠️ Texto PRÓPRIO: dizer "tente amanhã" sobre uma contagem que
+                   falhou faria ela desistir por um dia inteiro de um convite
+                   que o servidor aceitaria em dez segundos. */
+                r.error === "instavel"
+                ? "Não consegui conferir seus convites de hoje — tente de novo."
+                : r.error === "termo_curto"
+                  ? "Digite o código completo ou o e-mail dela."
+                  : r.error === "indisponivel"
+                    ? "Não é possível agora."
+                    : "Não foi possível. O convite precisa do SQL aplicado no banco.",
           { duration: 6000 },
         );
         return;
@@ -540,7 +545,7 @@ export function AmigasTab({
                   <Bolha tamanho={40} humor="feliz" flutua={false} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[15px] font-semibold">{ped.nome}</span>
-                    <span className="mt-0.5 block text-[12px] text-muted-foreground">
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
                       {tempoNoApp(ped.diasNoApp)}
                     </span>
                   </span>
@@ -558,7 +563,7 @@ export function AmigasTab({
                       recusa que notifica vira constrangimento. */}
                   <button
                     onClick={() => responderPedido(ped.id, false)}
-                    className="press min-h-11 flex-1 rounded-full border border-border text-[13px] font-semibold text-muted-foreground"
+                    className="press min-h-11 flex-1 rounded-full pill-3d text-[13px] font-semibold text-muted-foreground"
                   >
                     Agora não
                   </button>
@@ -641,7 +646,7 @@ export function AmigasTab({
                     {ultimaVez(a.vistaEm) ? (
                       <UltimaVez quando={a.vistaEm} />
                     ) : (
-                      <span className="mt-0.5 block text-[12.5px]" style={{ color: "#6d5b85" }}>
+                      <span className="mt-0.5 block text-xs" style={{ color: "#6d5b85" }}>
                         {tempoNoApp(a.diasNoApp)}
                       </span>
                     )}
@@ -750,7 +755,7 @@ export function AmigasTab({
                 ? `Você tem ${mesada.restante} 🌱 para dar`
                 : "Seu bolso deste mês acabou"}
             </p>
-            <p className="mt-1 text-[12.5px] leading-tight text-emerald-800/80">
+            <p className="mt-1 text-xs leading-tight text-emerald-800/80">
               {mesada.restante > 0
                 ? `São do Premium e só servem para presentear — ${PRESENTE_ENTRE_AMIGAS} por amiga, no 🎁 ao lado do nome dela.`
                 : "Ele enche de novo na virada do mês."}
@@ -770,7 +775,7 @@ export function AmigasTab({
           esse é o dado que menos pode vazar. O código é uma capacidade (só se
           tem se a outra der); o e-mail exige saber o e-mail. Ver
           `convidarAmiga`. */}
-      <section className="rounded-3xl border border-border bg-card p-4">
+      <section className="rounded-3xl card-material p-4">
         <p className="font-serif text-lg">Já tem uma amiga no app?</p>
         <p className="mt-1 text-[13px] leading-snug text-muted-foreground">
           Peça o código dela (7 letras e números, no cartão de indicação) ou use o e-mail que ela
@@ -793,7 +798,7 @@ export function AmigasTab({
             autoCapitalize="none"
             autoCorrect="off"
             spellCheck={false}
-            className="min-h-11 min-w-0 flex-1 rounded-full border border-border bg-background px-4 text-[14px]"
+            className="min-h-11 min-w-0 flex-1 rounded-full pill-3d bg-background px-4 text-[14px]"
           />
           <button
             onClick={() => void convidarPorTermo()}
@@ -813,7 +818,7 @@ export function AmigasTab({
             não sabe onde encontrar — e o cartão que mostra o código vive noutra
             aba. */}
         {codigo && (
-          <p className="mt-2.5 text-[12px] text-muted-foreground">
+          <p className="mt-2.5 text-xs text-muted-foreground">
             O seu código é{" "}
             <strong className="font-mono font-bold tracking-wider text-foreground">{codigo}</strong>{" "}
             — mande para ela te achar também.
@@ -858,7 +863,7 @@ export function AmigasTab({
               mais alto que o do desenho. A segunda é que o texto curto é mais
               VERDADEIRO — quem indica e quem entra ganham as duas, e é isso
               que faz o convite valer a pena mandar. */}
-          <p className="mt-1 text-[12.5px] leading-tight" style={{ color: "#6d5b85" }}>
+          <p className="mt-1 text-xs leading-tight" style={{ color: "#6d5b85" }}>
             Vocês duas ganham Sementinhas 🌱
           </p>
         </div>
@@ -944,7 +949,7 @@ function FolhaDePresente({
         className="w-full max-w-sm rounded-3xl border border-border bg-card p-5 shadow-[var(--shadow-float)]"
       >
         <p className="font-serif text-lg">Quanto para {amiga.nome}?</p>
-        <p className="mt-1 text-[12.5px] leading-snug text-muted-foreground">
+        <p className="mt-1 text-xs leading-snug text-muted-foreground">
           Você tem <strong className="font-semibold">{restante} 🌱</strong> no bolso do Premium
           neste mês. Ele só serve para presentear.
         </p>
@@ -974,7 +979,7 @@ function FolhaDePresente({
             <div className="mt-4 flex gap-2">
               <button
                 onClick={aoFechar}
-                className="press min-h-11 flex-1 rounded-full border border-border text-[13px] font-semibold text-muted-foreground"
+                className="press min-h-11 flex-1 rounded-full pill-3d text-[13px] font-semibold text-muted-foreground"
               >
                 Agora não
               </button>
@@ -1042,7 +1047,7 @@ function FolhaDeSair({
         <div className="mt-4 flex gap-2">
           <button
             onClick={aoConfirmar}
-            className="press min-h-11 flex-1 rounded-full border border-border text-[13px] font-semibold text-muted-foreground"
+            className="press min-h-11 flex-1 rounded-full pill-3d text-[13px] font-semibold text-muted-foreground"
           >
             Sair da amizade
           </button>
@@ -1277,7 +1282,7 @@ function UltimaVez({ quando }: { quando: string | null }) {
         ? "#f59e0b"
         : "#a8a29e";
   return (
-    <span className="mt-0.5 flex items-center gap-1.5 text-[12.5px]" style={{ color: "#6d5b85" }}>
+    <span className="mt-0.5 flex items-center gap-1.5 text-xs" style={{ color: "#6d5b85" }}>
       <span
         className="inline-block h-[7px] w-[7px] shrink-0 rounded-full"
         style={{ background: cor }}
@@ -1409,7 +1414,7 @@ function DuplaCard({
                 cortada no meio do "ê". Em pilha de avatares sobrepostos quem
                 fica na frente é sempre o primeiro. */}
             <span
-              className="relative z-10 flex h-14 w-14 items-center justify-center rounded-full border-[3px] border-white text-[11px] font-bold text-white"
+              className="relative z-10 flex h-14 w-14 items-center justify-center rounded-full border-[3px] border-white text-xs font-bold text-white"
               style={{ background: "linear-gradient(150deg,#f0a8c8,#d47ab0)" }}
             >
               Você
@@ -1424,7 +1429,7 @@ function DuplaCard({
               className="-ml-2 border-[3px] border-white"
             />
             <span
-              className="absolute bottom-0 left-1/2 z-20 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full border-[3px] border-white text-[12px] text-white"
+              className="absolute bottom-0 left-1/2 z-20 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full border-[3px] border-white text-xs text-white"
               style={{ background: "linear-gradient(150deg,#f472b6,#db2777)" }}
             >
               ♥
@@ -1447,7 +1452,7 @@ function DuplaCard({
                 🔥 {dupla.sequencia} {dupla.sequencia === 1 ? "dia" : "dias"} juntas
               </span>
             ) : (
-              <span className="mt-0.5 block text-[12px] text-muted-foreground">
+              <span className="mt-0.5 block text-xs text-muted-foreground">
                 {/* ⚠️ "a chama começa quando as duas aparecerem" é frase de
                     dupla NOVA, e ela aparecia também numa dupla com 41 dias de
                     história — dizendo "começa" para quem já tinha começado há
@@ -1467,7 +1472,7 @@ function DuplaCard({
                 Só aparece quando o recorde é MAIOR que a chama de hoje: com os
                 dois iguais seria a mesma frase escrita duas vezes. */}
             {dupla.recorde > dupla.sequencia && (
-              <span className="mt-0.5 block text-[11px] text-amber-700 dark:text-amber-300">
+              <span className="mt-0.5 block text-xs text-amber-700 dark:text-amber-300">
                 🏅 A melhor de vocês foi {dupla.recorde} dias seguidos
                 {dupla.juntas > dupla.recorde ? ` · ${dupla.juntas} dias juntas no total` : ""}
               </span>
@@ -1479,7 +1484,7 @@ function DuplaCard({
             /* 44px de altura, como o resto. Desfazer a dupla é uma ação que
                ela toma UMA vez e precisa acertar — errar o alvo aqui e acertar
                o "Desfazer" por engano é justamente o que não pode acontecer. */
-            className="min-h-11 shrink-0 rounded-full border border-border px-3 text-[11px] font-semibold text-muted-foreground"
+            className="min-h-11 shrink-0 rounded-full pill-3d px-3 text-xs font-semibold text-muted-foreground"
           >
             Desfazer
           </button>
@@ -1504,7 +1509,7 @@ function DuplaCard({
         dupla.sequencia === 0 &&
         dupla.paradaHa != null &&
         dupla.paradaHa >= DIAS_PARA_PAUSA && (
-          <p className="mt-2 rounded-2xl bg-white/70 p-3 text-[12px] leading-snug text-muted-foreground dark:bg-white/5">
+          <p className="mt-2 rounded-2xl bg-white/70 p-3 text-xs leading-snug text-muted-foreground dark:bg-white/5">
             A chama de vocês está em pausa. <strong className="font-semibold">Está tudo bem</strong>{" "}
             — ela volta a contar no dia em que as duas aparecerem, e nada do que vocês já fizeram se
             perdeu.
@@ -1532,7 +1537,7 @@ function DuplaCard({
             <button
               onClick={() => chamar("recusar", dupla.amigaId!)}
               disabled={ocupado}
-              className="min-h-11 rounded-full border border-border px-4 text-xs font-semibold text-muted-foreground"
+              className="min-h-11 rounded-full pill-3d px-4 text-xs font-semibold text-muted-foreground"
             >
               Agora não
             </button>
@@ -1553,7 +1558,7 @@ function DuplaCard({
           <button
             onClick={() => chamar("desfazer")}
             disabled={ocupado}
-            className="min-h-11 shrink-0 rounded-full border border-border px-3 text-[11px] font-semibold text-muted-foreground"
+            className="min-h-11 shrink-0 rounded-full pill-3d px-3 text-xs font-semibold text-muted-foreground"
           >
             Cancelar
           </button>
@@ -1567,7 +1572,7 @@ function DuplaCard({
           </p>
         ) : (
           <div className="mt-4">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Chamar para a dupla
             </p>
             <ul className="mt-2 flex flex-wrap gap-2">
@@ -1721,7 +1726,7 @@ function PerfilDaAmigaTela({
   const voltar = (
     <button
       onClick={aoVoltar}
-      className="press mb-3 rounded-full border border-border px-3 py-1.5 text-xs font-semibold"
+      className="press mb-3 rounded-full pill-3d px-3 py-1.5 text-xs font-semibold"
     >
       ← Amigas
     </button>
@@ -1809,7 +1814,7 @@ function PerfilDaAmigaTela({
       {/* ── QUEM ELA É — e o que NÃO está aqui ───────────────────────────
           Sem semana, sem DPP, sem medida. É o que permite esta tela existir
           quando uma gestação termina mal. */}
-      <div className="mt-4 rounded-3xl border border-border bg-card p-5 text-center">
+      <div className="mt-4 rounded-3xl card-material p-5 text-center">
         <p className="font-serif text-2xl">{perfil.nome}</p>
         {perfil.bebe && (
           <p className="mt-0.5 text-sm text-muted-foreground">esperando {perfil.bebe} 💜</p>
@@ -1844,7 +1849,7 @@ function PerfilDaAmigaTela({
             <button
               onClick={() => setEscolhendo(true)}
               disabled={presenteando || presenteado || perfil.jaPresenteada}
-              className="press mt-5 w-full rounded-full bg-emerald-500 py-3 text-sm font-bold text-white disabled:opacity-50"
+              className="press mt-5 w-full rounded-full bg-emerald-700 py-3 text-sm font-bold text-white disabled:opacity-50"
             >
               {presenteado || perfil.jaPresenteada
                 ? "Enviado ✓"
@@ -1852,7 +1857,7 @@ function PerfilDaAmigaTela({
                   ? "Enviando…"
                   : `Presentear ${PRESENTE_ENTRE_AMIGAS} 🌱`}
             </button>
-            <p className="mt-2 text-[11px] text-muted-foreground">
+            <p className="mt-2 text-xs text-muted-foreground">
               {presenteado || perfil.jaPresenteada
                 ? "Ela já ganhou um presente seu neste mês. O bolso volta na virada."
                 : "Ela recebe um aviso com o seu nome ao abrir o Caminho."}
@@ -1881,7 +1886,7 @@ function PerfilDaAmigaTela({
       {aoSairDaAmizade && (
         <button
           onClick={aoSairDaAmizade}
-          className="press mt-5 min-h-11 w-full rounded-full border border-border text-[13px] font-semibold text-muted-foreground"
+          className="press mt-5 min-h-11 w-full rounded-full pill-3d text-[13px] font-semibold text-muted-foreground"
         >
           Sair da amizade com {perfil.nome}
         </button>

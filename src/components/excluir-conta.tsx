@@ -29,6 +29,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { excluirMinhaConta, PALAVRA_DE_CONFIRMACAO } from "@/lib/conta.functions";
 import { useVoltar } from "@/lib/use-voltar";
+import { useTravarRolagemDeFundo } from "@/lib/use-travar-rolagem";
 
 export function ExcluirConta({ ehMedico = false }: { ehMedico?: boolean }) {
   const [aberto, setAberto] = useState(false);
@@ -36,6 +37,12 @@ export function ExcluirConta({ ehMedico = false }: { ehMedico?: boolean }) {
   const [indo, setIndo] = useState(false);
 
   useVoltar(aberto, () => setAberto(false));
+
+  /* A página de trás não anda enquanto esta folha está aberta — ver
+
+     `useTravarRolagemDeFundo`, que guarda e restaura o valor anterior. */
+
+  useTravarRolagemDeFundo(aberto);
 
   const podeConfirmar = palavra.trim().toUpperCase() === PALAVRA_DE_CONFIRMACAO;
 

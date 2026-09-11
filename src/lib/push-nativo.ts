@@ -27,6 +27,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { ehNativo, plataforma } from "@/lib/nativo";
 import { registrarTokenNativo } from "@/lib/push-nativo.functions";
+import { caminhoSeguroDoPush } from "@/lib/destino-do-push";
 
 export type ResultadoPush = { ok: boolean; reason?: string };
 
@@ -105,5 +106,47 @@ export async function pushNativoJaAutorizado(): Promise<boolean> {
     return (await PushNotifications.checkPermissions()).receive === "granted";
   } catch {
     return false;
+  }
+}
+
+/**
+ * TOCAR NUM AVISO LEVA AO LUGAR DO AVISO — no app nativo.
+ *
+ * ⚠️ O servidor manda `url` em todo push que dispara, e no nativo NINGUÉM
+ * lia: o app abria onde estava, e a paciente ficava procurando o que o aviso
+ * dizia. Tocar em "sua consulta é amanhã" tem de abrir a consulta.
+ *
+ * ⚠️ **O caminho passa pela régua** (`caminhoSeguroDoPush`), e nunca cru: o que
+ * chega aqui veio pelo serviço da Apple/Google como dado arbitrário. É a MESMA
+ * régua do service worker — ver `destino-do-push.ts` para o porquê de existirem
+ * duas implementações e do que as mantém iguais.
+ *
+ * ⚠️ **Navegação por `history`, não `location.href`.** Este app é uma rota só
+ * com estado por cima; recarregar a página inteira para trocar de aba custaria
+ * uma abertura completa — justamente no toque que deveria ser instantâneo. O
+ * `popstate` é o que o TanStack Router escuta.
+ *
+ * ⚠️ **E ele NÃO trata o aviso recebido com o app aberto** (`pushNotification
+ * Received`): mudar de tela sozinha, sem ela ter tocado em nada, é o oposto do
+ * que um aviso faz. Só o toque navega.
+ */
+export async function ligarToqueNoAviso(): Promise<void> {
+  if (!ehNativo()) return;
+  try {
+    const { PushNotifications } = await import("@capacitor/push-notifications");
+    await PushNotifications.addListener("pushNotificationActionPerformed", (acao) => {
+      const dados = (acao?.notification?.data ?? {}) as { url?: unknown };
+      const destino = caminhoSeguroDoPush(dados.url);
+      try {
+        window.history.pushState({}, "", destino);
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      } catch {
+        /* Último recurso: uma abertura inteira é pior que ficar onde está,
+           mas ficar sem resposta a um toque é pior que as duas. */
+        window.location.href = destino;
+      }
+    });
+  } catch {
+    /* Sem o plugin, o aviso continua chegando — só não navega. */
   }
 }

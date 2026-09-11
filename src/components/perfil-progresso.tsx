@@ -131,7 +131,7 @@ export function PerfilProgresso({
           {completo ? "Perfil completo 🎉" : `Perfil ${pct}% pronto`}
         </p>
         {!completo && (
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             {faltando.length} {faltando.length === 1 ? "item" : "itens"}
           </span>
         )}
@@ -147,19 +147,19 @@ export function PerfilProgresso({
       </div>
 
       {completo ? (
-        <p className="mt-2 text-[12px] leading-snug text-muted-foreground">
+        <p className="mt-2 text-xs leading-snug text-muted-foreground">
           Nada a preencher. Você aparece na busca com tudo o que a paciente quer saber.
         </p>
       ) : compacto ? (
         /* No cadastro, um passo por vez: a lista inteira de pendências antes de
            terminar o formulário desanima em vez de guiar. */
-        <p className="mt-2 text-[12px] leading-snug text-muted-foreground">
+        <p className="mt-2 text-xs leading-snug text-muted-foreground">
           <strong className="text-foreground">{faltando[0].rotulo}</strong> — {faltando[0].efeito}
         </p>
       ) : (
         <ul className="mt-3 space-y-2">
           {faltando.map((i) => (
-            <li key={i.chave} className="text-[12px] leading-snug">
+            <li key={i.chave} className="text-xs leading-snug">
               <span className="font-semibold text-foreground">{i.rotulo}</span>
               <span className="text-muted-foreground"> — {i.efeito}</span>
             </li>

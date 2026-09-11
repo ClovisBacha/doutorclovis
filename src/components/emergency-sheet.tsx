@@ -1,12 +1,21 @@
 import { useEffect, useState } from "react";
+/* Os dois veículos (192 e 193) são EMOJI, por decisão do dono: as peças
+   geradas em src/assets/sos/ foram para o ar e ele preferiu a ambulância
+   antiga ("preferia a antiga"); o caminhão voltou junto para o par não
+   desalinhar. As peças ficaram no repositório sem uso — não as reintroduza
+   sem uma foto que ele aprove. O coração do CVV continua sendo a peça da
+   Saúde. */
+import icCoracao from "@/assets/saude/saude.webp";
 import { toast } from "sonner";
 import { destravarSomDeUI, tocarSomDeUI } from "@/lib/tocar-som-de-ui";
+import { hapticoDeAviso, tocarPadrao } from "@/lib/nativo";
 import { RED_SYMPTOMS } from "@/lib/triage";
 import { esquemaWhatsApp, linkTel, linkWhatsApp } from "@/lib/telefone";
 import type { DoctorContato } from "@/lib/patientlink.functions";
 import { dispararEmergencia, type CanaisAviso } from "@/lib/emergencia.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { useVoltar } from "@/lib/use-voltar";
+import { useTravarRolagemDeFundo } from "@/lib/use-travar-rolagem";
 import { localizacaoAgora, localizacaoNegada } from "@/lib/localizacao";
 
 type Info = {
@@ -31,8 +40,10 @@ type Info = {
 export function EmergencySheet({
   onTriagem,
   info,
+  tituloDaFicha,
   medico,
   medicoResolvido,
+  fichaResolvida = true,
   onClose,
   onOpenCard,
 }: {
@@ -53,6 +64,17 @@ export function EmergencySheet({
   onTriagem?: () => void;
   info: Info;
   /**
+   * O cabecalho da ficha que o socorrista le.
+   *
+   * ⚠️ **E uma STRING, e nao um booleano de luto — de proposito.** Passar
+   * `emLuto` para dentro deste componente seria pedir para alguem, um dia,
+   * escrever `if (emLuto) return null` — que e exatamente o defeito consertado
+   * nesta mesma folha: a paciente em Modo Cuidado tocava no SOS e a folha nao
+   * montava. **O Modo Cuidado governa CONTEUDO; nunca o acesso ao socorro.**
+   * Uma string nao tem como desligar nada.
+   */
+  tituloDaFicha?: string;
+  /**
    * O médico DA PACIENTE, lido do cadastro dele (`getMyDoctorContact`).
    * `null` = ela ainda não tem médico vinculado, ou ele não preencheu o
    * WhatsApp: sem médico vinculado, NENHUM nome é mostrado (nunca o do dono da
@@ -65,6 +87,24 @@ export function EmergencySheet({
   medico?: DoctorContato | null;
   /** `false` = ainda não sabemos se ela tem médico. Ver `medicoResolvido`. */
   medicoResolvido?: boolean;
+  /**
+   * `false` = o PERFIL ainda não chegou. Não é o mesmo que "ela não preencheu".
+   *
+   * ⚠️ Isto passou a importar quando a folha ganhou o direito de abrir DURANTE
+   * o carregamento do app (o botão de socorro existe desde o primeiro quadro).
+   * Nesse instante `profile` é nulo, e a folha afirmava DUAS coisas falsas:
+   *
+   *   · "Complete tipo sanguíneo e contato de emergência no seu Perfil" — uma
+   *     acusação, numa emergência, sobre um perfil preenchido há meses;
+   *   · "Alergias: nenhuma informada" e "Medicamentos: nenhum" — **para um
+   *     SOCORRISTA**. "Nada relatado" e "desconhecido" não são a mesma coisa, e
+   *     a diferença entre os dois é uma prescrição. É a régua que o modo
+   *     consulta já aplica com `ficha.degradada`.
+   *
+   * Segue a forma de `medicoResolvido`, e o padrão é `true` para que nenhum
+   * chamador de hoje mude de comportamento.
+   */
+  fichaResolvida?: boolean;
   onClose: () => void;
   /** Abre a carteirinha completa (QR grande, copiar, imprimir) fora do SOS. */
   onOpenCard?: () => void;
@@ -73,6 +113,9 @@ export function EmergencySheet({
      inteiro usa para "cancelar isto aqui" fechava o APP — com a tela de
      emergência aberta. */
   useVoltar(true, onClose);
+  /* A página de trás não anda enquanto esta folha está aberta — ver
+     `useTravarRolagemDeFundo`, que guarda e restaura o valor anterior. */
+  useTravarRolagemDeFundo(true);
 
   /* Quem é "o médico" desta tela — tudo ou nada, nunca uma mistura.
      
@@ -193,6 +236,16 @@ export function EmergencySheet({
      * justamente o que não toca.
      */
     destravarSomDeUI();
+
+    /* ⚠️ E O DEDO RECEBE RESPOSTA AQUI, no mesmo instante e pelo mesmo motivo.
+       O som era o único retorno deste botão — e no iPhone no SILENCIOSO ele
+       não toca: o WebKit silencia Web Audio pelo botão físico (bug 237322).
+       Uma paciente em pânico apertava o círculo vermelho e não recebia sinal
+       NENHUM de que o app tinha entendido.
+       Vai antes de qualquer `await`, como o destravar: depois dele o gesto já
+       passou. E é um pulso só — o desfecho tem padrão próprio lá embaixo, e
+       dois padrões iguais não diriam nada um do outro. */
+    tocarPadrao([40]);
 
     /* ── A janela do WhatsApp é aberta AGORA, dentro do toque ──────────────
        Isto parece estranho e é o único jeito de funcionar. iOS e Android só
@@ -430,6 +483,10 @@ export function EmergencySheet({
        */
       const chegouEmTodos = r.canais.destinos.length > 0 && !r.canais.faltou;
       tocarSomDeUI(chegouEmTodos ? "sos" : "sos-falhou");
+      /* ⚠️ O MESMO desfecho no dedo, e pela MESMA régua do som — nunca uma
+         segunda: com duas, o iPhone no silencioso diria uma coisa pelo tato e
+         a tela diria outra. */
+      hapticoDeAviso(chegouEmTodos ? "sucesso" : "erro");
       /* A mensagem do WhatsApp é a MESMA que saiu por e-mail e SMS — vem
          pronta do servidor em vez de ser remontada aqui, senão o parente que
          receber pelos dois canais leria duas versões diferentes do mesmo
@@ -498,12 +555,13 @@ export function EmergencySheet({
        * distinguir os dois sem olhar.
        */
       tocarSomDeUI("sos-falhou");
+      hapticoDeAviso("erro");
       toast.error("Não consegui avisar por aqui — ligue 192 imediatamente.");
     }
   }
 
   const card = [
-    "FICHA DE EMERGÊNCIA - GESTANTE",
+    tituloDaFicha ?? "FICHA DE EMERGÊNCIA - GESTANTE",
     `Nome: ${info.name || "-"}`,
     info.babyName ? `Bebe: ${info.babyName}` : "",
     `Idade gestacional: ${info.weekLabel || "-"}`,
@@ -530,6 +588,13 @@ export function EmergencySheet({
        atrasa nada que ela esteja olhando. Medido: o chunk da folha de
        emergência caiu de 49,2 kB para 24,7 kB. */
     let vivo = true;
+    /* ⚠️ Sem ficha, sem QR: o desenho pulsante que já existe no `else` diz
+       "estou buscando", e um QR gerado agora levaria uma ficha vazia para o
+       telefone do socorrista. */
+    if (!fichaResolvida) {
+      setQr(null);
+      return;
+    }
     void import("qrcode")
       .then((m) =>
         (m.default ?? m).toDataURL(card, { margin: 1, width: 260, errorCorrectionLevel: "M" }),
@@ -539,7 +604,7 @@ export function EmergencySheet({
     return () => {
       vivo = false;
     };
-  }, [card]);
+  }, [card, fichaResolvida]);
 
   return (
     <div
@@ -709,7 +774,7 @@ export function EmergencySheet({
           <div
             /* Âmbar quando ninguém foi avisado: o painel ficava verde de sucesso
                enquanto o texto dentro dele dizia "ninguém foi avisado". */
-            className={`mt-2 rounded-2xl px-3.5 py-3 text-[12px] leading-snug ${
+            className={`mt-2 rounded-2xl px-3.5 py-3 text-xs leading-snug ${
               panic === "ninguem"
                 ? "bg-amber-50 text-amber-900 dark:bg-amber-500/10 dark:text-amber-200"
                 : "bg-emerald-50 text-emerald-900 dark:bg-emerald-500/10 dark:text-emerald-200"
@@ -756,7 +821,7 @@ export function EmergencySheet({
           </a>
         )}
         {(panic === "sent" || panic === "ninguem") && zapAbriu && (
-          <p className="mt-1.5 text-center text-[11px] leading-snug text-muted-foreground">
+          <p className="mt-1.5 text-center text-xs leading-snug text-muted-foreground">
             A mensagem já está escrita no WhatsApp — é só apertar enviar.
           </p>
         )}
@@ -771,10 +836,10 @@ export function EmergencySheet({
             coordenada de um instante vira um trajeto de oito horas. */}
         {(panic === "sent" || panic === "ninguem") && zapAbriu && (
           <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-3.5 py-3 dark:border-emerald-500/30 dark:bg-emerald-500/10">
-            <p className="text-[12.5px] font-bold text-emerald-800 dark:text-emerald-300">
+            <p className="text-xs font-bold text-emerald-800 dark:text-emerald-300">
               Se você estiver a caminho do hospital, compartilhe onde você está
             </p>
-            <p className="mt-1 text-[12px] leading-snug text-foreground/75">
+            <p className="mt-1 text-xs leading-snug text-foreground/75">
               Dentro da conversa do WhatsApp: toque em <b>📎</b> → <b>Localização</b> →{" "}
               <b>Localização em tempo real</b> → <b>8 horas</b>. Quem estiver te procurando passa a
               ver você se movendo.
@@ -800,6 +865,10 @@ export function EmergencySheet({
             href="tel:192"
             className="press flex flex-col items-center justify-between gap-3 rounded-3xl bg-card px-3 py-4 text-center ring-1 ring-black/5"
           >
+            {/* ⚠️ A ambulância VOLTOU a ser o emoji, por decisão do dono
+                ("a ambulância do SOS, preferia a antiga"). A peça gerada
+                (src/assets/sos/ambulancia.webp) ficou no repositório sem uso;
+                não a reintroduza aqui sem uma foto que ele aprove. */}
             <span className="text-[2.6rem] leading-none" aria-hidden>
               🚑
             </span>
@@ -858,6 +927,9 @@ export function EmergencySheet({
               href="tel:193"
               className="press flex flex-col items-center justify-between gap-3 rounded-3xl bg-card px-3 py-4 text-center ring-1 ring-black/5"
             >
+              {/* Emoji, como a ambulância ao lado: os dois cartões são um par, e
+                  uma peça de 64px ao lado de um emoji de 42px desalinhava os
+                  dois títulos (medido na foto). */}
               <span className="text-[2.6rem] leading-none" aria-hidden>
                 🚒
               </span>
@@ -882,7 +954,7 @@ export function EmergencySheet({
         </div>
 
         {!medZap && !medTel && (
-          <p className="mt-2.5 rounded-2xl bg-amber-50 px-3.5 py-2.5 text-center text-[12px] leading-snug text-amber-900 dark:bg-amber-500/12 dark:text-amber-200">
+          <p className="mt-2.5 rounded-2xl bg-amber-50 px-3.5 py-2.5 text-center text-xs leading-snug text-amber-900 dark:bg-amber-500/12 dark:text-amber-200">
             {medNome
               ? `${medNome} ainda não cadastrou um telefone no app. Use o 192 ou o 193 acima.`
               : medicoIndefinido
@@ -908,9 +980,9 @@ export function EmergencySheet({
           href="tel:188"
           className="press mt-3 flex items-center gap-3 rounded-2xl bg-card px-3.5 py-3 ring-1 ring-black/5"
         >
-          <span className="text-2xl leading-none" aria-hidden>
-            ❤️
-          </span>
+          {/* O coração da família do app (o mesmo da Saúde), no lugar do ❤️ —
+              era o único emoji que sobrava numa tela em que tudo é desenhado. */}
+          <img src={icCoracao} alt="" aria-hidden className="h-9 w-9 shrink-0 object-contain" />
           <span className="min-w-0 flex-1">
             <span className="block text-[13px] leading-snug text-foreground">
               <strong className="font-bold">CVV:</strong> apoio emocional gratuito, 24h, sigiloso.
@@ -967,7 +1039,12 @@ export function EmergencySheet({
             </div>
             <dl className="min-w-0 flex-1 space-y-1 text-xs">
               <Row label="Sangue" value={info.bloodType} />
-              <Row label="Alergias" value={info.allergies || "nenhuma informada"} />
+              {/* ⚠️ "NENHUMA" É UMA AFIRMAÇÃO, e quem a lê é o socorrista.
+                  Enquanto o perfil não chegou, o valor é DESCONHECIDO. */}
+              <Row
+                label="Alergias"
+                value={fichaResolvida ? info.allergies || "nenhuma informada" : "carregando…"}
+              />
               <Row label="Semana" value={info.weekLabel} />
               <Row label="Contato" value={info.emergencyContact} />
             </dl>
@@ -978,7 +1055,10 @@ export function EmergencySheet({
               <dl className="mt-3 space-y-1 border-t border-border pt-3 text-xs">
                 {info.babyName && <Row label="Bebê" value={info.babyName} />}
                 <Row label="DPP" value={info.dpp} />
-                <Row label="Medicamentos" value={info.medications || "nenhum"} />
+                <Row
+                  label="Medicamentos"
+                  value={fichaResolvida ? info.medications || "nenhum" : "carregando…"}
+                />
                 <Row label="Tel. emergência" value={info.emergencyPhone} />
                 {medNome && (
                   <Row label="Médico" value={medCrm ? `${medNome} · ${medCrm}` : medNome} />
@@ -996,8 +1076,11 @@ export function EmergencySheet({
             </button>
           )}
 
-          {(!info.bloodType || !info.emergencyContact) && (
-            <p className="mt-3 text-[11px] text-amber-600 dark:text-amber-400">
+          {/* ⚠️ Só quando o perfil JÁ CHEGOU: durante o carregamento isto
+              acusava a paciente de não ter preenchido o que está preenchido há
+              meses — e no pior momento para receber uma cobrança. */}
+          {fichaResolvida && (!info.bloodType || !info.emergencyContact) && (
+            <p className="mt-3 text-xs text-amber-600 dark:text-amber-400">
               Complete tipo sanguíneo e contato de emergência no seu Perfil para a ficha ficar
               completa.
             </p>
@@ -1036,14 +1119,14 @@ export function EmergencySheet({
             <button
               type="button"
               onClick={onTriagem}
-              className="press mt-3 w-full rounded-2xl border border-border bg-card px-4 py-3 text-sm font-semibold text-foreground"
+              className="press mt-3 w-full rounded-2xl card-material px-4 py-3 text-sm font-semibold text-foreground"
             >
               Não tenho certeza — avaliar meus sintomas
             </button>
           )}
         </div>
 
-        <p className="mt-4 text-center text-[11px] text-muted-foreground">
+        <p className="mt-4 text-center text-xs text-muted-foreground">
           Orientação geral — não substitui a avaliação do seu médico.
         </p>
       </div>

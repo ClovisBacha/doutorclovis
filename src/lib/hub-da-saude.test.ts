@@ -22,6 +22,15 @@ import { readFileSync } from "node:fs";
 import { RED_SYMPTOMS } from "./triage";
 
 const conta = readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8");
+/**
+ * ⚠️ A tela de peso/pressão/glicemia saiu de `minha-conta.tsx` para
+ * `src/components/health-tab.tsx` (set/2026), para poder ganhar bancada — e
+ * três catracas ficaram vermelhas só porque o CAMINHO mudou. Quinta vez nesta
+ * leva; a garantia não mudou uma linha em nenhuma delas.
+ */
+const saude = readFileSync("src/components/health-tab.tsx", "utf8");
+/** As duas juntas, para as buscas que não se importam com o arquivo. */
+const contaESaude = conta + "\n" + saude;
 
 /** O bloco do `HUB_SAUDE`, do abre-colchete até o fecha. */
 const gradeDaSaude = (() => {
@@ -49,8 +58,14 @@ describe("o que a grade da Saúde oferece", () => {
 
   test("os atalhos abrem a tela REAL, e não uma cópia", () => {
     /* Duas implementações de contagem de chutes divergiriam no primeiro
-       conserto. Os ladrilhos apontam para `Registros` com a sub-tela. */
-    expect(gradeDaSaude).toContain('destino: "Registros"');
+       conserto. Os ladrilhos apontam para o hub dos registros com a sub-tela.
+
+       ⚠️ A aba mudou de NOME em set/2026 ("Registros" → "Meu dia a dia", para
+       unir diário, chutes, contrações e linha do tempo debaixo de um nome que
+       não colide com a lista de medições da Saúde nem com o "Registros" do
+       painel do médico). O rótulo É a chave da aba, então esta asserção
+       acompanha — o que ela garante continua sendo o VÍNCULO. */
+    expect(gradeDaSaude).toContain('destino: "Meu dia a dia"');
     expect(gradeDaSaude).toContain('subDestino: "chutes"');
     expect(gradeDaSaude).toContain('subDestino: "contracoes"');
   });
@@ -76,16 +91,21 @@ describe("o que a grade da Saúde oferece", () => {
        automática requer aplicativo nativo". Trabalho da paciente, decisão de
        ninguém. O que fica proibido é PEDIR de novo — as colunas seguem no
        banco e os valores antigos continuam à mostra na lista de correção. */
-    expect(conta).not.toContain("Adicionar dados do wearable");
-    expect(conta).not.toContain("Como sincronizar com seu dispositivo");
-    expect(conta).not.toContain('label="SpO₂ (%)"');
+    expect(contaESaude).not.toContain("Adicionar dados do wearable");
+    expect(contaESaude).not.toContain("Como sincronizar com seu dispositivo");
+    expect(contaESaude).not.toContain('label="SpO₂ (%)"');
   });
 
   test("a lista de registros continua tendo como APAGAR", () => {
     /* Ela recolheu para deixar de ser a terceira cópia dos mesmos números na
-       mesma tela, mas o × é o único jeito de corrigir quem digitou 1200 em vez
-       de 120 — e o painel do médico pinta a gravidade desses números. */
-    expect(conta).toContain("Ver e corrigir meus registros");
-    expect(conta).toContain('aria-label="Apagar este registro"');
+       mesma tela, mas apagar é o único jeito de corrigir quem digitou 1200 em
+       vez de 120 — e o painel do médico pinta a gravidade desses números.
+
+       ⚠️ A GARANTIA é a CAPACIDADE, nunca a forma dela: o `×` de 8×18 que
+       apagava na hora virou, em set/2026, a linha que ABRE com o apagar de
+       44px dentro (o padrão que chutes e contrações já usavam). A grafia
+       antiga reprovava exatamente esse conserto. */
+    expect(contaESaude).toContain("Ver e corrigir meus registros");
+    expect(contaESaude).toContain("Apagar este registro");
   });
 });

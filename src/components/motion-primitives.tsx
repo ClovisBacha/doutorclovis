@@ -1,4 +1,27 @@
 import { motion, useReducedMotion, type Variants } from "motion/react";
+import { useEffect, useState } from "react";
+
+/**
+ * ⚠️ `useReduzDepoisDeMontar()` NÃO PODE DECIDIR O PRIMEIRO RENDER.
+ *
+ * No servidor ela devolve `false` (não há `matchMedia`); no aparelho de quem
+ * ligou "Reduzir movimento" ela devolve `true` já na primeira pintura. Com a
+ * decisão no render, o servidor mandava `<motion.div style="opacity:0">` e o
+ * cliente montava `<div>` sem estilo — o React acusava atributos divergentes
+ * em TODA aba com `Stagger`, para toda paciente com essa opção do iOS. Medido
+ * na `/preview-bebe-tab`: `reducedMotion: "reduce"` → 1 aviso; sem → 0.
+ *
+ * A régua é a mesma de `podeGravar` (`capacidade-fora-do-render`): o que
+ * depende do aparelho é lido DEPOIS de montar. O primeiro render é igual dos
+ * dois lados; quem pede menos movimento recebe o `<div>` estático um quadro
+ * depois — sem animação no meio, porque `initial` já era opacidade 0.
+ */
+function useReduzDepoisDeMontar(): boolean {
+  const prefere = useReducedMotion();
+  const [montado, setMontado] = useState(false);
+  useEffect(() => setMontado(true), []);
+  return montado && !!prefere;
+}
 import type { ReactNode } from "react";
 
 /**
@@ -26,7 +49,7 @@ export function Reveal({
   delay = 0,
   y = 16,
 }: BaseProps & { delay?: number; y?: number }) {
-  const reduce = useReducedMotion();
+  const reduce = useReduzDepoisDeMontar();
   if (reduce) return <div className={className}>{children}</div>;
   return (
     <motion.div
@@ -56,7 +79,7 @@ const itemVariants: Variants = {
  * Ideal pra telas que a paciente abre — os cards surgem um após o outro.
  */
 export function Stagger({ children, className }: BaseProps) {
-  const reduce = useReducedMotion();
+  const reduce = useReduzDepoisDeMontar();
   if (reduce) return <div className={className}>{children}</div>;
   return (
     <motion.div className={className} variants={containerVariants} initial="hidden" animate="show">
@@ -70,7 +93,7 @@ export function Stagger({ children, className }: BaseProps) {
  * `key` (ex.: a sub-aba atual) pra reanimar a cada troca.
  */
 export function Fade({ children, className }: BaseProps) {
-  const reduce = useReducedMotion();
+  const reduce = useReduzDepoisDeMontar();
   if (reduce) return <div className={className}>{children}</div>;
   return (
     <motion.div
@@ -86,7 +109,7 @@ export function Fade({ children, className }: BaseProps) {
 
 /** Item de um `Stagger`. */
 export function StaggerItem({ children, className }: BaseProps) {
-  const reduce = useReducedMotion();
+  const reduce = useReduzDepoisDeMontar();
   if (reduce) return <div className={className}>{children}</div>;
   return (
     <motion.div className={className} variants={itemVariants}>

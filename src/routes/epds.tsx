@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { nivelDaEpds } from "@/lib/epds";
 import { useState } from "react";
 import { AppCtaBanner } from "@/components/app-cta-banner";
 import { supabase } from "@/integrations/supabase/client";
@@ -135,6 +136,13 @@ const QUESTIONS: EpdsQuestion[] = [
 /* Interpretation                                                       */
 /* ------------------------------------------------------------------ */
 
+/**
+ * ⚠️ **O NÍVEL sai de `nivelDaEpds` (`lib/epds.ts`), e não daqui.** Esta função
+ * decide só o TEXTO da tela. A régua clínica precisou sair deste arquivo
+ * porque ele é uma ROTA: a aba Pós-parto do app faz o mesmo rastreio e não
+ * podia importá-la de um arquivo de rota — e o resultado foi as duas telas
+ * rodando o mesmo questionário com só uma alertando o médico.
+ */
 function interpret(score: number, q10Score: number) {
   if (q10Score > 0) {
     return {
@@ -307,11 +315,11 @@ function EpdsPage() {
                 try {
                   const { data: s } = await supabase.auth.getSession();
                   if (!s.session?.access_token) return;
-                  const level = interpret(totalScore, q10Score).level as
-                    | "baixo"
-                    | "moderado"
-                    | "alto"
-                    | "urgente";
+                  /* ⚠️ A régua vem de `lib/epds.ts` — a MESMA que a aba Pós-parto
+                     usa. O `as` que estava aqui casava a união à mão a partir
+                     de um objeto de TEXTO: bastava alguém mexer no rótulo para
+                     o nível mudar de significado sem o `tsc` reclamar. */
+                  const level = nivelDaEpds(totalScore, q10Score);
                   await saveEpdsLog({
                     data: {
                       accessToken: s.session.access_token,

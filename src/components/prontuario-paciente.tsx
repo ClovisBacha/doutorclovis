@@ -26,6 +26,7 @@ import {
   ESTILO_SINAL,
   baseDePressao,
   sinalGlicemia,
+  sinalPerdaDePeso,
   sinalPressao,
   sinalPressaoComBase,
   type Gravidade,
@@ -38,6 +39,7 @@ import {
   type FichaClinica,
   type Serie,
 } from "@/lib/clinical.functions";
+import { ROTULO_ESPECIE, itensDaLinha, resumo } from "@/lib/linha-do-tempo-clinica";
 import { formataTelefone, linkTel } from "@/lib/telefone";
 import { quando } from "@/lib/quando";
 import { GraficoClinico, daSerie, seriesDePressao } from "./grafico-clinico";
@@ -45,18 +47,6 @@ import { GraficoClinico, daSerie, seriesDePressao } from "./grafico-clinico";
 /* `idadeGestacional` mora em `modo-consulta.ts`. Estava duplicada aqui, e uma
    régua que arredonda em UM dos dois lugares faz a mesma paciente aparecer como
    36s numa tela e 36s6d noutra — e em obstetrícia os dias decidem conduta. */
-
-const ROTULO_ESPECIE: Record<string, string> = {
-  medida: "Medida",
-  sintoma: "Sintomas",
-  emergencia: "SOS",
-  exame: "Exame",
-  contracao: "Contração",
-  humor: "Humor",
-  movimento: "Movimentos",
-  consulta: "Pré-consulta",
-  pergunta: "Pergunta",
-};
 
 /** Um número com a etiqueta da própria régua clínica. */
 function Medida({
@@ -251,6 +241,29 @@ export function ProntuarioPaciente({
     ficha.pesoPreGestacional != null && peso.ultimo != null
       ? Math.round((peso.ultimo - Number(ficha.pesoPreGestacional)) * 10) / 10
       : null;
+  /**
+   * ⚠️ **O CARTÃO DE PESO AFIRMAVA "NORMAL" SOBRE UMA PERDA DE 5%.**
+   *
+   * Ele cravava `gravidade="normal"` sempre que houvesse os dois números — e o
+   * "normal" aqui é COR, na tela em que o médico decide. Uma paciente que caiu
+   * de 62 para 55 kg aparecia com "−6,8 kg na gestação" em cinza neutro, ao
+   * lado de uma pressão em âmbar. É a mesma família da glicemia que o prompt
+   * dizia estar "dentro do alvo": o app não estava calando um sinal, estava
+   * AFIRMANDO o contrário dele.
+   *
+   * `sinalPerdaDePeso` já existia em `sinais-clinicos.ts` — o limite mora lá e
+   * em nenhum outro lugar — e tinha **um leitor só: o prompt da
+   * nutricionista**. O médico nunca via.
+   *
+   * ⚠️ Os DOIS portões são do CHAMADOR, e a régua declara isso no cabeçalho: no
+   * luto e depois do parto o corpo perde peso, e é esperado. Marcar isso na tela
+   * clínica ensinaria a ignorar o sinal — que é o pior desfecho possível para
+   * um alarme.
+   */
+  const perda =
+    ficha.modoCuidado || ficha.jaPariu
+      ? null
+      : sinalPerdaDePeso(peso.ultimo, ficha.pesoPreGestacional);
 
   return (
     <div className="space-y-5">
@@ -409,8 +422,24 @@ export function ProntuarioPaciente({
             <Medida
               rotulo="Peso"
               valor={peso.ultimo != null ? `${peso.ultimo} kg` : "—"}
-              nota={ganho != null ? `${ganho > 0 ? "+" : ""}${ganho} kg na gestação` : undefined}
-              gravidade={ganho != null ? "normal" : undefined}
+              /* A perda VENCE o ganho: são a mesma pergunta, e a nota dela já
+                 traz os quilos e a porcentagem. Sem perda, o texto de sempre. */
+              nota={
+                perda?.gravidade === "atencao"
+                  ? perda.nota
+                  : ganho != null
+                    ? /* ⚠️ "na gestação" MENTE para quem já pariu, e a foto do
+                         estado de pós-parto mostrou isto: "−6,8 kg na gestação"
+                         numa puérpera. O número é o mesmo; o que muda é o que
+                         ele descreve. */
+                      `${ganho > 0 ? "+" : ""}${ganho} kg ${
+                        ficha.jaPariu ? "desde antes da gestação" : "na gestação"
+                      }`
+                    : undefined
+              }
+              gravidade={
+                perda?.gravidade === "atencao" ? "atencao" : ganho != null ? "normal" : undefined
+              }
             />
             <Medida
               rotulo="Registros"
@@ -470,34 +499,36 @@ export function ProntuarioPaciente({
             </p>
           ) : (
             <ul className="mt-2 space-y-1.5">
-              {eventos.slice(0, 40).map((e) => (
-                <li
-                  key={`${e.fonte}-${e.fonte_id}`}
-                  className="flex items-start gap-3 rounded-2xl border border-border bg-card p-3"
-                >
-                  <span
-                    aria-hidden
-                    className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
-                      e.gravidade === "grave"
-                        ? "bg-rose-500"
-                        : e.gravidade === "atencao"
-                          ? "bg-amber-500"
-                          : "bg-muted-foreground/30"
-                    }`}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                      {ROTULO_ESPECIE[e.especie] ?? e.especie} · {quando(e.ocorrido_em)}
-                    </p>
-                    <p className="mt-0.5 text-[13px] leading-snug text-foreground">{resumo(e)}</p>
-                    {e.texto && (
-                      <p className="mt-0.5 line-clamp-3 text-[12px] leading-snug text-muted-foreground">
-                        {e.texto}
+              {itensDaLinha(eventos)
+                .slice(0, 40)
+                .map((i) => (
+                  <li
+                    key={i.chave}
+                    className="flex items-start gap-3 rounded-2xl border border-border bg-card p-3"
+                  >
+                    <span
+                      aria-hidden
+                      className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
+                        i.gravidade === "grave"
+                          ? "bg-rose-500"
+                          : i.gravidade === "atencao"
+                            ? "bg-amber-500"
+                            : "bg-muted-foreground/30"
+                      }`}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                        {i.rotulo} · {quando(i.em)}
                       </p>
-                    )}
-                  </div>
-                </li>
-              ))}
+                      <p className="mt-0.5 text-[13px] leading-snug text-foreground">{i.resumo}</p>
+                      {i.texto && (
+                        <p className="mt-0.5 line-clamp-3 text-[12px] leading-snug text-muted-foreground">
+                          {i.texto}
+                        </p>
+                      )}
+                    </div>
+                  </li>
+                ))}
             </ul>
           )}
         </div>
@@ -507,50 +538,6 @@ export function ProntuarioPaciente({
 }
 
 /** Uma linha que diz o que aconteceu, sem obrigar o médico a ler um objeto. */
-function resumo(e: EventoClinico): string {
-  const d = e.dados;
-  const partes: string[] = [];
-  if (d.systolic != null && d.diastolic != null) partes.push(`PA ${d.systolic}/${d.diastolic}`);
-  if (d.glucose_mg_dl != null) {
-    partes.push(`glicemia ${d.glucose_mg_dl}${d.momento ? ` (${d.momento})` : ""}`);
-  }
-  if (d.weight_kg != null) partes.push(`peso ${d.weight_kg} kg`);
-  if (d.spo2 != null) partes.push(`SpO₂ ${d.spo2}%`);
-  if (d.heart_rate_bpm != null) partes.push(`FC ${d.heart_rate_bpm} bpm`);
-  if (d.sintomas?.length) partes.push(d.sintomas.join(", "));
-  /* `nivel` CARREGA DOIS VOCABULÁRIOS. A view projeta na mesma chave o `level`
-     de `triage_logs` (vermelho/amarelo/verde) e o de `epds_logs`
-     (baixo/moderado/alto/urgente) — e isto imprimia "triagem urgente" para um
-     rastreio de DEPRESSÃO, nome de outro instrumento. Um EPDS 21 com ideação
-     de autoagressão aparecia no prontuário rotulado como triagem de sintomas.
-
-     A gravidade em si sempre esteve certa (sai de `epds_q10`, não daqui); o que
-     mentia era o rótulo. A fonte desempata. */
-  if (d.nivel) {
-    partes.push(e.fonte === "epds_logs" ? `rastreio ${d.nivel}` : `triagem ${d.nivel}`);
-  }
-  if (d.chutes != null) partes.push(`${d.chutes} movimentos`);
-  if (d.intensidade != null) {
-    partes.push(`intensidade ${d.intensidade}${d.duracao_seg ? ` · ${d.duracao_seg}s` : ""}`);
-  }
-  if (d.nome) partes.push(d.nome);
-  if (d.humor) partes.push(`humor: ${d.humor}`);
-  if (d.epds != null) partes.push(`EPDS ${d.epds}`);
-  if (d.medicamentos) partes.push(`medicações: ${d.medicamentos}`);
-  if (d.emocional) partes.push(`emocional: ${d.emocional}`);
-  if (e.especie === "emergencia") partes.push("acionou o SOS");
-  if (e.especie === "pergunta") partes.push(d.respondida ? "respondida" : "sem resposta");
-  return partes.join(" · ") || (ROTULO_ESPECIE[e.especie] ?? "Registro");
-}
-
-/**
- * O bloco das 13h50.
- *
- * Um valor isolado não decide nada: o que decide é o que ele já sabia contra o
- * que apareceu depois. Sem consulta registrada, este bloco convida a registrar
- * a primeira — porque a alternativa (não mostrar nada) esconde que a
- * funcionalidade existe.
- */
 function MudancasDesdeAConsulta({
   eventos,
   consultas,

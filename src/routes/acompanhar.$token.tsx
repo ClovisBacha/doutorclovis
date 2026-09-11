@@ -14,6 +14,22 @@ import { HeartbeatFeel } from "@/components/heartbeat-feel";
 
 export const Route = createFileRoute("/acompanhar/$token")({
   head: () => ({ meta: [{ title: "Painel do Papai — Obstétrica" }] }),
+  /**
+   * ⚠️ **`?bancada=luto` existe porque esta tela era IMPOSSÍVEL DE OLHAR.**
+   *
+   * Ela nasce de um token de convite: para conferir qualquer coisa aqui era
+   * preciso uma conta de gestante, um convite gerado e o link na mão — e para
+   * conferir o Modo Cuidado, ligar o luto numa conta de verdade. Foi por isso
+   * que o portão de luto ficou meses cobrindo só o batimento enquanto três
+   * abas de gestação continuavam abertas.
+   *
+   * `q.bancada == null` e não `=== undefined`: o router serializa e revalida,
+   * e na segunda passada chega `null` — a armadilha que `preview-saude` e
+   * `preview-jogo` já documentam.
+   */
+  validateSearch: (q: Record<string, unknown>) => ({
+    bancada: q.bancada == null ? "" : String(q.bancada),
+  }),
   component: CompanionView,
 });
 
@@ -105,6 +121,7 @@ function CompanionView() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<PapaiTab>("bebe");
+  const { bancada } = Route.useSearch();
   const [panicEvent, setPanicEvent] = useState<{
     latitude: number | null;
     longitude: number | null;
@@ -115,6 +132,31 @@ function CompanionView() {
   useEffect(() => {
     (async () => {
       try {
+        if (bancada) {
+          /* A bancada injeta o DADO nos MESMOS `useState` da produção, nunca o
+             desenho — é a lição do `?streak=41` da folha da chama. */
+          setProfile({
+            display_name: "Marina Costa",
+            baby_name: "Helena",
+            lmp_date: "2026-02-10",
+            due_date: null,
+            reference_date: null,
+            reference_weeks: null,
+            reference_days: null,
+            fetal_bpm: 146,
+            fetal_bpm_at: "2026-08-01",
+            care_mode: bancada === "luto",
+          } as Profile);
+          if (bancada === "sos") {
+            setPanicEvent({
+              created_at: "2026-08-28T02:14:00.000Z",
+              lat: -23.5613,
+              lng: -46.6565,
+            } as any);
+          }
+          setLoading(false);
+          return;
+        }
         const res = await getCompanionView({ data: { token } });
         if (!res.ok) {
           setErr(
@@ -127,7 +169,7 @@ function CompanionView() {
         setProfile(res.profile);
         setCodigoDeConvite(res.codigoDeConvite ?? null);
       } catch {
-        // Falha de rede: sem isso a tela ficava em "Carregando..." p/ sempre.
+        // Falha de rede: sem isso a tela ficava em "Carregando…" p/ sempre.
         setErr("Não foi possível carregar. Verifique a conexão e recarregue.");
         return;
       } finally {
@@ -146,7 +188,7 @@ function CompanionView() {
   if (loading)
     return (
       <div className="mx-auto max-w-2xl px-5 py-20 text-center text-muted-foreground">
-        Carregando...
+        Carregando…
       </div>
     );
   if (err || !profile)
@@ -175,12 +217,47 @@ function CompanionView() {
   // Reta final (40s+): evita "0 dias para a DPP" perpétuo também pro acompanhante.
   const reta = gest ? retaFinalMensagemFor({ weeks: gest.weeks, dueDate: due }) : null;
 
-  const TABS: { id: PapaiTab; label: string }[] = [
-    { id: "bebe", label: "Bebê" },
-    { id: "apoiar", label: "Apoiar mamãe" },
-    { id: "tarefas", label: "Tarefas" },
-    { id: "parto", label: "Para o parto" },
-  ];
+  /**
+   * ⚠️ **NO MODO CUIDADO SOBRAM AS DUAS ABAS QUE CUIDAM DELA.**
+   *
+   * O portão anterior cobria só o batimento, com o comentário certo ("ele
+   * ouviria o coração de um bebê que não existe mais") e alcance curto: a aba
+   * "Bebê" continuava mostrando o TAMANHO e a descrição da semana, e a aba
+   * "Para o parto" continuava ensinando o que fazer no dia do parto — para o
+   * marido de uma mulher que acabou de perder a gestação, com ela sem estar do
+   * lado para explicar.
+   *
+   * "Apoiar mamãe" e "Tarefas" FICAM, e é a mesma razão que o comentário do
+   * batimento já dava: este painel é a rede de apoio dela, e é por aqui que
+   * entra o contato de emergência. Tirar tudo isolaria as duas pessoas no pior
+   * momento — a diferença é entre parar de falar do bebê e apagar o socorro.
+   */
+  /**
+   * ⚠️ **NO MODO CUIDADO NÃO SOBRA ABA NENHUMA — e isso não é exagero.**
+   *
+   * O portão anterior cobria só o batimento, com o comentário certo ("ele
+   * ouviria o coração de um bebê que não existe mais") e alcance curto. Lendo
+   * as outras três: a aba "Bebê" mostra TAMANHO e descrição da semana; "Para o
+   * parto" ensina o que fazer no dia do parto; e as dicas de "Apoiar mamãe" e
+   * "Tarefas" são todas de gestação — "acompanhe às consultas do pré-natal",
+   * "prepare lanches leves para combater o enjoo matinal".
+   *
+   * Nenhuma delas serve para o marido de uma mulher que acabou de perder a
+   * gestação, com ela sem estar do lado para explicar.
+   *
+   * ⚠️ **O QUE FICA É A EMERGÊNCIA**, e ela já vive FORA das abas: o alerta de
+   * SOS com localização e o botão do SAMU são desenhados antes delas. Era a
+   * razão que o comentário do batimento dava para manter o resto — e ela vale
+   * inteira sem uma única aba de gestação.
+   */
+  const TABS: { id: PapaiTab; label: string }[] = profile.care_mode
+    ? []
+    : [
+        { id: "bebe", label: "Bebê" },
+        { id: "apoiar", label: "Apoiar mamãe" },
+        { id: "tarefas", label: "Tarefas" },
+        { id: "parto", label: "Para o parto" },
+      ];
 
   return (
     <section className="mx-auto max-w-2xl px-5 py-10">
@@ -224,14 +301,24 @@ function CompanionView() {
         </div>
       )}
       {/* Header */}
-      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-        Painel do Papai
-      </p>
+      <p className="font-serif text-[15px] font-semibold text-primary">Painel do Papai</p>
+      {/* ⚠️ **O CABEÇALHO TAMBÉM É CONTEÚDO DE GESTAÇÃO.** No luto ele dizia
+          "Helena de Marina Costa" e, na linha de baixo, "Semana 28 e 3 dias ·
+          81 dias para a DPP" — o nome do bebê e a contagem regressiva para um
+          parto que não vai acontecer, no topo da tela, para quem abrir o link.
+          Foi a BANCADA que mostrou isto: eu tinha gateado as quatro abas e
+          deixado o título em pé. */}
       <h1 className="mt-2 font-serif text-3xl">
-        {profile.baby_name ? `${profile.baby_name} de` : "Bebê de"}{" "}
-        <span className="text-primary">{profile.display_name ?? "—"}</span>
+        {profile.care_mode ? (
+          <span className="text-primary">{profile.display_name ?? "—"}</span>
+        ) : (
+          <>
+            {profile.baby_name ? `${profile.baby_name} de` : "Bebê de"}{" "}
+            <span className="text-primary">{profile.display_name ?? "—"}</span>
+          </>
+        )}
       </h1>
-      {gest && (
+      {gest && !profile.care_mode && (
         <p className="mt-1 text-muted-foreground">
           Semana <strong className="text-foreground">{gest.weeks}</strong>
           {gest.days > 0 && ` e ${gest.days} dias`}
@@ -251,31 +338,57 @@ function CompanionView() {
         </p>
       )}
 
+      {/**
+       * ⚠️ **O TEXTO NÃO CONTA O QUE ACONTECEU, e essa é a decisão difícil.**
+       *
+       * O Modo Cuidado pode ser ligado pelo MÉDICO, e quem tem este link pode
+       * não saber de nada. Um painel que diz "ela perdeu a gestação" seria o
+       * app dando, por ela, a notícia mais íntima que existe — para quem quer
+       * que esteja com o celular na mão.
+       *
+       * Então ele diz o FATO sobre o próprio painel e para aí: as informações
+       * da gestação estão pausadas. Sem motivo, sem emoji de luto, sem
+       * conselho — e sem "está tudo bem", que é a frase que o repositório
+       * proíbe em todo texto sensível.
+       */}
+      {profile.care_mode && (
+        <div className="mt-6 card-material rounded-3xl p-5 text-sm leading-relaxed text-muted-foreground">
+          As informações da gestação estão pausadas neste link.
+          <br />
+          Os avisos de emergência continuam chegando aqui normalmente.
+        </div>
+      )}
+
       {/* Tabs */}
-      <div className="mt-6 flex gap-1 rounded-2xl border border-border bg-secondary/50 p-1">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setActiveTab(t.id)}
-            className={`flex-1 rounded-xl py-2 text-xs font-medium transition-colors ${
-              activeTab === t.id
-                ? "bg-background shadow-sm text-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {TABS.length > 0 && (
+        <div className="mt-6 flex gap-1 rounded-2xl border border-border bg-secondary/50 p-1">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`flex-1 rounded-xl py-2 text-xs font-medium transition-colors ${
+                activeTab === t.id
+                  ? "bg-background shadow-sm text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="mt-6">
         {/* Tab: Bebê */}
-        {activeTab === "bebe" && gest && baby && (
+        {/* ⚠️ O portão é repetido no CORPO, e não só na fita de abas: a aba
+            inicial é `"bebe"` no `useState`, então sem esta condição o painel
+            ABRIRIA na aba do bebê mesmo com ela fora da fita. */}
+        {activeTab === "bebe" && !profile.care_mode && gest && baby && (
           <div className="space-y-4">
             <div className="rounded-3xl bg-gradient-to-br from-primary/10 to-secondary/30 p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-primary">Esta semana</p>
+                  <p className="font-serif text-[15px] font-semibold text-primary">Esta semana</p>
                   <p className="mt-1 font-serif text-4xl">
                     {gest.weeks}
                     <span className="ml-1 text-xl text-muted-foreground">sem</span>
@@ -325,7 +438,7 @@ function CompanionView() {
             )}
 
             {due && (
-              <div className="rounded-2xl border border-border bg-card p-4 text-sm">
+              <div className="card-material rounded-2xl p-4 text-sm">
                 <p className="text-muted-foreground">Data Provável do Parto</p>
                 <p className="mt-1 font-serif text-xl">
                   {new Date(due + "T00:00:00").toLocaleDateString("pt-BR", {
@@ -350,9 +463,9 @@ function CompanionView() {
         )}
 
         {/* Tab: Apoiar mamãe */}
-        {activeTab === "apoiar" && (
+        {activeTab === "apoiar" && !profile.care_mode && (
           <div className="space-y-4">
-            <div className="rounded-3xl border border-border bg-card p-5">
+            <div className="card-material rounded-3xl p-5">
               <p className="font-serif text-lg">Apoio emocional</p>
               <ul className="mt-3 space-y-2">
                 {tips.emotional.map((tip, i) => (
@@ -363,7 +476,7 @@ function CompanionView() {
                 ))}
               </ul>
             </div>
-            <div className="rounded-3xl border border-border bg-card p-5">
+            <div className="card-material rounded-3xl p-5">
               <p className="font-serif text-lg">Suporte físico</p>
               <ul className="mt-3 space-y-2">
                 {tips.physical.map((tip, i) => (
@@ -378,7 +491,7 @@ function CompanionView() {
         )}
 
         {/* Tab: Tarefas */}
-        {activeTab === "tarefas" && (
+        {activeTab === "tarefas" && !profile.care_mode && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
               Tarefas práticas recomendadas para o {trimester}º trimestre.
@@ -392,9 +505,9 @@ function CompanionView() {
         )}
 
         {/* Tab: Para o parto */}
-        {activeTab === "parto" && (
+        {activeTab === "parto" && !profile.care_mode && (
           <div className="space-y-4">
-            <div className="rounded-3xl border border-border bg-card p-5">
+            <div className="card-material rounded-3xl p-5">
               <p className="font-serif text-lg">No dia do parto</p>
               <ul className="mt-3 space-y-3">
                 {PARTO_TIPS.map((tip, i) => (
@@ -446,7 +559,7 @@ function TaskItem({ label }: { label: string }) {
       }`}
     >
       <span
-        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 ${done ? "border-emerald-500 bg-emerald-500 text-white" : "border-muted-foreground"}`}
+        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 ${done ? "border-emerald-500 bg-emerald-700 text-white" : "border-muted-foreground"}`}
       >
         {done && "✓"}
       </span>

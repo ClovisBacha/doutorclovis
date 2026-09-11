@@ -32,6 +32,7 @@ import {
   rotuloDeVotos,
   TEMAS_DA_AULA,
   temaDoDia,
+  type ContagemDeReacoes,
 } from "./rede-social";
 
 function perfil(p: Partial<Perfil> = {}): Perfil {
@@ -273,7 +274,48 @@ describe("aoReagir", () => {
   });
 });
 
-describe("contagem de reações", () => {});
+describe("contagem de reações", () => {
+  /**
+   * ⚠️ **ESTE `describe` ESTAVA VAZIO — literalmente `() => {}`.**
+   *
+   * `totalDeReacoes` era importado no topo do arquivo e não aparecia em
+   * asserção nenhuma. Mutando o corpo dela para `return 0`, a suíte inteira
+   * ficava verde.
+   *
+   * E o efeito na tela é maior que "um número errado": o total governa DUAS
+   * condições do cartão (`total > 0 && souAAutora && aoVerQuemReagiu` e o
+   * ramo do resumo). Com zero, **a linha de emojis some inteira** e o botão de
+   * "quem reagiu" desaparece — a autora perde o único caminho para ver quem
+   * respondeu ao post dela.
+   */
+  test("soma todos os tipos", () => {
+    expect(totalDeReacoes({ amei: 3, abraco: 2, forca: 1 })).toBe(6);
+  });
+
+  test("contagem vazia é zero", () => {
+    expect(totalDeReacoes({})).toBe(0);
+  });
+
+  test("⚠️ conta os TREZE tipos, e não uma fatia deles", () => {
+    /* Uma soma que esquecesse um tipo faria o resumo sumir de todo post que só
+       recebeu aquele — e ninguém saberia qual. */
+    const uma = Object.fromEntries(REACOES.map((r) => [r.tipo, 1])) as ContagemDeReacoes;
+    expect(totalDeReacoes(uma)).toBe(REACOES.length);
+  });
+
+  test("⚠️ ignora chave que não é reação conhecida", () => {
+    /* A contagem vem do banco. Um `tipo` fora do catálogo — porque alguém
+       acrescentou no SQL e não no TypeScript — não pode inflar o número. */
+    expect(totalDeReacoes({ amei: 2, inventado: 99 } as unknown as ContagemDeReacoes)).toBe(2);
+  });
+
+  test("⚠️ e o zero é DIFERENTE do ausente na tela", () => {
+    /* Não é sobre a função: é o contrato que ela sustenta. `total > 0` é o que
+       decide se a linha do resumo existe — por isso a soma precisa ser exata. */
+    expect(totalDeReacoes({ amei: 0 })).toBe(0);
+    expect(totalDeReacoes({ amei: 1 })).toBe(1);
+  });
+});
 
 /* ─── 7 · AVISOS ────────────────────────────────────────────────────────── */
 

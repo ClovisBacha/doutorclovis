@@ -26,6 +26,7 @@ import { computeGestation } from "./gestacao";
 import {
   piorSinal,
   sinalGlicemia,
+  sinalMovimentosReduzidos,
   sinalPressao,
   sinalSaturacao,
   type Gravidade,
@@ -70,6 +71,19 @@ export type DadosEvento = {
   intensidade?: number | null;
   duracao_seg?: number | null;
   chutes?: number | null;
+  /* ⚠️ A FORÇA DO MOVIMENTO (1 mais fraco · 2 como sempre · 3 mais forte).
+     Ela é escrita por `kick_sessions.strength` e projetada pela view; sem este
+     campo o dado chegava ao painel e era DESCARTADO no caminho — a coluna
+     escrita e nunca lida que este repositório já pagou meia dúzia de vezes.
+     Heazell 2017: redução de FORÇA tem aOR 2,53 para natimortalidade, contra
+     2,97 da frequência. É quase o mesmo peso, e o médico só via a frequência. */
+  forca?: number | null;
+  /* ⚠️ A DURAÇÃO DA SESSÃO DE MOVIMENTOS, em minutos. Ela é o dado clínico —
+     o que se mede é o TEMPO ATÉ 10 MOVIMENTOS —, e sem ela "4 movimentos" no
+     prontuário é indistinguível de uma sessão de cinco minutos E do alarme
+     vermelho que a tela dela mostra a partir de duas horas. É por ela que a
+     régua de movimentos reduzidos passa a valer também do lado do médico. */
+  duracao_min?: number | null;
   humor?: string | null;
   epds?: number | null;
   epds_q10?: number | null;
@@ -104,7 +118,10 @@ const COLS = "fonte,fonte_id,user_id,ocorrido_em,especie,dados,texto";
    é ela que ordena a fila do médico, e ordenar por média esconderia justamente
    o caso que não pode esperar.
    ──────────────────────────────────────────────────────────────────────────── */
-function avaliar(especie: EspecieEvento, d: DadosEvento): { g: Gravidade; notas: string[] } {
+/* Exportada para o teste alcançá-la — a régua da gravidade é o que decide a
+   cor da linha no prontuário, e ela precisa ser exercitada com dado, não lida
+   como texto. */
+export function avaliar(especie: EspecieEvento, d: DadosEvento): { g: Gravidade; notas: string[] } {
   const sinais: (Sinal | null)[] = [
     sinalPressao(d.systolic, d.diastolic),
     sinalGlicemia(d.glucose_mg_dl),
@@ -126,6 +143,36 @@ function avaliar(especie: EspecieEvento, d: DadosEvento): { g: Gravidade; notas:
     sinais.push({ gravidade: "grave", nota: `EPDS ${d.epds} — rastreio positivo` });
   } else if (d.epds != null && d.epds >= 10) {
     sinais.push({ gravidade: "atencao", nota: `EPDS ${d.epds}` });
+  }
+
+  /* ⚠️ **A NOITE DO ALARME CHEGA AO MÉDICO.** A paciente que conta duas horas
+     e não chega a dez lê, na tela dela, um cartão vermelho com o 192 — e o
+     prontuário mostrava a mesma linha cinzenta de qualquer outra noite.
+     Redução de movimentos fetais é um dos NOVE SINTOMAS VERMELHOS de
+     `triage.ts`; chegando por esta porta, ela ficava sem cor.
+
+     ⚠️ A RÉGUA É A ÚNICA (`sinais-clinicos.ts`), e o que muda é a VOZ: a nota
+     dela é escrita PARA A PACIENTE ("Ligue para o seu médico agora"), e
+     repeti-la aqui seria o app mandando o médico ligar para o médico dele. É o
+     mesmo que este bloco já faz com a triagem e o EPDS — a classificação vem
+     de lá, a frase é a desta tela.
+
+     ⚠️ E `semanas: null` de propósito: a semana que se tem aqui é a de HOJE, e
+     uma sessão de dois meses atrás aconteceu noutra. A própria régua declara
+     que os dois limites (dez movimentos, duas horas) não dependem da semana —
+     ela só decide quando a contagem COMEÇA. */
+  if (especie === "movimento") {
+    const reduzido = sinalMovimentosReduzidos({
+      semanas: null,
+      movimentos: d.chutes,
+      minutos: d.duracao_min,
+    });
+    if (reduzido) {
+      sinais.push({
+        gravidade: reduzido.gravidade,
+        nota: `${d.chutes} movimentos em ${d.duracao_min} min de contagem`,
+      });
+    }
   }
 
   // SOS é emergência por definição: ela apertou o botão.
@@ -551,6 +598,17 @@ export type FichaClinica = {
   riscos: string[];
   observacoesPrevias: string | null;
   modoCuidado: boolean;
+  /**
+   * ⚠️ Ela já teve o bebê. Existe para GATEAR a régua de perda de peso: depois
+   * do parto o corpo perde peso, e é esperado — flagrar isso na tela clínica
+   * ensinaria o médico a ignorar o sinal. `sinalPerdaDePeso` declara no
+   * cabeçalho que quem gateia é o chamador.
+   *
+   * ⚠️ `gestDias` NÃO responde a esta pergunta: `computeGestation` conta para
+   * sempre (com teto em 42 semanas), então uma puérpera de duas semanas aparece
+   * como "41s" e não como alguém que pariu.
+   */
+  jaPariu: boolean;
   /** O banco não tinha as colunas do perfil rico: campos ausentes são
       DESCONHECIDOS, não vazios. */
   degradada: boolean;
@@ -560,7 +618,23 @@ const PERFIL_COLS =
   "display_name,baby_name,lmp_date,due_date,reference_date,reference_weeks,reference_days," +
   "pregnancy_number,prior_bp_elevated,prior_bp_week,prior_gestational_diabetes,prior_preterm," +
   "prior_cesarean,prior_notes,blood_type,allergies,medications,height_cm," +
-  "pre_pregnancy_weight_kg,emergency_contact,emergency_phone,care_mode,phone";
+  "pre_pregnancy_weight_kg,emergency_contact,emergency_phone,care_mode,phone,birth_date";
+
+/**
+ * ⚠️ **UM DEGRAU SÓ PARA `birth_date`, e ele é DERIVADO por remoção.**
+ *
+ * A coluna nasceu numa migration posterior às do perfil rico. Sem este degrau,
+ * um banco que ainda não a tem devolveria `42703` para a consulta INTEIRA e a
+ * ficha cairia direto no mínimo: alergias, medicações e a história de risco
+ * viravam DESCONHECIDAS por causa de uma coluna que a tela usa só para saber se
+ * a paciente já pariu. É a forma mais cara de defeito deste repositório — a
+ * coluna nova apagando o recurso antigo.
+ *
+ * ⚠️ E `degradada` NÃO acende aqui: o que falta é o dado do nascimento, e não o
+ * perfil. Acender faria a ficha inteira gritar "desconhecida" sobre campos que
+ * chegaram inteiros.
+ */
+const PERFIL_SEM_NASCIMENTO = PERFIL_COLS.replace(",birth_date", "");
 
 /**
  * Dias de gestação hoje.
@@ -614,8 +688,13 @@ export const fichaClinica = createServerFn({ method: "POST" })
        uma coluna ausente apagaria a ficha toda em vez de um campo. */
     let perfil: Record<string, unknown> | null = null;
     let degradada = false;
-    for (const cols of [PERFIL_COLS, "display_name,baby_name,lmp_date,due_date"]) {
-      if (cols !== PERFIL_COLS) degradada = true;
+    for (const cols of [
+      PERFIL_COLS,
+      PERFIL_SEM_NASCIMENTO,
+      "display_name,baby_name,lmp_date,due_date",
+    ]) {
+      /* Só o degrau MÍNIMO é "degradada" — ver `PERFIL_SEM_NASCIMENTO`. */
+      if (cols !== PERFIL_COLS && cols !== PERFIL_SEM_NASCIMENTO) degradada = true;
       const { data: row, error } = await sb
         .from("patient_profiles")
         .select(cols)
@@ -660,6 +739,11 @@ export const fichaClinica = createServerFn({ method: "POST" })
       riscos,
       observacoesPrevias: (perfil.prior_notes as string) ?? null,
       modoCuidado: !!perfil.care_mode,
+      /* Sem a coluna (degrau acima) o campo nem vem: "não sei" vale NÃO PARIU,
+         que é o lado que mantém a régua de perda de peso ligada. O falso
+         positivo aqui é um sinal a mais numa puérpera; o falso negativo é uma
+         perda de 5% calada numa gestante. */
+      jaPariu: !!perfil.birth_date,
       /* Sem isto a ficha reduzida era indistinguível de uma paciente sem
          alergias e sem história de risco — a tela afirmando o oposto por
          omissão, numa gestante com pré-eclâmpsia anterior. */
@@ -881,14 +965,15 @@ export const salvarConsulta = createServerFn({ method: "POST" })
         achados: z.string().max(8000).optional(),
         conduta: z.string().max(8000).optional(),
         resumoPaciente: z.string().max(4000).optional(),
-        /* As faixas repetem as de `sinais-clinicos.ts` e as do CHECK do banco.
-           Validar aqui é o que faz o médico ver "a diastólica precisa ficar
-           entre 20 e 200" em vez do erro genérico do Postgres. */
-        systolic: z.number().int().min(50).max(300).nullable().optional(),
-        diastolic: z.number().int().min(20).max(200).nullable().optional(),
-        pesoKg: z.number().min(25).max(350).nullable().optional(),
-        alturaUterinaCm: z.number().min(5).max(60).nullable().optional(),
-        bpmFetal: z.number().int().min(60).max(220).nullable().optional(),
+        /* ⚠️ SÓ PISO, NENHUM TETO (set/2026) — a mesma decisão de
+           `sinais-clinicos.ts` e dos CHECKs do banco. O piso continua porque
+           zero e negativo não são medida; o teto saiu porque plausibilidade
+           chutada recusa o número de uma paciente real. */
+        systolic: z.number().int().min(50).nullable().optional(),
+        diastolic: z.number().int().min(20).nullable().optional(),
+        pesoKg: z.number().positive().nullable().optional(),
+        alturaUterinaCm: z.number().positive().nullable().optional(),
+        bpmFetal: z.number().int().min(60).nullable().optional(),
       })
       .parse(i),
   )
@@ -953,6 +1038,13 @@ export const salvarConsulta = createServerFn({ method: "POST" })
         // Índice único: a mesma consulta já foi registrada.
         if (code === "23505") {
           return { ok: false as const, id: null, motivo: "duplicada" as const };
+        }
+        /* ⚠️ O DEPLOY CHEGA ANTES DO SQL, SEMPRE — é o estado normal desta
+           produção. Nessa janela o app aceita um peso de 400 kg e o banco o
+           recusa pelo CHECK antigo (23514). "Confira os valores" seria conselho
+           errado: o número está certo, e repetir falha para sempre. */
+        if (code === "23514") {
+          return { ok: false as const, id: null, motivo: "teto_antigo_no_banco" as const };
         }
         return { ok: false as const, id: null };
       }
@@ -1150,7 +1242,19 @@ export const emissoesDaPaciente = createServerFn({ method: "POST" })
     z.object({ accessToken: z.string().min(10), pacienteId: z.string().uuid() }).parse(i),
   )
   .handler(async ({ data }) => {
-    const vazio = { ok: true as const, emissoes: [] as Emissao[] };
+    /* ⚠️ **`degradado` EXISTE PORQUE LISTA VAZIA ERA UMA AFIRMAÇÃO.**
+     *
+     * `if (error) return vazio` fazia "não consegui ler" chegar à tela como
+     * "ele não emitiu nada para ela" — e a tela, com um `ok: true` na mão, não
+     * tinha como saber a diferença. Num cartão clínico isso vale uma receita
+     * repetida ou um exame pedido duas vezes, na consulta em que ele acabou de
+     * abrir a ficha dela para decidir.
+     *
+     * ⚠️ E o campo NÃO é `ok: false`: aquilo já quer dizer "não é sua paciente"
+     * ou "sessão inválida", e a tela responde a isso escondendo o bloco. Um
+     * booleano fazendo dois trabalhos é o defeito que a tela de assinatura já
+     * pagou aqui. */
+    const vazio = { ok: true as const, emissoes: [] as Emissao[], degradado: false };
     const user = await medicoDaSessao(data.accessToken);
     if (!user) return { ...vazio, ok: false as const };
     const pacientes = await pacientesAtuais(user.id);
@@ -1164,9 +1268,10 @@ export const emissoesDaPaciente = createServerFn({ method: "POST" })
         .eq("doctor_id", user.id)
         .order("created_at", { ascending: false })
         .limit(50);
-      if (error) return vazio;
+      if (error) return { ...vazio, degradado: true };
       return {
         ok: true as const,
+        degradado: false,
         emissoes: ((rows ?? []) as Record<string, unknown>[]).map((r) => ({
           id: String(r.id),
           user_id: String(r.user_id),
@@ -1180,7 +1285,7 @@ export const emissoesDaPaciente = createServerFn({ method: "POST" })
         })),
       };
     } catch {
-      return vazio;
+      return { ...vazio, degradado: true };
     }
   });
 
