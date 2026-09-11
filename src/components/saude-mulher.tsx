@@ -19,6 +19,7 @@ import { CicloMenstrualTab } from "@/components/ciclo-menstrual-tab";
 import { Fade } from "@/components/motion-primitives";
 import { NaoConsegueLer } from "@/components/nao-consegui-ler";
 import { TabSkeleton } from "@/components/tab-skeleton";
+import { diasAte, frasePrazo, proximaData, statusDoExame } from "@/lib/preventivos";
 import { supabase } from "@/integrations/supabase/client";
 import {
   getPreventiveReminders,
@@ -220,13 +221,6 @@ const PREVENTIVE_EXAMS: ExamDef[] = [
   },
 ];
 
-function nextDueDate(lastDone: string | null, frequencyMonths: number): Date | null {
-  if (!lastDone) return null;
-  const d = new Date(lastDone + "T00:00:00");
-  d.setMonth(d.getMonth() + frequencyMonths);
-  return d;
-}
-
 export function PreventivosTab({
   bancada,
 }: {
@@ -319,17 +313,10 @@ export function PreventivosTab({
   // Group: overdue, due soon (within 60 days), ok
   const examGroups = PREVENTIVE_EXAMS.map((exam) => {
     const r = reminderMap[exam.key];
-    const nextDue = r?.last_done_date ? nextDueDate(r.last_done_date, exam.frequencyMonths) : null;
-    const daysUntil = nextDue ? Math.round((nextDue.getTime() - today.getTime()) / 86400000) : null;
-    let status: "overdue" | "soon" | "ok" | "never" = "never";
-    if (r?.last_done_date) {
-      if (daysUntil !== null) {
-        if (daysUntil < 0) status = "overdue";
-        else if (daysUntil <= 60) status = "soon";
-        else status = "ok";
-      }
-    }
-    return { exam, r, nextDue, daysUntil, status };
+    /* A régua inteira mora em `preventivos.ts` — aqui só se desenha. */
+    const nextDue = proximaData(r?.last_done_date ?? null, exam.frequencyMonths);
+    const daysUntil = nextDue ? diasAte(nextDue, today) : null;
+    return { exam, r, nextDue, daysUntil, status: statusDoExame(daysUntil) };
   });
 
   const overdueCount = examGroups.filter((e) => e.status === "overdue").length;
@@ -423,11 +410,7 @@ export function PreventivosTab({
                                   : "text-green-700"
                             }
                           >
-                            {daysUntil < 0
-                              ? `(${Math.abs(daysUntil)} dias em atraso)`
-                              : daysUntil === 0
-                                ? "(hoje)"
-                                : `(em ${daysUntil} dias)`}
+                            {frasePrazo(daysUntil)}
                           </span>
                         )}
                       </p>

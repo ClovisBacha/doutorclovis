@@ -78,7 +78,11 @@ describe("a grade da Saúde usa a régua", () => {
   })();
 
   test("⚠️ o dia do registro sai do INSTANTE, nunca de um corte de string", () => {
-    expect(BLOCO).toContain("quandoFoi(chutes.started_at");
+    /* ⚠️ A GARANTIA é "quem decide o dia é `quandoFoi` sobre um `started_at`",
+       e nunca o NOME da variável: o bloco passou a ler a última contagem das
+       duas fontes (servidor e fila local), e a grafia `chutes.started_at`
+       reprovava um conserto que só ampliou o que ele enxerga. */
+    expect(BLOCO).toMatch(/quandoFoi\(\w+\.started_at/);
     /* A forma exata do defeito. */
     expect(BLOCO).not.toContain("slice(0, 10)");
   });
@@ -114,8 +118,7 @@ describe("o bloco da Saúde não afirma atualidade sobre dado velho — sem escr
   });
 
   test("e o filtro de recência dos chutes continua sendo `quandoFoi`", () => {
-    expect(BLOCO).toMatch(
-      /const quando = quandoFoi\(chutes\.started_at, agora\);\s*d\["chutes"\] = quando \?/,
-    );
+    expect(BLOCO).toMatch(/const quando = quandoFoi\(\w+\.started_at, agora\);/);
+    expect(BLOCO).toMatch(/d\["chutes"\] = quando\s*\?/);
   });
 });

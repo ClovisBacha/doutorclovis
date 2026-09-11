@@ -54,7 +54,14 @@ describe("a tela obedece à régua, e a aba diz a verdade sobre o parto", () => 
   test("⚠️ o anel e o calendário passam pela régua de idade, não só pela bandeira", () => {
     expect(TELA).toMatch(/historicoVelho = model != null && !previsaoAindaVale\(model\.lastStart/);
     expect(TELA).toMatch(/mostraPrevisao = model != null && !gestante && !historicoVelho/);
-    expect(TELA).toContain("!mostraPrevisao ? null : model ?");
+    /* ⚠️ A GARANTIA é que o anel esteja atrás dos TRÊS termos, e não a grafia
+       do ternário: em set/2026 a condição passou de `!mostraPrevisao` para os
+       termos soltos, porque `!mostraPrevisao` também barrava o CONVITE de quem
+       nunca registrou — que era, por construção, inalcançável. */
+    const cond = TELA.match(/\n\s*gestante \|\|[^?]*\?/)?.[0] ?? "";
+    expect(cond).toContain("gestante");
+    expect(cond).toContain("historicoVelho");
+    expect(cond).toContain("instavel");
   });
 
   test("⚠️ 'gestante' é gestação SEM nascimento — senão a previsão nunca volta", () => {

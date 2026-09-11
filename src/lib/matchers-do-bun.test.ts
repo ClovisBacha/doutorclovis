@@ -72,6 +72,21 @@ describe("⚠️ matchers que quebram o tsc da CI", () => {
       if (/\bexpect\([^()[\]{}]*,\s*[`"']/.test(codigo)) {
         culpados.push(arquivo + " → recado como segundo argumento do " + "expect");
       }
+      /* ⚠️ **E `it` NÃO É EXPORTADO NOS TIPOS DO `bun:test`** — só `test`. O
+         `bun test` roda normalmente (o runtime tem os dois), e o `tsc` da CI
+         reprova com `TS2305: Module 'bun:test' has no exported member`. É a
+         terceira forma da mesma armadilha, e ela me pegou em set/2026 num
+         arquivo novo, com o portão local já verde nas outras duas.
+
+         A busca é pelo IMPORT, e não pela chamada: `it(` aparece dentro de
+         palavras comuns, e o que quebra o `tsc` é justamente a linha do import.
+         O nome é montado por concatenação pela mesma razão das outras. */
+      const imports = codigo.match(/import\s*\{([^}]*)\}\s*from\s*["']bun:test["']/g) ?? [];
+      for (const linha of imports) {
+        if (new RegExp("\\b" + "i" + "t\\b").test(linha)) {
+          culpados.push(arquivo + " → importa " + "i" + "t de bun:test (use test)");
+        }
+      }
     }
     expect(culpados).toEqual([]);
   });

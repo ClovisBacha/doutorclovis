@@ -408,7 +408,22 @@ export function CicloMenstrualTab({
           período abaixo para ver o anel de fases, a janela fértil e a previsão
           do próximo ciclo" — a promessa exata que o aviso acima acabou de
           dizer que está pausada, duas frases se contradizendo na mesma tela. */
-        !mostraPrevisao ? null : model ? (
+        /* ⚠️ **O CONVITE ERA CÓDIGO MORTO.** A condição de fora era
+           `!mostraPrevisao`, e `mostraPrevisao` já exige `model != null` — ou
+           seja, o ramo do `else` (que é justamente o de quem AINDA NÃO TEM
+           modelo) era inalcançável. Medido nos três estados da bancada: o
+           convite não aparecia em nenhum, e quem nunca registrou um período
+           ficava sem a única explicação do que o anel faz.
+
+           Quem barra o convite é a GESTAÇÃO e o histórico velho — os dois já
+           dizem acima, com texto próprio, que a previsão está pausada, e
+           convidar embaixo daquilo seria a tela se contradizendo. */
+        /* ⚠️ E `instavel` BARRA O CONVITE, senão ele volta pela outra ponta:
+           com a leitura falhando não há modelo, e "Registre seu período abaixo"
+           é a tela de quem nunca registrou dita a quem tem meses de histórico —
+           a MESMA classe de defeito que a faixa de "não consegui ler" existe
+           para fechar, e ela apareceria logo abaixo, contradizendo o convite. */
+        gestante || historicoVelho || instavel ? null : model ? (
           <Stagger className="space-y-4">
             <StaggerItem>
               <CicloHero model={model} />

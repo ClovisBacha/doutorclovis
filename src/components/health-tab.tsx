@@ -32,6 +32,55 @@ import { sinalGlicemia, sinalPressao, validaRegistro, vozDaPaciente } from "@/li
    `silencio-do-cuidado.tsx` e `kicks-tab.tsx`. */
 import type { Gest, Profile } from "@/routes/_authenticated/minha-conta";
 
+/**
+ * AS CORES DOS GRÁFICOS, E POR QUE ELAS SÃO CONSTANTES NOMEADAS.
+ *
+ * ⚠️ **A FAIXA DO IOM E O PESO DELA TINHAM A MESMA COR.** Os três elementos do
+ * gráfico de ganho — o corredor preenchido, as duas linhas tracejadas e a
+ * linha do peso dela — eram todos `var(--primary)`, e o texto do cartão
+ * prometia, com todas as letras, **"Faixa recomendada em verde"**. A paciente
+ * lia a legenda, procurava uma faixa verde e encontrava tudo rosa: duas
+ * identidades ("o seu peso" e "a zona saudável") pintadas da mesma cor, com a
+ * tela afirmando o contrário do que desenhava.
+ *
+ * Cor de LINHA é identidade — a régua que o prontuário já aplica. A faixa é
+ * referência e fica verde (a família da própria aba Saúde); a série é dela e
+ * fica no rosa da marca.
+ *
+ * ⚠️ **E OS NÚMEROS DE LIMITE ERAM ILEGÍVEIS.** Medido a 393px: `140`
+ * (sistólica), `90` (diastólica), `95` e `140` (glicemia) saíam a **5,44px
+ * reais** e o eixo do IOM a 6,22 — contra o piso de 13px que o app inteiro
+ * aplicou em set/2026. Eles escaparam daquela varredura porque texto dentro de
+ * `<svg>` não usa classe do Tailwind: o tamanho vem do atributo `font-size`,
+ * em unidades do `viewBox`.
+ *
+ * ⚠️ Os tons `-400` ficavam para a LINHA (ela é um tracejado de referência, e
+ * discreto está certo); quem precisa de contraste é o NÚMERO que a nomeia, e
+ * ele passou para o `-700` da mesma família — a associação continua sendo o
+ * matiz.
+ */
+const COR = {
+  faixaIom: "#047857",
+  sistolica: "#f87171",
+  sistolicaTexto: "#b91c1c",
+  diastolica: "#60a5fa",
+  diastolicaTexto: "#1d4ed8",
+  glicemiaOk: "#4ade80",
+  glicemiaOkTexto: "#15803d",
+  glicemiaAlta: "#fb923c",
+  glicemiaAltaTexto: "#c2410c",
+} as const;
+
+/**
+ * O tamanho do texto DENTRO dos gráficos, em unidades do `viewBox` de 400.
+ *
+ * ⚠️ Não é um número de estilo: a 393px de tela o SVG é desenhado com ~311px,
+ * ou seja uma escala de ~0,78 — então 16 unidades viram ~12,4px reais, que é o
+ * piso de leitura do app. Mexer na largura do `viewBox` sem mexer aqui faz o
+ * rótulo voltar a encolher sem ninguém ver.
+ */
+const FONTE_DO_GRAFICO = 16;
+
 /** A linha de `health_logs` que esta tela desenha. */
 export type HealthLog = {
   id: string;
@@ -51,6 +100,7 @@ export function HealthTab({
   gest,
   profile,
   onNavigate,
+  careMode,
   bancada,
 }: {
   gest: Gest;
@@ -58,6 +108,26 @@ export function HealthTab({
   /* A sub-tela viaja junto — é ela que abre a linha do tempo direto, e não a
      grade. `goToTab` já aceita os dois argumentos. */
   onNavigate: (tab: string, sub?: string) => void;
+  /**
+   * ⚠️ **A CURVA DE GANHO SAI NO MODO CUIDADO, E O RESTO DA TELA FICA.**
+   *
+   * Esta era a única tela clínica do hub da Saúde que não recebia o portão —
+   * as quatro vizinhas (Registros, Nutrição, Bem-estar, Pós-parto) já
+   * recebiam. O que ela desenhava para quem acabou de perder a gestação era a
+   * "Curva de ganho de peso (IOM 2009)": o corredor projetado até a 40ª
+   * semana, ou seja, o desenho de uma gestação que vai continuar.
+   *
+   * ⚠️ **Peso, ganho, pressão, glicemia, os dois gráficos, o formulário e a
+   * lista FICAM INTEIROS** — é o corpo dela, e hipertensão de puerpério
+   * existe. O Modo Cuidado faz o app parar de FALAR DO BEBÊ, nunca de medir a
+   * paciente. É a mesma linha que o Portal Pós-parto traça ao manter a EPDS e
+   * o retorno e tirar as três telas que falam do bebê.
+   *
+   * ⚠️ E o CONVITE para configurar altura e peso pré-gestacional sai junto: ele
+   * existe só para destravar a curva, e oferecer o caminho para um gráfico que
+   * não vai aparecer é pior que não oferecer nada.
+   */
+  careMode?: boolean;
   /**
    * ⚠️ A bancada injeta o DADO nos MESMOS `useState` da produção, nunca um
    * desenho à parte — e com a mesma FORMA das props, porque uma bancada que
@@ -71,6 +141,23 @@ export function HealthTab({
   /* Booleano, e nunca o objeto: um literal remontado a cada render faria os
      efeitos re-rodarem em toda pintura. */
   const ehBancada = !!bancada;
+  /**
+   * Qual linha do histórico está aberta para correção.
+   *
+   * ⚠️ **O QUE HAVIA AQUI ERA UM `×` DE 8×18 PIXELS QUE APAGAVA NA HORA.**
+   * Medido a 393px: o alvo do glifo, sem caixa nenhuma, num botão que apaga
+   * peso, pressão ou glicemia do prontuário — sem passo nenhum entre o toque e
+   * o sumiço. As duas abas irmãs (chutes e contrações) resolveram isto em
+   * set/2026 com o padrão que está aqui: a linha ABRE, e o apagar mora dentro
+   * dela, com 44px e com o texto dizendo o que apagar.
+   *
+   * ⚠️ E o conserto NÃO é esticar o `×` com `after:-inset`: medido no chá de
+   * bebê, um alvo maior que a folga entre as linhas encavala a caixa da linha
+   * de baixo e o toque apaga o ITEM ERRADO. Aqui a folga entre centros é de
+   * 62px — o `-inset` até caberia —, mas o padrão da casa resolve também a
+   * ausência de confirmação, que é a metade mais cara do defeito.
+   */
+  const [abertoId, setAbertoId] = useState<string | null>(null);
   const [form, setForm] = useState({
     weight_kg: "",
     systolic: "",
@@ -218,6 +305,9 @@ export function HealthTab({
       toast.error("Não foi possível excluir o registro. Tente novamente.");
       return;
     }
+    /* Fecha a linha só depois de o banco confirmar: fechar antes diria "pronto"
+       sobre uma exclusão que não aconteceu. */
+    setAbertoId(null);
     load();
   }
 
@@ -306,7 +396,7 @@ export function HealthTab({
   }
 
   // Build SVG IOM chart
-  const showIomChart = bmi != null && prePregW != null && weightByWeek.length > 0;
+  const showIomChart = !careMode && bmi != null && prePregW != null && weightByWeek.length > 0;
   const iomChartW = 400,
     iomChartH = 180;
   let iomMinY: number, iomMaxY: number;
@@ -328,7 +418,9 @@ export function HealthTab({
     return (week / 42) * iomChartW;
   }
   function toSvgY(w: number) {
-    return iomChartH - ((w - iomMinY) / yRange) * (iomChartH - 20) - 10;
+    /* ⚠️ A folga de baixo é a FAIXA DO EIXO, e ela cresceu junto com a fonte:
+       com 10 unidades o rótulo de 16 passava por cima da curva. */
+    return iomChartH - ((w - iomMinY) / yRange) * (iomChartH - 34) - 24;
   }
 
   const bandMinPts = Array.from(
@@ -511,24 +603,24 @@ export function HealthTab({
           </div>
           <svg viewBox={`0 0 ${iomChartW} ${iomChartH}`} className="mt-3 h-44 w-full">
             {/* Corridor band */}
-            <polygon points={bandPolygon} fill="var(--primary)" fillOpacity="0.12" />
+            <polygon points={bandPolygon} fill={COR.faixaIom} fillOpacity="0.12" />
             {/* Min line */}
             <polyline
               points={bandMinPts}
               fill="none"
-              stroke="var(--primary)"
+              stroke={COR.faixaIom}
               strokeWidth="1"
               strokeDasharray="4 3"
-              opacity="0.4"
+              opacity="0.55"
             />
             {/* Max line */}
             <polyline
               points={bandMaxPts}
               fill="none"
-              stroke="var(--primary)"
+              stroke={COR.faixaIom}
               strokeWidth="1"
               strokeDasharray="4 3"
-              opacity="0.4"
+              opacity="0.55"
             />
             {/* Actual weight line */}
             {weightByWeek.length > 1 && (
@@ -551,12 +643,19 @@ export function HealthTab({
               />
             ))}
             {/* X-axis labels */}
-            {[0, 10, 20, 28, 36, 40].map((w) => (
+            {/* ⚠️ DE DEZ EM DEZ, e não `[0,10,20,28,36,40]`: com a fonte
+                legível (era 5,4px) os rótulos 36 e 40 encostavam um no outro —
+                a lista antiga só cabia porque ninguém conseguia lê-la. */}
+            {[0, 10, 20, 30, 40].map((w) => (
               <text
                 key={w}
-                x={toSvgX(w)}
-                y={iomChartH - 1}
-                fontSize="8"
+                /* ⚠️ **O "0s" SAÍA PELA BORDA.** Com `textAnchor="middle"` e
+                   `toSvgX(0) === 0`, metade do rótulo fica fora do `viewBox` —
+                   medido: `left: -3`, e na foto sobrava só o "s". O piso e o
+                   teto são meia largura do rótulo. */
+                x={Math.min(Math.max(toSvgX(w), 14), iomChartW - 14)}
+                y={iomChartH - 2}
+                fontSize={FONTE_DO_GRAFICO}
                 fill="var(--muted-foreground)"
                 textAnchor="middle"
               >
@@ -578,6 +677,7 @@ export function HealthTab({
           </p>
         </div>
       ) : (
+        !careMode &&
         prePregW == null && (
           <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm">
             Configure sua <strong>altura</strong> e <strong>peso pré-gestacional</strong> em{" "}
@@ -624,12 +724,12 @@ export function HealthTab({
                 y1={sy(140)}
                 x2={W - 10}
                 y2={sy(140)}
-                stroke="#f87171"
+                stroke={COR.sistolica}
                 strokeWidth="1"
                 strokeDasharray="4 3"
                 opacity="0.6"
               />
-              <text x="12" y={sy(140) - 3} fontSize="7" fill="#f87171" opacity="0.8">
+              <text x="12" y={sy(140) - 5} fontSize={FONTE_DO_GRAFICO} fill={COR.sistolicaTexto}>
                 140
               </text>
               {/* threshold 90 diastólica */}
@@ -638,32 +738,32 @@ export function HealthTab({
                 y1={sy(90)}
                 x2={W - 10}
                 y2={sy(90)}
-                stroke="#60a5fa"
+                stroke={COR.diastolica}
                 strokeWidth="1"
                 strokeDasharray="4 3"
                 opacity="0.6"
               />
-              <text x="12" y={sy(90) - 3} fontSize="7" fill="#60a5fa" opacity="0.8">
+              <text x="12" y={sy(90) - 5} fontSize={FONTE_DO_GRAFICO} fill={COR.diastolicaTexto}>
                 90
               </text>
               <polyline
                 points={systPts}
                 fill="none"
-                stroke="#f87171"
+                stroke={COR.sistolica}
                 strokeWidth="2.2"
                 strokeLinejoin="round"
               />
               <polyline
                 points={diasPts}
                 fill="none"
-                stroke="#60a5fa"
+                stroke={COR.diastolica}
                 strokeWidth="2.2"
                 strokeLinejoin="round"
               />
               {bpHistory.map((l, i) => (
                 <g key={i}>
-                  <circle cx={sx(i)} cy={sy(l.systolic!)} r="3.5" fill="#f87171" />
-                  <circle cx={sx(i)} cy={sy(l.diastolic!)} r="3.5" fill="#60a5fa" />
+                  <circle cx={sx(i)} cy={sy(l.systolic!)} r="3.5" fill={COR.sistolica} />
+                  <circle cx={sx(i)} cy={sy(l.diastolic!)} r="3.5" fill={COR.diastolica} />
                 </g>
               ))}
             </svg>
@@ -701,7 +801,7 @@ export function HealthTab({
                 y={sy(95)}
                 width={W - 20}
                 height={sy(minY) - sy(95)}
-                fill="#4ade80"
+                fill={COR.glicemiaOk}
                 opacity="0.08"
               />
               <line
@@ -709,12 +809,12 @@ export function HealthTab({
                 y1={sy(95)}
                 x2={W - 10}
                 y2={sy(95)}
-                stroke="#4ade80"
+                stroke={COR.glicemiaOk}
                 strokeWidth="1"
                 strokeDasharray="4 3"
                 opacity="0.7"
               />
-              <text x="12" y={sy(95) - 3} fontSize="7" fill="#4ade80" opacity="0.9">
+              <text x="12" y={sy(95) - 5} fontSize={FONTE_DO_GRAFICO} fill={COR.glicemiaOkTexto}>
                 95
               </text>
               {/* threshold 140 */}
@@ -723,12 +823,12 @@ export function HealthTab({
                 y1={sy(140)}
                 x2={W - 10}
                 y2={sy(140)}
-                stroke="#fb923c"
+                stroke={COR.glicemiaAlta}
                 strokeWidth="1"
                 strokeDasharray="4 3"
                 opacity="0.7"
               />
-              <text x="12" y={sy(140) - 3} fontSize="7" fill="#fb923c" opacity="0.9">
+              <text x="12" y={sy(140) - 5} fontSize={FONTE_DO_GRAFICO} fill={COR.glicemiaAltaTexto}>
                 140
               </text>
               <polyline
@@ -750,9 +850,9 @@ export function HealthTab({
                        baixos que o card. */
                     const g = sinalGlicemia(l.glucose_mg_dl)?.gravidade;
                     return g === "grave"
-                      ? "#f87171"
+                      ? COR.sistolica
                       : g === "atencao"
-                        ? "#fb923c"
+                        ? COR.glicemiaAlta
                         : "var(--primary)";
                   })()}
                 />
@@ -872,40 +972,66 @@ export function HealthTab({
               Você ainda não registrou nada.
             </p>
           )}
-          {logs.map((l) => (
-            <div
-              key={l.id}
-              className="flex items-start justify-between rounded-xl border border-border bg-card p-4 text-sm"
-            >
-              <span className="shrink-0 text-muted-foreground">
-                {new Date(l.log_date + "T00:00:00").toLocaleDateString("pt-BR")}
-              </span>
-              <span className="flex flex-1 flex-wrap gap-x-3 gap-y-0.5 px-3 text-xs">
-                {l.weight_kg && <span>⚖️ {l.weight_kg} kg</span>}
-                {l.systolic && l.diastolic && (
-                  <span>
-                    💓 {l.systolic}/{l.diastolic}
+          {logs.map((l) => {
+            const aberta = abertoId === l.id;
+            return (
+              <div key={l.id} className="rounded-xl border border-border bg-card">
+                {/* ⚠️ A LINHA INTEIRA É O ALVO, e tocar ABRE — nunca apaga. É o
+                  mesmo desenho das duas abas irmãs, e ele resolve as duas
+                  metades do defeito de uma vez: o alvo minúsculo e o apagar
+                  sem passo nenhum entre o dedo e o dado clínico. */}
+                <button
+                  type="button"
+                  onClick={() => setAbertoId(aberta ? null : l.id)}
+                  aria-expanded={aberta}
+                  className="press flex w-full items-start justify-between gap-1 p-4 text-left text-sm"
+                >
+                  <span className="shrink-0 text-muted-foreground">
+                    {new Date(l.log_date + "T00:00:00").toLocaleDateString("pt-BR")}
                   </span>
-                )}
-                {l.glucose_mg_dl && <span>🩸 {l.glucose_mg_dl} mg/dL</span>}
-                {/* Os quatro de wearable continuam aqui de propósito: o app
+                  <span className="flex flex-1 flex-wrap gap-x-3 gap-y-0.5 px-3 text-xs">
+                    {l.weight_kg && <span>⚖️ {l.weight_kg} kg</span>}
+                    {l.systolic && l.diastolic && (
+                      <span>
+                        💓 {l.systolic}/{l.diastolic}
+                      </span>
+                    )}
+                    {l.glucose_mg_dl && <span>🩸 {l.glucose_mg_dl} mg/dL</span>}
+                    {/* Os quatro de wearable continuam aqui de propósito: o app
                     parou de PEDIR, mas quem já registrou tem de conseguir ver
                     (e apagar) o que mandou. */}
-                {l.spo2 && <span>🫁 {l.spo2}% SpO₂</span>}
-                {l.heart_rate_bpm && <span>❤️ {l.heart_rate_bpm}bpm</span>}
-                {l.steps && <span>🚶 {l.steps} passos</span>}
-                {l.sleep_hours && <span>🌙 {l.sleep_hours}h sono</span>}
-                {l.notes && <span className="text-muted-foreground">{l.notes}</span>}
-              </span>
-              <button
-                onClick={() => remove(l.id)}
-                aria-label="Apagar este registro"
-                className="shrink-0 text-xs text-muted-foreground hover:text-destructive"
-              >
-                ×
-              </button>
-            </div>
-          ))}
+                    {l.spo2 && <span>🫁 {l.spo2}% SpO₂</span>}
+                    {l.heart_rate_bpm && <span>❤️ {l.heart_rate_bpm}bpm</span>}
+                    {l.steps && <span>🚶 {l.steps} passos</span>}
+                    {l.sleep_hours && <span>🌙 {l.sleep_hours}h sono</span>}
+                    {l.notes && <span className="text-muted-foreground">{l.notes}</span>}
+                  </span>
+                  <span aria-hidden className="shrink-0 text-xs text-muted-foreground">
+                    {aberta ? "▴" : "▾"}
+                  </span>
+                </button>
+                {aberta && (
+                  <div className="border-t border-border px-4 pb-4 pt-3">
+                    <button
+                      type="button"
+                      onClick={() => void remove(l.id)}
+                      className="press inline-flex min-h-11 items-center rounded-full border border-rose-300 px-4 text-xs font-semibold text-rose-800"
+                    >
+                      Apagar este registro
+                    </button>
+                    {/* ⚠️ O TEXTO DIZ O QUE NÃO APAGAR. Sem ele, o botão que
+                      existe para tirar um número digitado errado tira também a
+                      pressão alta que ela mediu de verdade — e é justamente
+                      essa que o painel do médico pinta. */}
+                    <p className="mt-2 text-[13px] leading-snug text-muted-foreground">
+                      Apague só o que não aconteceu — um número digitado errado, por exemplo. O que
+                      você mediu de verdade é o que o seu médico lê.
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </details>
     </div>

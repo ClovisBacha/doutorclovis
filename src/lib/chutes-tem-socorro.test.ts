@@ -179,14 +179,17 @@ describe("⚠️ e o ciclo não prevê período para uma gestante", () => {
        `gestante ? null` travava só a bandeira, e a bandeira sozinha deixava o
        pós-parto voltar projetando o período de antes da gravidez. */
     expect(CICLO).toMatch(/mostraPrevisao = model != null && !gestante && /);
-    expect(CICLO).toContain("!mostraPrevisao ? null : model ?");
+    /* A condição que barra o bloco inteiro — a grafia mudou em set/2026, a
+       garantia não: grávida, nem o anel nem o convite são desenhados. */
+    const cond = CICLO.match(/\n\s*gestante \|\|[^?]*\?/)?.[0] ?? "";
+    expect(cond).toContain("gestante");
   });
 
   test("⚠️ e o convite a 'registrar para ver a previsão' também não", () => {
     /* Ele prometia exatamente o que o aviso acima diz estar pausado — duas
        frases se contradizendo na mesma tela. O `gestante ? null` cobre os DOIS
        ramos, e é por isso que ele vem antes do `model ?`. */
-    const i = CICLO.indexOf("!mostraPrevisao ? null : model ?");
+    const i = CICLO.search(/\n\s*gestante \|\|[^?]*\?/);
     expect(i).toBeGreaterThan(-1);
     expect(CICLO.indexOf("Registre seu período abaixo")).toBeGreaterThan(i);
   });

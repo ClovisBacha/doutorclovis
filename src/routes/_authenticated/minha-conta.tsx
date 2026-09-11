@@ -128,6 +128,11 @@ import { BabyTab } from "@/components/baby-tab";
 import { KicksTab } from "@/components/kicks-tab";
 import { HealthTab } from "@/components/health-tab";
 import { NutricaoTab } from "@/components/nutricao-tab";
+import { lerFilaDeChutes } from "@/lib/fila-de-chutes";
+import { lerFila as lerFilaDeContracoes } from "@/lib/fila-de-contracoes";
+/* `mesclar` sob outro nome: neste arquivo "mesclar" solto diria pouco, e a
+   palavra já aparece em contexto de blob da jornada. */
+import { mesclar as mesclarRegistros } from "@/lib/fila-local";
 import { diasEntre, inicioDeHojeISO, quandoFoi } from "@/lib/quando-foi";
 import { SaudeMulherHub } from "@/components/saude-mulher";
 import { Field } from "@/components/campo";
@@ -883,7 +888,21 @@ export function HubSaude({
          "hoje". Ver `src/lib/quando-foi.ts`. */
       const agora = new Date();
       const desdeMeiaNoite = inicioDeHojeISO(agora);
-      const [saude, chutes, contr] = await Promise.all([
+      /* ⚠️ **O NÚMERO DO BLOCO CONTAVA SÓ O SERVIDOR, e as duas abas irmãs
+         guardam registro no APARELHO desde set/2026.** Uma contração
+         cronometrada sem rede fica na fila local até subir — e o bloco dizia
+         "3 contrações" sobre um dia em que ela cronometrou cinco. Não é
+         omissão: é um NÚMERO MENOR afirmado num dia de trabalho de parto.
+
+         Quem mescla é `mesclar`, a régua única das duas filas: ela deduplica
+         pelo `started_at` (a chave natural, porque nenhuma das duas tabelas
+         tem chave única) e faz a linha do SERVIDOR vencer — senão, no segundo
+         entre o `insert` dar certo e o `load()` responder, o mesmo registro
+         contaria duas vezes.
+
+         `getSession` lê do DISCO e entra na MESMA onda das três consultas:
+         `getUser` seria uma quarta ida à rede na frente de um número. */
+      const [saude, chutes, contr, sessao] = await Promise.all([
         supabase
           .from("health_logs")
           .select("weight_kg, systolic, diastolic, log_date")
@@ -899,13 +918,20 @@ export function HubSaude({
           .then((r) => (r.error ? null : (r.data?.[0] ?? null))),
         supabase
           .from("contraction_logs")
-          .select("started_at")
+          /* `id` entra porque `mesclar` casa e desempata por linha — a coluna
+             não é desenhada em lugar nenhum deste bloco. */
+          .select("id, started_at")
           .gte("started_at", desdeMeiaNoite)
           .order("started_at", { ascending: false })
           .limit(50)
           .then((r) => (r.error ? null : (r.data ?? null))),
+        supabase.auth.getSession().then((r) => r.data.session),
       ]);
       if (!vivo) return;
+      const uid = sessao?.user?.id ?? "";
+      const emMs = agora.getTime();
+      const pendentesDeChutes = uid ? lerFilaDeChutes(uid, emMs) : [];
+      const pendentesDeContracoes = uid ? lerFilaDeContracoes(uid, emMs) : [];
       const d: Record<string, Dado | null> = {};
       if (saude) {
         const peso =
@@ -934,7 +960,15 @@ export function HubSaude({
               ? { valor: pa, legenda: "pressão" }
               : null;
       }
-      if (chutes && chutes.kick_count != null) {
+      /* A última contagem é a mais recente das DUAS listas — ler só o
+         servidor faria a contagem que ela acabou de encerrar sem rede (a mais
+         nova que existe) não ser "a última". É o mesmo defeito que
+         `ultimaContagem` fecha dentro da aba. */
+      const ultimaDeChutes = mesclarRegistros(
+        chutes ? [{ id: "s", started_at: chutes.started_at, kick_count: chutes.kick_count }] : [],
+        pendentesDeChutes,
+      )[0];
+      if (ultimaDeChutes && ultimaDeChutes.kick_count != null) {
         /* ⚠️ NUNCA `String(started_at).slice(0, 10)`: a coluna é `timestamptz`
            e o PostgREST devolve em UTC. Medido em São Paulo — uma sessão às
            21h30 do dia 5 chega como dia 6, não casava com "hoje" nem com
@@ -942,13 +976,22 @@ export function HubSaude({
            horário que a tela recomenda era quem nunca via o número. */
         /* `quandoFoi` continua sendo o FILTRO (hoje ou ontem, senão o número
            some) — só não vai mais para o texto. */
-        const quando = quandoFoi(chutes.started_at, agora);
-        d["chutes"] = quando ? { valor: String(chutes.kick_count), legenda: "chutes" } : null;
+        const quando = quandoFoi(ultimaDeChutes.started_at, agora);
+        d["chutes"] = quando
+          ? { valor: String(ultimaDeChutes.kick_count), legenda: "chutes" }
+          : null;
       }
-      if (contr && contr.length > 0) {
+      /* ⚠️ As pendentes são recortadas pelo MESMO `desdeMeiaNoite` da consulta:
+         a fila guarda até sete dias, e somá-la inteira poria as contrações de
+         terça no contador de hoje. */
+      const contracoesDeHoje = mesclarRegistros(
+        contr ?? [],
+        pendentesDeContracoes.filter((c) => c.started_at >= desdeMeiaNoite),
+      );
+      if (contracoesDeHoje.length > 0) {
         /* A consulta já recorta o dia (`desdeMeiaNoite`); o "hoje" e a hora da
            última saíram do TEXTO a pedido do dono. */
-        d["contracoes"] = { valor: String(contr.length), legenda: "contrações" };
+        d["contracoes"] = { valor: String(contracoesDeHoje.length), legenda: "contrações" };
       }
       setDados(d);
     })().catch(() => {
@@ -3177,7 +3220,12 @@ function MinhaContaPage() {
                 {tab === "Saúde" && (
                   <div className="space-y-5">
                     <CabecalhoDaSaude chave="Saúde" />
-                    <HealthTab gest={gest} profile={profile} onNavigate={goToTab} />
+                    <HealthTab
+                      gest={gest}
+                      profile={profile}
+                      onNavigate={goToTab}
+                      careMode={careMode}
+                    />
                   </div>
                 )}
                 {tab === "Nutrição" && (

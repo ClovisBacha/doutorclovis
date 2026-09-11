@@ -94,6 +94,9 @@ const EXTRAS = [
   "/preview-saude-registros?estado=grave",
   "/preview-saude-registros?estado=normal",
   "/preview-saude-registros?estado=semperfil",
+  /* ⚠️ O Modo Cuidado desta tela só se vê na CURVA de ganho — ela é a única
+     peça gestacional ali, e sem este estado o portão ficaria sem foto. */
+  "/preview-saude-registros?estado=grave&luto=1",
   /* ⚠️ A nutricionista virtual: `carregando` é a bolha vazia que renderiza "…"
      — indistinguível de um "…" que nunca termina —, e `erro` é o aviso do
      servidor virando bolha. Os dois só nascem de cota estourada ou falha de
@@ -154,6 +157,9 @@ const EXTRAS = [
      velho (a previsão não pode voltar projetando um período de dez meses). */
   "/preview-saude-mulher?tela=ciclo&ativo=1",
   "/preview-saude-mulher?tela=ciclo&velho=1",
+  /* O convite de quem nunca registrou — ele era CÓDIGO MORTO até set/2026, e
+     é este estado que prova que ele voltou a ser alcançável. */
+  "/preview-saude-mulher?tela=ciclo&estado=vazio",
   /* ⚠️ O bloco com DADO VELHO: ele mostrava o último valor sem limite de
      recência, e uma pressão de meses atrás lia como o estado de hoje. */
   "/preview-saude?w=24&dados=2",

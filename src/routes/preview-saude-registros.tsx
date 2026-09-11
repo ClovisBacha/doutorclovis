@@ -28,6 +28,9 @@ export const Route = createFileRoute("/preview-saude-registros")({
        segunda passada chega `null` — `Number(null)` é 0. */
     w: q.w == null || q.w === "" ? 28 : Number(q.w),
     estado: q.estado == null ? "vazio" : String(q.estado),
+    /* ⚠️ O Modo Cuidado desta tela só se vê na CURVA — ela é a única peça
+       gestacional aqui, e sem este parâmetro o estado ficaria sem foto. */
+    luto: q.luto === "1" || q.luto === 1 || q.luto === true,
   }),
   head: () => ({
     meta: [{ title: "Bancada dos registros" }, { name: "robots", content: "noindex" }],
@@ -70,7 +73,7 @@ const NORMAL: HealthLog[] = [
 const GRAVE: HealthLog[] = [log(0, 69.2, 165, 105, 148), ...NORMAL.slice(1)];
 
 function Pagina() {
-  const { w, estado } = Route.useSearch();
+  const { w, estado, luto } = Route.useSearch();
 
   const bancada =
     estado === "instavel"
@@ -83,8 +86,16 @@ function Pagina() {
             ? { logs: NORMAL }
             : { logs: [] };
 
-  /* O perfil com altura e peso pré-gestacional é o que destrava a curva do
-     IOM — sem ele o gráfico de ganho não existe, e esse é um estado real. */
+  /* ⚠️ **O QUE DESTRAVA A CURVA DO IOM SÃO TRÊS COISAS, e este comentário
+     afirmava DUAS.** Altura e peso pré-gestacional dão o IMC; o que faltava era
+     a ÂNCORA GESTACIONAL — `weightByWeek` só ganha ponto quando
+     `computeGestation` devolve semana para a data de CADA registro, e com
+     `lmp_date: null` ela devolve `null` para todos. Medido: o gráfico de ganho
+     de peso nunca apareceu em bancada nenhuma, em nenhum estado.
+
+     A DUM é derivada de `w` para o registro mais novo cair exatamente na semana
+     que a legenda anuncia — e sai de `dia()`, que é cravado: derivar de `w` é
+     determinístico, usar o relógio não seria. */
   const perfil =
     estado === "semperfil"
       ? ({
@@ -101,24 +112,26 @@ function Pagina() {
           id: "b",
           display_name: "Ana",
           baby_name: "Helena",
-          lmp_date: null,
           due_date: null,
           reference_date: null,
           reference_weeks: null,
           reference_days: null,
           height_cm: 165,
           pre_pregnancy_weight_kg: 62,
+          lmp_date: dia(w * 7),
         } as never);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6">
       <p className="mb-4 text-xs text-muted-foreground">
         Bancada · estado <strong>{estado}</strong> · semana <strong>{w}</strong>
+        {luto ? " · Modo Cuidado" : ""}
       </p>
       <HealthTab
         gest={{ weeks: w, days: 0, totalDays: w * 7 } as never}
         profile={perfil}
         onNavigate={() => {}}
+        careMode={luto}
         bancada={bancada}
       />
     </div>

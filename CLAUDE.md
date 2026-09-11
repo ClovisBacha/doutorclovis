@@ -16258,3 +16258,172 @@ exercita OUTRO caminho (o da rede em vez do da fila). O filtro pega o cartão qu
 contém o texto (`"Salva no seu celular"`) e procura o botão dentro dele.
 ⚠️ E a contagem de toques do relatório é o que impede isso de passar em vazio:
 seletor que não casa sai com menos toques do que o roteiro tem passos.
+
+## A vistoria da aba Saúde, e os sete defeitos dela (set/2026)
+
+Pedido do dono: _"na aba da saúde revise tudo e veja se está tudo correto,
+fluxos funcionando etc, faça uma geral e o que estiver estragado conserte"_. O
+método foi o da casa — ler as cinco telas inteiras, abrir cada bancada num
+navegador a 393px e MEDIR. Cinco dos sete achados só apareceram na foto ou na
+régua; nenhum deles aparecia em teste, `tsc` ou lint.
+
+### ⚠️ 1. O ✕ QUE APAGAVA UM REGISTRO CLÍNICO MEDIA 8×18 PIXELS
+
+Na lista "✏️ Ver e corrigir meus registros", o botão que apaga peso, pressão ou
+glicemia era só o glifo `×`, sem caixa nenhuma — **medido: 8×18** — e apagava
+**na hora**, sem passo nenhum entre o dedo e o dado que o painel do médico lê.
+
+⚠️ **E as duas abas irmãs já tinham sido consertadas.** Chutes e contrações
+adotaram em set/2026 o padrão que está aqui agora: a linha ABRE, e o apagar
+mora dentro dela com 44px e com o texto dizendo o que apagar. É a forma mais
+comum de defeito deste repositório — a régua aplicada num lugar e deixada de pé
+no vizinho, no caso a tela MAIS clínica do app.
+
+⚠️ **E o conserto NÃO é esticar o ✕ com `after:-inset`**: medido no chá de
+bebê, um alvo maior que a folga entre linhas encavala a caixa da linha de baixo
+e o toque apaga o ITEM ERRADO. Aqui a folga entre centros é de 62px e o
+`-inset` até caberia — mas o padrão da casa resolve também a ausência de
+confirmação, que é a metade mais cara. Medido depois: linha 333×69, apagar
+155×44.
+
+### ⚠️ 2. O CARTÃO DIZIA "FAIXA RECOMENDADA EM VERDE" SOBRE UMA FAIXA ROSA
+
+A "Curva de ganho de peso (IOM 2009)" tinha o corredor preenchido, as duas
+linhas tracejadas **e a linha do peso dela** todos em `var(--primary)` — duas
+identidades ("o seu peso" e "a zona saudável") na mesma cor, com o texto do
+cartão prometendo verde. A paciente lia a legenda, procurava a faixa verde e
+encontrava tudo rosa.
+
+⚠️ **E o rótulo "0s" do eixo saía PELA BORDA** (medido: `left: −3`, com
+`textAnchor="middle"` e `toSvgX(0) === 0`) — na foto sobrava só o "s".
+
+⚠️ **NADA DISSO TINHA SIDO VISTO PORQUE A CURVA NUNCA FOI FOTOGRAFADA.** A
+bancada afirmava, por escrito, que "altura e peso pré-gestacional é o que
+destrava a curva do IOM" — e são TRÊS coisas: sem `lmp_date`,
+`computeGestation` devolve `null` para a data de cada registro, `weightByWeek`
+fica vazio e o gráfico não existe. O perfil da bancada tinha `lmp_date: null`
+em todos os estados. **Comentário de bancada que afirma destravar um recurso e
+não destrava é pior que bancada nenhuma.**
+
+### ⚠️ 3. OS LIMITES CLÍNICOS DOS GRÁFICOS SAÍAM A 5,4 PIXELS
+
+Medido a 393px: `140` (sistólica), `90` (diastólica), `95` e `140` (glicemia)
+saíam a **5,44px reais** e o eixo do IOM a **6,22** — contra o piso de 13px que
+o app inteiro adotou em set/2026. São os números que dão sentido às linhas
+tracejadas de limite, e as cores (tons `-400` com opacidade) eram ilegíveis.
+
+⚠️ **Eles escaparam da varredura da letra porque texto dentro de `<svg>` não
+usa classe do Tailwind** — o tamanho vem do atributo `font-size`, em unidades
+do `viewBox`. `FONTE_DO_GRAFICO = 16` num `viewBox` de 400 desenhado com ~311px
+dá 12,4px reais; mexer na largura do `viewBox` sem mexer nessa constante faz o
+rótulo voltar a encolher sem ninguém ver.
+
+⚠️ Os tons `-400` ficaram para a LINHA (ela é referência, e discreta está
+certo); quem precisa de contraste é o NÚMERO que a nomeia, e ele foi para o
+`-700` da mesma família — a associação continua sendo o matiz. E os ticks do
+eixo passaram a ser de dez em dez: com a fonte legível, `36s` e `40s` se
+encostavam. **A lista antiga só cabia porque ninguém conseguia lê-la.**
+
+### ⚠️ 4. A CURVA GESTACIONAL CONTINUAVA NO MODO CUIDADO
+
+`HealthTab` era a **única** tela clínica do hub que não recebia o portão — as
+quatro vizinhas já recebiam. O que ela desenhava para quem acabou de perder a
+gestação era o corredor de ganho projetado até a 40ª semana: o desenho de uma
+gestação que vai continuar.
+
+⚠️ **Peso, ganho, pressão, glicemia, os dois gráficos, o formulário e a lista
+FICAM INTEIROS** — é o corpo dela, e hipertensão de puerpério existe. É a mesma
+linha que o Portal Pós-parto traça ao manter a EPDS e o retorno e tirar as três
+telas que falam do bebê. E o teste cobra as DUAS metades: um que só cobrisse o
+portão aprovaria alguém "consertando" o luto ao custo dos números dela.
+
+### ⚠️ 5. O BLOCO DO HUB CONTAVA SÓ O SERVIDOR
+
+As duas abas irmãs guardam registro no APARELHO desde set/2026 (`fila-de-chutes`,
+`fila-de-contracoes`). Os blocos da grade liam só o banco: com pendentes na
+fila, o bloco dizia **"3 contrações"** sobre um dia em que ela cronometrou
+cinco. Não é omissão — é um número MENOR afirmado num dia de trabalho de parto.
+
+- Quem mescla é **`mesclar`**, a régua única das duas filas: deduplica pelo
+  `started_at` (a chave natural, porque nenhuma das tabelas tem chave única) e
+  faz a linha do SERVIDOR vencer — senão, no segundo entre o `insert` dar certo
+  e o `load()` responder, o mesmo registro contaria duas vezes.
+- ⚠️ **As pendentes são recortadas pelo MESMO `desdeMeiaNoite` da consulta**: a
+  fila guarda sete dias, e somá-la inteira poria as contrações de terça no
+  contador de hoje.
+- ⚠️ **`getSession` lê do DISCO e entra na onda que já existe** — `getUser`
+  seria uma quarta ida à rede na frente de um número.
+- E "a última contagem" passou a sair das duas fontes: lendo só o servidor, a
+  contagem que ela acabou de encerrar sem rede (a mais nova que existe) não
+  seria a última. É o defeito que `ultimaContagem` fecha dentro da aba,
+  chegando pela porta do hub.
+
+### ⚠️ 6. O RÓTULO DE UM BLOCO FICAVA 17px ABAIXO DO VIZINHO
+
+Medido a 393px: os blocos têm a caixa idêntica (175×291) e o texto flutuava
+dentro dela — rótulo em `top=219` num e `top=236` no vizinho da MESMA linha.
+
+A causa é só uma: **o subtítulo de uma linha devolve 16px à arte**, que é
+`flex-1` e os absorve, e tudo abaixo dela desce junto. `min-h-[2lh]` no
+subtítulo reserva duas linhas sempre. ⚠️ `lh` é a altura de linha do próprio
+elemento, então isto continua valendo se a fonte ou o `leading` mudarem — uma
+altura em px voltaria a desalinhar no primeiro ajuste da letra. Medido depois:
+rótulos todos em `top=219`, e nas grades quadradas 23 blocos com 0 cortados.
+
+### ⚠️ 7. O CONVITE DO CICLO ERA CÓDIGO MORTO
+
+`!mostraPrevisao ? null : model ? (anel) : (convite)` — e `mostraPrevisao` já
+exige `model != null`, então o ramo do `else` (que é justamente o de quem ainda
+não tem modelo) era **inalcançável**. Medido nos três estados da bancada: o
+convite não aparecia em nenhum, e quem nunca registrou um período ficava sem a
+única explicação do que o anel faz.
+
+⚠️ **E o conserto ingênuo o trouxe de volta pela outra ponta** — medido na
+hora: com a leitura FALHANDO não há modelo, e "Registre seu período abaixo"
+passou a ser dito a quem tem meses de histórico, com a faixa de "não consegui
+ler" logo abaixo contradizendo o convite. `instavel` barra junto.
+
+### Os preventivos: a régua saiu do `.tsx`
+
+`src/lib/preventivos.ts`. Ela morava dentro do componente e por isso nunca foi
+exercitada — um teste teria de importar a tela inteira (a lição de
+`assinatura.ts` e `buscar-paciente.ts`).
+
+⚠️ **E ela tinha dois defeitos que só aparecem depois do meio-dia:** o cálculo
+era um INSTANTE contra uma MEIA-NOITE (`Math.round((nextDue - new Date()) /
+86400000)`), então um exame que vence HOJE, consultado às 15h, dava −1 e a tela
+escrevia **"(1 dias em atraso)"** — com o plural errado, sobre um rastreamento
+em dia. O que decide é o DIA CIVIL. ⚠️ E `setMonth` TRANSBORDA: 31 de maio + 6
+meses cairia em 1º de dezembro, e as frequências semestrais (pressão, dentista)
+são as que esbarram nisso.
+
+### ⚠️ E A CATRACA DOS MATCHERS NÃO COBRIA `it`
+
+O portão local ficou verde e o `tsc` reprovou com `TS2305: Module 'bun:test'
+has no exported member 'it'` — **`it` não é exportado nos tipos do `bun:test`,
+só `test`**, e o runtime tem os dois. É a terceira forma da mesma armadilha
+(depois de `toMatchObject`, `toBeDefined` e do `expect(valor, "recado")`), e
+ela me pegou num arquivo novo com a catraca já no lugar. A busca é pelo
+IMPORT — `it(` aparece dentro de palavras comuns, e o que quebra o `tsc` é a
+linha do import. Conferida por mutação.
+
+### ⚠️ E o roteiro de interação passou EM VAZIO
+
+`<summary>` **não tem role de botão**, e `getByRole("button")` não o alcança:
+o passo que abria a lista recolhida saía com **zero toques**, e o roteiro
+passava sem exercitar a linha que ele existe para cobrir. A contagem de toques
+do relatório é o que denuncia isso — sem ela, um roteiro que não casa nada é
+indistinguível de um que passou. O motor ganhou `abrirLista`, que toca na TAG.
+
+⚠️ **E o roteiro para no "abrir", sem tocar em "Apagar este registro"**: o
+apagar chama o servidor, e sem sessão a bancada receberia 400 no console — que
+a varredura contaria como problema, com razão. É a lição que este roteiro já
+custou DUAS reprovações de CI. Provado por contagem de requisições: **zero
+chamadas ao servidor durante os dois toques.**
+
+**Sem SQL:** os sete saem de colunas e tabelas que já existem.
+**Bancadas novas:** `/preview-saude-registros?estado=grave&luto=1` (a curva que
+some no Modo Cuidado) · `/preview-saude-mulher?tela=ciclo&estado=vazio` (o
+convite que voltou a ser alcançável) — as duas na varredura da CI. E
+`/preview-saude-registros` passou a fabricar a DUM, sem a qual a curva de ganho
+nunca aparecia em foto nenhuma.

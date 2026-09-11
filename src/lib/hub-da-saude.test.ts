@@ -98,9 +98,14 @@ describe("o que a grade da Saúde oferece", () => {
 
   test("a lista de registros continua tendo como APAGAR", () => {
     /* Ela recolheu para deixar de ser a terceira cópia dos mesmos números na
-       mesma tela, mas o × é o único jeito de corrigir quem digitou 1200 em vez
-       de 120 — e o painel do médico pinta a gravidade desses números. */
+       mesma tela, mas apagar é o único jeito de corrigir quem digitou 1200 em
+       vez de 120 — e o painel do médico pinta a gravidade desses números.
+
+       ⚠️ A GARANTIA é a CAPACIDADE, nunca a forma dela: o `×` de 8×18 que
+       apagava na hora virou, em set/2026, a linha que ABRE com o apagar de
+       44px dentro (o padrão que chutes e contrações já usavam). A grafia
+       antiga reprovava exatamente esse conserto. */
     expect(contaESaude).toContain("Ver e corrigir meus registros");
-    expect(contaESaude).toContain('aria-label="Apagar este registro"');
+    expect(contaESaude).toContain("Apagar este registro");
   });
 });

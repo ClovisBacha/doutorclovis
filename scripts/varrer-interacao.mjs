@@ -155,6 +155,26 @@ const ROTEIRO = [
     nome: "chutes · tirar um toque contado a mais",
     passos: [{ clique: /Contei um a mais/ }],
   },
+  /* ⚠️ **A LINHA QUE ABRE PARA APAGAR UM REGISTRO CLÍNICO.** Ela só existe
+     depois de dois toques — abrir a lista recolhida e tocar na linha —, então
+     a varredura de bancadas nunca a alcançou: até set/2026 o que havia ali era
+     um `×` de 8×18 pixels que apagava peso, pressão ou glicemia na hora.
+
+     ⚠️ **O ROTEIRO PARA NO "ABRIR", e não toca em "Apagar este registro".** O
+     apagar chama o servidor, e sem sessão a bancada receberia 400 no console —
+     que a varredura contaria como problema, com razão. É a lição que este
+     roteiro já custou DUAS vezes: aqui se toca em controle LOCAL; o que
+     dispara rede se prova na medição, com a rede forjada. */
+  {
+    q: "/preview-saude-registros?estado=grave&w=28",
+    nome: "saúde · abrir uma linha do histórico para corrigir",
+    passos: [
+      { abrirLista: "Ver e corrigir meus registros" },
+      /* A linha do dia da pressão grave — o nome acessível dela carrega a data
+         e os três números, então o `165` a distingue das outras quatro. */
+      { clique: /165/ },
+    ],
+  },
 ];
 
 /** Ruído de ambiente, não da tela — a mesma lista da varredura de bancadas. */
@@ -205,6 +225,14 @@ for (const t of ROTEIRO) {
             .locator("input[type=text], input:not([type]), textarea")
             .first()
             .fill(s.digitar, { timeout: 4000 });
+          toques++;
+        } else if (s.abrirLista) {
+          /* ⚠️ **`<summary>` NÃO TEM ROLE DE BOTÃO**, e `getByRole("button")`
+             não o alcança — medido: o passo que tentava abrir a lista recolhida
+             dos registros saía com ZERO toques, e o roteiro passava em vazio
+             sobre a linha que ele existe para exercitar. Aqui o toque é na TAG,
+             que é o que o dedo de verdade acerta. */
+          await p.locator("summary", { hasText: s.abrirLista }).first().click({ timeout: 4000 });
           toques++;
         } else if (s.segurar) {
           await p.mouse.down();

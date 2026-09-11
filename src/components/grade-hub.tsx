@@ -190,7 +190,18 @@ export function GradeHub({
             <span className="line-clamp-2 block font-serif text-[15.5px] leading-tight text-foreground">
               {label}
             </span>
-            <span className="mt-0.5 line-clamp-2 block text-xs leading-[1.28] text-muted-foreground">
+            {/* ⚠️ **DUAS LINHAS RESERVADAS, SEMPRE — e isto é alinhamento, não
+                espaçamento.** Medido a 393px, na grade da Saúde: os blocos têm
+                a caixa idêntica (175×291) e o texto flutuava dentro dela — o
+                rótulo em `top=219` num e `top=236` no vizinho da MESMA linha,
+                17px de diferença. A causa é só esta: quem tem subtítulo de uma
+                linha devolve 16px à arte, que é `flex-1` e os absorve, e TUDO
+                abaixo dela desce junto.
+
+                `lh` é a altura de linha do próprio elemento, então isto
+                continua valendo se a fonte ou o `leading` mudarem — uma altura
+                em px voltaria a desalinhar no primeiro ajuste da letra. */}
+            <span className="mt-0.5 line-clamp-2 block min-h-[2lh] text-xs leading-[1.28] text-muted-foreground">
               {sub}
             </span>
           </span>
