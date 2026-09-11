@@ -63,38 +63,58 @@ describe("começar não grava nada", () => {
     expect(corpo("start")).toContain("guardarSessao(uid,");
     expect(corpo("tap")).toContain("guardarSessao(uid,");
     /* E encerrar LIMPA — senão a sessão salva reapareceria na abertura
-       seguinte, com o relógio de uma contagem que já virou linha. */
-    expect(corpo("stop")).toContain("guardarSessao(uid, null)");
+       seguinte, com o relógio de uma contagem que já virou linha.
+       ⚠️ A asserção cobrava `guardarSessao(uid, null)` com o NOME da variável,
+       e reprovou o dia em que `stop` passou a resolver a conta por conta
+       própria (`conta`) para a fila não deixar de persistir quando `uid` ainda
+       não tinha respondido — ou seja, reprovou uma garantia MAIS FORTE. É a
+       décima sétima vez nesta base: cobre-se a garantia, nunca a escrita. */
+    expect(corpo("stop")).toMatch(/guardarSessao\((uid|conta), null\)/);
   });
 });
 
 describe("encerrar é o que grava", () => {
   const c = corpo("stop");
 
-  test("⚠️ a linha nasce aqui, com o `started_at` do INÍCIO", () => {
+  test("⚠️ a contagem nasce aqui, com o `started_at` do INÍCIO", () => {
     /* Pelo `DEFAULT now()` do banco, a sessão pareceria ter começado no
        instante em que ela encerrou — e a duração é metade da régua
-       ("10 em até 2 horas"). */
-    expect(c).toContain(".insert(");
+       ("10 em até 2 horas").
+
+       ⚠️ **A asserção cobrava `.insert(` DENTRO de `stop`, e isso deixou de ser
+       a garantia.** O encerramento passou a gravar na FILA LOCAL (o `insert`
+       mudou-se para `sincronizar`), justamente porque ele era o único ponto de
+       falha de até duas horas de contagem. O que não pode mudar é o que ela
+       cobrava de verdade: o instante do INÍCIO é o que vai para a linha. */
     expect(c).toMatch(/started_at:\s*active\.startedAt/);
     expect(c).toMatch(/ended_at:/);
+    /* E quem sobe leva o mesmo instante, nunca um novo. */
+    const sinc = corpo("sincronizar");
+    expect(sinc).toContain(".insert(");
+    expect(sinc).toMatch(/started_at:\s*pacote\.started_at/);
   });
 
   test("⚠️ ZERO movimentos continua sendo gravado — é o alarme", () => {
     /* Nenhuma condição sobre a contagem entre o começo da função e o insert. */
-    const ateOInsert = c.slice(0, c.indexOf(".insert("));
-    expect(ateOInsert).not.toMatch(/if\s*\([^)]*(finalCount|count)[^)]*\)/);
+    const ateAGravacao = c.slice(0, c.indexOf("gravarFilaDeChutes("));
+    expect(ateAGravacao.length).toBeGreaterThan(100);
+    expect(ateAGravacao).not.toMatch(/if\s*\([^)]*(finalCount|count)[^)]*\)/);
   });
 
-  test("⚠️ falhar ao gravar NÃO limpa a tela", () => {
-    /* Zerar aqui perderia duas horas de contagem dela. */
-    const i = c.indexOf("if (error)");
+  test("⚠️ falhar a SUBIDA não perde a contagem — ela volta para a fila", () => {
+    /* ⚠️ **A asserção cobrava `toast.error` dentro de `stop`, e isso era o
+       defeito com outro nome.** Antes, a rede caindo devolvia um erro e deixava
+       duas horas de contagem presas na tela esperando um dedo — e o que ela faz
+       depois de duas horas deitada de lado é fechar o app, com a sessão
+       guardada vencendo em quatro horas. A garantia de hoje é mais forte: o
+       encerramento não pode falhar do lado dela, e o pacote que não subiu
+       CONTINUA na fila, com uma tentativa a mais. */
+    const sinc = corpo("sincronizar");
+    const i = sinc.indexOf("if (error)");
     expect(i).toBeGreaterThan(-1);
-    const j = c.indexOf("}", c.indexOf("return;", i));
-    const bloco = c.slice(i, j);
-    expect(bloco).toContain("toast.error");
-    expect(bloco).not.toContain("setCount(0)");
-    expect(bloco).not.toContain("setActive(null)");
+    const bloco = sinc.slice(i, sinc.indexOf("break;", i));
+    expect(bloco).toContain("tentativas: pacote.tentativas + 1");
+    expect(bloco).not.toContain("semSessao");
   });
 });
 

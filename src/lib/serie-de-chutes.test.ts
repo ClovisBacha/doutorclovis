@@ -156,13 +156,17 @@ describe("⚠️ e o degrau da coluna nova — a gravação não pode parar por 
     const { readFileSync } = await import("node:fs");
     const { semComentarios } = await import("@/lib/sem-comentarios");
     const codigo = semComentarios(readFileSync("src/components/kicks-tab.tsx", "utf8"));
-    const i = codigo.indexOf("async function stop(");
-    expect(`stop: ${i > -1}`).toBe("stop: true");
-    const corpo = codigo.slice(i, codigo.indexOf("\n  const relogio", i));
+    /* ⚠️ A fatia era a de `stop`, e o `insert` mudou-se para `sincronizar`
+       quando a contagem passou a nascer na fila local — ou seja, o teste
+       reprovou uma garantia MAIS FORTE (o encerramento deixou de depender da
+       rede). O degrau continua sendo o mesmo, e é ELE o que se cobra. */
+    const i = codigo.indexOf("async function sincronizar(");
+    expect(`sincronizar: ${i > -1}`).toBe("sincronizar: true");
+    const corpo = codigo.slice(i, codigo.indexOf("const [corrigindo, setCorrigindo]", i));
     expect(corpo).toContain('code === "PGRST204"');
     expect(corpo).not.toContain("42703");
     /* A primeira tentativa leva a força; a segunda, a linha sem ela. */
-    expect(corpo).toMatch(/insert\(\{ \.\.\.linha, strength: forca \}\)/);
+    expect(corpo).toMatch(/insert\(\{ \.\.\.linha, strength: pacote\.strength \}\)/);
     expect(corpo).toMatch(/insert\(linha\)/);
   });
 });
@@ -233,7 +237,15 @@ describe('⚠️ "A última" sai da ÚLTIMA SESSÃO REAL, e não do último pont
     const { readFileSync } = await import("node:fs");
     const { semComentarios } = await import("@/lib/sem-comentarios");
     const codigo = semComentarios(readFileSync("src/components/kicks-tab.tsx", "utf8"));
-    expect(codigo).toContain("ultimaContagem(history)");
+    /* ⚠️ A asserção cobrava `ultimaContagem(history)` com o NOME da lista, e
+       reprovou o dia em que a tela passou a ler a lista MESCLADA (servidor +
+       o que ainda não subiu). Isso não é detalhe de escrita: lendo só
+       `history`, a contagem que ela acabou de encerrar sem rede — a mais
+       RECENTE que existe — não seria "a última", e a fita descreveria o dia
+       anterior. É exatamente o defeito que `ultimaContagem` foi escrita para
+       impedir, voltando por outra porta. */
+    expect(codigo).toMatch(/ultimaContagem\(todas\)/);
+    expect(codigo).toContain("const todas = mesclar(history, pendentes)");
     expect(codigo).not.toMatch(/serie\s*\.at\(\s*-1\s*\)|serie\[serie\.length - 1\]/);
     /* E a frase da leitura só sai quando a última contagem FECHOU dez —
        sem esse portão, o sossego volta a falar do dia errado. */

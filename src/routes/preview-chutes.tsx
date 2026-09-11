@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { KicksTab, type KickSession } from "@/components/kicks-tab";
+import { PREFIXO_LOCAL, type SessaoPendente } from "@/lib/fila-de-chutes";
 
 /**
  * BANCADA DO CONTADOR DE MOVIMENTOS.
@@ -21,6 +22,7 @@ import { KicksTab, type KickSession } from "@/components/kicks-tab";
  *   `?estado=historico` — sessões anteriores, os três cartões
  *   `?estado=serie`     — doze contagens: o gráfico com a faixa do "seu normal"
  *   `?estado=longo`     — 14 noites: o corte da lista e o que ficou de fora
+ *   `?estado=pendente`  — uma contagem salva no aparelho que ainda não subiu
  *   `?estado=luto`      — Modo Cuidado
  *
  * ⚠️ `?w=` é a semana. Antes da 26ª a tela não fala de contagem (SOGC 2023);
@@ -121,6 +123,23 @@ const HISTORICO: KickSession[] = [
   sessao(60 * 92, 7, 120),
 ];
 
+/* ⚠️ **A CONTAGEM QUE AINDA NÃO SUBIU.** Ela é salva no aparelho no instante
+   do encerramento e sobe quando a rede volta (ver `fila-de-chutes.ts`) — então
+   só existe entre um `insert` que falhou e o próximo que der certo, o que é
+   impossível de fabricar numa conta de teste sem derrubar a rede na mão. Sem
+   este estado, a linha que diz "salva no seu celular" e o desfecho dela nunca
+   seriam olhados: é como a fila funcionaria por dentro e mentiria por fora. */
+const PENDENTE: SessaoPendente[] = [
+  {
+    id: `${PREFIXO_LOCAL}1`,
+    started_at: new Date(ANCORA - 40 * 60000).toISOString(),
+    ended_at: new Date(ANCORA - 18 * 60000).toISOString(),
+    kick_count: 10,
+    strength: 2,
+    tentativas: 1,
+  },
+];
+
 /* ⚠️ Catorze noites: o único estado que prova o corte da lista e a frase que
    diz o que ficou de fora. Com dez ou menos, o corte é invisível. */
 const LONGO: KickSession[] = Array.from({ length: 14 }, (_, i) =>
@@ -155,7 +174,9 @@ function Pagina() {
                   ? { history: LONGO }
                   : estado === "ultima-incompleta"
                     ? { history: ULTIMA_INCOMPLETA }
-                    : { history: [] };
+                    : estado === "pendente"
+                      ? { history: HISTORICO, pendentes: PENDENTE }
+                      : { history: [] };
 
   return (
     <div className="mx-auto max-w-lg px-4 py-6">

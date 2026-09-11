@@ -38,6 +38,16 @@ import {
   ultimaContagem,
 } from "@/lib/serie-de-chutes";
 import { FORCA_PADRAO, NIVEIS_DE_FORCA, nivelDeForca } from "@/lib/forca-do-movimento";
+import {
+  comSessao,
+  ehLocal,
+  gravarFilaDeChutes,
+  lerFilaDeChutes,
+  mesclar,
+  novoIdLocal,
+  semSessao,
+  type SessaoPendente,
+} from "@/lib/fila-de-chutes";
 import { guardarSessao, lerSessao } from "@/lib/sessao-guardada";
 import { sinalMovimentosReduzidos } from "@/lib/sinais-clinicos";
 import { manterTelaAcesa } from "@/lib/tela-acesa";
@@ -100,6 +110,8 @@ export function KicksTab({
     instavel?: boolean;
     /** Uma sessão em curso, com quantos movimentos e há quantos minutos. */
     ativa?: { count: number; minutos: number };
+    /** Contagens salvas no aparelho que ainda não subiram. */
+    pendentes?: SessaoPendente[];
   };
 }) {
   /* ⚠️ A sessão em curso é LOCAL — ela só vira linha no banco quando termina.
@@ -111,6 +123,12 @@ export function KicksTab({
   const [history, setHistory] = useState<KickSession[]>(bancada?.history ?? []);
   /** A leitura FALHOU — não é o mesmo que ela nunca ter contado chutes. */
   const [instavel, setInstavel] = useState(bancada?.instavel ?? false);
+  /**
+   * ⚠️ **AS CONTAGENS QUE AINDA NÃO SUBIRAM.** Elas já estão salvas no
+   * aparelho e aparecem na lista como qualquer outra — a diferença é que o
+   * médico ainda não as vê. Ver `fila-de-chutes.ts`.
+   */
+  const [pendentes, setPendentes] = useState<SessaoPendente[]>(bancada?.pendentes ?? []);
   /* Como sempre é o padrão: é o caso comum, e um padrão vazio obrigaria a
      escolher algo para poder encerrar. */
   const [forca, setForca] = useState<number>(FORCA_PADRAO);
@@ -176,6 +194,23 @@ export function KicksTab({
     if (ehBancada) return;
     load();
   }, [ehBancada]);
+
+  /* ⚠️ **A FILA É LIDA ASSIM QUE A CONTA RESOLVE, E TENTA SUBIR.** Sem isto o
+     pacote ficaria no aparelho esperando a próxima contagem para ser reparado —
+     e quem não conta todo dia só descobriria dias depois, se descobrisse.
+
+     ⚠️ E o ouvinte de `online` é o que fecha o caso do elevador e do
+     estacionamento: a rede volta sozinha, sem ninguém tocar em nada. */
+  useEffect(() => {
+    if (ehBancada || !uid) return;
+    const fila = lerFilaDeChutes(uid, Date.now());
+    setPendentes(fila);
+    void sincronizar(fila);
+    const aoVoltar = () => void sincronizar(lerFilaDeChutes(uid, Date.now()));
+    window.addEventListener("online", aoVoltar);
+    return () => window.removeEventListener("online", aoVoltar);
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [ehBancada, uid]);
 
   /* ⚠️ A SESSÃO EM CURSO É RESTAURADA. Trocar de sub-tela desmonta esta aba
      (`<Fade key={sub}>`), e o pior caminho era o do SOCORRO: o botão do cartão
@@ -243,74 +278,222 @@ export function KicksTab({
     }
   }
 
+  /**
+   * ⚠️ **A CONTAGEM É SALVA NO APARELHO, E SÓ DEPOIS SOBE.**
+   *
+   * Antes esta função era o único ponto de falha de até DUAS HORAS de contagem:
+   * `insert` direto, e sem rede saía `toast.error` com a contagem presa na tela
+   * esperando um dedo. E o que ela faz depois de duas horas deitada de lado é
+   * fechar o app — com a sessão guardada vencendo em quatro horas, a noite em
+   * que o bebê se mexeu pouco simplesmente sumia.
+   *
+   * Agora ela nunca falha do lado dela: o pacote entra na fila local no
+   * instante do encerramento e a subida acontece quando der (agora, ou quando a
+   * rede voltar). É o mesmo desenho da aba irmã — ver `fila-de-chutes.ts`.
+   */
   async function stop(finalCount = count) {
     if (!active) return;
-    /* ⚠️ `getSession` lê o DISCO; `getUser` ia à REDE — no caminho que grava
-       DUAS HORAS de contagem. Num 4G de hospital a paciente recebia "não foi
-       possível salvar" e perdia tudo por uma ida que não precisava existir. É
-       a mesma troca que o cronômetro de contrações já tinha feito. */
-    const { data: sess } = await supabase.auth.getSession();
-    const usuario = sess.session?.user?.id ?? uid;
-    if (!usuario) {
-      toast.error("Não foi possível salvar a sessão. Tente novamente.");
-      return;
+    const agora = Date.now();
+    /* ⚠️ **SEM `uid` A FILA NÃO PERSISTE**, e a contagem sumiria em silêncio —
+       o defeito que esta fila veio consertar, entrando pela porta dos fundos.
+       O efeito de montagem já o resolve do DISCO, então este caminho é raro;
+       ele existe para o caso em que ela encerra antes disso. `getSession` lê o
+       disco — `getUser` iria à rede, no fim de duas horas de contagem. */
+    let conta = uid;
+    if (!conta && !ehBancada) {
+      const { data: sess } = await supabase.auth.getSession();
+      conta = sess.session?.user?.id ?? null;
+      if (conta) setUid(conta);
     }
-    /* ⚠️ `started_at` vai EXPLÍCITO, e não pelo `DEFAULT now()` do banco: a
-       sessão começou quando ela tocou em "Iniciar", não quando ela encerrou —
-       e a duração é o que dá sentido a "10 em 2 horas". */
-    const linha = {
-      user_id: usuario,
+    const pacote: SessaoPendente = {
+      id: novoIdLocal(agora),
+      /* ⚠️ `started_at` é o instante em que ela TOCOU em iniciar, e não o de
+         agora: a duração é o que dá sentido a "10 em 2 horas". */
       started_at: active.startedAt,
-      ended_at: new Date().toISOString(),
+      ended_at: new Date(agora).toISOString(),
       kick_count: finalCount,
+      strength: forca,
+      tentativas: 0,
     };
-    /* ⚠️ DEGRAU DE RECUO, e ele não é opcional: `strength` nasce num
-       `APLICAR_*.sql` que o dono roda À MÃO, e o deploy chega ANTES — é o
-       estado normal desta produção. Sem o degrau, GRAVAR A SESSÃO pararia de
-       funcionar para todo mundo por causa de uma coluna que ninguém pediu.
+    const fila = comSessao(pendentes, pacote, agora);
+    setPendentes(fila);
+    gravarFilaDeChutes(conta ?? "", fila);
 
-       ⚠️ E o código é `PGRST204`, nunca `42703`: num INSERT quem recusa é o
-       PostgREST, pelo schema cache, e o pedido nem chega ao Postgres. Escrever
-       o outro já custou três recursos silenciosos nesta base. */
-    let { error } = await (supabase as any)
-      .from("kick_sessions")
-      .insert({ ...linha, strength: forca });
-    if ((error as { code?: string } | null)?.code === "PGRST204") {
-      ({ error } = await (supabase as any).from("kick_sessions").insert(linha));
-    }
-    if (error) {
-      /* ⚠️ NÃO limpa a tela: a contagem dela continua à mostra para ela poder
-         tentar de novo. Zerar aqui perderia duas horas de contagem. */
-      toast.error("Não foi possível salvar a sessão. Tente novamente.");
-      return;
-    }
-    /* ⚠️ **A CONTAGEM ACABAVA EM SILÊNCIO — o único retorno desta tela era
-       `toast.error`.** Ela conta dez movimentos, o botão some, a tela volta ao
-       começo, e nada diz que gravou: do lado de quem usa, isso é
-       indistinguível de ter perdido a contagem — e quem acha que perdeu conta
-       de novo, ou desiste. É a mesma lição que o cronômetro de contrações e o
-       registro de marco do bebê já pagaram aqui.
+    /* ⚠️ **O texto diz o RESULTADO, nunca "parabéns".** Isto é medida clínica,
+       não conquista: uma contagem que parou em quatro movimentos também é
+       salva, e festejá-la seria o app comemorando o que ela veio relatar. O
+       tempo aparece só quando os dez fecharam, porque é só aí que ele quer
+       dizer alguma coisa (é o eixo do gráfico).
 
-       ⚠️ **E o texto diz o RESULTADO, nunca "parabéns".** Isto é medida
-       clínica, não conquista: uma contagem que parou em quatro movimentos
-       também é salva, e festejá-la seria o app comemorando o que ela veio
-       relatar. O tempo aparece só quando os dez fecharam, porque é só aí que
-       ele quer dizer alguma coisa (é o eixo do gráfico). */
-    /* ⚠️ A duração sai de `active.startedAt` — o mesmo instante que vai para
-       a linha —, e nunca de `startRef`: ele é zero numa sessão restaurada
-       antes do efeito e na bancada, e `Date.now() - 0` são décadas. */
-    const minutos = Math.max(
-      1,
-      Math.round((Date.now() - new Date(active.startedAt).getTime()) / 60000),
-    );
+       ⚠️ E a duração sai de `active.startedAt` — o mesmo instante que vai para
+       a linha —, nunca de `startRef`: ele é zero numa sessão restaurada antes
+       do efeito e na bancada, e `Date.now() - 0` são décadas. */
+    const minutos = Math.max(1, Math.round((agora - new Date(active.startedAt).getTime()) / 60000));
     toast.success(
       finalCount >= 10 ? `10 movimentos em ${minutos} min. Contagem salva.` : "Contagem salva.",
     );
     setActive(null);
     setCount(0);
-    guardarSessao(uid, null);
-    load();
+    guardarSessao(conta, null);
     triggerAchievementsCheck();
+    await sincronizar(fila);
+  }
+
+  /**
+   * Sobe o que está na fila, uma de cada vez.
+   *
+   * ⚠️ **A PARTIR DA SEGUNDA TENTATIVA ELA CONFERE ANTES DE INSERIR.**
+   * `kick_sessions` não tem chave única: um `insert` que deu certo com a
+   * resposta perdida no caminho viraria uma SEGUNDA linha no mesmo instante — e
+   * duas contagens idênticas no prontuário fazem o médico ler duas noites onde
+   * houve uma. A chave natural é o `started_at`.
+   *
+   * ⚠️ E falha ao CONFERIR não insere: na dúvida, a contagem espera. Uma
+   * duplicata é dado clínico falso; um atraso é só um atraso.
+   */
+  async function sincronizar(lista: readonly SessaoPendente[]) {
+    if (ehBancada || !uid || !lista.length) return;
+    let fila = [...lista];
+    let subiuAlguma = false;
+    for (const pacote of lista) {
+      if (pacote.tentativas > 0) {
+        const { data: jaLa, error: erroConfere } = await (supabase as any)
+          .from("kick_sessions")
+          .select("id")
+          .eq("user_id", uid)
+          .eq("started_at", pacote.started_at)
+          .limit(1);
+        if (erroConfere) continue;
+        if (jaLa && jaLa.length) {
+          fila = semSessao(fila, pacote.id);
+          subiuAlguma = true;
+          continue;
+        }
+      }
+      const linha = {
+        user_id: uid,
+        started_at: pacote.started_at,
+        ended_at: pacote.ended_at,
+        kick_count: pacote.kick_count,
+      };
+      /* ⚠️ DEGRAU DE RECUO, e ele não é opcional: `strength` nasce num
+         `APLICAR_*.sql` que o dono roda À MÃO, e o deploy chega ANTES — é o
+         estado normal desta produção. Sem o degrau, GRAVAR A CONTAGEM pararia
+         de funcionar para todo mundo por causa de uma coluna que ninguém pediu.
+
+         ⚠️ E o código é `PGRST204`, nunca `42703`: num INSERT quem recusa é o
+         PostgREST, pelo schema cache, e o pedido nem chega ao Postgres. */
+      let { error } = await (supabase as any)
+        .from("kick_sessions")
+        .insert({ ...linha, strength: pacote.strength });
+      if ((error as { code?: string } | null)?.code === "PGRST204") {
+        ({ error } = await (supabase as any).from("kick_sessions").insert(linha));
+      }
+      if (error) {
+        fila = comSessao(fila, { ...pacote, tentativas: pacote.tentativas + 1 }, Date.now());
+        break;
+      }
+      fila = semSessao(fila, pacote.id);
+      subiuAlguma = true;
+    }
+    setPendentes(fila);
+    gravarFilaDeChutes(uid, fila);
+    if (subiuAlguma) await load();
+  }
+
+  /** Qual linha do histórico está aberta para correção. `null` = nenhuma. */
+  const [corrigindo, setCorrigindo] = useState<string | null>(null);
+
+  /**
+   * ⚠️ **CORRIGIR A FORÇA DEPOIS — o caminho que não existia.**
+   *
+   * A força é marcada DURANTE a contagem, e é o eixo com razão de chance 2,53
+   * para desfecho ruim (Heazell 2017). Errar o chip é o caso normal: ela está
+   * deitada no escuro, com o telefone na mão, prestando atenção no bebê e não
+   * na tela. E o número vai para o prontuário — uma noite marcada "mais fraco"
+   * por engano vira, do lado do médico, uma noite pior do que foi; e o
+   * contrário some com o sinal que a contagem existia para dar.
+   */
+  async function corrigirForca(id: string, valor: number) {
+    /* Pintura otimista: ela precisa VER que pegou. O recuo abaixo desfaz se o
+       servidor recusar. */
+    const antes = history;
+    setHistory((hs) => hs.map((h) => (h.id === id ? { ...h, strength: valor } : h)));
+    /* ⚠️ **A PENDENTE É CORRIGIDA NO APARELHO.** Ela ainda não existe no banco:
+       um `update` por id local não casaria linha nenhuma, devolveria
+       `error: null` (o PostgREST responde 204 a um update que não casa nada) e
+       a tela diria "corrigido" sobre coisa nenhuma — e o que subiria depois
+       seria o valor velho. */
+    if (ehLocal(id)) {
+      if (uid) {
+        const agora = Date.now();
+        const daFila = lerFilaDeChutes(uid, agora).find((x) => x.id === id);
+        if (daFila) {
+          const fila = comSessao(
+            lerFilaDeChutes(uid, agora),
+            { ...daFila, strength: valor },
+            agora,
+          );
+          gravarFilaDeChutes(uid, fila);
+          setPendentes(fila);
+        }
+      }
+      setCorrigindo(null);
+      return;
+    }
+    const { error } = await (supabase as any)
+      .from("kick_sessions")
+      .update({ strength: valor })
+      .eq("id", id);
+    if (error) {
+      /* ⚠️ **DESFAZ, e nunca "salvo" sobre o que não salvou.** É a régua que os
+         marcos do bebê pagaram: `{ ok: false }` chega numa resposta 200 normal,
+         então um `try/catch` não pega — é preciso LER o valor.
+
+         ⚠️ E o recuo do `PGRST204` NÃO existe aqui de propósito: sem a coluna
+         no banco não há o que corrigir, e o chip nem é desenhado. */
+      setHistory(antes);
+      toast.error("Não consegui corrigir agora. Tente de novo.");
+      return;
+    }
+    setCorrigindo(null);
+  }
+
+  /**
+   * ⚠️ **APAGAR UMA CONTAGEM — e o caso que torna isto clínico, não conforto.**
+   *
+   * Ela toca em "Iniciar sessão" e esquece; o telefone dorme; a sessão é
+   * encerrada com dois movimentos em duas horas. Essa linha é indistinguível,
+   * para o app, de uma noite em que o bebê de fato se mexeu pouco: ela sai
+   * âmbar na lista, entra em `clinical_events` com gravidade e aparece no
+   * rascunho de achados como "⚠️ Movimentos" — ou seja, vira um ALARME FALSO na
+   * fila do consultório, sobre uma contagem que nunca aconteceu.
+   *
+   * Até aqui o único caminho para desfazer isso era não existir. A aba Saúde
+   * tem o × por linha desde ago/2026, com a razão escrita: valor errado que não
+   * se pode apagar vira alarme falso no consultório.
+   */
+  async function apagarContagem(id: string) {
+    /* A que ainda não subiu sai só da fila — não há linha no banco para
+       apagar, e um `delete` por id local não casaria nada. */
+    if (ehLocal(id)) {
+      if (uid) {
+        const fila = semSessao(lerFilaDeChutes(uid, Date.now()), id);
+        gravarFilaDeChutes(uid, fila);
+        setPendentes(fila);
+      } else {
+        setPendentes((ps) => semSessao(ps, id));
+      }
+      setCorrigindo(null);
+      return;
+    }
+    const { error } = await (supabase as any).from("kick_sessions").delete().eq("id", id);
+    if (error) {
+      toast.error("Não consegui apagar esta contagem. Tente de novo.");
+      return;
+    }
+    setHistory((hs) => hs.filter((h) => h.id !== id));
+    setCorrigindo(null);
   }
 
   /* ⚠️ O relógio mora em `lib/` e as DUAS telas de cronômetro leem a mesma
@@ -343,7 +526,19 @@ export function KicksTab({
      pessoal, a leitura de hoje contra ela, e o tamanho da janela. Média
      aritmética, percentil populacional, tendência extrapolada e "score" ficam
      de fora de propósito. */
-  const serie = serieDeChutes(history);
+  /**
+   * ⚠️ **A LISTA QUE A TELA LÊ É A MESCLADA — o servidor mais o que ainda não
+   * subiu.** Sem isto a contagem que ela acabou de encerrar sem rede
+   * simplesmente não apareceria: o `load()` volta sem ela, e a tela diria
+   * "Nenhuma sessão registrada ainda" um segundo depois de a paciente ter
+   * contado por duas horas. É o pior desfecho possível desta tela, e ele seria
+   * a fila funcionando por dentro e mentindo por fora.
+   *
+   * ⚠️ E a mesclagem desempata por `started_at`: entre o `insert` dar certo e o
+   * `load()` responder, a mesma contagem existe nos dois lugares.
+   */
+  const todas = mesclar(history, pendentes) as KickSession[];
+  const serie = serieDeChutes(todas);
   const faixa = faixaPessoal(serie);
   const leitura = leituraDeHoje(serie, faixa);
   /* ⚠️ **"A última" NÃO é o último ponto da série.** A série descarta de
@@ -351,10 +546,10 @@ export function KicksTab({
      última" apresentando um dia anterior é reasseguramento sobre o dia errado
      — na tela que mede um dos nove sintomas VERMELHOS. A régua está em
      `serie-de-chutes.ts`, com o caso medido. */
-  const ultima = ultimaContagem(history);
+  const ultima = ultimaContagem(todas);
   /* A consulta já vem decrescente (`order("started_at", { ascending: false })`),
      então as primeiras são as últimas noites. */
-  const historicoVisivel = history.slice(0, LINHAS_NO_HISTORICO);
+  const historicoVisivel = todas.slice(0, LINHAS_NO_HISTORICO);
 
   /* Modo Cuidado: a aba inteira se cala. Ela oferecia "conte 10
      movimentos de {nome do bebê}" — o convite mais doloroso possível para
@@ -393,17 +588,31 @@ export function KicksTab({
             SOGC e PSANZ adotaram: mede-se o TEMPO até dez movimentos, deitada
             de lado, no começo da noite (o pico de atividade fica entre 21h e
             22h). Para a maioria isso leva cerca de vinte minutos. */}
-        <p className="mt-2 text-sm text-muted-foreground">
-          {isMonitoringPhase
-            ? `Conte quanto tempo ${label} leva para fazer 10 movimentos. Deitada de lado, no começo da noite — para a maioria são uns 20 minutos. Passadas 2 horas sem 10, ligue para o seu médico.`
-            : `A contagem começa por volta da semana ${SEMANA_DE_OBSERVAR}.`}
-        </p>
-        {/* Soluços são involuntários e não contam — é o que o protocolo diz, e
-            é a dúvida mais comum de quem começa a contar. */}
-        {isMonitoringPhase && (
-          <p className="mt-1 text-[13px] text-muted-foreground">
-            Valem chutes, socos, rolamentos e cutucadas. Soluços não contam.
-          </p>
+        {/* ⚠️ **O MÉTODO SAI DA FRENTE DURANTE A CONTAGEM.** Medido a 393px:
+            este bloco são ~150px de texto ACIMA do contador, e em produção ele
+            ainda tem o cabeçalho da grade (`VoltarDaGrade`) por cima. Com a
+            sessão em curso isso empurra o cartão vermelho — o que carrega o 192
+            — para a borda da dobra, e é o único momento em que ela não precisa
+            ler como se conta: ela já está contando.
+
+            Fora da sessão ele FICA, e em primeiro lugar: é o que ensina o
+            método, e é a razão pela qual a contagem vale alguma coisa. É a
+            mesma decisão que a aba irmã tomou com o aviso de uso. */}
+        {!active && (
+          <>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {isMonitoringPhase
+                ? `Conte quanto tempo ${label} leva para fazer 10 movimentos. Deitada de lado, no começo da noite — para a maioria são uns 20 minutos. Passadas 2 horas sem 10, ligue para o seu médico.`
+                : `A contagem começa por volta da semana ${SEMANA_DE_OBSERVAR}.`}
+            </p>
+            {/* Soluços são involuntários e não contam — é o que o protocolo diz,
+                e é a dúvida mais comum de quem começa a contar. */}
+            {isMonitoringPhase && (
+              <p className="mt-1 text-[13px] text-muted-foreground">
+                Valem chutes, socos, rolamentos e cutucadas. Soluços não contam.
+              </p>
+            )}
+          </>
         )}
         {/* ⚠️ **A TELA SE CONTRADIZIA, e o custo era um alarme falso que ela
             dava a si mesma.** Fotografado em `?estado=vazio&w=12`: a frase
@@ -471,6 +680,32 @@ export function KicksTab({
               </div>
             </button>
             <p className="mt-4 text-sm text-muted-foreground">⏱ {relogio}</p>
+            {/* ⚠️ **UM TOQUE A MAIS NÃO TINHA DESFAZER, E ELE ERRA PARA O LADO
+                DE TRANQUILIZAR.** Este é um contador de TOQUE: o dedo escorrega,
+                o telefone registra dois, ela conta um espreguiçar longo como
+                dois movimentos. E o efeito não é neutro — a contagem inflada
+                FECHA OS DEZ MAIS CEDO, então a tela responde "10 movimentos em
+                8 min" sobre uma noite em que ele se mexeu menos. O erro empurra
+                exatamente na direção que esta tela existe para não empurrar.
+
+                ⚠️ **E ele fica LONGE do círculo, com alvo próprio.** Um desfazer
+                encostado no botão que ela está tocando dezenas de vezes seria
+                acertado sem querer — e aí o conserto vira o defeito. O rótulo
+                diz o que aconteceu ("contei um a mais"), e não uma operação
+                aritmética: ninguém em pé, no escuro, procura um "−1". */}
+            {count > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  const anterior = count - 1;
+                  setCount(anterior);
+                  guardarSessao(uid, { startedAt: active.startedAt, count: anterior, forca });
+                }}
+                className="press mt-1 inline-flex min-h-11 items-center px-3 text-[13px] text-muted-foreground underline underline-offset-4 hover:text-sky-900"
+              >
+                Contei um a mais — tirar 1
+              </button>
+            )}
             {/* ⚠️ O caminho de socorro, no formato que o cronômetro de
                 contrações já usa: a frase da régua e DOIS toques — o médico
                 dela e o 192. Nada aqui depende de a sessão ser encerrada:
@@ -642,7 +877,7 @@ export function KicksTab({
           empilhados: no celular os três viravam 330px de rolagem para três
           números, e eles contam UMA história — o seu normal, a última, e sobre
           quantas contagens isso foi medido. */}
-      {history.length > 0 && (
+      {todas.length > 0 && (
         <div className="rounded-3xl card-material p-5">
           <div className="grid grid-cols-3 gap-2 text-center">
             <div>
@@ -673,7 +908,7 @@ export function KicksTab({
             </div>
             <div>
               <p className="text-[13px] font-medium text-sky-800">Contagens</p>
-              <p className="mt-1 font-serif text-2xl tabular-nums">{history.length}</p>
+              <p className="mt-1 font-serif text-2xl tabular-nums">{todas.length}</p>
             </div>
           </div>
           <p className="mt-3 text-[13px] leading-snug text-muted-foreground">
@@ -714,7 +949,7 @@ export function KicksTab({
               que ela é prop. A carteirinha já carrega "ligue 192" na dela;
               aqui o que não pode faltar é dizer que a decisão de procurar
               atendimento NÃO depende desta tela voltar. */}
-          {instavel && history.length === 0 && (
+          {instavel && todas.length === 0 && (
             <NaoConsegueLer
               oQue="o seu histórico de chutes"
               sossego="As suas contagens continuam salvas. E se você está sentindo o bebê se mexer menos que o normal dele, não espere por esta tela: fale com o seu médico ou procure atendimento."
@@ -728,7 +963,7 @@ export function KicksTab({
               de novo, e o prontuário fica com duas linhas de duas horas.
               ⚠️ A confirmação de que gravou vem do INSERT, nunca do sucesso da
               recarga — é por isso que o texto diz que a contagem foi salva. */}
-          {instavel && history.length > 0 && (
+          {instavel && todas.length > 0 && (
             <div className="rounded-xl border border-sky-200 bg-sky-50/70 p-3 text-[13px] text-sky-900">
               Não consegui atualizar a lista agora — a sua contagem foi salva.{" "}
               <button
@@ -740,7 +975,7 @@ export function KicksTab({
               </button>
             </div>
           )}
-          {!instavel && history.length === 0 && (
+          {!instavel && todas.length === 0 && (
             <p className="text-sm text-muted-foreground">Nenhuma sessão registrada ainda.</p>
           )}
           {/* ⚠️ **A LISTA DESENHAVA ATÉ 120 LINHAS, e o comentário do `load()`
@@ -777,64 +1012,125 @@ export function KicksTab({
                `=== 1 || === 3` escrito aqui é a régua duplicada — o dia em que
                alguém acrescentar um nível, este chip some sem erro nenhum. */
             const forcaDaNoite = nivelDeForca(s.strength);
+            const aberta = corrigindo === s.id;
+            /* ⚠️ A pendente é a que ainda não subiu: ela já está SALVA (no
+               aparelho), e o que falta é o médico ver. Dizer "não salvou" aqui
+               seria mentir; não dizer nada faria a paciente concluir que o
+               consultório já recebeu. */
+            const pendente = ehLocal(s.id);
             return (
-              <div
-                key={s.id}
-                className="flex items-center gap-2 rounded-xl card-material p-3 text-sm"
-              >
-                {/* ⚠️ Dia e hora CURTOS, sem o ano: a lista é de 90 dias, e a
-                    data cheia quebrava a linha em três no celular — medido a
-                    393px, com umas linhas de uma altura e outras de três. */}
-                <span className="tabular-nums text-muted-foreground">
-                  {diaCurto(s.started_at)} · {horaCurta(s.started_at)}
-                </span>
-                {s.kick_count >= 10 ? (
-                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">
-                    ✓ 10
+              <div key={s.id} className="rounded-xl card-material">
+                {/* ⚠️ **A LINHA INTEIRA É O ALVO, e não um × de canto.** Medido
+                    no chá de bebê: um × com `-my-2` encavala a caixa com a da
+                    linha de baixo, e o toque dez pixels abaixo do centro apaga o
+                    ITEM ERRADO. Numa lista que apaga dado clínico isso é
+                    inaceitável — e aqui a linha apagada é uma noite inteira de
+                    contagem. */}
+                <button
+                  type="button"
+                  onClick={() => setCorrigindo(aberta ? null : s.id)}
+                  aria-expanded={aberta}
+                  className="press flex w-full items-center gap-2 p-3 text-left text-sm"
+                >
+                  {/* ⚠️ Dia e hora CURTOS, sem o ano: a lista é de 90 dias, e a
+                      data cheia quebrava a linha em três no celular — medido a
+                      393px, com umas linhas de uma altura e outras de três. */}
+                  <span className="tabular-nums text-muted-foreground">
+                    {diaCurto(s.started_at)} · {horaCurta(s.started_at)}
                   </span>
-                ) : naoChegouEmDuasHoras ? (
-                  /* ⚠️ **A NOITE DO ALARME PARECIA UMA NOITE QUALQUER.** Uma
-                     contagem que ela encerrou aos oito minutos com quatro
-                     movimentos e a que passou DUAS HORAS com quatro saíam com
-                     o mesmo chip azul-pálido — e a segunda é literalmente o
-                     caso que faz esta tela existir. É a linha que ela mostra ao
-                     médico, e a que ela procura quando quer saber se já
-                     aconteceu antes. */
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
-                    {s.kick_count} em 2h
-                  </span>
-                ) : (
-                  <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs text-sky-900">
-                    {s.kick_count}
-                  </span>
+                  {s.kick_count >= 10 ? (
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">
+                      ✓ 10
+                    </span>
+                  ) : naoChegouEmDuasHoras ? (
+                    /* ⚠️ **A NOITE DO ALARME PARECIA UMA NOITE QUALQUER.** Uma
+                       contagem que ela encerrou aos oito minutos com quatro
+                       movimentos e a que passou DUAS HORAS com quatro saíam com
+                       o mesmo chip azul-pálido — e a segunda é literalmente o
+                       caso que faz esta tela existir. É a linha que ela mostra
+                       ao médico, e a que ela procura quando quer saber se já
+                       aconteceu antes. */
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
+                      {s.kick_count} em 2h
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs text-sky-900">
+                      {s.kick_count}
+                    </span>
+                  )}
+                  {/* ⚠️ A FORÇA É LIDA AQUI, e isto não é enfeite: sem um
+                      leitor, a coluna seria escrita e nunca vista — a corrente
+                      quebrada que este repositório já pagou meia dúzia de
+                      vezes. É o eixo com aOR 2,53 para desfecho ruim, e é
+                      comparando com as outras noites que ela percebe a
+                      MUDANÇA. */}
+                  {forcaDaNoite?.chip && (
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs ${
+                        forcaDaNoite.valor === 1
+                          ? "bg-amber-100 text-amber-900"
+                          : "bg-sky-100 text-sky-900"
+                      }`}
+                    >
+                      {forcaDaNoite.chip}
+                    </span>
+                  )}
+                  {/* O minuto é o dado da série — ele vem por último e alinhado
+                      à direita, que é onde o olho já procura o número. */}
+                  <span className="ml-auto tabular-nums font-medium">{dur} min</span>
+                </button>
+                {pendente && (
+                  <p className="px-3 pb-2 text-[13px] text-muted-foreground">
+                    Salva no seu celular — vai para o seu médico quando a internet voltar.
+                  </p>
                 )}
-                {/* ⚠️ A FORÇA É LIDA AQUI, e isto não é enfeite: sem um leitor,
-                    a coluna seria escrita e nunca vista — a corrente quebrada
-                    que este repositório já pagou meia dúzia de vezes. É o eixo
-                    com aOR 2,53 para desfecho ruim, e é comparando com as
-                    outras noites que ela percebe a MUDANÇA. */}
-                {forcaDaNoite?.chip && (
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs ${
-                      forcaDaNoite.valor === 1
-                        ? "bg-amber-100 text-amber-900"
-                        : "bg-sky-100 text-sky-900"
-                    }`}
-                  >
-                    {forcaDaNoite.chip}
-                  </span>
+                {aberta && (
+                  <div className="border-t border-border px-3 pb-3 pt-3">
+                    {/* ⚠️ **A FORÇA É O QUE SE CORRIGE, e não a contagem.** O
+                        número de movimentos é a MEDIDA — reescrevê-lo depois
+                        seria o app deixando a paciente reescrever o fato que
+                        ela veio registrar. O que se erra de verdade é o chip,
+                        marcado no escuro com o telefone na mão; e para o toque a
+                        mais durante a contagem existe o desfazer, lá em cima. */}
+                    <p className="text-[13px] text-muted-foreground">Como estavam os movimentos?</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {NIVEIS_DE_FORCA.map((n) => (
+                        <button
+                          key={n.valor}
+                          type="button"
+                          onClick={() => void corrigirForca(s.id, n.valor)}
+                          className={`press min-h-11 rounded-full border px-3 text-xs font-medium ${
+                            s.strength === n.valor
+                              ? "border-sky-700 bg-sky-700 text-white"
+                              : "border-border text-muted-foreground"
+                          }`}
+                        >
+                          {n.rotulo}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void apagarContagem(s.id)}
+                      className="press mt-3 inline-flex min-h-11 items-center rounded-full border border-rose-300 px-4 text-xs font-semibold text-rose-800"
+                    >
+                      Apagar esta contagem
+                    </button>
+                    <p className="mt-2 text-[13px] leading-snug text-muted-foreground">
+                      Apague só o que não aconteceu — uma sessão que você abriu sem querer, por
+                      exemplo. Uma noite em que {label} se mexeu pouco é justamente o que o seu
+                      médico precisa ver.
+                    </p>
+                  </div>
                 )}
-                {/* O minuto é o dado da série — ele vem por último e alinhado à
-                    direita, que é onde o olho já procura o número. */}
-                <span className="ml-auto tabular-nums font-medium">{dur} min</span>
               </div>
             );
           })}
-          {history.length > historicoVisivel.length && (
+          {todas.length > historicoVisivel.length && (
             <p className="pt-1 text-[13px] text-muted-foreground">
               Mostrando as {LINHAS_NO_HISTORICO} últimas. As outras{" "}
-              {history.length - historicoVisivel.length} dos últimos 90 dias continuam salvas e
-              entram nas contas acima.
+              {todas.length - historicoVisivel.length} dos últimos 90 dias continuam salvas e entram
+              nas contas acima.
             </p>
           )}
         </div>

@@ -16006,3 +16006,167 @@ todos os outros estados usam intensidade constante, e foi por isso que a régua
 podia nascer sem nunca ter sido olhada) · `?estado=instavel-com-fila` (a falha
 de leitura que já não apaga o que ela cronometrou) · e a bancada do prontuário
 ganhou duas noites de contração, que ela nunca teve.
+
+## A mesma nota, aplicada à aba irmã: o contador de movimentos (set/2026)
+
+Pedido do dono, depois de os cinco critérios da aba de contrações chegarem a 10:
+_"faça oq deve ser feito para todos ficarem nota 10"_. "Todos" são as duas telas
+do par — elas vivem no mesmo hub, medem os dois sintomas vermelhos que uma
+gestante mede sozinha em casa, e **quase todo conserto que uma recebeu nunca
+chegou à outra**. A mesma régua de cinco critérios, medida antes de opinar:
+
+| critério               | contrações (set/2026) | chutes, antes desta leva |
+| ---------------------- | --------------------- | ------------------------ |
+| segurança clínica      | 10                    | **9**                    |
+| o momento real         | 10                    | **5**                    |
+| qualidade do dado      | 10                    | **4**                    |
+| o que chega ao médico  | 10                    | **8**                    |
+| desenho e legibilidade | 10                    | **7**                    |
+
+### ⚠️ 1. DUAS HORAS DE CONTAGEM DEPENDIAM DE UMA IDA À REDE
+
+`stop()` era o único ponto de falha de uma sessão inteira: a linha só nasce no
+ENCERRAMENTO (decisão certa, e testada — a linha aberta com `kick_count: 0`
+chegava ao prontuário como "Movimentos — 0 movimentos", uma afirmação que nunca
+aconteceu), então TODO o valor da noite atravessava um `insert`. Falhando ele,
+saía `toast.error` e a contagem ficava presa na tela esperando um dedo.
+
+⚠️ **E o que ela de fato faz depois de duas horas deitada de lado é fechar o
+app.** A sessão em curso é guardada, com validade de QUATRO HORAS: a paciente
+que contou no quarto dos fundos, recebeu o erro e voltou na manhã seguinte
+encontrava **nada**. Perder a noite em que o bebê se mexeu pouco é perder
+exatamente a que importa.
+
+**`fila-de-chutes.ts`** faz a contagem nascer no aparelho e subir quando der.
+
+- ⚠️ **O MECANISMO VIROU UM MÓDULO SÓ (`fila-local.ts`), e essa foi a primeira
+  decisão.** A fila das contrações resolveu isto uma leva antes, e a segunda
+  cópia ia nascer aqui. Duas filas escritas à mão divergem no primeiro
+  conserto — e a divergência apareceria como **uma das duas perdendo dado
+  clínico em silêncio**, porque uma fila que falha fica calada por construção.
+  Há teste cobrando que nenhuma das duas volte a falar com o `localStorage` por
+  conta própria.
+- ⚠️ **O QUE NÃO É GENÉRICO FICOU DE FORA**, e é uma diferença clínica: numa
+  contração sobe a ENCERRADA (a aberta ainda vai ganhar `ended_at`, e é um
+  estado legítimo); aqui `ended_at` é OBRIGATÓRIO no validador do pacote, porque
+  um pacote sem fim viraria a linha aberta que a decisão de gravar-no-
+  encerramento existe para impedir.
+- ⚠️ **A partir da SEGUNDA tentativa ela CONFERE antes de inserir.**
+  `kick_sessions` não tem chave única: um `insert` que deu certo com a resposta
+  perdida no caminho viraria **duas noites de contagem** no prontuário. A chave
+  natural é o `started_at`. E falha ao CONFERIR não insere — uma duplicata é
+  dado clínico falso; um atraso é só um atraso.
+- ⚠️ **O ouvinte de `online` é o que fecha o caso do elevador**: a rede volta
+  sozinha, sem ninguém tocar em nada.
+- ⚠️ **A LISTA QUE A TELA LÊ É A MESCLADA.** Sem isso a fila funcionaria por
+  dentro e mentiria por fora: o `load()` volta sem a pendente e a tela diria
+  "Nenhuma sessão registrada ainda" um segundo depois de ela ter contado por
+  duas horas. É o pior desfecho possível desta tela.
+- ⚠️ **E "A ÚLTIMA" passou a sair da lista mesclada** — lendo só o servidor, a
+  contagem que ela acabou de encerrar sem rede (a mais RECENTE que existe) não
+  seria "a última", e a fita descreveria o dia anterior. É o defeito que
+  `ultimaContagem` foi escrita para impedir, voltando por outra porta.
+- ⚠️ **Sem `uid` resolvido, `stop()` o busca do DISCO** (`getSession`, nunca
+  `getUser`): sem ele a fila não persiste e a contagem sumiria em silêncio — o
+  defeito que ela veio consertar, entrando pela porta dos fundos.
+
+### ⚠️ 2. UM TOQUE A MAIS NÃO TINHA DESFAZER — e ele erra para o lado de TRANQUILIZAR
+
+Este é um contador de TOQUE: o dedo escorrega, o telefone registra dois, um
+espreguiçar longo é contado como dois movimentos. E o efeito não é neutro — **a
+contagem inflada FECHA OS DEZ MAIS CEDO**, então a tela responde "10 movimentos
+em 8 min" sobre uma noite em que ele se mexeu menos. O erro empurra exatamente
+na direção que esta tela existe para não empurrar.
+
+- ⚠️ **O desfazer fica LONGE do círculo, com alvo próprio** (medido: o botão em
+  y=400, o círculo termina em 360, com o relógio entre os dois). Um desfazer
+  encostado no botão que ela toca dezenas de vezes seria acertado sem querer — e
+  aí o conserto vira o defeito.
+- ⚠️ **Ele REESCREVE a sessão guardada**, senão trocar de aba traria o valor
+  inflado de volta.
+- O rótulo diz o que aconteceu ("Contei um a mais"), e não uma operação
+  aritmética: ninguém em pé, no escuro, procura um "−1".
+
+### ⚠️ 3. A CONTAGEM ABERTA SEM QUERER VIRAVA ALARME FALSO NO CONSULTÓRIO
+
+Ela toca em "Iniciar sessão" e esquece; o telefone dorme; a sessão é encerrada
+com dois movimentos em duas horas. Essa linha é indistinguível, para o app, de
+uma noite em que o bebê de fato se mexeu pouco: sai âmbar na lista, entra em
+`clinical_events` com gravidade e aparece no rascunho de achados como
+"⚠️ Movimentos". **Até aqui não havia caminho nenhum para desfazer isso** — nem
+apagar uma linha, nem corrigir a força depois.
+
+- ⚠️ **A LINHA INTEIRA É O ALVO, e não um × de canto.** Medido no chá de bebê:
+  um × com `-my-2` encavala a caixa com a da linha de baixo, e o toque dez
+  pixels abaixo do centro apaga o ITEM ERRADO. Numa lista que apaga dado clínico
+  isso é inaceitável — e aqui a linha apagada é uma noite inteira de contagem.
+- ⚠️ **O que se corrige é a FORÇA, e nunca a contagem.** O número de movimentos
+  é a MEDIDA; reescrevê-lo depois seria o app deixando a paciente reescrever o
+  fato que ela veio registrar. Para o toque a mais existe o desfazer, durante a
+  sessão. A força é o eixo com aOR 2,53 (Heazell 2017) e é marcada no escuro com
+  o telefone na mão — errar o chip é o caso normal.
+- ⚠️ **A pendente é corrigida e apagada NA FILA**, nunca por id no banco: um
+  `update`/`delete` por id local não casa linha nenhuma e devolve `error: null`
+  (o PostgREST responde 204), então a tela diria "pronto" sobre coisa nenhuma —
+  e o que subiria depois seria o valor velho.
+- ⚠️ **E o texto diz o que NÃO apagar**: "uma noite em que ele se mexeu pouco é
+  justamente o que o seu médico precisa ver". Sem isso, o botão que existe para
+  tirar um alarme falso da fila tiraria o verdadeiro.
+
+### 4. O método sai da frente durante a contagem
+
+Medido a 393px: o bloco que ensina o método são ~150px de texto ACIMA do
+contador, e em produção ele ainda tem o cabeçalho da grade por cima. Com a
+sessão em curso isso empurrava o cartão vermelho — o que carrega o 192 — para a
+borda da dobra.
+
+|                    | antes | depois    |
+| ------------------ | ----- | --------- |
+| contador           | y=341 | **y=184** |
+| "Ligar 192 (SAMU)" | y=716 | **y=607** |
+
+⚠️ **Fora da sessão ele FICA, e em primeiro lugar**: é o que ensina o método, e
+é a razão pela qual a contagem vale alguma coisa. É a mesma decisão que a aba
+irmã tomou com o aviso de uso, e a mesma linha que separa "não está aqui agora"
+de "não existe mais".
+
+### ⚠️ E CINCO TESTES TRAVAVAM A GRAFIA — a décima sétima vez
+
+Os cinco ficaram vermelhos sobre mudanças que só APERTAM a garantia:
+`guardarSessao(uid, null)` com o nome da variável, `.insert(` dentro de `stop`,
+`toast.error` dentro de `stop`, a fatia do degrau do `PGRST204` ancorada em
+`stop`, e `ultimaContagem(history)` com o nome da lista.
+
+⚠️ **O terceiro é o mais instrutivo: ele cobrava "falhar ao gravar NÃO limpa a
+tela" — ou seja, travava no lugar o comportamento que ESTA leva veio consertar.**
+Um teste que descreve como o código está escrito, e não o que ele garante, um dia
+reprova o conserto. Todos os cinco passaram a cobrar a garantia, com a razão
+escrita ao lado.
+
+⚠️ **E duas âncoras minhas caíram em COMENTÁRIO** — `semComentarios` apaga a
+prosa, `indexOf` devolveu −1 e a fatia foi ao fim do arquivo. As duas âncoras de
+uma fatia são de CÓDIGO, sempre.
+
+### O que NÃO foi feito, e por quê
+
+⚠️ **`movimento` continua fora de `eventosQuePedemOlhar`** (a fila de trabalho
+do consultório). Uma sessão `grave` É deterioração — a razão escrita lá nasceu
+quando o evento só carregava a contagem —, mas o CLAUDE.md registra que **mexer
+em qual evento clínico entra na fila é escolha do dono**, e ela continua sendo.
+O argumento dos dois lados está na seção do movimento, acima; reverter é uma
+linha no `.in()`.
+
+**Medido ao fim:** 6.338 → **6.356 testes verdes** · **207 bancadas** e **17
+roteiros de interação** sem problema · **7 mutantes em vermelho** (o encerramento
+sem gravar na fila, a confirmação de duplicata neutralizada, a lista ignorando as
+pendentes, o desfazer sem reescrever a sessão, o pacote sem fim entrando na fila,
+a fila voltando ao `localStorage`) · nenhum alvo abaixo de 44px na folha de
+correção · zero erros de console nos estados fotografados.
+
+**Sem SQL:** tudo sai de `kick_sessions` e de colunas que já existem.
+**Bancada nova:** `/preview-chutes?estado=pendente` — a contagem salva no
+aparelho que ainda não subiu só existe entre um `insert` que falhou e o próximo
+que der certo, e não se fabrica numa conta de teste sem derrubar a rede na mão.
+**Roteiros novos:** `chutes · corrigir a força de uma contagem` e
+`chutes · tirar um toque contado a mais` — os dois caminhos que mexem em dado
+clínico e que só nascem de um toque.

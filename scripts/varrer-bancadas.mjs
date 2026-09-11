@@ -65,6 +65,10 @@ const EXTRAS = [
   "/preview-chutes?estado=serie",
   "/preview-chutes?estado=instavel-historico",
   "/preview-chutes?estado=ultima-incompleta",
+  /* ⚠️ A contagem salva no aparelho que ainda não subiu: ela só existe entre
+     um `insert` que falhou e o próximo que der certo, e não se fabrica numa
+     conta de teste sem derrubar a rede na mão. */
+  "/preview-chutes?estado=pendente",
   /* ⚠️ O corte da lista e a frase que diz o que ficou de fora só existem acima
      de dez noites — com menos, o corte é invisível. */
   "/preview-chutes?estado=longo",

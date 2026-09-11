@@ -126,6 +126,22 @@ const ROTEIRO = [
     nome: "contrações · corrigir a intensidade de uma linha",
     passos: [{ clique: /^\d{2}:\d{2}/ }, { clique: /^Forte$/ }],
   },
+  /* ⚠️ **E o mesmo caminho na aba irmã.** Apagar uma contagem é o conserto de
+     um ALARME FALSO no consultório (a sessão aberta sem querer, encerrada com
+     dois movimentos em duas horas, que sai âmbar e entra nos achados) — ou
+     seja, é um caminho que mexe em dado clínico e que só nasce de um toque. */
+  {
+    q: "/preview-chutes?estado=historico&w=30",
+    nome: "chutes · corrigir a força de uma contagem",
+    passos: [{ clique: /em 2h/ }, { clique: /^Mais fraco$/ }],
+  },
+  /* ⚠️ O desfazer do toque a mais: ele só existe com a contagem em curso, e é
+     o conserto do erro que empurra para o lado de TRANQUILIZAR. */
+  {
+    q: "/preview-chutes?estado=contando&w=30",
+    nome: "chutes · tirar um toque contado a mais",
+    passos: [{ clique: /Contei um a mais/ }],
+  },
 ];
 
 /** Ruído de ambiente, não da tela — a mesma lista da varredura de bancadas. */
