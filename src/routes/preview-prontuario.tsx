@@ -51,6 +51,11 @@ export const Route = createFileRoute("/preview-prontuario")({
        de Peso passou meses cravando "normal" sem ninguém olhar. */
     perdapeso: q.perdapeso == null ? 0 : Number(q.perdapeso),
     pos: q.pos == null ? 0 : Number(q.pos),
+    /* ⚠️ O exame enviado ANTES de o envio sair do produto (ago/2026). Nada
+       escreve em `exam_files` desde então, então este estado não se fabrica
+       numa conta de teste — e sem ele a linha condicional que o mostra fica
+       sem foto, que é como o contador permanentemente em zero sobreviveu. */
+    exame: q.exame == null ? 0 : Number(q.exame),
   }),
 });
 
@@ -83,7 +88,8 @@ function ev(
 }
 
 function Bancada() {
-  const { degradada, incompleto, carregando, semficha, secao, perdapeso, pos } = Route.useSearch();
+  const { degradada, incompleto, carregando, semficha, secao, perdapeso, pos, exame } =
+    Route.useSearch();
 
   const ficha: FichaClinica = {
     nome: "Marina Costa",
@@ -116,6 +122,21 @@ function Bancada() {
     ev("2026-08-12T08:00:00.000Z", "medida", { weight_kg: perdapeso ? 55.2 : 71.4 }, "normal"),
     ev("2026-08-09T21:40:00.000Z", "medida", { glucose_mg_dl: 96 }, "normal"),
     ev("2026-08-04T09:10:00.000Z", "medida", { systolic: 128, diastolic: 84 }, "normal"),
+    /* O exame HISTÓRICO: `fonte` é `exam_files`, que é o que `mudancasDesde`
+       recorta como espécie `exame`. */
+    ...(exame
+      ? [
+          ev(
+            "2026-08-16T10:00:00.000Z",
+            "exame",
+            {},
+            "normal",
+            "Ultrassom morfológico",
+            [],
+            "exam_files",
+          ),
+        ]
+      : []),
     /* ⚠️ AS DUAS SESSÕES DE MOVIMENTO EXISTEM PARA PROVAR A FORÇA, e ela nunca
        tinha sido fotografada: a bancada não trazia nenhum evento `movimento`,
        então a coluna era escrita, projetada pela view e DESCARTADA no caminho

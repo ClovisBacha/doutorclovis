@@ -399,31 +399,66 @@ export const eventosQuePedemOlhar = createServerFn({ method: "POST" })
       if (ids.length === 0) return falhou ? { ...vazio, incompleto: true } : vazio;
 
       const desde = new Date(Date.now() - data.dias * 86400000).toISOString();
-      const { linhas, incompleto } = await lerEventos(
-        ids,
-        (q) =>
-          q
-            /* Humor e movimento ficam de fora daqui de propósito: são sinais de
-             engajamento, não de deterioração, e enchiam a fila de itens que
-             não mudam conduta. Eles continuam na ficha da paciente. */
-            /* `humor` ENTRA — é onde mora o EPDS, e a questão 10 é ideação de
-             autoagressão. O rótulo de humor do diário não vaza junto porque
-             não tem régua: sai `normal` e o filtro abaixo o descarta.
+      /* `humor` ENTRA — é onde mora o EPDS, e a questão 10 é ideação de
+         autoagressão. O rótulo de humor do diário não vaza junto porque não tem
+         régua: sai `normal` e o filtro abaixo o descarta.
 
-             `contracao` SAI: não há régua para intensidade, então toda linha
-             saía normal — mas era buscada, e uma noite de trabalho de parto
-             grava centenas de linhas que consumiam o teto de 400 e empurravam
-             para fora a pressão alterada de outra paciente, sem nenhum sinal.
+         `contracao` SAI: não há régua para intensidade, então toda linha saía
+         normal — mas era buscada, e uma noite de trabalho de parto grava
+         centenas de linhas que consumiam o teto e empurravam para fora a
+         pressão alterada de outra paciente, sem nenhum sinal.
 
-             `emergencia` e `consulta` SAEM porque SOS e pré-consulta já têm
-             item próprio na fila, com marcador de resolução próprio
-             (`atendido_em`, `seen_by_doctor`). Mantendo os dois, o item que o
-             médico acabou de resolver de um lado continuava vivo do outro. */
-            .in("especie", ["medida", "sintoma", "humor"])
-            .gte("ocorrido_em", desde)
-            .order("ocorrido_em", { ascending: false }),
-        TETO_FILA,
-      );
+         `emergencia` e `consulta` SAEM porque SOS e pré-consulta já têm item
+         próprio na fila, com marcador de resolução próprio (`atendido_em`,
+         `seen_by_doctor`). Mantendo os dois, o item que o médico acabou de
+         resolver de um lado continuava vivo do outro.
+
+         ⚠️ `movimento` ENTRA — e ele vem NUMA LEITURA PRÓPRIA, logo abaixo.
+         O comentário que ficava aqui dizia que movimento era "sinal de
+         engajamento, não de deterioração". Isso era VERDADE quando o evento
+         carregava só a contagem de chutes, e deixou de ser em set/2026: a view
+         passou a projetar `duracao_min` e `avaliar` passou a classificar a
+         sessão por `sinalMovimentosReduzidos`. Desde então uma sessão pode sair
+         GRAVE — duas horas com menos de dez movimentos —, e redução de
+         movimento fetal é um dos nove sintomas VERMELHOS de `triage.ts`. A
+         razão escrita tinha vencido, e é a classe de defeito que este
+         repositório já pagou quatro vezes: prosa desatualizada sustentando uma
+         decisão que os fatos não sustentam mais. */
+      const [daFila, doMovimento] = await Promise.all([
+        lerEventos(
+          ids,
+          (q) =>
+            q
+              .in("especie", ["medida", "sintoma", "humor"])
+              .gte("ocorrido_em", desde)
+              .order("ocorrido_em", { ascending: false }),
+          TETO_FILA,
+        ),
+        /* ⚠️ LEITURA SEPARADA, E NÃO UMA STRING A MAIS NO `.in()` ACIMA — é a
+           diferença entre consertar e repetir o mecanismo do `contracao`.
+           O teto corta ANTES do filtro de gravidade (que roda em TypeScript,
+           sobre o que sobrou), na ordem `ocorrido_em DESC`. Uma contagem normal
+           é a esmagadora maioria das sessões, então no `.in()` cada uma delas
+           gastaria orçamento da MESMA cota e o que cairia seria o evento mais
+           antigo da janela — de qualquer paciente, inclusive uma pressão
+           alterada de outra pessoa. Com orçamento próprio, movimento não
+           disputa com pressão: no pior caso ele trunca a si mesmo, e a faixa de
+           `incompleto` acende do mesmo jeito.
+           O teto é o MESMO `TETO_FILA` de propósito: um segundo número aqui
+           seria mais uma constante a manter em sincronia, e não há razão para
+           movimento ter orçamento menor que os outros. */
+        lerEventos(
+          ids,
+          (q) =>
+            q
+              .eq("especie", "movimento")
+              .gte("ocorrido_em", desde)
+              .order("ocorrido_em", { ascending: false }),
+          TETO_FILA,
+        ),
+      ]);
+      const linhas = [...daFila.linhas, ...doMovimento.linhas];
+      const incompleto = daFila.incompleto || doMovimento.incompleto;
 
       const tratados = await lerDesfechos(user.id, { desde });
       const eventos = montar(linhas, tratados)

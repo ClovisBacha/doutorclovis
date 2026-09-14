@@ -522,53 +522,70 @@ export function ChaDeBebe({
               const e = i.tipo === "cota" ? estadoDaCota(i.meta, i.reservado) : null;
               return (
                 <li key={i.id} className="text-sm">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="min-w-0 flex-1">{i.titulo}</span>
-                    <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                      {e ? legendaDaCota(e) : i.reservado > 0 ? "reservado 💛" : "—"}
+                  {/* ⚠️ A LINHA INTEIRA É O ALVO, e não um ✕ de canto — é o
+                      MESMO padrão da lista de registros clínicos da aba Saúde e
+                      das abas de chutes e contrações, pelo mesmo motivo medido:
+                      um ✕ com `-my-2` encavala a caixa da linha vizinha, e o
+                      toque 10px abaixo do centro tirava o ITEM ERRADO. Medido a
+                      393px antes: caixa 29×32, alvo EFETIVO 30×26 nas linhas
+                      com vizinho abaixo.
+                      ⚠️ E NÃO se conserta com `after:-inset`: foi tentado e
+                      medido — o pseudo-elemento do vizinho fica por cima e a
+                      altura efetiva CAI de 18 para 6px. O conserto é a altura
+                      da linha.
+                      ⚠️ `<span>`, NUNCA `<div>`, no agrupamento: `<button>` só
+                      aceita conteúdo de fraseado, e este repositório já ficou
+                      SEM ABRIR por árvore inválida (`<ul>` dentro de `<p>`).
+                      ⚠️ E `min-h-11`, nunca `h-11`: com altura fixa um título
+                      longo é cortado — e o título é o que identifica QUAL item
+                      está sendo tirado. */}
+                  <button
+                    type="button"
+                    onClick={() => setConfirmando(confirmando === i.id ? null : i.id)}
+                    aria-expanded={confirmando === i.id}
+                    aria-label={`Tirar ${i.titulo} da lista`}
+                    className="press flex min-h-11 w-full items-center justify-between gap-2 text-left"
+                  >
+                    <span className="flex min-w-0 flex-1 items-baseline gap-2">
+                      <span className="min-w-0 flex-1">{i.titulo}</span>
+                      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                        {e ? legendaDaCota(e) : i.reservado > 0 ? "reservado 💛" : "—"}
+                      </span>
                     </span>
-                    {/* ✕ desenhado em texto: é o único controle destrutivo
-                        desta tela.
-                        ⚠️ E ESTE COMENTÁRIO PROMETIA "44px" QUE O CÓDIGO NUNCA
-                        ENTREGOU. Medido a 393px: o desenho é 29×32 e o alvo
-                        efetivo é 28×18 — metade do mínimo em altura.
-                        ⚠️ PIOR: o toque 10px ABAIXO do centro já acerta o ✕ da
-                        LINHA DE BAIXO. Num controle que tira item da lista,
-                        isso tira o item errado. A causa é o `-my-2`: as caixas
-                        dos botões se encavalam.
-                        ⚠️ E NÃO SE CONSERTA COM `after:-inset`. Foi tentado e
-                        medido: estender a área do dedo põe o pseudo-elemento do
-                        vizinho por cima, e a altura efetiva CAI de 18 para 6.
-                        O conserto de verdade é a ALTURA DA LINHA (botão h-11
-                        com a linha acompanhando), que muda o desenho da lista —
-                        decisão do dono, não remendo. */}
-                    <button
-                      type="button"
-                      onClick={() => setConfirmando(confirmando === i.id ? null : i.id)}
-                      aria-label={`Tirar ${i.titulo} da lista`}
-                      className="press -my-2 shrink-0 px-2 py-2 text-base leading-none text-muted-foreground"
+                    {/* O ✕ deixou de ser CONTROLE e virou afordância: quem
+                        recebe o toque é a linha. `aria-hidden` para o leitor de
+                        tela não anunciar o glifo além do rótulo da linha. */}
+                    <span
+                      aria-hidden
+                      className="shrink-0 text-base leading-none text-muted-foreground"
                     >
                       ✕
-                    </button>
-                  </div>
+                    </span>
+                  </button>
                   {/* ⚠️ MENSAGEM SEPARADA, e não o mesmo botão virando "tem
                       certeza?" — a mesma decisão do cancelar consulta, e pelo
                       mesmo motivo: o segundo toque no lugar do primeiro
                       confirma o que ela ainda estava lendo. */}
                   {confirmando === i.id && (
-                    <div className="mt-1.5 flex items-center gap-2 rounded-xl bg-muted/60 px-3 py-2">
-                      <span className="min-w-0 flex-1 text-xs">Tirar da lista?</span>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-xl bg-muted/60 px-3 py-2">
+                      {/* ⚠️ A CONFIRMAÇÃO DIZ O NOME, e é a última defesa contra
+                          o toque na linha errada — que é literalmente o risco
+                          desta lista. "Tirar da lista?" sozinho não dá a ela
+                          nenhuma chance de perceber que a linha aberta não é a
+                          que ela mirou. O `aria-label` do controle já dizia o
+                          nome; a TELA não dizia. */}
+                      <span className="min-w-0 flex-1 text-xs">Tirar “{i.titulo}” da lista?</span>
                       <button
                         type="button"
                         onClick={() => void tirar(i.id)}
-                        className="press shrink-0 rounded-lg bg-destructive px-3 py-1.5 text-xs font-semibold text-destructive-foreground"
+                        className="press min-h-11 shrink-0 rounded-lg bg-destructive px-4 text-xs font-semibold text-destructive-foreground"
                       >
                         Tirar
                       </button>
                       <button
                         type="button"
                         onClick={() => setConfirmando(null)}
-                        className="press shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs"
+                        className="press min-h-11 shrink-0 rounded-lg border border-border px-4 text-xs"
                       >
                         Não
                       </button>
@@ -583,13 +600,13 @@ export function ChaDeBebe({
             value={novoTitulo}
             onChange={(e) => setNovoTitulo(e.target.value.slice(0, 120))}
             placeholder="Acrescentar um item"
-            className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm"
+            className="min-h-11 min-w-0 flex-1 rounded-xl border border-border bg-background px-3 text-sm"
           />
           <button
             type="button"
             onClick={acrescentar}
             disabled={ehCota && !pedacos}
-            className="press shrink-0 rounded-xl border border-primary/40 px-3 py-2 text-sm font-medium text-primary disabled:opacity-40"
+            className="press min-h-11 shrink-0 rounded-xl border border-primary/40 px-4 text-sm font-medium text-primary disabled:opacity-40"
           >
             Pôr na lista
           </button>
@@ -599,7 +616,10 @@ export function ChaDeBebe({
             ⚠️ **Desligado por padrão.** A maioria dos itens de um chá é item
             simples; abrir o formulário já em modo cota faria toda mãe decidir
             sobre divisão para acrescentar uma mamadeira. */}
-        <label className="mt-2 flex items-center gap-2 text-[13px] text-muted-foreground">
+        {/* ⚠️ O ALVO DE UM CHECKBOX NATIVO É O `<label>`, e não a caixinha de
+            16×16: tocar no rótulo alterna. Medido antes: label 359×20 — a
+            largura estava boa e a ALTURA era metade do mínimo. */}
+        <label className="mt-2 flex min-h-11 items-center gap-2 text-[13px] text-muted-foreground">
           <input
             type="checkbox"
             checked={ehCota}
@@ -633,7 +653,7 @@ export function ChaDeBebe({
                   setPedacos(null);
                 }}
                 placeholder="1200"
-                className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                className="min-h-11 min-w-0 flex-1 rounded-xl border border-border bg-background px-3 text-sm"
               />
             </div>
 

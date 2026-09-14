@@ -175,6 +175,22 @@ const ROTEIRO = [
       { clique: /165/ },
     ],
   },
+
+  /* ⚠️ **A LISTA DO CHÁ DE BEBÊ — o terceiro controle destrutivo do app**, e o
+     único que ainda tirava o ITEM ERRADO: o ✕ tinha `-my-2`, as caixas dos
+     botões se encavalavam, e o toque 10px abaixo do centro acertava a linha de
+     baixo (medido: alvo efetivo 30×26). Agora a LINHA inteira é o alvo (359×44)
+     e a confirmação diz o NOME do item, que é a última defesa se o toque abriu
+     a linha errada.
+
+     ⚠️ **O roteiro para na confirmação e toca em "Não".** "Tirar" chama o
+     servidor, e sem sessão a bancada receberia 400 no console — que a varredura
+     contaria como problema, com razão. Aqui se toca em controle LOCAL. */
+  {
+    q: "/preview-presentes?dona=1",
+    nome: "chá de bebê · abrir a confirmação de tirar um item, e desistir",
+    passos: [{ clique: /^Tirar Banheira com suporte da lista$/ }, { clique: /^Não$/ }],
+  },
 ];
 
 /** Ruído de ambiente, não da tela — a mesma lista da varredura de bancadas. */

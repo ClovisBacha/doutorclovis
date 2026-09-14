@@ -51,6 +51,8 @@ export function SaudeMulherHub({
     cycles?: MenstrualCycle[];
     reminders?: PreventiveReminder[];
     instavel?: boolean;
+    /** O "hoje" cravado da bancada — ver `PreventivosTab`. */
+    hoje?: string;
   };
 }) {
   const [sub, setSub] = useState<(typeof SAUDE_MULHER_SUBTABS)[number]["key"]>(
@@ -63,7 +65,7 @@ export function SaudeMulherHub({
           <button
             key={s.key}
             onClick={() => setSub(s.key)}
-            className={`shrink-0 rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors ${
+            className={`flex min-h-11 shrink-0 items-center rounded-full px-4 text-[13px] font-semibold transition-colors ${
               sub === s.key
                 ? "bg-primary text-primary-foreground"
                 : /* ⚠️ `/60`, e não `/55`: medido, `/55` dá 3,88:1 — abaixo do mínimo de
@@ -91,7 +93,11 @@ export function SaudeMulherHub({
         {sub === "preventivos" && (
           <PreventivosTab
             bancada={
-              bancada && { reminders: bancada.reminders ?? [], instavel: bancada.instavel ?? false }
+              bancada && {
+                reminders: bancada.reminders ?? [],
+                instavel: bancada.instavel ?? false,
+                hoje: bancada.hoje,
+              }
             }
           />
         )}
@@ -224,7 +230,19 @@ const PREVENTIVE_EXAMS: ExamDef[] = [
 export function PreventivosTab({
   bancada,
 }: {
-  bancada?: { reminders?: PreventiveReminder[]; instavel?: boolean };
+  bancada?: {
+    reminders?: PreventiveReminder[];
+    instavel?: boolean;
+    /**
+     * ⚠️ O "HOJE" DA BANCADA, em ISO. Sem ele a bancada cravava as DATAS e
+     * deixava o `hoje` no relógio REAL: os prazos andavam um dia por dia, duas
+     * fotos de dias diferentes não se comparavam, e — o que custou caro — o
+     * estado âmbar "em breve" saía do alcance sozinho. É a mesma armadilha que
+     * a bancada das contrações já pagou; ali o conserto foi cravar as DUAS
+     * pontas, e é o mesmo aqui.
+     */
+    hoje?: string;
+  };
 }) {
   const [reminders, setReminders] = useState<PreventiveReminder[]>(bancada?.reminders ?? []);
   const [loading, setLoading] = useState(!bancada);
@@ -308,7 +326,8 @@ export function PreventivosTab({
     );
 
   const reminderMap = Object.fromEntries(reminders.map((r) => [r.exam_key, r]));
-  const today = new Date();
+  /* Na produção é sempre o relógio dela; a bancada é a única que crava. */
+  const today = bancada?.hoje ? new Date(bancada.hoje) : new Date();
 
   // Group: overdue, due soon (within 60 days), ok
   const examGroups = PREVENTIVE_EXAMS.map((exam) => {
@@ -402,11 +421,22 @@ export function PreventivosTab({
                                  dá 4,36:1 e `green-600` fica pior ainda —
                                  abaixo do mínimo de 4,5. E é justamente aqui
                                  que mora "(396 dias em atraso)", a frase que
-                                 diz que um rastreamento venceu. */
+                                 diz que um rastreamento venceu.
+                                 ⚠️ E O DO MEIO NÃO ERA `-700`: este comentário
+                                 dizia "nos três" e o ramo do "em breve" usava
+                                 `text-primary`, que mediu **4,21:1** — abaixo
+                                 do mínimo. Sobreviveu porque o estado âmbar não
+                                 era fotografável: a bancada tinha um exame
+                                 atrasado e um em dia, e nenhum vencendo. É a
+                                 mesma família do comentário que afirma uma
+                                 garantia que o código ao lado não entrega.
+                                 O âmbar também é a cor que o chip 🔔 e o
+                                 contador de "Em breve" já usam — o prazo estava
+                                 sozinho em rosa. */
                               daysUntil < 0
                                 ? "text-red-700 font-medium"
                                 : daysUntil <= 60
-                                  ? "text-primary font-medium"
+                                  ? "text-amber-700 font-medium"
                                   : "text-green-700"
                             }
                           >
@@ -426,7 +456,7 @@ export function PreventivosTab({
                     setEditDate(r?.last_done_date ?? "");
                     setEditNotes(r?.notes ?? "");
                   }}
-                  className="shrink-0 rounded-full border border-border px-3 py-1 text-xs font-medium hover:border-primary hover:text-primary"
+                  className="press min-h-11 shrink-0 rounded-full border border-border px-4 text-xs font-medium hover:border-primary hover:text-primary"
                 >
                   {isEditing ? "Fechar" : r?.last_done_date ? "Atualizar" : "Registrar"}
                 </button>
@@ -440,7 +470,7 @@ export function PreventivosTab({
                         type="date"
                         value={editDate}
                         onChange={(e) => setEditDate(e.target.value)}
-                        className="w-full rounded-xl border border-border bg-background px-3 py-1.5 text-sm"
+                        className="min-h-11 w-full rounded-xl border border-border bg-background px-3 text-sm"
                       />
                     </div>
                     <div>
@@ -449,14 +479,14 @@ export function PreventivosTab({
                         value={editNotes}
                         onChange={(e) => setEditNotes(e.target.value)}
                         placeholder="Resultado, local, médico…"
-                        className="w-full rounded-xl border border-border bg-background px-3 py-1.5 text-sm"
+                        className="min-h-11 w-full rounded-xl border border-border bg-background px-3 text-sm"
                       />
                     </div>
                   </div>
                   <button
                     onClick={handleSave}
                     disabled={saving}
-                    className="rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-white disabled:opacity-40"
+                    className="press min-h-11 rounded-full bg-primary px-5 text-xs font-medium text-white disabled:opacity-40"
                   >
                     {saving ? "Salvando…" : "Salvar"}
                   </button>

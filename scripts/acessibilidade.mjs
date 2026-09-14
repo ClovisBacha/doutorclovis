@@ -173,11 +173,19 @@ const MEDIR = () => {
     if (r < (grande ? 3 : 4.5)) out.contraste.push({ r, px, t: t.slice(0, 40) });
   }
 
-  /* ALVO — controles reais abaixo de 44px nos DOIS lados. */
+  /* ALVO — controle abaixo de 44px em QUALQUER um dos lados.
+     ⚠️ ERA `&&` ("nos DOIS lados"), e isso tornava a varredura CEGA para a
+     classe mais comum de alvo pequeno: o botão BAIXO E LARGO. Um "Registrar"
+     de 80×28 passava batido, e foi assim que a tela de Preventivos chegou a
+     TREZE de treze controles abaixo do mínimo sem esta varredura acusar um.
+     WCAG 2.5.8 mede os dois lados: reprova se QUALQUER um for menor.
+     ⚠️ E o número total SOBE ao consertar isto — não porque a acessibilidade
+     piorou, mas porque o instrumento parou de falhar aberto. Ferramenta de
+     verificação que falha aberta é pior que não existir: ela dá permissão. */
   for (const el of document.querySelectorAll('button,a[href],[role="button"],input,select')) {
     if (!visivel(el)) continue;
     const r = el.getBoundingClientRect();
-    if (r.width < 44 && r.height < 44) {
+    if (r.width < 44 || r.height < 44) {
       out.alvo.push({
         w: Math.round(r.width),
         h: Math.round(r.height),

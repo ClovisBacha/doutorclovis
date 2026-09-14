@@ -94,6 +94,15 @@ const EXTRAS = [
   "/preview-saude-registros?estado=grave",
   "/preview-saude-registros?estado=normal",
   "/preview-saude-registros?estado=semperfil",
+  /* ⚠️ Os três estados da curva do IOM que NÃO tinham foto — e foi por essa
+     falta que o estado sem saída (peso sim, altura não) nasceu. */
+  "/preview-saude-registros?estado=semaltura",
+  "/preview-saude-registros?estado=sempeso",
+  "/preview-saude-registros?estado=semregistro",
+  /* ⚠️ O pós-parto: a curva GESTACIONAL não pode continuar desenhada com os
+     pesos do puerpério. `pos` compõe com os outros estados de propósito. */
+  "/preview-saude-registros?estado=normal&pos=1",
+  "/preview-saude-registros?estado=semaltura&pos=1",
   /* ⚠️ O Modo Cuidado desta tela só se vê na CURVA de ganho — ela é a única
      peça gestacional ali, e sem este estado o portão ficaria sem foto. */
   "/preview-saude-registros?estado=grave&luto=1",
@@ -280,6 +289,9 @@ const EXTRAS = [
      cadastrado e meses de registro. */
   "/preview-prontuario?perdapeso=1",
   "/preview-prontuario?perdapeso=1&pos=1",
+  /* O exame HISTÓRICO: nada escreve em `exam_files` desde ago/2026, então esta
+     linha só existe aqui. */
+  "/preview-prontuario?exame=1",
   "/preview-registrar-consulta?primeira=1",
 ];
 

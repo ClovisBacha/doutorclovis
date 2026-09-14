@@ -615,16 +615,38 @@ function MudancasDesdeAConsulta({
           <Contador n={m.episodios.length} rot="episódios" grave />
           <Contador n={m.alteracoes.length} rot="fora de faixa" />
           <Contador n={m.perguntasAbertas.length} rot="perguntas sem resposta" />
+          {/* ⚠️ ESTE SLOT CONTAVA "exames enviados", E ELE ERA ZERO POR
+              CONSTRUÇÃO. O envio de exame saiu do produto em ago/2026 e nada
+              escreve em `exam_files` desde então — e, pior, `m.exames` não é
+              "os exames dela": é o recorte DESDE A ÚLTIMA CONSULTA
+              (`mudancasDesde` acima). Como o ramo de `!ultima` retorna antes,
+              quando esta grade é desenhada o corte é sempre a data da consulta.
+              Ou seja: um quarto do bloco mais importante desta tela era um zero
+              permanente com cara de informação.
+              O que ele passa a medir é o que a paciente de fato produziu no
+              período — que é a pergunta que o médico faz aqui. */}
           <Contador
-            n={m.exames.length}
-            rot="exames enviados"
+            n={m.registros}
+            rot="registros no período"
             extra={
               m.deltaPeso != null
                 ? `${m.deltaPeso > 0 ? "+" : ""}${m.deltaPeso} kg no período`
-                : `${m.registros} registros`
+                : undefined
             }
           />
         </div>
+      )}
+
+      {/* O exame enviado ANTES da remoção continua sendo dado da paciente, e
+          some da tela seria esconder histórico. Ele deixa de ocupar um slot
+          fixo e vira linha CONDICIONAL: aparece só quando existe, e diz que é
+          histórico — senão o médico fica esperando um envio que o app não
+          aceita mais. */}
+      {m.exames.length > 0 && (
+        <p className="mt-2 text-[12px] leading-snug text-muted-foreground">
+          {m.exames.length} {m.exames.length === 1 ? "exame enviado" : "exames enviados"} no período
+          — o app não aceita mais envio de exame; estes são anteriores.
+        </p>
       )}
 
       {(m.episodios.length > 0 || m.alteracoes.length > 0) && (

@@ -68,8 +68,15 @@ describe("o Modo Cuidado na tela de peso, pressão e glicemia", () => {
     expect(linha).toContain("!careMode");
   });
 
+  /* ⚠️ ESTE TESTE TRAVAVA `prePregW == null`, a condição ANTIGA do convite —
+     e ela era o defeito: cobria um dos três casos que a curva exige, deixando
+     um estado SEM SAÍDA (peso sim, altura não → nem curva nem convite). O que
+     se cobra é a garantia: o convite é barrado pelo Modo Cuidado, more a
+     condição de dados onde morar. */
   test("o convite que existe só para destravá-la sai junto", () => {
-    expect(saude).toMatch(/!careMode &&\s*\n?\s*prePregW == null/);
+    const i = saude.indexOf("faltaNaCurva != null");
+    expect(i).toBeGreaterThan(-1);
+    expect(saude.slice(Math.max(0, i - 220), i)).toContain("!careMode");
   });
 
   /* ⚠️ A OUTRA METADE, e ela é a que importa: o Modo Cuidado faz o app parar de

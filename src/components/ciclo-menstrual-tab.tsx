@@ -448,7 +448,7 @@ export function CicloMenstrualTab({
       {!showForm ? (
         <button
           onClick={() => setShowForm(true)}
-          className="rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-white"
+          className="press min-h-11 rounded-full bg-primary px-6 text-sm font-medium text-white"
         >
           + Registrar período
         </button>
@@ -462,7 +462,7 @@ export function CicloMenstrualTab({
                 type="date"
                 value={newStartDate}
                 onChange={(e) => setNewStartDate(e.target.value)}
-                className="w-full rounded-xl border border-border bg-background px-4 py-2 text-sm"
+                className="min-h-11 w-full rounded-xl border border-border bg-background px-4 text-sm"
               />
             </div>
             <div>
@@ -513,13 +513,13 @@ export function CicloMenstrualTab({
             <button
               onClick={handleLogStart}
               disabled={submitting}
-              className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-white disabled:opacity-40"
+              className="press min-h-11 rounded-full bg-primary px-5 text-sm font-medium text-white disabled:opacity-40"
             >
               {submitting ? "Salvando…" : "Salvar"}
             </button>
             <button
               onClick={() => setShowForm(false)}
-              className="rounded-full border border-border px-5 py-2 text-sm font-medium"
+              className="press min-h-11 rounded-full border border-border px-5 text-sm font-medium"
             >
               Cancelar
             </button>
@@ -563,11 +563,11 @@ export function CicloMenstrualTab({
                         type="date"
                         value={endDate}
                         onChange={(e) => setEndDate(e.target.value)}
-                        className="rounded-xl border border-border bg-background px-2 py-1 text-xs"
+                        className="min-h-11 rounded-xl border border-border bg-background px-2 text-xs"
                       />
                       <button
                         onClick={() => handleMarkEnd(cycle.id)}
-                        className="rounded-full bg-primary px-3 py-1 text-xs font-medium text-white"
+                        className="press min-h-11 rounded-full bg-primary px-4 text-xs font-medium text-white"
                       >
                         Ok
                       </button>
@@ -575,7 +575,7 @@ export function CicloMenstrualTab({
                   ) : (
                     <button
                       onClick={() => setEndingId(cycle.id)}
-                      className="rounded-full border border-border px-3 py-1 text-xs font-medium hover:border-primary hover:text-primary"
+                      className="press min-h-11 rounded-full border border-border px-4 text-xs font-medium hover:border-primary hover:text-primary"
                     >
                       Encerrar
                     </button>

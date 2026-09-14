@@ -16427,3 +16427,219 @@ some no Modo Cuidado) · `/preview-saude-mulher?tela=ciclo&estado=vazio` (o
 convite que voltou a ser alcançável) — as duas na varredura da CI. E
 `/preview-saude-registros` passou a fabricar a DUM, sem a qual a curva de ganho
 nunca aparecia em foto nenhuma.
+
+## As pendências da vistoria da Saúde, e o instrumento que falhava aberto (set/2026)
+
+Pedido do dono depois da vistoria: _"baseando em tudo que você encontrou nessa
+vistoria faça todas as modificações necessárias"_ — ou seja, aplicar o que a
+vistoria tinha deixado registrado como decisão dele. Quatro pendências, mais o
+que a medição achou ao ir consertá-las.
+
+⚠️ **E DUAS DAS QUATRO MUDARAM DE FORMA QUANDO FORAM OLHADAS DE PERTO.** A
+pendência era "o alvo de 32×19" e "o contador em zero"; o que havia atrás era
+outra coisa nos dois casos. Vale mais que os consertos: **a pendência registrada
+é o SINTOMA que alguém reparou, não o defeito.**
+
+### ⚠️ 1. O LINK "Perfil" NÃO PRECISAVA DE ALVO MAIOR — a frase era falsa
+
+Eram dois botões, e só um era problema de alvo.
+
+- **O da legenda da curva** vivia na frase _"Configure altura e peso
+  pré-gestacional em Perfil"_ — e `showIomChart` exige `bmi != null`, que exige
+  os DOIS campos. **Quando aquela legenda está na tela, os dois já estão
+  preenchidos.** A frase mandava configurar o que já estava configurado. Ela
+  saiu, e o alvo saiu com ela. (Mesmo se fosse verdadeira, a WCAG 2.5.8 isenta
+  alvo INLINE numa frase, e esticá-lo cobriria as linhas vizinhas do próprio
+  parágrafo, que tem três.)
+- **O do cartão-convite** era alvo de verdade: o cartão inteiro virou `<button>`.
+  Medido: **32×19 → 361×94**.
+
+⚠️ **E o cartão escondia um ESTADO SEM SAÍDA.** A curva exige três coisas
+(altura, peso pré-gestacional, um peso registrado) e o convite era gateado por
+UMA (`prePregW == null`). Altura e peso são campos independentes e opcionais no
+Perfil, então **quem preencheu só o peso não via nem a curva nem o convite —
+nada desenhado, nada dizendo por quê.** Ela preencheu metade e o app calou.
+
+**`src/lib/curva-do-ganho.ts` é a régua ÚNICA**: `faltaParaACurva` devolve `null`
+exatamente quando a curva pode ser desenhada, e as DUAS metades derivam dela —
+não há como uma mudar sem a outra. O texto **nomeia o que falta e credita o que
+ela já preencheu**; e quando o que falta é um peso REGISTRADO, o cartão não é
+botão, porque a ação é o formulário logo abaixo e um alvo que leva ao lugar
+errado é pior que nenhum.
+
+### ⚠️ 2. A CURVA GESTACIONAL CONTINUAVA DESENHADA DEPOIS DO PARTO
+
+`HealthTab` não tinha **uma referência sequer** a `birth_date`, e
+`computeGestation` conta para sempre (teto em 42 semanas): os pesos do PUERPÉRIO
+seguiam plotados contra o corredor do IOM. E o peso cai depois do parto — então a
+tela mostrava a puérpera **"abaixo da faixa recomendada"** sobre uma faixa que
+não descreve mais o corpo dela.
+
+É a mesma classe do prompt que dizia "semana 42 da gestação" com o bebê no colo,
+e o portão é o mesmo que `SaudeMulherHub` já usava. ⚠️ Ele barra a curva **e o
+convite** (oferecer destravar o que não se aplica é oferecer nada); peso,
+pressão, glicemia e a lista **FICAM** — é o corpo dela, e hipertensão de
+puerpério existe.
+
+### ⚠️ 3. O ✕ DO CHÁ TIRAVA O ITEM ERRADO — e a confirmação não dizia qual
+
+Medido a 393px: caixa 29×32, **alvo EFETIVO 30×26** nas linhas com vizinho
+abaixo, porque o `-my-2` encavalava as caixas. A linha inteira virou o alvo
+(**359×44**), o ✕ virou `<span aria-hidden>`, e os dois botões finais foram a
+`min-h-11`.
+
+⚠️ **E a parte que mais importa não era o alvo: a confirmação dizia só "Tirar da
+lista?".** Se o toque abriu a linha errada — que é literalmente o risco desta
+lista — o texto não dava à mãe nenhuma chance de perceber. O `aria-label` já
+dizia o nome; a TELA não. Agora diz.
+
+**Provado, e não deduzido:** o toque 10px ABAIXO do centro — o caso exato que
+antes acertava a linha de baixo — abre a linha CERTA nas três.
+
+### ⚠️ 4. O CONTADOR "exames enviados" ERA ZERO POR CONSTRUÇÃO — e a premissa registrada estava errada
+
+A vistoria tinha registrado que "quem enviou ANTES ainda tem contagem de verdade
+ali". **É quase sempre falso**: `m.exames` não é "os exames dela", é o recorte
+**desde a última consulta** (`mudancasDesde`), e como o ramo de `!ultima` retorna
+antes, quando a grade é desenhada o corte é sempre a data da consulta.
+
+O quarto slot passou a medir **`m.registros`** ("registros no período"), com a
+variação de peso mantida no `extra`; o exame virou **linha condicional** abaixo
+da grade, só quando existe, dizendo que é histórico. E `painel-no-app` perdeu
+`examesNovos` — campo lido em três lugares e passado por **NINGUÉM**, cartão
+pronto esperando o defeito voltar.
+
+⚠️ **O comentário dele ficou ÓRFÃO sobre `salasAbertas`**, documentando o campo
+errado — e foi reescrito como a REGRA: todo campo daquele tipo é obrigatório,
+porque campo opcional é um contador que pode nascer em zero sem ter olhado.
+
+### ⚠️ 5. `movimento` ENTROU NA FILA — por uma leitura SEPARADA
+
+A razão escrita ("sinais de engajamento, não de deterioração") era verdade quando
+o evento carregava só a contagem, e venceu em set/2026: a view passou a projetar
+`duracao_min` e `avaliar` passou a classificar. Desde então **uma sessão pode
+sair GRAVE** — duas horas com menos de dez movimentos —, e redução de movimento
+fetal é um dos nove sintomas VERMELHOS.
+
+⚠️ **E NÃO por uma string a mais no `.in()`** — isso repetiria o mecanismo que
+tirou `contracao` daqui: o teto corta ANTES do filtro de gravidade, na ordem
+`ocorrido_em DESC`, então cada contagem normal (a esmagadora maioria) gastaria a
+MESMA cota e o que cairia seria o evento mais antigo **de qualquer paciente**.
+Com orçamento próprio, movimento só trunca a si mesmo. As duas leituras saem
+juntas (`Promise.all`), e `incompleto` acende se qualquer uma cortar.
+
+### ⚠️ 6. A VARREDURA DE ACESSIBILIDADE DA CASA ERA CEGA — e é o achado mais caro
+
+`scripts/acessibilidade.mjs` reprovava com
+`r.width < 44 && r.height < 44` — **"nos DOIS lados"**. Com `&&`, um botão
+**80×28 não é reportado**, e esse é o formato da classe inteira: o botão baixo e
+largo.
+
+Foi assim que a tela de **Preventivos chegou a TREZE de treze controles abaixo do
+mínimo** — os dez "Registrar/Atualizar" com que ela registra rastreamento de
+câncer — **sem esta varredura acusar um**.
+
+⚠️ **Ferramenta de verificação que falha ABERTO é pior que não existir: ela dá
+permissão.** Corrigido para `||`, o total do app foi de **53 para 474**. O número
+não subiu porque a acessibilidade piorou — subiu porque o instrumento parou de
+mentir. Os 474 são dívida medida do app inteiro; **a aba Saúde ficou com ZERO
+alvos próprios abaixo de 44** (o que sobra nas telas dela é a moldura do SITE,
+que tem régua própria, e o FAB do chat, que é `pointer-events: none`).
+
+**Consertados nesta leva:** "Adicionar" (grava registro clínico), as duas abas de
+Saúde da mulher, os dez "Registrar/Atualizar", "Salvar" do preventivo,
+"+ Registrar período", "Salvar"/"Cancelar"/"Encerrar" do ciclo, "Pôr na lista",
+o "Voltar" do painel da nutrição, os campos de formulário, e o **`Field`
+compartilhado** — `min-h-11` no componente conserta ~20 campos de uma vez, que é
+uma regra e não vinte edições.
+
+⚠️ **E o alvo de um checkbox nativo é o `<label>`**, nunca a caixinha de 16×16:
+tocar no rótulo alterna. Medido: 359×20 → 359×44, e provado tocando no ALTO do
+rótulo, longe da caixinha.
+
+### ⚠️ 7. `strength` NÃO TINHA DEGRAU — e apagava noventa dias de histórico
+
+`kicks-tab.tsx` fazia `.select("… , strength")` sem recuo. A coluna nasce em
+`APLICAR_FORCA_DO_MOVIMENTO.sql`, que o dono roda À MÃO e DEPOIS do deploy: num
+banco sem ela o PostgREST devolve `42703` para o select INTEIRO, a tela cai em
+`setInstavel(true)` e **o histórico de noventa dias some**, por causa de uma
+coluna que alimenta um chip. A forma mais cara de defeito deste repositório — a
+coluna nova apagando o recurso antigo, em silêncio.
+
+### ⚠️ 8. OS DEZ CAMPOS DA ABA NÃO TINHAM NOME ACESSÍVEL
+
+Em `Field`, o `<label>` era **irmão** do `<input>`, sem `htmlFor` e sem `id`:
+não dava nome ao campo nem foco ao toque. O leitor de tela anunciava sem nome os
+cinco com que ela registra peso, pressão e glicemia. O label passou a ENVOLVER o
+input — conserto sem `id`, porque um `id` fixo num componente usado vinte vezes
+na mesma página produziria vinte ids repetidos, que é outro defeito.
+
+### ⚠️ 9. A BANCADA DOS PREVENTIVOS ANDAVA COM O RELÓGIO
+
+Ela cravava as DATAS e deixava o "hoje" no relógio REAL (`new Date()` no
+componente). Duas consequências: os prazos andavam um dia por dia — duas fotos de
+dias diferentes não se comparam —, e **`statusDoExame` tem quatro estados e a
+bancada provava três**: faltava o âmbar "em breve", que é o que faz a mulher
+marcar o exame.
+
+`hoje` virou parâmetro de bancada (produção continua no relógio dela), as duas
+pontas passaram a ser cravadas, e entrou um preventivo desenhado para cair no
+âmbar. Medido: os contadores foram de **"1 · 0 · 8" para "1 · 1 · 7"**.
+
+⚠️ **E o estado recém-revelado trouxe um defeito junto**: o prazo "em breve" saía
+a **4,21:1** — e o comentário ao lado afirmava `-700` "nos TRÊS" ramos enquanto o
+do meio usava `text-primary`. Comentário prometendo uma garantia que o código não
+entrega, sobrevivendo justamente porque o estado não era fotografável.
+
+### As armadilhas de MEDIÇÃO desta leva — cinco, e as cinco produziram número falso
+
+1. ⚠️ **`<details>` FECHADO mantém caixa de layout e NÃO recebe toque.**
+   `getBoundingClientRect` devolve tamanho real, `innerText` vem vazio, e o
+   hit-testing falha. Uma sonda que não abre disclosure acusa controle CERTO de
+   "coberto" — e, pior, **não enxerga um alvo pequeno de verdade lá dentro**.
+2. ⚠️ **`t.contains(el)` conta qualquer ANCESTRAL como acerto** e infla a
+   medida: um botão de 29px "mediu" 54. Só `t === el || el.contains(t)`.
+3. ⚠️ **`elementFromPoint` devolve `null` fora do viewport** — terceira vez que
+   isto aparece aqui. Role o elemento à vista ANTES de sondar.
+4. ⚠️ **Clique antes da hidratação se perde em silêncio**, e o relatório diz
+   "não funciona" sobre um botão que funciona. Espere o seletor E ~2 s.
+5. ⚠️ **`page.evaluate` com a função em STRING avalia como EXPRESSÃO e nunca a
+   chama com o argumento** — devolve `undefined`, e o relatório sai com seis
+   linhas de `undefined` que lêem como "não achei nada".
+
+⚠️ **E uma de COMPARAÇÃO:** um `diff` cujas duas âncoras não casam devolve
+**zero linhas dos dois lados e imprime "IDÊNTICOS"**. Aconteceu ao comparar os
+dois arquivos que montam `clinical_events` — o veredito foi refeito com âncora
+real (o código é mesmo idêntico; a divergência era só de prosa), e a sonda passou
+a ABORTAR quando a fatia é curta demais.
+
+### ⚠️ E TRÊS ALARMES MEUS CAÍRAM NA CONFERÊNCIA
+
+O quinto ladrilho do hub "cortado" (era a foto de página inteira contra o rodapé
+— o texto está lá), a bancada de preventivos "inexistente" (`?tela=preventivos`
+existe; eu tinha fotografado o padrão) e os cinco controles "cobertos" da tela de
+registros (era o `<details>` fechado). **Conferir custa minutos; acreditar custa
+mexer em código correto num app que está em produção.**
+
+### ⚠️ E a décima nona vez do teste que trava a GRAFIA
+
+Quatro nesta leva, e **um deles escrito por mim uma hora antes**: a linha
+literal de `showIomChart` reprovou o portão de pós-parto, que só APERTA a
+garantia. Os outros: `prePregW == null` (a condição que ERA o defeito),
+`const { … error } = await` (que reprova o degrau de coluna, porque ele precisa
+de `let`), e um piso de contagem que eu escrevi errado.
+
+⚠️ **O `const` é o mais instrutivo**: exigir a palavra-chave tornava impossível
+acrescentar um recuo de coluna ausente. Hoje aceita `const` ou `let`, e o que se
+cobra é a ORIGEM do valor — conferido por mutação, a catraca continua mordendo.
+
+### ⚠️ E a varredura adversarial MORREU NO LIMITE DE SESSÃO
+
+Dez lentes levantaram **40 achados**; a fase de céticos emitiu **21 de ~120
+vereditos** antes de 97 agentes falharem por limite. Pela régua desta casa,
+**achado sem cético é hipótese** — então o que entrou nesta leva é só o que eu
+confirmei abrindo o arquivo e medindo. O resto está levantado e **não** foi
+aplicado; entre eles, e sem verificação: a zona verde do gráfico de glicemia sem
+PISO (hipoglicemia desenhada como faixa boa), o "Normal" em verde para glicemia
+139, a triagem chegando ao prontuário em CÓDIGO, o ciclo falando de um parto que
+não vai acontecer, e quatro testes da leva anterior com janela larga demais.

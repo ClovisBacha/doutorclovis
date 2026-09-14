@@ -80,6 +80,14 @@ const PREVENTIVOS: PreventiveReminder[] = [
     notes: "Feito na clínica do bairro",
   },
   { id: "p2", user_id: "b", exam_key: "mamografia", last_done_date: dia(120), notes: null },
+  /* ⚠️ O EM BREVE (âmbar), que NÃO EXISTIA NA BANCADA. `statusDoExame` tem
+     quatro estados e ela provava três — faltava justamente o que faz a mulher
+     MARCAR o exame. A conta: `pressao_arterial` é semestral, e um exame feito
+     há 150 dias vence em 30 — dentro do corte de 60 dias.
+     E ele só é estável porque o `hoje` agora é CRAVADO: com o relógio real, um
+     exame desenhado para cair em "em breve" sairia da janela sozinho em algumas
+     semanas, e este estado voltaria a não ter foto sem ninguém perceber. */
+  { id: "p3", user_id: "b", exam_key: "pressao_arterial", last_done_date: dia(150), notes: null },
 ];
 
 function Pagina() {
@@ -102,6 +110,9 @@ function Pagina() {
       : estado === "vazio"
         ? { cycles: [], reminders: [] }
         : { cycles: ciclos, reminders: PREVENTIVOS };
+  /* As DUAS pontas cravadas: as datas saem de `dia()` e o "hoje" vai junto.
+     Sem isto os prazos andavam um dia por dia. */
+  const comHoje = { ...bancada, hoje: new Date(HOJE).toISOString() };
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6">
@@ -114,7 +125,7 @@ function Pagina() {
       <SaudeMulherHub
         gestante={gestante}
         initialSub={tela === "preventivos" ? "preventivos" : "ciclo"}
-        bancada={bancada}
+        bancada={comHoje}
       />
     </div>
   );

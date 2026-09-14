@@ -1,4 +1,8 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, test } from "bun:test";
+
+import { semComentarios } from "@/lib/sem-comentarios";
 
 import { diasAte, frasePrazo, proximaData, statusDoExame } from "@/lib/preventivos";
 
@@ -91,5 +95,52 @@ describe("frasePrazo", () => {
 
   test("sem prazo não escreve nada", () => {
     expect(frasePrazo(null)).toBeNull();
+  });
+});
+
+/**
+ * ⚠️ AS DUAS PONTAS DA MEDIÇÃO TÊM DE SER CRAVADAS NA BANCADA — e não eram.
+ * A bancada cravava as DATAS dos exames e deixava o "hoje" no relógio REAL, de
+ * modo que os prazos andavam um dia por dia: duas fotos de dias diferentes não
+ * se comparavam, e um exame desenhado para cair em "em breve" sairia da janela
+ * de 60 dias sozinho, sem ninguém perceber. É a mesma armadilha que a bancada
+ * das contrações pagou, e o conserto é o mesmo.
+ */
+describe("a bancada dos preventivos não anda com o relógio", () => {
+  const tab = semComentarios(readFileSync("src/components/saude-mulher.tsx", "utf8"));
+  const bancada = semComentarios(readFileSync("src/routes/preview-saude-mulher.tsx", "utf8"));
+
+  test("a produção continua usando o relógio dela; só a bancada crava", () => {
+    expect(tab).toContain("bancada?.hoje ? new Date(bancada.hoje) : new Date()");
+  });
+
+  test("o hub REPASSA o hoje — sem isso a prop existiria e não chegaria", () => {
+    const i = tab.indexOf("<PreventivosTab");
+    expect(i).toBeGreaterThan(-1);
+    expect(tab.slice(i, i + 400)).toContain("hoje: bancada.hoje");
+  });
+
+  test("a bancada manda o hoje cravado, e não um relógio vivo", () => {
+    expect(bancada).toContain("hoje: new Date(HOJE).toISOString()");
+    /* `Date.now()` aqui faria os prazos mudarem entre duas fotos. */
+    expect(bancada).not.toContain("Date.now()");
+  });
+
+  /* ⚠️ `statusDoExame` tem QUATRO estados e a bancada provava TRÊS: faltava o
+     âmbar "em breve", que é o que faz a mulher marcar o exame. */
+  test("existe um exame desenhado para cair em 'em breve'", () => {
+    /* Os objetos do array são formatados ora numa linha, ora em várias — o
+       padrão atravessa a quebra, senão ele casa só os de uma linha e o piso
+       abaixo passa a reprovar sobre uma bancada correta. */
+    const alvos = [...bancada.matchAll(/exam_key:\s*"(\w+)",\s*last_done_date:\s*dia\((\d+)\)/g)];
+    expect(alvos.length).toBeGreaterThanOrEqual(3);
+    /* pressao_arterial é semestral: 150 dias atrás vence em ~30, dentro do
+       corte de 60 de `statusDoExame`. */
+    const pa = alvos.find((m) => m[1] === "pressao_arterial");
+    expect(pa == null).toBe(false);
+    const atras = Number(pa![2]);
+    const faltam = 182 - atras;
+    expect(faltam).toBeGreaterThan(0);
+    expect(faltam).toBeLessThanOrEqual(60);
   });
 });

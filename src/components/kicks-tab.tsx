@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { NaoConsegueLer } from "@/components/nao-consegui-ler";
 import { SilencioDoCuidado } from "@/components/silencio-do-cuidado";
 import { supabase } from "@/integrations/supabase/client";
+import { colunaAusente } from "@/lib/postgrest";
 import { triggerAchievementsCheck } from "@/lib/checar-conquistas";
 import { hapticKick } from "@/lib/haptics";
 import { diaCurto, horaCurta } from "@/lib/hora-do-registro";
@@ -166,14 +167,29 @@ export function KicksTab({
      contrário) sem ninguém saber qual das duas falhou. */
   async function load() {
     const desde = new Date(Date.now() - 90 * 86400000).toISOString();
-    const { data, error } = await (supabase as any)
-      .from("kick_sessions")
-      /* Só o que a tela lê: `select("*")` trazia `user_id` e `created_at`. */
-      .select("id, started_at, ended_at, kick_count, strength")
-      .not("ended_at", "is", null)
-      .gte("started_at", desde)
-      .order("started_at", { ascending: false })
-      .limit(120);
+    /* ⚠️ **`strength` PRECISA DE DEGRAU, e não tinha.** Ela nasce em
+       `APLICAR_FORCA_DO_MOVIMENTO.sql`, que o dono roda À MÃO e DEPOIS do
+       deploy — e num banco sem a coluna o PostgREST devolve `42703` para o
+       select INTEIRO. Sem o recuo, a tela respondia "não consegui ler" e o
+       HISTÓRICO DE NOVENTA DIAS sumia por causa de uma coluna que alimenta um
+       chip. É a forma mais cara de defeito deste repositório: a coluna nova
+       apagando o recurso antigo, em silêncio.
+       Descendo o degrau, a força fica `undefined` e `nivelDeForca` devolve
+       `null` — o chip não aparece, e todo o resto continua. */
+    const COLUNAS = "id, started_at, ended_at, kick_count, strength";
+    const pedir = (cols: string) =>
+      (supabase as any)
+        .from("kick_sessions")
+        /* Só o que a tela lê: `select("*")` trazia `user_id` e `created_at`. */
+        .select(cols)
+        .not("ended_at", "is", null)
+        .gte("started_at", desde)
+        .order("started_at", { ascending: false })
+        .limit(120);
+    let { data, error } = await pedir(COLUNAS);
+    if (error && colunaAusente(error)) {
+      ({ data, error } = await pedir(COLUNAS.replace(", strength", "")));
+    }
     if (error) {
       setInstavel(true);
       return;

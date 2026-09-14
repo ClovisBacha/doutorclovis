@@ -21,6 +21,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { Field } from "@/components/campo";
+import { conviteDaCurva, faltaParaACurva } from "@/lib/curva-do-ganho";
 import { iomGain } from "@/lib/curva-de-ganho";
 import { NaoConsegueLer } from "@/components/nao-consegui-ler";
 import { supabase } from "@/integrations/supabase/client";
@@ -396,7 +397,29 @@ export function HealthTab({
   }
 
   // Build SVG IOM chart
-  const showIomChart = !careMode && bmi != null && prePregW != null && weightByWeek.length > 0;
+  /* ⚠️ UMA RÉGUA SÓ para "dá para desenhar?" e "o que falta?" — as duas
+     metades já divergiram, e a divergência era um estado SEM SAÍDA: quem
+     preencheu o peso pré-gestacional e não a altura não via nem a curva nem o
+     convite. `faltaParaACurva` devolve `null` exatamente quando dá. */
+  const faltaNaCurva = faltaParaACurva({
+    alturaCm: profile?.height_cm ?? null,
+    pesoPreKg: prePregW,
+    registrosDePeso: weightByWeek.length,
+  });
+  /* ⚠️ **A CURVA É GESTACIONAL, E ELA PARAVA DE VALER SEM PARAR DE SER
+     DESENHADA.** `computeGestation` conta para sempre (teto em 42 semanas),
+     então depois do parto os pesos do PUERPÉRIO continuavam sendo plotados
+     contra o corredor do IOM — e o peso cai depois do parto, de modo que a tela
+     mostrava a puérpera "abaixo da faixa recomendada" sobre uma faixa que não
+     descreve mais o corpo dela. É a mesma classe do prompt que dizia "semana 42
+     da gestação" com o bebê no colo, e o portão é o mesmo que
+     `SaudeMulherHub` já usa: `birth_date` preenchido.
+     ⚠️ E ele barra a curva E o convite: oferecer destravar uma curva
+     gestacional a quem já pariu é oferecer o que não se aplica. O resto da tela
+     — peso, pressão, glicemia, lista — FICA: é o corpo dela, e hipertensão de
+     puerpério existe. É a mesma linha que o Portal Pós-parto traça. */
+  const jaPariu = !!profile?.birth_date;
+  const showIomChart = !careMode && !jaPariu && faltaNaCurva === null;
   const iomChartW = 400,
     iomChartH = 180;
   let iomMinY: number, iomMaxY: number;
@@ -663,34 +686,62 @@ export function HealthTab({
               </text>
             ))}
           </svg>
+          {/* ⚠️ A FRASE "Configure altura e peso pré-gestacional em Perfil"
+              SAIU DAQUI, e ela era um texto de tela que afirmava o que o código
+              não faz. `showIomChart` exige `bmi != null`, e `bmi` exige altura E
+              peso pré-gestacional: quando esta legenda está desenhada, os dois
+              JÁ estão preenchidos. Ela mandava configurar o que já estava
+              configurado — e o alvo de 32×19 que a vistoria mediu era o botão
+              dessa frase. O conserto não é esticar o alvo: é a frase não estar
+              aqui. (E mesmo que estivesse certa, a WCAG 2.5.8 isenta alvo
+              INLINE cuja altura é constrangida pelo line-height do texto ao
+              redor — esticá-lo cobriria as linhas vizinhas do próprio
+              parágrafo, que aqui tem três.)
+              O caminho para CORRIGIR um peso pré-gestacional errado — que
+              desloca a faixa inteira, e é leitura clínica — mora no Perfil, e é
+              lá que ela o encontra. */}
           <p className="mt-1 text-xs text-muted-foreground">
-            Linha sólida = seu peso · Faixa = zona saudável para seu IMC. Configure altura e peso
-            pré-gestacional em{" "}
-            <button
-              type="button"
-              onClick={() => onNavigate("Perfil")}
-              className="font-semibold text-primary underline underline-offset-2 hover:opacity-80"
-            >
-              Perfil
-            </button>
-            .
+            Linha sólida = seu peso · Faixa = zona saudável para seu IMC.
           </p>
         </div>
       ) : (
+        /* ⚠️ O CONVITE COBRE TODO CASO EM QUE A CURVA NÃO APARECE, e antes ele
+           cobria UM: o gate era `prePregW == null` enquanto a curva exige três
+           coisas. Sobrava um estado sem saída — nada desenhado, nada explicando.
+           Quem decide é a MESMA `faltaParaACurva` do `showIomChart`.
+           O Modo Cuidado continua barrando os dois: o convite oferece destravar
+           a curva GESTACIONAL, e oferecê-la a quem perdeu a gestação é o que o
+           portão existe para impedir. */
         !careMode &&
-        prePregW == null && (
-          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm">
-            Configure sua <strong>altura</strong> e <strong>peso pré-gestacional</strong> em{" "}
+        !jaPariu &&
+        faltaNaCurva != null &&
+        (() => {
+          const convite = conviteDaCurva(faltaNaCurva);
+          /* Sem ação no Perfil (falta só registrar um peso, e o formulário está
+             logo abaixo) o cartão não é botão: um alvo que leva ao lugar errado
+             é pior que nenhum. */
+          if (!convite.acao)
+            return (
+              <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm">
+                {convite.texto}
+              </div>
+            );
+          /* O CARTÃO INTEIRO É O ALVO — era um `<div>` com um link inline de
+             32×19 dentro. Aqui o cartão só existe para levar ao Perfil, então o
+             texto inteiro é o rótulo e o alvo passa dos 44px por padding. */
+          return (
             <button
               type="button"
               onClick={() => onNavigate("Perfil")}
-              className="font-semibold text-primary underline underline-offset-2 hover:opacity-80"
+              className="press w-full rounded-2xl border border-primary/20 bg-primary/5 p-4 text-left text-sm"
             >
-              Perfil
-            </button>{" "}
-            para ver a curva de ganho de peso recomendada pelo IOM.
-          </div>
-        )
+              {convite.texto}{" "}
+              <span className="font-semibold text-primary underline underline-offset-2">
+                {convite.acao}
+              </span>
+            </button>
+          );
+        })()
       )}
 
       {/* Gráfico histórico de PA */}
@@ -921,7 +972,7 @@ export function HealthTab({
             impedir o bloco de voltar. */}
         <button
           onClick={add}
-          className="mt-4 rounded-full bg-primary px-5 py-2 text-sm text-primary-foreground"
+          className="press mt-4 min-h-11 rounded-full bg-primary px-5 text-sm text-primary-foreground"
         >
           Adicionar
         </button>

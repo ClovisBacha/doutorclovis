@@ -236,7 +236,13 @@ describe("o vazio não pode ser a falha", () => {
       for (const k of ligacoes) {
         const guarda = guardaDoIf(c, k);
         if (/\berror\b/.test(guarda)) {
-          expect(blocoDaFuncao(c, k)).toMatch(/const \{[^}]*\berror\b[^}]*\} = await/);
+          /* ⚠️ `const` OU `let`: uma leitura com DEGRAU de coluna ausente
+             precisa reatribuir (`let { data, error } = await …; if (error &&
+             colunaAusente(error)) ({ data, error } = await …)`), e exigir a
+             palavra `const` reprovava esse conserto — que só APERTA a garantia.
+             O que se cobra é a ORIGEM do valor: `error` sai de um `await`
+             DENTRO do bloco que o usa. */
+          expect(blocoDaFuncao(c, k)).toMatch(/(?:const|let) \{[^}]*\berror\b[^}]*\} = await/);
         }
       }
 
