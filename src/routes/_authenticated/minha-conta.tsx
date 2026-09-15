@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { subtabPermitida, subtabsDoBebe } from "@/lib/subtabs-do-bebe";
+import { destinoDaBarra, rotuloDaBarra, type OrigemDaBarra } from "@/lib/voltar-da-barra";
 import { nivelDaEpds, respostaDaQuestao10 } from "@/lib/epds";
 import { codificarFoto } from "@/lib/codificar-imagem";
 import {
@@ -1562,7 +1563,11 @@ function MinhaContaPage() {
    * `null` = veio da home (ou de um destino da barra de baixo), e aí voltar é
    * mesmo ir para a home.
    */
-  const [origem, setOrigem] = useState<Tab | null>(null);
+  /* ⚠️ **O PAR, e não só a aba.** Guardar o rótulo sozinho descartava a
+     sub-tela: quem tocava no único botão de contato do cartão vermelho de
+     movimentos reduzidos voltava para a GRADE de "Meu dia a dia", e não para
+     os Chutes. Ver `voltar-da-barra.ts`. */
+  const [origem, setOrigem] = useState<OrigemDaBarra>(null);
 
   /**
    * A seta deve voltar para um HUB, e não para uma aba.
@@ -1583,7 +1588,9 @@ function MinhaContaPage() {
     /* Só guarda origem quando existe uma: na home mobile não há "tela
        anterior", e guardar a aba que estava por baixo faria o voltar pular
        para um lugar que ela não estava vendo. E nunca guarda a si mesma. */
-    setOrigem(!mobileHome && tab !== (t as Tab) ? (tab as Tab) : null);
+    setOrigem(
+      !mobileHome && tab !== (t as Tab) ? { tab: tab as Tab, sub: consultasSub ?? null } : null,
+    );
     setVoltarAoHub(null);
     setTab(t as Tab);
     setMobileHome(false);
@@ -2480,26 +2487,39 @@ function MinhaContaPage() {
           lojinha e voltava, era despejado na tela do Bebê e perdia o lugar na
           trilha;
        3. não veio de lugar nenhum → home. */
+  /* ⚠️ **AS ABAS QUE O HUB DE FATO CONTÉM** — derivadas de `HUB_SAUDE`, e
+     nunca de `SECTION_TABS.saude`. As duas listas têm cinco itens e NÃO são os
+     mesmos cinco: Bem-estar e Alertas estão na seção e não estão na grade. Era
+     essa diferença que mandava a paciente para um hub sem a tela de onde ela
+     veio — em Modo Cuidado, pelo botão "Apoio emocional" do cartão de
+     acolhimento. */
+  const abasDoHub = HUB_SAUDE.map((i) => i.destino);
+
+  const destinoDaSeta = destinoDaBarra({
+    hubAberto,
+    voltarAoHub,
+    tab,
+    origem,
+    secao: tabToSection(tab as AppTab),
+    abasDoHub,
+  });
+
   function voltarDaBarra() {
-    /* Antes da regra 1, e não depois: quem veio de um hub para uma aba de
-       fora da seção dele (Chutes, Contrações) volta para o hub. A regra 1 não
-       pega esse caso porque ela olha a SEÇÃO da aba atual, e a aba atual é
-       Registros. */
-    if (!hubAberto && voltarAoHub) {
-      setHubAberto(voltarAoHub);
+    const d = destinoDaSeta;
+    if (d.t === "hub") {
+      setHubAberto(d.hub as BottomSection);
       setVoltarAoHub(null);
-      setConsultasSub(null);
-      return;
-    }
-    if (!hubAberto && tabToSection(tab as AppTab) === "saude") {
-      setHubAberto("saude");
+      /* ⚠️ Só a volta ao HUB limpa a sub-tela: a grade não tem uma. */
+      if (!hubAberto) setConsultasSub(null);
       return;
     }
     setHubAberto(null);
-    if (origem) {
-      setTab(origem);
+    if (d.t === "aba") {
+      setTab(d.tab as Tab);
       setOrigem(null);
-      setConsultasSub(null);
+      /* ⚠️ **RESTAURA a sub-tela, e não `null`.** É o mesmo dado que
+         `consultasSub` já carregava na ida — bastava não jogá-lo fora. */
+      setConsultasSub(d.sub);
       return;
     }
     setMobileHome(true);
@@ -2775,7 +2795,11 @@ function MinhaContaPage() {
             <div className="flex min-w-0 items-center gap-2.5">
               <button
                 onClick={voltarDaBarra}
-                aria-label={origem ? `Voltar para ${origem}` : "Voltar"}
+                /* ⚠️ **O RÓTULO SAI DO DESTINO, nunca de `origem` solto.** Ele
+                   anunciava "Voltar para Caminho" e a regra do hub levava para
+                   a grade da Saúde — uma seta que promete um lugar e entrega
+                   outro é pior que uma seta sem rótulo. */
+                aria-label={rotuloDaBarra(destinoDaSeta)}
                 className="press flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/8 text-primary transition-colors hover:bg-primary/15"
               >
                 <ChevronLeft className="h-[18px] w-[18px]" strokeWidth={2} />

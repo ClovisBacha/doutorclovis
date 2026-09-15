@@ -219,3 +219,67 @@ describe("idDaFuncao e a busca", () => {
     expect(CHAVE_DICA.startsWith("dc-path-")).toBe(true);
   });
 });
+
+describe("o mapa e as grades concordam sobre o que some no luto", () => {
+  /**
+   * ⚠️ **O MAPA ESCONDIA O CRONÔMETRO DE CONTRAÇÕES NO MODO CUIDADO — contra as
+   * DUAS grades que o mantêm.** As grades filtram uma chave só
+   * (`careMode && i.key === "chutes"`), pela razão escrita: quem perdeu a
+   * gestação PODE ESTAR EM TRABALHO DE PARTO. O mapa marcava `noLuto: false` em
+   * `contracoes` e tirava do luto justamente o cronômetro daquela noite.
+   *
+   * São três listas que precisam concordar (as duas grades e o mapa), e é a
+   * mais nova que divergiu — que é sempre como isto acontece.
+   */
+  const chavesFiltradasNasGrades = () => {
+    const chaves = new Set<string>();
+    for (const m of conta.matchAll(/careMode && i\.key === "([^"]+)"/g)) chaves.add(m[1]);
+    return chaves;
+  };
+
+  test("as grades filtram exatamente as chaves que o mapa esconde", () => {
+    const filtradas = chavesFiltradasNasGrades();
+    /* Se o filtro das grades mudar de forma, este teste fica vazio e passaria
+       em branco — a contagem é o que impede isso. */
+    expect(filtradas.size).toBeGreaterThan(0);
+
+    /* Só as funções que as grades de fato desenham entram na comparação:
+       o mapa lista telas que não têm ladrilho nenhum. */
+    const doHub = FUNCOES_DO_APP.filter((f) => f.sub != null && f.tab === "Meu dia a dia");
+    expect(doHub.length).toBeGreaterThan(1);
+    for (const f of doHub) {
+      const escondidaNaGrade = filtradas.has(f.sub!);
+      expect({ id: f.id, escondida: !f.noLuto }).toEqual({
+        id: f.id,
+        escondida: escondidaNaGrade,
+      });
+    }
+  });
+
+  test("⚠️ e o cronômetro de contrações continua alcançável no luto", () => {
+    /* A asserção nomeada, porque este é o caso que custou: um cronômetro de
+       trabalho de parto sumindo de quem pode estar em trabalho de parto. */
+    const visiveis = funcoesVisiveis({ careMode: true, weeks: 30 }).map((f) => f.id);
+    expect(visiveis).toContain("contracoes");
+    expect(visiveis).not.toContain("chutes");
+  });
+});
+
+describe("o rodapé do mapa conta a lista que ela está vendo", () => {
+  test("⚠️ o total é o das VISÍVEIS, nunca o do catálogo", () => {
+    /* Era `FUNCOES_DO_APP.length` — trinta e cinco anunciadas embaixo de vinte
+       no Modo Cuidado, na tela que existe para dizer o que o app faz. */
+    const tela = readFileSync("src/components/mapa-do-app.tsx", "utf8");
+    const i = tela.indexOf("funções ·");
+    expect(i).toBeGreaterThan(-1);
+    const rodape = tela.slice(i - 200, i + 120);
+    expect(rodape).toContain("{visiveis.length} funções");
+    expect(rodape).not.toContain("FUNCOES_DO_APP.length");
+  });
+
+  test("e a lista de fato encolhe no luto — senão o conserto não teria efeito", () => {
+    const cheia = funcoesVisiveis({ careMode: false, weeks: 30 }).length;
+    const luto = funcoesVisiveis({ careMode: true, weeks: 30 }).length;
+    expect(luto).toBeLessThan(cheia);
+  });
+});

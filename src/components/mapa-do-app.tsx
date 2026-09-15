@@ -140,8 +140,13 @@ export function MapaDoApp({
           })}
         </div>
         <p className="border-t border-border/60 px-5 py-2.5 text-center text-xs text-muted-foreground">
-          {FUNCOES_DO_APP.length} funções · {visiveis.filter((f) => !visitadas.has(f.id)).length}{" "}
-          que você ainda não abriu
+          {/* ⚠️ **ERA `FUNCOES_DO_APP.length` — o total do CATÁLOGO, sobre uma
+              lista FILTRADA.** No Modo Cuidado e antes da semana mínima a lista
+              encolhe, e o rodapé anunciava trinta e cinco funções embaixo de
+              vinte: o número contradizendo o que ela está vendo, na tela que
+              existe para dizer o que o app faz. */}
+          {visiveis.length} funções · {visiveis.filter((f) => !visitadas.has(f.id)).length} que você
+          ainda não abriu
         </p>
       </div>
     </div>

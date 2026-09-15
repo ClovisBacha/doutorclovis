@@ -192,7 +192,13 @@ export const FUNCOES_DO_APP: readonly FuncaoDoApp[] = [
     tab: "Meu dia a dia",
     sub: "contracoes",
     grupo: "e-o-bebe",
-    noLuto: false,
+    /* ⚠️ **FICA NO LUTO, e o mapa era a única das três listas que o escondia.**
+       As duas grades que abrem esta tela filtram só `chutes`
+       (`HUB_SAUDE.filter(… i.key === "chutes")` e a de Meu dia a dia), pela
+       razão escrita: quem perdeu a gestação PODE ESTAR EM TRABALHO DE PARTO. O
+       mapa marcava `false` e tirava do luto justamente o cronômetro que ela
+       pode precisar naquela noite. Há catraca comparando as três listas. */
+    noLuto: true,
   },
   {
     id: "contagem",
