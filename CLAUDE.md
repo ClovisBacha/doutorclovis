@@ -4684,16 +4684,19 @@ passa meses sem ninguém perceber que não funciona.
 
 ### O que sobrou, e não foi feito
 
-⚠️ **O NÚMERO AQUI JÁ ENVELHECEU UMA VEZ, e a favor do argumento.** Este
-parágrafo dizia 20.367 linhas; medido em set/2026, são **21.478** — ele cresceu
-1.111 linhas enquanto a nota dizia que ele estava parado. Toda leva nova entra
-nele, e a cirurgia fica mais cara a cada semana. Quem mexer aqui, remeça:
-`wc -l < src/routes/_authenticated/minha-conta.tsx`.
+⚠️ **O NÚMERO AQUI JÁ ENVELHECEU DUAS VEZES, e nos DOIS sentidos.** Ele dizia
+20.367, depois 21.478 (o arquivo crescera 1.111 linhas enquanto a nota o dava
+por parado) — e em set/2026 são **15.049**, porque os cortes começaram e a nota
+continuou dizendo 21.478. **A segunda vez foi pior que a primeira: um número
+vencido para MAIS descreve uma dívida que não existe, e foi por ele que os
+candidatos de corte listados aqui mandaram cortar o que já estava cortado.**
+Quem mexer aqui, remeça: `wc -l < src/routes/_authenticated/minha-conta.tsx`.
 
-`minha-conta.tsx` tem **21.478 linhas, 29 estados e zero memoização**: qualquer
-toque repinta a árvore inteira. É a maior peça estrutural que resta, e ficou
-parada de propósito — é cirurgia grande, e o dono precisa dizer se a lentidão
-sobreviveu às quatro correções acima antes de valer o risco.
+`minha-conta.tsx` tem **15.049 linhas, 29 estados e zero memoização**: qualquer
+toque repinta a árvore inteira. É a maior peça estrutural que resta, e a
+memoização segue parada de propósito — é cirurgia grande, e o dono precisa
+dizer se a lentidão sobreviveu às quatro correções acima antes de valer o
+risco.
 
 ## As oito ideias da Comunidade, aplicadas (ago/2026)
 
@@ -7872,10 +7875,11 @@ literal, e `chama-sequencia.tsx` monta a classe por interpolação. Um script qu
 apagasse toda classe sem ocorrência literal quebraria as duas animações sem
 erro nenhum.
 
-**A maior peça que resta continua sendo `minha-conta.tsx`** — 21.478 linhas,
-125 kB comprimidos, zero memoização —, e ela segue parada de propósito: é
-cirurgia grande, e o dono precisa dizer se a lentidão sobreviveu às correções
-desta leva antes de valer o risco.
+**A maior peça que resta continua sendo `minha-conta.tsx`** — 15.049 linhas em
+set/2026 (eram 21.478 quando este parágrafo foi escrito), 89 kB comprimidos,
+zero memoização —, e a MEMOIZAÇÃO segue parada de propósito: é cirurgia grande,
+e o dono precisa dizer se a lentidão sobreviveu às correções desta leva antes de
+valer o risco.
 
 ## A segunda catraca, e a régua que ninguém chamava (ago/2026)
 
@@ -12399,9 +12403,11 @@ do dono, não remendo. **Truque de pseudo-elemento não conserta encavalamento.*
 
 ## O primeiro corte do `minha-conta.tsx` (set/2026)
 
-O arquivo tem **21.478 linhas** — e o número deste parágrafo já envelheceu uma
-vez, dizendo 20.367 enquanto ele crescia 1.111 linhas. É a única dívida do
-repositório que fica mais cara a cada semana, porque toda leva nova entra nela.
+O arquivo tinha **21.478 linhas** quando este corte foi feito — e o número já
+envelhecera uma vez, dizendo 20.367 enquanto ele crescia 1.111 linhas. (Hoje
+são 15.049; ver a seção dos cortes seguintes, mais abaixo.) Era a única dívida
+do repositório que ficava mais cara a cada semana, porque toda leva nova entrava
+nela.
 
 O primeiro corte foi `OnboardingRitual` + `CodigoDaEmbaixadora` →
 `src/components/onboarding-ritual.tsx` (**−665 linhas**, 20.813).
@@ -12467,10 +12473,21 @@ de console.
 
 ### O que vem depois, em ordem
 
-Os candidatos seguintes, medidos (linhas · dependências de módulo):
+⚠️ **ESTA LISTA VENCEU, E ELA ENGANOU ALGUÉM — a lista original nomeava
 `ConquistasTab` 676 · `CantinhoTab` 610 · `CicloMenstrualTab` 418 ·
-`ExerciciosTab` 387 · `ContracoesTab` 364. Os três primeiros também são export
-solto hoje, então pagam as duas dívidas juntas.
+`ExerciciosTab` 387 · `ContracoesTab` 364, e os cinco JÁ ESTAVAM CORTADOS
+quando ela foi lida de novo.** Em set/2026 o dono pediu "faça o corte do
+ConquistasTab e do CantinhoTab" a partir dela, e os dois arquivos existiam em
+`src/components/` havia dias. É a sexta vez que prosa desatualizada engana
+alguém neste repositório, e a primeira em que a prosa era do próprio autor da
+leva anterior.
+
+**A régua que fica: uma lista de candidatos é uma MEDIÇÃO com data, não uma
+decisão.** Quem for cortar remeça na hora — o que vale é
+`grep -n "^export \(function\|const\)" no arquivo de rota` (a dívida de
+pacote) e `awk` por tamanho de bloco (a dívida de legibilidade), nunca esta
+lista. Ver a seção do corte seguinte, logo abaixo, para o estado medido de
+set/2026.
 
 ⚠️ **`MinhaContaPage` (1.864 linhas) fica por último**, e não por primeiro: é
 ela que segura os 29 estados que todo o resto lê por prop. Cortá-la é o único
@@ -12492,6 +12509,171 @@ processo em toda execução. A leitura da pasta virou módulo
 ⚠️ **E o mutante não contou na primeira tentativa**: a âncora não casou (o
 prettier reformata o JSON gerado em uma coluna por linha), e o `assert` acusou
 em vez de deixar passar um "✅ vermelho" sobre uma edição que nunca aconteceu.
+
+## O corte que ZEROU os exports soltos de `minha-conta.tsx` (set/2026)
+
+Pedido do dono: _"faça o corte do ConquistasTab e do CantinhoTab"_ — a partir da
+lista de candidatos da seção acima.
+
+⚠️ **OS DOIS JÁ ESTAVAM CORTADOS**, `conquistas-tab.tsx` havia onze dias e
+`cantinho-tab.tsx` na mesma madrugada. A lista que os nomeava era uma medição
+antiga apresentada como plano, e eu a repassei ao dono sem conferir. **Prosa
+vencida engana quem a escreveu tanto quanto quem a lê**, e o conserto está na
+seção acima: a lista passou a dizer que venceu, e a régua é remedir na hora.
+
+### O que de fato faltava, e a medição que decidiu
+
+O critério que o dono aprovou era o meu: _"pagam a dívida estrutural e uma
+entrada da catraca de export solto de uma vez"_. Com os nomes de hoje, isso são
+os **seis exports soltos** que restavam no arquivo de rota —
+`mostrarSaudeDaMulher`, `HubSaude` e as quatro `*_SUBTABS`.
+
+⚠️ **E o corte foi escolhido por MEDIÇÃO, não por tamanho.** Um move de
+componente que a rota importa estaticamente não muda um byte do pacote; o que
+muda é o export não-rota, porque ele sai do pedaço daquela rota e entra no da
+ÁRVORE DE ROTAS. A prova estava no bundle **antes** do corte:
+
+```
+preview-saude .js        →  import{ m, j, H } from "./index-*.js"       ← H = HubSaude, na ENTRADA
+preview-grades.js        →  import{ ab,ac,ad,ae,af,ag } from "./index-*.js" ← as 4 SUBTABS, na ENTRADA
+preview-saude-registros  →  import{ H } from "./health-tab-*.js"        ← pedaço PRÓPRIO (o certo)
+```
+
+Ou seja: o hub e as quatro tabelas viajavam no pedaço que **toda página do site
+baixa**, e a bancada irmã mostrava, no mesmo build, como deveria ser.
+
+### O resultado, medido nos dois builds
+
+|                              |                antes |               depois |
+| ---------------------------- | -------------------: | -------------------: |
+| **pedaço de ENTRADA (gzip)** |              204.159 | **197.039** (−7.120) |
+| `minha-conta.tsx`            |        15.726 linhas |    **15.049** (−677) |
+| exports soltos na rota       |                    6 | **0** (só a `Route`) |
+| `CONHECIDOS` da catraca      | 28 nomes, 5 arquivos |            **22, 4** |
+
+Saíram junto do grafo estático da rota **22 artes `.webp` e 18 ícones**, mais os
+três módulos de fila e o `quando-foi`. Depois do corte, `preview-saude` importa
+de `hub-saude-*.js` e `preview-grades` de `grades-das-abas-*.js` — pedaços
+próprios, o mesmo padrão de `health-tab-*.js`.
+
+⚠️ **É mais que o dobro do precedente**: tirar `PainelDaEmbaixadora` de
+`influenciadora.tsx` custou −3.527 na entrada, e foi o achado que criou a
+catraca.
+
+### O que é um move puro, e como isso foi PROVADO
+
+Os dois corpos são **byte a byte** os originais — conferido por SHA-256,
+comparando o arquivo novo (sem o cabeçalho e os imports, e com as três palavras
+`export` desfeitas) contra a fatia extraída da rota. `hub-saude.tsx` e
+`grades-das-abas.tsx` não têm uma linha de lógica nova.
+
+⚠️ **`ARTE_GRADE` e `ARTE_BEBE` foram junto, e a ORDEM é obrigatória.** `const`
+de módulo não é içado: declarado depois da primeira grade que o lê, o módulo
+estoura na avaliação e **toda página responde 500** — está registrado neste
+arquivo porque já aconteceu. Cada mapa continua antes das tabelas que o
+consomem.
+
+⚠️ **`Tab` continua vindo da rota por `import type`**, e isso não custa um byte.
+Mover `Tab` para `lib/` toca dezenas de referências e deixaria de ser um move.
+
+### ⚠️ Nove testes liam o fonte da rota — e três deles PASSARIAM EM VAZIO
+
+O caminho mudou, a garantia não mudou uma linha em nenhum. Mas reapontá-los
+destapou três asserções que ficariam **verdes sobre nada**:
+
+- ⚠️ **As duas negativas de `chutes-no-luto`** (`not.toContain('careMode &&
+i.key === "contracoes"')`) ficariam cegas: o filtro que elas proíbem mudou de
+  arquivo, e uma negativa sobre um arquivo que não contém o código passa sempre.
+  Hoje varrem os DOIS fontes.
+- ⚠️ **Duas fatias por `indexOf` sem conferência de âncora** (em `aba-da-saude` e
+  no segundo `describe` de `quando-foi`): uma âncora que não casa devolve −1, e
+  `slice(-1)` dá um caractere — o `not.toContain` seguinte fica verde sobre
+  nada. É a armadilha que este arquivo cataloga, encontrada por acaso ao mover.
+- ⚠️ **`mapa-do-app` deriva as chaves do luto varrendo o FONTE atrás do filtro
+  das grades.** Lendo só a rota, ele passaria a enxergar **uma** grade em vez de
+  duas, e a comparação das três listas ficaria frouxa exatamente onde ela existe
+  para ser apertada. Hoje lê os três fontes juntos.
+
+⚠️ **E `subTelasDe` ganhou conferência de âncora**: sem ela, um hub que mudasse
+de arquivo apareceria com ZERO sub-telas e as asserções passariam em branco.
+Medido depois: as cinco grades devolvem 6 · 4 · 6 · 7 · 5 chaves.
+
+### ⚠️ E o portão diverge do `bun test` por DESENHO, não por defeito
+
+O portão imprimiu `6483 pass` e o `bun test` desta árvore dá `6488`. **Não é a
+coleta parcial que este arquivo registra**: o portão roda `bun test src/` (372
+arquivos) e o `bun test` roda tudo (373) — os cinco testes de diferença são
+`medicoes/ondas-do-perfil`, que mora fora de `src/` de propósito (o
+`mock.module` do bun escreve num registro compartilhado entre arquivos). A trava
+de cobertura compara ARQUIVOS, e passou. Conferir isso custou dois minutos e
+evitou reportar um número errado.
+
+⚠️ **E uma medição minha mentiu duas vezes antes de acertar:** agrupar os
+pedaços por `basename.rsplit('-',1)[0]` colide (`index-*.js` são dezenas, dos
+pacotes do `node_modules`), e a soma deu 381 bytes para o "índice". O pedaço de
+ENTRADA é **o maior `index-*.js`**, e é ele que se mede.
+
+## ⚠️ DOIS PORTÕES JUNTOS DÃO VERMELHO FALSO E SUÍTE PELA METADE (set/2026)
+
+Achado ao verificar o corte acima, e ele é do INSTRUMENTO, não do código.
+
+O portão imprimiu **`tsc FALHOU (código 2)`** apontando `saude-clinica.test.ts` e
+`saude-clinica-sondas.test.ts` — dois arquivos que ninguém tinha tocado, com o
+erro `Module '"bun:test"' has no exported member 'it'`. O MESMO `tsc`, rodado
+sozinho em seguida, saiu **0 sem uma linha de erro**. E o mesmo relatório dizia
+**`6263 pass`** onde a árvore tem **6483**.
+
+**A causa: dois `verificar.sh` rodando ao mesmo tempo** (medido com `ps`: PIDs
+8162 e 8252), os dois escrevendo no mesmo `/tmp/portao.log` — então o relatório
+que eu li era de uma execução e o arquivo, de outra.
+
+⚠️ **E A TRAVA DE COBERTURA NÃO PEGA ESSE CASO.** Ela compara ARQUIVOS rodados
+com os do disco, e a execução espremida rodou os **372 inteiros** — com duzentos
+testes a menos DENTRO deles. Um portão que sai verde tendo rodado menos do que
+existe é exatamente o defeito que ela nasceu para impedir, chegando por uma
+porta que ela não vê.
+
+A trava nova é `flock -n` no descritor 9, ANTES do primeiro passo: depois dele
+não serviria de nada, porque o `tsc` concorrente já teria rodado e é ele que dá
+o falso vermelho. O descritor é fechado pelo sistema quando o processo morre,
+então um portão morto a `pkill` não deixa a trava presa.
+
+⚠️ **A causa do aperto NÃO foi reproduzida** — pressão de memória com dois `tsc`
+e dois `bun test` no mesmo contêiner é a suspeita, e suspeita não é causa. O que
+a trava faz não depende de saber: ela fecha a porta inteira.
+
+### ⚠️ A primeira versão tinha FALSO POSITIVO, e a contraprova a pegou
+
+`pgrep -f "scripts/verifica[r]\.sh"` casa também o **`bash -c` do harness**, que
+carrega o comando inteiro na própria linha de comando. Rodando **SOZINHO**, o
+portão acusava "já há 3 portão(ões) rodando" e se recusava a rodar.
+
+⚠️ **O colchete só impede o `pgrep` de casar a SI MESMO** — nunca outro processo
+cuja linha contenha a string. É uma armadilha diferente da que este arquivo já
+registrava, e a régua continua sendo a mesma: **catraca que reprova o estado
+correto é catraca que alguém desliga**, e esta quase nasceu assim. O que a pegou
+foi rodar a contraprova nos DOIS sentidos (sozinho tem de passar; com outro em
+voo tem de recusar), e não só no sentido que eu esperava.
+
+⚠️ **E sem `flock` no PATH o portão SEGUE em vez de falhar**: a exclusividade
+protege contra ruído local, e recusar o portão inteiro por falta dela seria
+trocar um falso vermelho por outro — a regra que `portao-nao-falha-aberto.ts`
+existe para sustentar.
+
+### ⚠️ E O MEU PATCH APAGOU A FUNÇÃO `limpo()` — a catraca do portão pegou
+
+Escrevendo a trava, substituí o trecho entre dois índices (`s[:i] + novo + s[j:]`)
+e **entre as duas âncoras vivia a definição de `limpo()`**, que é chamada em três
+lugares. Sem ela o portão imprimiria `command not found` **exatamente quando
+alguma coisa falha**, que é o único momento em que ele importa.
+
+É a armadilha do patch por texto que este arquivo cataloga ("a fatia ia até o
+fim e comeu o fecho do arquivo"), aqui comendo uma função no MEIO. Quem a pegou
+foi `portao-nao-falha-aberto.test.ts`, que confere o próprio script.
+
+**A régua: inserção por ÂNCORA (`s.replace(ancora, ancora + novo)`), nunca por
+par de índices.** Uma inserção não pode apagar nada, e o `git diff --stat`
+prova: **41 inserções, 0 deleções.**
 
 ## A leva de artes 3D: barra, hubs e a vitrine do Cantinho (set/2026)
 

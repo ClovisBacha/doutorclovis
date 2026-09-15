@@ -103,6 +103,39 @@ describe("nenhum passo reprova por motivo alheio ao código", () => {
   });
 });
 
+describe("⚠️ um portão de cada vez", () => {
+  /* DOIS `verificar.sh` ao mesmo tempo neste contêiner deram `tsc FALHOU
+     (código 2)` em arquivos que ninguém tocou — o mesmo `tsc`, rodado sozinho
+     em seguida, saiu 0 — e `6263 pass` onde a árvore tinha 6483. A trava de
+     cobertura NÃO pega esse caso: ela compara ARQUIVOS, e a execução espremida
+     rodou os 372 inteiros, com duzentos testes a menos dentro deles. */
+  test("a exclusividade é conferida ANTES de qualquer passo", () => {
+    const i = CODIGO.indexOf("flock -n 9");
+    expect(i).toBeGreaterThan(-1);
+    /* Depois do primeiro passo ela não serviria de nada: o `tsc` concorrente
+       já teria rodado, e é ele que dá o falso vermelho. */
+    expect(i).toBeLessThan(CODIGO.indexOf("npx tsc --noEmit"));
+    expect(CODIGO).toMatch(/exec 9> \/tmp\/\.verificar-doutorclovis\.lock/);
+  });
+
+  test("⚠️ NÃO é `pgrep` — aquela versão tinha falso positivo", () => {
+    /* `pgrep -f "scripts/verificar.sh"` casa também o `bash -c` do harness,
+       que carrega o comando inteiro na própria linha: rodando SOZINHO, o
+       portão acusava "3 portões rodando" e se recusava a rodar. O colchete só
+       impede o `pgrep` de casar a SI MESMO, nunca outro processo cuja linha
+       contenha a string. Catraca que reprova o estado correto é catraca que
+       alguém desliga. */
+    expect(CODIGO).not.toMatch(/pgrep[^\n]*verifica/);
+  });
+
+  test("⚠️ sem `flock` no PATH o portão SEGUE, e não reprova", () => {
+    /* A exclusividade protege contra ruído local. Recusar o portão inteiro por
+       falta dela seria trocar um falso vermelho por outro — a regra que este
+       arquivo inteiro existe para sustentar. */
+    expect(CODIGO).toMatch(/if command -v flock > \/dev\/null 2>&1; then/);
+  });
+});
+
 describe("uma execução por ferramenta", () => {
   test("⚠️ `bun test` roda UMA vez — três execuções podiam discordar", () => {
     /* Além de triplicar o tempo do portão, num teste intermitente as três

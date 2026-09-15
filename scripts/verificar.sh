@@ -20,6 +20,47 @@ passo() { printf "%-12s " "$1"; }
 # decisão.
 limpo() { grep -vE '^npm (notice|warn)|^$' || true; }
 
+# ─── UM PORTÃO DE CADA VEZ ───────────────────────────────────────────────────
+# ⚠️ **DOIS PORTÕES AO MESMO TEMPO DÃO UM FALSO VERMELHO E UMA COLETA PARCIAL —
+# medido em set/2026.** Dois `verificar.sh` simultâneos neste contêiner deram
+# `tsc FALHOU (código 2)` em arquivos que ninguém tinha tocado (o mesmo `tsc`,
+# rodado sozinho em seguida, saiu 0) e `6263 pass` onde a árvore tem 6483. E os
+# dois escreviam no mesmo log, então o relatório lido era de uma execução e o
+# arquivo, de outra.
+#
+# ⚠️ **A trava de cobertura lá embaixo NÃO pega esse caso**: ela compara
+# ARQUIVOS rodados com os do disco, e a execução espremida rodou os 372
+# inteiros — com duzentos testes a menos dentro deles. Um portão que sai verde
+# tendo rodado menos do que existe é o defeito que ela nasceu para impedir,
+# chegando por uma porta que ela não vê.
+#
+# ⚠️ A causa do aperto não foi reproduzida (pressão de memória com dois `tsc` e
+# dois `bun test` no mesmo contêiner é a suspeita, e suspeita não é causa). O
+# que esta trava faz não depende de saber a causa: ela recusa começar enquanto
+# outro portão estiver vivo.
+#
+# ⚠️ **É `flock`, e NÃO `pgrep` — a primeira versão tinha FALSO POSITIVO, e a
+# contraprova a pegou.** `pgrep -f "scripts/verifica[r]\.sh"` casa também o
+# `bash -c` do harness, que carrega o comando inteiro na própria linha: rodando
+# SOZINHO, o portão acusava "3 portões rodando" e se recusava a rodar. O
+# colchete só impede o `pgrep` de casar a SI MESMO, nunca outro processo cuja
+# linha contenha a string.
+#
+# ⚠️ O descritor é fechado pelo sistema quando o processo morre, então um portão
+# morto a `pkill` não deixa a trava presa. E sem `flock` no PATH o portão SEGUE
+# em vez de falhar: a exclusividade protege contra ruído local, e recusar o
+# portão inteiro por falta dela seria trocar um falso vermelho por outro.
+if command -v flock > /dev/null 2>&1; then
+  exec 9> /tmp/.verificar-doutorclovis.lock
+  if ! flock -n 9; then
+    passo "exclusivo"
+    echo "FALHOU — já há outro portão rodando"
+    echo "  ⚠️  dois portões juntos dão tsc vermelho falso e suíte coletada pela metade."
+    echo "      Espere o outro terminar (ou mate-o) e rode de novo, sozinho."
+    exit 1
+  fi
+fi
+
 # ─── tsc ─────────────────────────────────────────────────────────────────────
 # ⚠️ Julgado pelo CÓDIGO DE SAÍDA, e não por "imprimiu alguma coisa?". O `tsc`
 # sai 2 quando há erro de tipo e 0 quando não há — é o sinal exato. A regra
