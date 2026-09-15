@@ -1013,7 +1013,7 @@ export const PostInstagram = memo(function PostInstagram({
             type="button"
             onClick={() => setEditando(post.texto ?? "")}
             aria-label="Editar a legenda"
-            className="press grid h-11 w-9 shrink-0 place-items-center text-muted-foreground"
+            className="press grid h-11 w-11 shrink-0 place-items-center text-muted-foreground"
           >
             <IconeLapis />
           </button>
@@ -1032,7 +1032,7 @@ export const PostInstagram = memo(function PostInstagram({
             onClick={() => aoFixar(post, !post.fixadoEm)}
             aria-label={post.fixadoEm ? "Soltar do topo do perfil" : "Fixar no topo do perfil"}
             aria-pressed={!!post.fixadoEm}
-            className={`press grid h-11 w-9 shrink-0 place-items-center ${
+            className={`press grid h-11 w-11 shrink-0 place-items-center ${
               post.fixadoEm ? "text-foreground" : "text-muted-foreground"
             }`}
           >
@@ -1240,9 +1240,13 @@ export const PostInstagram = memo(function PostInstagram({
           <button
             type="button"
             onClick={() => aoVerQuemReagiu(post)}
-            /* ⚠️ 44px de ALTURA: a fileira de emojis desenha 22px, e é ela que
-               a autora toca para ver quem respondeu ao post dela. */
-            className="press flex min-h-[44px] min-w-0 items-center gap-1.5"
+            /* ⚠️ 44px nos DOIS lados: a fileira de emojis desenha 22px, e é ela
+               que a autora toca para ver quem respondeu ao post dela. A altura
+               já vinha do `min-h`; a LARGURA media 36 — o `-mx-1 px-1` a leva a
+               48 sem mover um pixel do desenho — e é `1.5` e não `1` porque com
+               `px-1` a medida deu 43,x e a varredura, que arredonda, continuava
+               reprovando um alvo que parecia 44. */
+            className="press -mx-1.5 flex min-h-[44px] min-w-0 items-center gap-1.5 px-1.5"
             aria-label={`Ver quem reagiu — ${total}`}
           >
             <span aria-hidden className="flex -space-x-1.5 text-[15px] leading-none">
@@ -1814,7 +1818,10 @@ export function CartaoDaSemana({
           type="button"
           onClick={aoFechar}
           aria-label="Dispensar o resumo da semana"
-          className="press -mr-1 shrink-0 px-1.5 text-[18px] leading-none text-muted-foreground"
+          /* ⚠️ **44px, medido.** Era `px-1.5` sem caixa: 23×18 — o glifo `×` é
+             estreito, e um botão sem caixa mede o GLIFO. O `-my-1.5` cresce a
+             área do dedo sem mover o desenho nem empurrar a faixa. */
+          className="press -my-1.5 -mr-2 flex h-11 w-11 shrink-0 items-center justify-center text-[18px] leading-none text-muted-foreground"
         >
           ×
         </button>
@@ -10903,7 +10910,11 @@ export function NovoPost({
           type="button"
           onClick={enviar}
           disabled={!podeEnviar}
-          className="press text-[14px] font-semibold text-primary disabled:opacity-40"
+          /* ⚠️ **Sem `-mr-2`, e a FOTO é que disse.** O puxão pela direita
+             encostava o rótulo a 8px da borda enquanto o `‹` do outro lado
+             respeitava os 16 do `px-4` — a barra saía torta, e na captura lia
+             como texto cortado. O `px-2` sozinho já leva a 44 de altura. */
+          className="press flex min-h-11 items-center px-2 text-[14px] font-semibold text-primary disabled:opacity-40"
         >
           {enviando ? "Publicando…" : "Compartilhar"}
         </button>
@@ -10928,7 +10939,7 @@ export function NovoPost({
                 setMarcadas(rascunho.marcadas);
                 setOfereceu(true);
               }}
-              className="press shrink-0 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
+              className="press -my-1.5 flex min-h-11 shrink-0 items-center rounded-full bg-primary px-3 text-xs font-semibold text-primary-foreground"
             >
               Recuperar
             </button>
@@ -10941,7 +10952,11 @@ export function NovoPost({
                 setOfereceu(true);
               }}
               aria-label="Descartar o rascunho"
-              className="press shrink-0 px-1 text-[16px] leading-none text-muted-foreground"
+              /* ⚠️ **O MENOR ALVO DO APP ERA O QUE APAGA O QUE ELA ESCREVEU:**
+                 18×16, encostado num "Recuperar" de 84×30. Errar o toque aqui
+                 não custa uma tela errada — custa o texto. Os dois vão a 44 de
+                 altura, e o × a 44 de largura. */
+              className="press -my-1.5 -mr-1 flex h-11 w-11 shrink-0 items-center justify-center text-[16px] leading-none text-muted-foreground"
             >
               ×
             </button>

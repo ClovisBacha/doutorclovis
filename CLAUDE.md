@@ -17089,3 +17089,152 @@ com texto livre, que é o único caso em que nenhum dos três defeitos aparece.
 **Medido ao fim:** 6.483 testes · 217 bancadas · 19 roteiros de interação · zero
 problemas · **26 mutantes conferidos em vermelho** e dois em verde de propósito
 (as duas formas equivalentes, que não podem reprovar).
+
+## ⚠️ OS "474 ALVOS" ERAM 75 — o instrumento é que estava quebrado (set/2026)
+
+A varredura de acessibilidade tinha sido consertada uma leva antes (o `&&` do
+alvo, que a tornava cega ao botão baixo e largo) e o número saltou de 53 para 474. Esse 474 foi oferecido ao dono como "a dívida de acessibilidade do app".
+
+**Ele estava errado por um fator de seis, e as três causas são a mesma: o
+instrumento falhava ABERTO.** Ferramenta de verificação que falha aberta não é
+fraca — **ela dá permissão.**
+
+### ⚠️ 1. ELA APROVAVA SEM TER MEDIDO NADA
+
+Medido, e é como esta leva começou: com o servidor de dev no chão, as 22 rotas
+devolveram `ERR_CONNECTION_REFUSED` e o relatório saiu
+
+    22 telas · contraste 0 · alvo 0 · sem nome 0 · sem alt 0
+
+com código de saída **ZERO**. Vinte e duas linhas de "não abriu" no meio do log,
+e o fim — que é por onde um relatório se lê — dizendo que estava tudo certo.
+
+Hoje ela conta as telas que de fato ABRIRAM, diz `N de M telas MEDIDAS`, lista
+as que ficaram de fora e **sai 1**. E três conferências entram junto, cada uma
+fechando uma forma de "abriu" que não é "mediu":
+
+- ⚠️ **O CÓDIGO HTTP.** Uma bancada que deixou de existir devolve 404 — e o
+  router **DESENHA** uma tela de 404, com texto e com a moldura do site. Sem
+  isso ela entraria na conta como medida, e a varredura aprovaria uma tela que
+  não existe mais. É a mesma falha aberta que a sonda de produção já pagou aqui,
+  tratando um 403 do WAF como veredito.
+- ⚠️ **A TELA DESENHOU.** Um 200 sobre uma tela em branco produz zero achados, e
+  zero achados sobre nada é o mesmo relatório de uma tela perfeita.
+- **`BASE_DA_VARREDURA`**, para a CONTRAPROVA poder existir. Rodadas as duas:
+  porta morta → **sai 1**; bancada inexistente → **sai 1**.
+
+### ⚠️ 2. ELA CONTAVA A MOLDURA DO SITE — 374 dos 473
+
+Toda `/preview-*` é rota do **site institucional**, então o cabeçalho e o rodapé
+dele aparecem em cada bancada — e `/minha-conta`, que é o app, os **esconde**.
+Medido: 17 controles × 22 telas = **374**. Mais 22 links de salto e 1 checkbox
+(item 3), e sobram **75 do app da paciente**.
+
+⚠️ **O número bruto nunca foi a resposta** — é a mesma lição das varreduras de
+523 e de 66. O que muda aqui é o custo: com 374 linhas de ruído, a dívida de
+verdade não é lida, e **um relatório de 474 linhas que ninguém lê é o mesmo que
+não ter varredura**.
+
+⚠️ **O separador é `.chrome-publico`, e NUNCA `closest("header,footer,nav")`.**
+A heurística foi tentada e mordeu para o lado perigoso: o cartão de publicação
+da Comunidade é um `<header>` de verdade, então os botões de **editar** e
+**fixar** — dois alvos reais de 36 de largura — sumiam para o balde do site. Uma
+varredura que move defeito do app para a lista "não é comigo" é pior que uma que
+o conta duas vezes. `.chrome-publico` é o mesmo invólucro que o app usa para
+esconder a moldura: o que ele esconde é, por definição, o que a paciente não vê.
+
+### ⚠️ 3. ELA REPROVAVA O QUE ESTÁ CERTO
+
+- **O link de salto** (`sr-only`, 1×1 até receber foco) — 22 linhas, uma por
+  tela, **já registradas neste arquivo como falso positivo** e contadas assim
+  mesmo. Reprovar o certo é como uma catraca vira ruído.
+- **A caixinha de um checkbox dentro de um `<label>` de 44** — o alvo de um
+  campo é o LABEL (tocar no rótulo alterna), e este arquivo já registrava isso.
+  Ou seja: ela reprovava **o próprio conserto** que o repositório tinha feito no
+  chá de bebê. Hoje a medida resolve `el.closest("label") ?? el`.
+
+### Os onze controles que mediam o GLIFO
+
+Um botão sem caixa mede o DESENHO — e `×` é um glifo estreito, `🔊` é um emoji.
+Todos os números abaixo foram medidos a 393px.
+
+| controle                                  | media         | onde                |
+| ----------------------------------------- | ------------- | ------------------- |
+| **`×` que DESCARTA o rascunho**           | 18×16         | compositor          |
+| `×` que dispensa o resumo da semana       | 23×18         | feed                |
+| `Recuperar` (o par do × acima)            | 84×30         | compositor          |
+| `Compartilhar` (a ação principal da tela) | 84×22         | compositor          |
+| `🔊` trocar o som ×2                      | 25×20         | meditação e Bebê    |
+| balão da voz · ⏸ pausa                    | 18×18 · 36×36 | sessão de meditação |
+| ✏️ editar a legenda · 📌 fixar no topo    | 36×44         | cartão do post      |
+| 🤗 resumo de reações                      | 36×44         | cartão do post      |
+
+⚠️ **O menor alvo do app era o que APAGA O QUE ELA ESCREVEU**, encostado num
+"Recuperar" cinco vezes maior. Errar o toque ali não custa uma tela errada —
+custa o texto.
+
+⚠️ **E o ✕ de FECHAR das duas telas de sessão já tinha `-m-2 flex h-11 w-11`,
+com a razão escrita, na MESMA LINHA do botão do som.** A régua estava aplicada
+num botão e de pé no vizinho — a forma mais comum de defeito deste repositório.
+
+### ⚠️ `after:-inset-N` NUM ELEMENTO COM BORDA NÃO DÁ `tamanho + 2N`
+
+A pausa é um círculo DESENHADO de 36 (crescê-lo mexe na composição), então quem
+cresce é a ÁREA, pelo `after` — o padrão que este arquivo já registra. Só que
+`-inset-1` sobre 36 deu **42**, e não 44: medido no `getComputedStyle` do
+`::after`. **Um absoluto se posiciona contra o PADDING BOX do pai**, e este
+botão tem `border`. A conta é `tamanho − 2×borda + 2×inset`. Com `-inset-[5px]`:
+44×44, os quatro cantos respondendo ao toque.
+
+⚠️ **E `-m-2` em DOIS irmãos adjacentes faz o de trás roubar a borda do da
+frente** — medido: o botão da voz saiu com **40×44 efetivo** num box de 44,
+porque o do som pinta por cima. É a colisão que este arquivo registra duas
+vezes, e ela só aparece quando se mede o alvo EFETIVO (`elementFromPoint`), nunca
+o `getBoundingClientRect`. Hoje só o último da linha puxa, e pela direita.
+
+### ⚠️ A QUARTA FORMA DA ARMADILHA DO `bun:test`: `test.each`
+
+`TS2339: Property 'each' does not exist`, mais um `TS7006` por parâmetro da
+tabela. Verde no `bun test` — que é o portão que eu de fato rodo — e **vermelho
+no `tsc` da CI**. Depois de `toMatchObject`, `toBeDefined`, `expect(valor,
+"recado")` e `it`, esta me pegou num arquivo novo com a catraca já no lugar.
+`matchers-do-bun.test.ts` passou a cobri-la; um laço `for` sobre uma lista
+tipada faz o mesmo e é tipado. Conferida por contraprova.
+
+### O que NÃO foi mexido, e é decisão do dono
+
+Sobram **67 alvos** no app, e a esmagadora maioria é **uma classe só**: botão de
+largura total com 36–40px de altura, chip de 32–34, e nome/hashtag clicável
+dentro de um parágrafo. A auditoria da Comunidade já tinha registrado a decisão
+— _"os primeiros são a convenção do app inteiro, mudá-los é uma revisão de
+design, não um conserto; os segundos são links de texto dentro de um parágrafo"_.
+Vinte e sete deles estão no compositor de publicação (os 22 chips de marco e os
+4 de camada). Levá-los a 44 é uma linha por chip e **muda a cara da tela** — é
+escolha dele, não remendo, e o número está aqui para ela ser tomada.
+
+### ⚠️ Quatro armadilhas de medição desta leva
+
+1. ⚠️ **Sonda que só varre DENTRO da caixa não vê `after:-inset`.** Ela reportou
+   36×36 sobre um alvo de 44 — ou seja, reprovaria o conserto. Varre-se 14px
+   além do `getBoundingClientRect`.
+2. ⚠️ **`scrollIntoView` dentro de `page.evaluate` NÃO rola na hora** —
+   `styles.css` põe `scroll-behavior: smooth` no `<html>`, e o `rect` lido logo
+   depois ainda é o de antes. Com o elemento a y=3167 num viewport de 852,
+   `elementFromPoint` devolve `null` e a medida sai **0×0**, que lê como
+   "coberto". Terceira vez que a ausência de rolagem engana uma sonda aqui.
+3. ⚠️ **Passo de 1px sobre um `rect` fracionário ainda erra ±1 por lado** — 44
+   medindo 42. Quando o número importa, confere-se o `getComputedStyle` do
+   pseudo-elemento e os quatro cantos, e não a varredura.
+4. ⚠️ **`playwright` não resolve a partir de `/tmp`** — o script de medição roda
+   de dentro do repositório (em `scratchpad/`, que é ignorado), com
+   `executablePath: "/opt/pw-browsers/chromium"`.
+
+⚠️ **E a FOTO desfez uma decisão minha**: eu tinha posto `-mr-2` no
+"Compartilhar" para o rótulo não andar, e na captura ele encostava a 8px da
+borda enquanto o `‹` do outro lado respeitava os 16 do `px-4` — a barra saía
+torta. Nenhuma asserção estava perto disso.
+
+**Medido ao fim:** 6.502 testes · 217 bancadas · 19 roteiros de interação · zero
+problemas · **9 mutantes em vermelho** e as duas contraprovas da varredura
+(porta morta e bancada inexistente) saindo 1 · e o número honesto do app:
+**75 → 67 alvos**, com os 374 da moldura do site ditos à parte.

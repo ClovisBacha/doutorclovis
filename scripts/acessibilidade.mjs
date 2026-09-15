@@ -21,6 +21,11 @@
 import { chromium } from "playwright";
 import { existsSync } from "node:fs";
 
+/* O endereço é parametrizável para a CONTRAPROVA poder existir: apontar a
+   varredura para uma porta morta é a única forma de provar que ela reprova
+   quando nada abre — que é o defeito que ela já teve. */
+const BASE = process.env.BASE_DA_VARREDURA ?? "http://127.0.0.1:8080";
+
 const ROTAS = [
   "/preview-home?w=20",
   "/preview-saude?w=20",
@@ -184,12 +189,42 @@ const MEDIR = () => {
      verificação que falha aberta é pior que não existir: ela dá permissão. */
   for (const el of document.querySelectorAll('button,a[href],[role="button"],input,select')) {
     if (!visivel(el)) continue;
-    const r = el.getBoundingClientRect();
+    /* ⚠️ **O LINK DE SALTO NÃO É UM ALVO DE TOQUE.** Ele é `sr-only` — 1×1 de
+       propósito — e só ganha tamanho ao receber FOCO, que é o único jeito de
+       alcançá-lo. Medi-lo no estado de repouso reprova o desenho certo, e
+       reprovar o certo é como uma catraca vira ruído: eram 22 linhas, uma por
+       tela, já registradas como falso positivo e contadas assim mesmo. */
+    if (el.className && String(el.className).includes("sr-only")) continue;
+    /* ⚠️ **O ALVO DE UM CAMPO DENTRO DE UM `<label>` É O LABEL.** Tocar no
+       rótulo alterna a caixinha — então a caixinha de 16×16 de um checkbox
+       envolvido por um label de 44 de altura NÃO é um alvo pequeno. Medir o
+       `<input>` aqui reprovava exatamente o conserto que este repositório já
+       tinha feito (o `min-h-11` no label do chá de bebê). */
+    const alvo = el.closest("label") ?? el;
+    const r = alvo.getBoundingClientRect();
     if (r.width < 44 || r.height < 44) {
       out.alvo.push({
         w: Math.round(r.width),
         h: Math.round(r.height),
         t: (el.textContent || el.getAttribute("aria-label") || el.tagName).trim().slice(0, 36),
+        /* ⚠️ **A MOLDURA DO SITE NÃO É O APP DA PACIENTE, e contá-la junto
+           inflou o número em SEIS VEZES.** Toda `/preview-*` é rota do site
+           institucional, então o cabeçalho e o rodapé dele aparecem em cada
+           bancada — e `/minha-conta`, que é o app, os ESCONDE. Medido: 18
+           controles da moldura × 22 telas = 396 dos 473 achados. Com eles
+           dentro, a dívida de verdade ficava invisível no meio do ruído, que
+           é como uma varredura de 474 linhas deixa de ser lida.
+
+           ⚠️ **O separador é `.chrome-publico`, e NUNCA `closest("header,
+           footer,nav")`.** A heurística foi tentada e mordeu para o lado
+           perigoso: o cartão de publicação da Comunidade é um `<header>` de
+           verdade, então os botões de EDITAR e FIXAR — dois alvos reais de 36
+           de largura — sumiam para o balde do site. Uma varredura que move
+           defeito do app para a lista "não é comigo" é pior que uma que o
+           conta duas vezes. `.chrome-publico` é o mesmo invólucro que o app
+           usa para ESCONDER a moldura em `/minha-conta`: o que ele esconde é,
+           por definição, o que a paciente não vê. */
+        moldura: !!alvo.closest(".chrome-publico"),
       });
     }
   }
@@ -307,41 +342,85 @@ async function porMascaraDeGlifo(p, itens) {
   return fora;
 }
 
-const total = { contraste: 0, alvo: 0, semNome: 0, semAlt: 0, naoMedivel: 0 };
+const total = { contraste: 0, alvo: 0, alvoDaMoldura: 0, semNome: 0, semAlt: 0, naoMedivel: 0 };
+/* ⚠️ **QUANTAS TELAS DE FATO ABRIRAM.** Sem este contador o script imprimia
+   `22 telas · contraste 0 · alvo 0` e saía ZERO com o servidor de dev no chão —
+   medido: as 22 rotas devolveram `ERR_CONNECTION_REFUSED` e o relatório saiu
+   com cara de aprovação. É a mesma falha ABERTA que este instrumento já pagou
+   uma vez (o `&&` do alvo, que o tornava cego ao botão baixo e largo): uma
+   ferramenta de verificação que aprova sem ter medido nada não é fraca — ela
+   DÁ PERMISSÃO. */
+let abriram = 0;
+const naoAbriram = [];
 for (const rota of ROTAS) {
   const p = await ctx.newPage();
   try {
-    await p.goto("http://127.0.0.1:8080" + rota, { waitUntil: "networkidle", timeout: 30000 });
+    const resp = await p.goto(BASE + rota, { waitUntil: "networkidle", timeout: 30000 });
+    /* ⚠️ **O CÓDIGO HTTP É CONFERIDO, e não só o "abriu".** Uma bancada que
+       deixou de existir devolve 404 — e o router DESENHA uma tela de 404, com
+       texto e com a moldura do site. Sem esta linha ela entraria na conta como
+       "medida", e a varredura aprovaria uma tela que não existe mais. É a mesma
+       falha aberta que a sonda de produção já pagou aqui, tratando um 403 do
+       WAF como veredito. */
+    if (resp && resp.status() >= 400) throw new Error(`HTTP ${resp.status()}`);
     await p.waitForTimeout(1600);
+    /* ⚠️ **PÁGINA QUE NÃO DESENHOU NADA TAMBÉM NÃO FOI MEDIDA.** Um `goto` que
+       devolve 200 sobre uma tela em branco produz zero achados — e zero achados
+       sobre nada é o mesmo relatório de uma tela perfeita. É a mesma conferência
+       que `varrer-bancadas` faz. */
+    const temTexto = await p.evaluate(() => (document.body.innerText || "").trim().length > 40);
+    if (!temTexto) throw new Error("a página abriu e não desenhou texto nenhum");
     const r = await p.evaluate(MEDIR);
     /* ⚠️ A segunda passada mede o que o CSS não alcança, e o resultado ENTRA na
        lista de reprovados — não numa lista "olhe com o olho". */
     const emGradiente = await porMascaraDeGlifo(p, r.naoMedivel);
     r.contraste.push(...emGradiente);
-    const n = r.contraste.length + r.alvo.length + r.semNome.length + r.semAlt.length;
+    const n =
+      r.contraste.length +
+      r.alvo.filter((x) => !x.moldura).length +
+      r.semNome.length +
+      r.semAlt.length;
     if (n) {
       console.log(`\n■ ${rota}`);
       r.contraste
         .slice(0, 4)
         .forEach((x) => console.log(`   contraste ${x.r}:1 (${x.px}px) "${x.t}"`));
-      r.alvo.slice(0, 4).forEach((x) => console.log(`   alvo ${x.w}×${x.h} "${x.t}"`));
+      r.alvo
+        .filter((x) => !x.moldura)
+        .slice(0, 6)
+        .forEach((x) => console.log(`   alvo ${x.w}×${x.h} "${x.t}"`));
       r.semNome.slice(0, 3).forEach((x) => console.log(`   sem nome: ${x.html}`));
       r.semAlt.slice(0, 3).forEach((x) => console.log(`   sem alt: …${x.src}`));
       if (r.naoMedivel.length)
         console.log(`   (${r.naoMedivel.length} sobre gradiente, medidos pela máscara de glifo)`);
     }
     total.contraste += r.contraste.length;
-    total.alvo += r.alvo.length;
+    total.alvo += r.alvo.filter((x) => !x.moldura).length;
+    total.alvoDaMoldura += r.alvo.filter((x) => x.moldura).length;
     total.semNome += r.semNome.length;
     total.semAlt += r.semAlt.length;
     total.naoMedivel += r.naoMedivel.length;
+    abriram++;
   } catch (e) {
+    naoAbriram.push(rota);
     console.log(`\n■ ${rota} — não abriu: ${String(e).slice(0, 80)}`);
   }
   await p.close();
 }
 await b.close();
 console.log(
-  `\n${ROTAS.length} telas · contraste ${total.contraste} · alvo ${total.alvo} · sem nome ${total.semNome} · sem alt ${total.semAlt}` +
+  `\n${abriram} de ${ROTAS.length} telas MEDIDAS · contraste ${total.contraste} · alvo ${total.alvo} · sem nome ${total.semNome} · sem alt ${total.semAlt}` +
+    `\n(+ ${total.alvoDaMoldura} alvos do CABEÇALHO E DO RODAPÉ DO SITE, que /minha-conta esconde — régua própria, fora da conta acima)` +
     `\n${total.naoMedivel} textos sobre gradiente, medidos pela máscara de glifo (a foto, não o CSS)`,
 );
+/* ⚠️ **UMA TELA QUE NÃO ABRIU É REPROVAÇÃO, e não uma linha no meio do log.**
+   O relatório é lido pelo fim; um "contraste 0" embaixo de vinte e duas falhas
+   de conexão lê como aprovação. Sai 1, e diz o que ficou sem medir. */
+if (naoAbriram.length) {
+  console.log(
+    `\n⚠️  ${naoAbriram.length} tela(s) NÃO foram medidas — o número acima não fala delas:\n   ` +
+      naoAbriram.join("\n   ") +
+      `\n   (o servidor de dev está no ar em 127.0.0.1:8080?)`,
+  );
+  process.exit(1);
+}

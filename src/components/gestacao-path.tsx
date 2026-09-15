@@ -6863,7 +6863,20 @@ export function MeditationBlock({
                 <button
                   onClick={() => (pausada ? void retomarSessao() : pausarSessao("toque"))}
                   aria-label={pausada ? "Continuar" : "Pausar"}
-                  className="press grid h-9 w-9 place-items-center rounded-full border border-violet-200 bg-white/70 text-violet-600"
+                  /* ⚠️ O círculo é o DESENHO, e ele tem 36 de propósito: crescê-lo
+                     mexe na composição da tela. Quem cresce é a ÁREA, pelo
+                     `after` — e `-inset-1` (4px) cabe nos 12 do `gap-3` sem
+                     encostar no vizinho, que é a colisão que este repositório
+                     já pagou duas vezes.
+
+                     ⚠️ **É `-inset-[5px]` e NÃO `-inset-1`, e a conta surpreende:**
+                     um absoluto se posiciona contra o PADDING BOX do pai, e
+                     este botão tem `border`. `-inset-1` (4px) sobre 36 com 1px
+                     de borda dá **42**, não 44 — medido no `getComputedStyle`
+                     do `::after`. A conta é `tamanho − 2×borda + 2×inset`.
+                     Medido depois: 44×44 efetivo, e o botão da voz ao lado
+                     continua com os 44 dele. */
+                  className="press relative grid h-9 w-9 place-items-center rounded-full border border-violet-200 bg-white/70 text-violet-600 after:absolute after:-inset-[5px] after:content-['']"
                 >
                   <svg viewBox="0 0 24 24" className="h-[15px] w-[15px]" fill="currentColor">
                     {pausada ? (
@@ -6881,7 +6894,11 @@ export function MeditationBlock({
                 <button
                   onClick={alternarVoz}
                   aria-label={voz ? "Desligar voz" : "Ligar voz"}
-                  className={`press ${voz ? "text-violet-600" : "text-violet-300"}`}
+                  /* ⚠️ O ícone tem 18px e o botão não tinha caixa: o alvo era o
+                     desenho. Esta linha da sessão não é fotografável por
+                     bancada nenhuma (elas abrem na intro), e foi por isso que
+                     os três botões dela ficaram de fora das varreduras. */
+                  className={`press flex h-11 w-11 items-center justify-center ${voz ? "text-violet-600" : "text-violet-300"}`}
                 >
                   <svg
                     viewBox="0 0 24 24"
@@ -6903,7 +6920,11 @@ export function MeditationBlock({
                 <button
                   onClick={() => setSomNaSessaoAberto(true)}
                   aria-label="Trocar o som de fundo"
-                  className="press text-xl leading-none"
+                  /* ⚠️ **44px, medido em 25×20 na tela irmã.** Emoji sem caixa
+                     mede o GLIFO. O ✕ de fechar destas duas telas já tinha
+                     ganhado `-m-2 flex h-11 w-11` com a razão escrita; o botão
+                     do som, ao lado dele na MESMA linha, ficou de pé. */
+                  className="press -mr-2 flex h-11 w-11 items-center justify-center text-xl leading-none"
                 >
                   {som === "silencio" ? "🔇" : "🔊"}
                 </button>
@@ -8010,7 +8031,9 @@ export function BondingBlock({
             <button
               onClick={() => setSomAberto(true)}
               aria-label="Trocar o som de fundo"
-              className="press text-xl leading-none"
+              /* ⚠️ 44px — ver o ✕ de fechar, seis linhas acima, que já tinha
+                 esta mesma caixa e esta mesma razão. */
+              className="press -m-2 flex h-11 w-11 items-center justify-center text-xl leading-none"
             >
               {som === "silencio" ? "🔇" : "🔊"}
             </button>

@@ -81,6 +81,17 @@ describe("⚠️ matchers que quebram o tsc da CI", () => {
          A busca é pelo IMPORT, e não pela chamada: `it(` aparece dentro de
          palavras comuns, e o que quebra o `tsc` é justamente a linha do import.
          O nome é montado por concatenação pela mesma razão das outras. */
+      /* ⚠️ **E `test.each` / `describe.each` TAMBÉM NÃO SÃO TIPADOS** —
+         `TS2339: Property 'each' does not exist`, mais um `TS7006` em cada
+         parâmetro da tabela. Verde no `bun test`, vermelho no `tsc` da CI: a
+         QUARTA forma da mesma armadilha, e ela me pegou em set/2026 num arquivo
+         novo com o portão local já verde nas outras três. Um laço `for` sobre
+         uma lista tipada faz o mesmo e é tipado. O nome é montado por
+         concatenação pela mesma razão das outras: um literal aqui faria a
+         catraca acusar a si mesma. */
+      if (new RegExp("\\b(test|describe)\\." + "each\\b").test(codigo)) {
+        culpados.push(arquivo + " → usa ." + "each" + " (não é tipado; use um for)");
+      }
       const imports = codigo.match(/import\s*\{([^}]*)\}\s*from\s*["']bun:test["']/g) ?? [];
       for (const linha of imports) {
         if (new RegExp("\\b" + "i" + "t\\b").test(linha)) {
