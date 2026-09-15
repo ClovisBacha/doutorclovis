@@ -14296,6 +14296,25 @@ no arquivo** — e confira o código HTTP e o tamanho antes de tratar "não ache
 como veredito. As três causas desta noite são a mesma falha: **medir sem
 conferir que a leitura aconteceu é falha ABERTA.**
 
+⚠️ **E UMA QUARTA CAUSA, em set/2026: O NOME DO PEDAÇO NÃO É O NOME DO
+ARQUIVO FONTE.** Uma sonda procurou `/assets/rede-instagram-*.js` e imprimiu
+"não achei o chunk" **catorze vezes seguidas** sobre um deploy que já estava no
+ar — esse pedaço **não existe** no build: o Rollup agrupa por dependência, e
+`rede-instagram.tsx` foi parar em `rede-comentarios-*.js`, onde os quatro
+marcadores estavam o tempo todo. E o recado era a falha aberta de sempre: ele
+não distinguia "a versão é antiga" de "eu estou procurando um arquivo que nunca
+existiu", e teria repetido para sempre.
+
+**O caminho que funciona é seguir a CADEIA de imports, nunca adivinhar o
+nome:** o HTML → o pedaço da ROTA que ele cita → os nomes de módulo que esse
+pedaço importa → baixar e procurar. Um componente `lazy()` **não aparece no
+HTML** (`gestacao-path` e a Comunidade são os dois casos), e o pedaço dele quase
+nunca se chama como o `.tsx`.
+
+⚠️ E o `grep` chama o HTML de produção de **binário** (há bytes de controle no
+payload do SSR) e imprime só "binary file matches": sem `-a`, uma busca que
+ACHOU parece uma que não achou.
+
 **Conferido no fim:** os dois marcadores das ondas 2 e 3 vivem no MESMO pedaço
 (`/assets/nutricao-tab-*.js`), então a busca por pedaço funciona — o que fazia
 a sonda dizer "versão anterior" era o 403 do WAF, não a ausência do código.
