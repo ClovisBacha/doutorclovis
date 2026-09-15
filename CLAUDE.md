@@ -8428,6 +8428,37 @@ determinístico falha nas duas, artefato de carga não.
 de verdade, que é coisa que este app tem: o laço do `useSyncExternalStore`
 nasceu exatamente assim.
 
+#### ⚠️ E ELA NÃO RODAVA SOZINHA — a prosa acima prometia o que o código não fazia (set/2026)
+
+A repetição vivia DENTRO do `conferir`, que por sua vez roda dentro do
+`Promise.all` do lote: **a segunda tentativa disputava o servidor com até três
+outras páginas, exatamente como a primeira.** Ou seja, sob carga as duas caíam
+juntas — que é o caso exato que ela existe para separar.
+
+Medido no runner: `/preview-home` reprovou nas duas com **`503`** enquanto **o
+MESMO commit passava na execução paralela do mesmo job** (o CI dispara `push` e
+`pull_request` ao mesmo tempo, e são dois servidores de dev mais dois Chromium
+no mesmo runner de dois núcleos). Os quatro commits seguintes ficaram verdes nos
+dois. Hoje as suspeitas são recolhidas no lote e repetidas DEPOIS que todos os
+lotes fecharam, uma de cada vez, com o servidor ocioso.
+
+⚠️ **E o `503` NÃO entrou na lista de ruído.** 5xx é o que se vê quando o
+servidor de dev quebra de verdade, e engoli-lo trocaria um job intermitente por
+um job CEGO — o oposto do que a segunda chance existe para fazer. Quem separa
+carga de defeito é o SILÊNCIO da repetição, nunca o código do erro.
+
+⚠️ **E a contraprova é obrigatória aqui**, porque uma "segunda chance" mal feita
+é indistinguível de uma varredura que aprova tudo: uma rota inexistente continua
+reprovando nas duas passadas e o script sai 1.
+
+⚠️ E três armadilhas de método na mesma hora, todas já catalogadas neste
+arquivo e cometidas de novo: o patch por texto **comeu o fecho do arquivo**
+(`b.close()` e o resumo) porque a fatia ia até o fim — a varredura que rodou em
+cima disso nunca imprimiria o resumo, e o silêncio dela lia como aprovação; o
+`pkill` no MESMO comando devolveu **144**; e `pgrep -f varrer-bancadas` casava a
+própria linha de comando, devolvendo um PID novo a cada tentativa (use o
+colchete: `varrer-bancada[s]`).
+
 ### ⚠️ E O JOB FALHOU NA PRIMEIRA VEZ — por dois erros MEUS
 
 1. **A espera pelo servidor procurava um texto que não existe.** O passo fazia

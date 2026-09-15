@@ -376,28 +376,50 @@ async function abrir(rota) {
  * ele é ignorado junto. A segunda chance roda SOZINHA, sem concorrência: um
  * defeito determinístico falha nas duas; um artefato de carga, não.
  *
- * ⚠️ E ela é UMA só. Três tentativas começariam a esconder defeito de corrida
- * de verdade, que é coisa que este app tem (o `useSyncExternalStore` em laço
- * nasceu assim).
+ * ⚠️ **E ELA NÃO RODAVA SOZINHA — a prosa acima prometia uma garantia que o
+ * código não entregava.** A repetição vivia DENTRO do `conferir`, que por sua
+ * vez roda dentro do `Promise.all` do lote: a segunda tentativa disputava o
+ * servidor com até três outras páginas, exatamente como a primeira. Medido no
+ * runner: `/preview-home` reprovou nas duas com `503` — o servidor de dev
+ * afogado — enquanto **o mesmo commit passava na execução paralela do mesmo
+ * job**. Hoje as suspeitas são recolhidas no lote e repetidas DEPOIS que todos
+ * os lotes fecharam, uma de cada vez, com o servidor ocioso.
+ *
+ * ⚠️ E ela continua sendo UMA só. Três tentativas começariam a esconder defeito
+ * de corrida de verdade, que é coisa que este app tem (o `useSyncExternalStore`
+ * em laço nasceu assim).
+ *
+ * ⚠️ **E o `503` NÃO entrou na lista de ruído.** 5xx é o que se vê quando o
+ * servidor de dev quebra de verdade, e engoli-lo trocaria um job intermitente
+ * por um job cego — que é o oposto do que a segunda chance existe para fazer.
+ * Quem separa carga de defeito é o SILÊNCIO da repetição, nunca o código do
+ * erro.
  */
-async function conferir(rota) {
-  const primeira = await abrir(rota);
-  if (primeira.length === 0) return;
-  const segunda = await abrir(rota);
-  if (segunda.length === 0) {
-    console.log(`⚠️  ${rota} — falhou no lote e passou sozinha (artefato de carga)`);
-    return;
-  }
-  ruins.push({ rota, erros: segunda });
-  console.log(`❌ ${rota}`);
-  segunda.slice(0, 3).forEach((x) => console.log(`     ${x}`));
-}
+const suspeitas = [];
 
 /* Em lotes: sequencial demoraria minutos, e tudo de uma vez estoura a memória
    do runner. */
 for (let i = 0; i < alvos.length; i += 4) {
-  await Promise.all(alvos.slice(i, i + 4).map(conferir));
+  await Promise.all(
+    alvos.slice(i, i + 4).map(async (rota) => {
+      if ((await abrir(rota)).length > 0) suspeitas.push(rota);
+    }),
+  );
 }
+
+/* A segunda chance, agora de verdade sozinha — um de cada vez, com todos os
+   lotes já fechados. */
+for (const rota of suspeitas) {
+  const erros = await abrir(rota);
+  if (erros.length === 0) {
+    console.log(`⚠️  ${rota} — falhou no lote e passou sozinha (artefato de carga)`);
+    continue;
+  }
+  ruins.push({ rota, erros });
+  console.log(`❌ ${rota}`);
+  erros.slice(0, 3).forEach((x) => console.log(`     ${x}`));
+}
+
 await b.close();
 
 console.log(`\n${alvos.length} bancadas varridas · ${ruins.length} com problema`);
