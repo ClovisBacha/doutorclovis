@@ -18,7 +18,13 @@ import { semComentarios } from "@/lib/sem-comentarios";
  */
 
 const saude = semComentarios(readFileSync("src/components/health-tab.tsx", "utf8"));
-const hub = semComentarios(readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8"));
+const conta = semComentarios(readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8"));
+/**
+ * ⚠️ O HUB saiu de `minha-conta.tsx` para cá (set/2026): ele era `export
+ * function` num arquivo de ROTA, e isso o içava para o pedaço de ENTRADA que
+ * toda página do site baixa. Só o CAMINHO mudou; a garantia, nenhuma linha.
+ */
+const hub = semComentarios(readFileSync("src/components/hub-saude.tsx", "utf8"));
 const grade = semComentarios(readFileSync("src/components/grade-hub.tsx", "utf8"));
 const ciclo = semComentarios(readFileSync("src/components/ciclo-menstrual-tab.tsx", "utf8"));
 
@@ -138,7 +144,7 @@ describe("o Modo Cuidado na tela de peso, pressão e glicemia", () => {
   });
 
   test("a tela recebe o portão de quem o governa", () => {
-    expect(hub).toMatch(/<HealthTab[^>]*careMode=\{careMode\}/);
+    expect(conta).toMatch(/<HealthTab[^>]*careMode=\{careMode\}/);
   });
 });
 
@@ -176,9 +182,11 @@ describe("o número do bloco no hub da Saúde", () => {
   /* `getUser` seria uma quarta ida à REDE na frente de um número; `getSession`
      lê do disco e cabe na onda que já existe. */
   test("a sessão sai do disco e na mesma onda das consultas", () => {
-    const bloco = hub.slice(
-      hub.indexOf("const [saude, chutes, contr, sessao] = await Promise.all(["),
-    );
+    const i = hub.indexOf("const [saude, chutes, contr, sessao] = await Promise.all([");
+    /* ⚠️ Sem esta linha, uma âncora que não casa devolve −1 e `slice(-1)` dá UM
+       caractere: o `not.toContain` abaixo ficaria verde sobre nada. */
+    expect(i).toBeGreaterThan(0);
+    const bloco = hub.slice(i);
     expect(bloco.slice(0, 2000)).toContain("supabase.auth.getSession()");
     expect(bloco.slice(0, 2000)).not.toContain("auth.getUser()");
   });

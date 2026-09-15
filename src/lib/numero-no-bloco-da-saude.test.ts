@@ -44,15 +44,31 @@ import { semComentarios } from "@/lib/sem-comentarios";
    `src/lib/sem-comentarios.ts`, e ela existe justamente porque as duas formas
    ingênuas — a de regex e a de linha — mordem nos dois sentidos. */
 const GRADE = semComentarios(readFileSync("src/components/grade-hub.tsx", "utf8"));
-const CONTA = semComentarios(readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8"));
+/**
+ * ⚠️ O HUB saiu de `minha-conta.tsx` para cá (set/2026): ele era `export
+ * function` num arquivo de ROTA, e isso o içava para o pedaço de ENTRADA que
+ * toda página do site baixa. Só o CAMINHO mudou; a garantia, nenhuma linha.
+ */
+const HUB = semComentarios(readFileSync("src/components/hub-saude.tsx", "utf8"));
 
-/** O corpo de `HubSaude`, do `export function` até a função seguinte. */
+/**
+ * O corpo de `HubSaude`, do `export function` até o fim.
+ *
+ * ⚠️ **Ele é a ÚLTIMA declaração do arquivo, e por isso a fatia vai até o
+ * fim** — a âncora antiga (`\nconst CAT_STYLE`) era a declaração seguinte no
+ * arquivo de rota, e uma âncora que não casa devolve −1, que `slice` lê como
+ * "um caractere antes do fim": a fatia sairia quase VAZIA e as asserções
+ * negativas ficariam verdes sobre nada. Daí a conferência de TAMANHO, e a de
+ * que o corte não engoliu uma segunda função — é como uma fatia começa a
+ * mentir.
+ */
 function corpoDoHub(): string {
-  const i = CONTA.indexOf("export function HubSaude");
+  const i = HUB.indexOf("export function HubSaude");
   expect(i).toBeGreaterThan(0);
-  const j = CONTA.indexOf("\nconst CAT_STYLE", i);
-  expect(j).toBeGreaterThan(i);
-  return CONTA.slice(i, j);
+  const corpo = HUB.slice(i);
+  expect(corpo.length).toBeGreaterThan(2000);
+  expect(corpo).not.toContain("\nexport function ");
+  return corpo;
 }
 
 describe("o número dela chega ao bloco da Saúde", () => {

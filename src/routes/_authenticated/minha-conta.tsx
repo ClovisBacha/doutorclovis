@@ -42,11 +42,6 @@ import drPortrait from "@/assets/dr-clovis-portrait.jpg";
    natural do objeto, luz ambiente — e recortados por `scripts/bebes/do-drive.mjs`
    (PSNR 46–50 dB). Substituem os traços do Lucide nos blocos grandes: um bloco
    de 300px pedia um objeto com volume, não um contorno de 1,7px. */
-import icSaude from "@/assets/saude/saude.webp";
-import icChutes from "@/assets/saude/chutes.webp";
-import icContracoes from "@/assets/saude/contracoes.webp";
-import icNutricao from "@/assets/saude/nutricao.webp";
-import icMulher from "@/assets/saude/mulher.webp";
 import { ymdLocal } from "@/lib/utils";
 import { getMyDoctor } from "@/lib/doctors.functions";
 import { minhasConsultas, type ConsultaDaPaciente } from "@/lib/clinical.functions";
@@ -129,12 +124,8 @@ import { BabyTab } from "@/components/baby-tab";
 import { KicksTab } from "@/components/kicks-tab";
 import { HealthTab } from "@/components/health-tab";
 import { NutricaoTab } from "@/components/nutricao-tab";
-import { lerFilaDeChutes } from "@/lib/fila-de-chutes";
-import { lerFila as lerFilaDeContracoes } from "@/lib/fila-de-contracoes";
 /* `mesclar` sob outro nome: neste arquivo "mesclar" solto diria pouco, e a
    palavra já aparece em contexto de blob da jornada. */
-import { mesclar as mesclarRegistros } from "@/lib/fila-local";
-import { diasEntre, inicioDeHojeISO, quandoFoi } from "@/lib/quando-foi";
 import { SaudeMulherHub } from "@/components/saude-mulher";
 import { Field } from "@/components/campo";
 import {
@@ -329,26 +320,13 @@ import {
   lerPassoDoTutorial,
 } from "@/lib/tutorial-do-mascote";
 import { GradeHub, VoltarDaGrade } from "@/components/grade-hub";
-import arteGrade_agenda from "@/assets/grades/agenda.webp";
-import arteGrade_preparo from "@/assets/grades/preparo.webp";
-import arteGrade_perguntas from "@/assets/grades/perguntas.webp";
-import arteGrade_checklist from "@/assets/grades/checklist.webp";
-import arteGrade_parto from "@/assets/grades/parto.webp";
-import arteGrade_tele from "@/assets/grades/tele.webp";
-import arteGrade_particular from "@/assets/grades/particular.webp";
-import arteGrade_meditacoes from "@/assets/grades/meditacoes.webp";
-import arteGrade_sons from "@/assets/grades/sons.webp";
-import arteGrade_exercicios from "@/assets/grades/exercicios.webp";
-import arteGrade_humor from "@/assets/grades/humor.webp";
-import arteGrade_apoio from "@/assets/grades/apoio.webp";
-import arteGrade_diario from "@/assets/grades/diario.webp";
-import arteGrade_timeline from "@/assets/grades/timeline.webp";
-import arteBebe_semana from "@/assets/bebe/semana.webp";
-import arteBebe_contagem from "@/assets/bebe/contagem.webp";
-import arteBebe_album from "@/assets/bebe/album.webp";
-import arteBebe_nome from "@/assets/bebe/nome.webp";
-import arteBebe_carta from "@/assets/bebe/carta.webp";
-import arteBebe_quartinho from "@/assets/bebe/quartinho.webp";
+import {
+  BEBE_SUBTABS,
+  BEMESTAR_SUBTABS,
+  CONSULTAS_SUBTABS,
+  REGISTROS_SUBTABS,
+} from "@/components/grades-das-abas";
+import { CabecalhoDaSaude, HUB_SAUDE, HubSaude } from "@/components/hub-saude";
 import {
   contarNaoLidas,
   lerLidas,
@@ -360,14 +338,12 @@ import {
 } from "@/lib/notificacoes";
 import type { OrigemLocal } from "@/components/app-mobile-shell";
 import {
-  AudioLines,
   Baby,
   CalendarCheck,
   ChevronLeft,
   ClipboardList,
   Flower2,
   Gift,
-  HeartPulse,
   IdCard,
   Footprints,
   HeartHandshake,
@@ -382,8 +358,6 @@ import {
   MessageCircleQuestion,
   NotebookPen,
   PersonStanding,
-  Ribbon,
-  Salad,
   Scroll,
   Settings,
   ShoppingBag,
@@ -680,372 +654,6 @@ const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
     tabs: ["Chat IA", "Loja", "Assinatura", "Perfil"],
   },
 ];
-
-/* ══════════════════ Hub da Saúde (celular) ══════════════════
-   A seção Saúde tem seis abas e elas moravam numa fileira de pílulas que
-   rolava na horizontal. Numa tela de 390px cabiam quatro: "Alertas" e "Saúde
-   da mulher" ficavam além da borda, sem nenhum sinal de que existiam — e as
-   quatro visíveis eram alvos de 36px de altura espremidos entre o título e o
-   conteúdo.
-
-   Viraram seis quadrados grandes, dois por linha. É a mesma navegação, mas
-   cada destino ganha nome, uma linha dizendo o que tem dentro, um ícone e um
-   alvo do tamanho do polegar — e, principalmente, todos aparecem de uma vez.
-
-   ─── O QUE ENTROU E O QUE SAIU DAQUI (ago/2026) ──────────────────────────
-   A aba se chamava Saúde e as DUAS ferramentas de automonitoramento com mais
-   peso clínico da gestação estavam fora dela: contar movimentos do bebê e
-   cronometrar contrações moravam em Registros, dentro do grupo Gestação.
-
-   Isso era pior que uma escolha de arrumação, porque a triagem de sintomas
-   mora AQUI e cita as duas pelo nome: "redução dos movimentos do bebê" e
-   "contrações regulares antes de 37 semanas" são dois dos nove sintomas
-   VERMELHOS. Uma paciente que sente o bebê parado abria Saúde, encontrava a
-   pergunta, e não tinha como contar dali.
-
-   Entraram como ATALHOS, não como cópias: os dois ladrilhos abrem
-   `Registros` já na sub-tela certa. Duas implementações de contagem de
-   chutes divergiriam no primeiro conserto.
-
-   E "Saúde da mulher" saiu da grade enquanto ela está grávida — ver
-   `mostrarSaudeDaMulher`.
-
-   `aspect-square` de propósito: é o que garante "dois quadrados grandes por
-   linha" em qualquer largura, de um iPhone SE a um tablet em retrato. */
-type LadrilhoDaSaude = {
-  key: string;
-  label: string;
-  sub: string;
-  Icon: LucideIcon;
-  /** Ícone 3D; quando presente, `GradeHub` desenha a imagem no lugar do Lucide. */
-  imagem?: string;
-  caixa: string;
-  tinta: string;
-  /** Aba de destino. Nem todo ladrilho é uma aba de mesmo nome. */
-  destino: Tab;
-  /** Sub-tela dentro do destino — é o que faz Chutes abrir em Chutes. */
-  subDestino?: string;
-};
-
-/* ─── QUATRO LADRILHOS, E NÃO SEIS (ago/2026) ─────────────────────────────
-   Pedido do dono: "nessa tela eu não quero que tenha as funções de alertas, e
-   nem de bem-estar — tudo que é do bem-estar está dentro da aba do jogo".
-
-   Ele está certo sobre o Jogo: o Caminho tem os quatro momentos do dia
-   (`MovementBlock`, `MeditationBlock`, `BondingBlock`, `GratitudeBlock`), então
-   Meditar e Mexer já vivem lá, com implementação própria.
-
-   E os nove sintomas VERMELHOS que a triagem lista continuam no SOS, que é o
-   primeiro botão da barra — `emergency-sheet` os mostra sob "Procure
-   atendimento agora se sentir". A grade perdeu um atalho, não o conteúdo.
-
-   A ordem que ficou é clínica: primeiro "estou bem?" (números), depois "e o
-   bebê?" (chutes, contrações), e por fim o que se come. */
-const HUB_SAUDE: LadrilhoDaSaude[] = [
-  {
-    key: "Saúde",
-    imagem: icSaude,
-    label: "Saúde",
-    sub: "Peso, pressão e glicemia",
-    Icon: HeartPulse,
-    caixa: "border-emerald-200/70 from-emerald-50 to-teal-50/60",
-    tinta: "text-emerald-600",
-    destino: "Saúde",
-  },
-  {
-    key: "chutes",
-    imagem: icChutes,
-    label: "Chutes",
-    sub: "Contar os movimentos",
-    Icon: Footprints,
-    caixa: "border-sky-200/70 from-sky-50 to-cyan-50/60",
-    tinta: "text-sky-600",
-    destino: "Meu dia a dia",
-    subDestino: "chutes",
-  },
-  {
-    key: "contracoes",
-    imagem: icContracoes,
-    label: "Contrações",
-    sub: "Cronometrar e ver o padrão",
-    Icon: Timer,
-    caixa: "border-orange-200/70 from-orange-50 to-amber-50/60",
-    tinta: "text-orange-600",
-    destino: "Meu dia a dia",
-    subDestino: "contracoes",
-  },
-  {
-    key: "Nutrição",
-    imagem: icNutricao,
-    label: "Nutrição",
-    sub: "O que comer hoje",
-    Icon: Salad,
-    caixa: "border-lime-200/70 from-lime-50 to-amber-50/60",
-    tinta: "text-lime-600",
-    destino: "Nutrição",
-  },
-  {
-    key: "Saúde da mulher",
-    imagem: icMulher,
-    label: "Saúde da mulher",
-    sub: "Ciclo, mamas e colo",
-    Icon: Ribbon,
-    caixa: "border-pink-200/70 from-pink-50 to-rose-50/60",
-    tinta: "text-pink-600",
-    destino: "Saúde da mulher",
-  },
-];
-
-/**
- * A GRADE MOSTRA "SAÚDE DA MULHER"?
- *
- * Dois dos cinco quadrados da aba eram para uma mulher que NÃO está grávida:
- * "Ciclo menstrual" não tem o que mostrar por nove meses, e os preventivos que
- * ele lembra — Papanicolau, mamografia, perfil lipídico — em geral não se faz
- * durante a gestação. Não são recursos ruins; estavam na hora errada, ocupando
- * 40% da tela mais clínica do app.
- *
- * A régua é a mesma do Portal Pós-parto: aparece quando FAZ SENTIDO. Sem
- * gestação em andamento, é a aba certa; a partir da 36ª semana o pós-parto
- * entra no horizonte e ela volta.
- *
- * ⚠️ **Hoje ela decide só a LEGENDA do ladrilho, nunca a presença dele.** A
- * primeira versão tirava o ladrilho e afirmava que "a aba continua listada no
- * menu (`SECOES`)" — esse menu era o de computador (`hidden md:flex`), e no
- * celular a função sumia por nove meses. Uma garantia escrita que o aparelho
- * não cumpre é pior que nenhuma: quem lê acredita que preservou o acesso.
- */
-export function mostrarSaudeDaMulher(weeks: number | null | undefined): boolean {
-  return weeks == null || weeks >= 36;
-}
-
-/** O número dela num bloco da Saúde: o valor grande e a legenda pequena. */
-type Dado = { valor: string; legenda?: string };
-
-/**
- * O cabeçalho das três telas que o hub da Saúde abre como ABA (Saúde,
- * Nutrição, Saúde da mulher) — Chutes e Contrações já passam pelo cabeçalho de
- * `Registros`. Sem seta: a barra de cima é quem volta ao hub (`voltarDaBarra`).
- * Lê o MESMO `HUB_SAUDE` que desenha o bloco, então o coração verde de lá é o
- * coração verde daqui por construção.
- */
-function CabecalhoDaSaude({ chave }: { chave: string }) {
-  const item = HUB_SAUDE.find((i) => i.key === chave);
-  if (!item) return null;
-  return <VoltarDaGrade rotulo={item.label} ladrilho={item} />;
-}
-
-export function HubSaude({
-  onAbrir,
-  weeks,
-  careMode,
-  bancada,
-  cabecalhos,
-}: {
-  onAbrir: (t: Tab, sub?: string) => void;
-  /** Semana gestacional — `null` quando não há gestação configurada. */
-  weeks: number | null;
-  /**
-   * ⚠️ **NO MODO CUIDADO O LADRILHO DE CHUTES SAI DA GRADE.** Ele convida a
-   * "contar os movimentos" — depois do batimento, é a tela mais dolorosa do
-   * app para quem acabou de perder a gestação. O histórico dela NÃO é apagado
-   * (é a memória dela, a mesma decisão que manteve `exam_files` e o Álbum de
-   * pé); o que sai é o convite.
-   *
-   * ⚠️ E o CRONÔMETRO DE CONTRAÇÕES FICA, de propósito: quem perdeu a gestação
-   * pode estar em trabalho de parto, e a decisão já está escrita no próprio
-   * componente. O Modo Cuidado faz o app parar de FALAR DO BEBÊ, nunca de
-   * socorrer.
-   */
-  careMode?: boolean;
-  /**
-   * Só a `/preview-saude`: os números prontos, sem sessão. Sem isto a bancada
-   * mostraria sempre o bloco VAZIO — o único estado que ela não precisava provar.
-   * Injeta o DADO no mesmo estado da produção, nunca um desenho à parte.
-   */
-  bancada?: Record<string, Dado | null>;
-  /** Só a `/preview-saude`: em vez da grade, os cinco cabeçalhos de sub-tela, para fotografar. */
-  cabecalhos?: boolean;
-}) {
-  /* Usa a MESMA grade das sub-abas (`GradeHub`). Antes esta tela tinha uma
-     cópia do desenho; duas cópias do mesmo quadrado significam duas chances de
-     elas divergirem no próximo ajuste. */
-  /* ⚠️ OS NÚMEROS DELA DENTRO DOS BLOCOS. O dono pediu blocos que "preencham a
-     tela inteira" e eles preenchiam com gradiente vazio; o que dá sentido ao
-     tamanho é o dado. Três leituras em paralelo (uma onda, não três), e
-     ⚠️ QUALQUER FALHA VIRA `null` — que não desenha nada. "Não consegui ler" e
-     "ela nunca registrou" precisam cair no mesmo lugar, porque um "0" afirmaria
-     um fato que a tela não sabe. Nutrição não tem número: fica sem, e isso
-     também é informação (é conteúdo, não medição). */
-  const [dados, setDados] = useState<Record<string, Dado | null>>(bancada ?? {});
-  const ehBancada = !!bancada;
-  useEffect(() => {
-    if (ehBancada) return;
-    let vivo = true;
-    (async () => {
-      /* ⚠️ O INSTANTE da meia-noite DELA, e não uma data solta: mandar
-         `"2026-09-05T00:00:00"` sem fuso faz o Postgres ler em UTC, e em São
-         Paulo isso arrasta as contrações das 21h de ONTEM para dentro do
-         "hoje". Ver `src/lib/quando-foi.ts`. */
-      const agora = new Date();
-      const desdeMeiaNoite = inicioDeHojeISO(agora);
-      /* ⚠️ **O NÚMERO DO BLOCO CONTAVA SÓ O SERVIDOR, e as duas abas irmãs
-         guardam registro no APARELHO desde set/2026.** Uma contração
-         cronometrada sem rede fica na fila local até subir — e o bloco dizia
-         "3 contrações" sobre um dia em que ela cronometrou cinco. Não é
-         omissão: é um NÚMERO MENOR afirmado num dia de trabalho de parto.
-
-         Quem mescla é `mesclar`, a régua única das duas filas: ela deduplica
-         pelo `started_at` (a chave natural, porque nenhuma das duas tabelas
-         tem chave única) e faz a linha do SERVIDOR vencer — senão, no segundo
-         entre o `insert` dar certo e o `load()` responder, o mesmo registro
-         contaria duas vezes.
-
-         `getSession` lê do DISCO e entra na MESMA onda das três consultas:
-         `getUser` seria uma quarta ida à rede na frente de um número. */
-      const [saude, chutes, contr, sessao] = await Promise.all([
-        supabase
-          .from("health_logs")
-          .select("weight_kg, systolic, diastolic, log_date")
-          .order("log_date", { ascending: false })
-          .limit(1)
-          .then((r) => (r.error ? null : (r.data?.[0] ?? null))),
-        supabase
-          .from("kick_sessions")
-          .select("kick_count, started_at")
-          .not("ended_at", "is", null)
-          .order("started_at", { ascending: false })
-          .limit(1)
-          .then((r) => (r.error ? null : (r.data?.[0] ?? null))),
-        supabase
-          .from("contraction_logs")
-          /* `id` entra porque `mesclar` casa e desempata por linha — a coluna
-             não é desenhada em lugar nenhum deste bloco. */
-          .select("id, started_at")
-          .gte("started_at", desdeMeiaNoite)
-          .order("started_at", { ascending: false })
-          .limit(50)
-          .then((r) => (r.error ? null : (r.data ?? null))),
-        supabase.auth.getSession().then((r) => r.data.session),
-      ]);
-      if (!vivo) return;
-      const uid = sessao?.user?.id ?? "";
-      const emMs = agora.getTime();
-      const pendentesDeChutes = uid ? lerFilaDeChutes(uid, emMs) : [];
-      const pendentesDeContracoes = uid ? lerFilaDeContracoes(uid, emMs) : [];
-      const d: Record<string, Dado | null> = {};
-      if (saude) {
-        const peso =
-          saude.weight_kg != null ? `${String(saude.weight_kg).replace(".", ",")} kg` : null;
-        const pa =
-          saude.systolic != null && saude.diastolic != null
-            ? `${saude.systolic}/${saude.diastolic}`
-            : null;
-        /* ⚠️ NADA DE "QUANDO" ESCRITO NO BLOCO — decisão do dono, com o print
-           na mão ("quando que fez não preciso deixar escrito"). O que fica é o
-           NÚMERO e o que ele é.
-           ⚠️ Mas o dado VELHO continua não podendo se passar por atual: uma
-           pressão de cinco meses atrás lida como o estado de hoje é a pior
-           forma de dado velho. Sem poder escrever "há 3 meses", o que sobra é
-           a régua dos blocos vizinhos — passado o prazo, o número SOME e o
-           bloco volta ao rótulo, que sempre foi verdade. Sete dias, porque
-           peso e pressão não se medem todo dia. */
-        const velho = saude.log_date ? diasEntre(saude.log_date, agora) > 7 : false;
-        /* O peso é o valor grande; a pressão vai na legenda. Sem peso, a
-           pressão sobe para o valor — o bloco nunca fica com legenda solta. */
-        d["Saúde"] = velho
-          ? null
-          : peso
-            ? { valor: peso, legenda: pa ? `pressão ${pa}` : undefined }
-            : pa
-              ? { valor: pa, legenda: "pressão" }
-              : null;
-      }
-      /* A última contagem é a mais recente das DUAS listas — ler só o
-         servidor faria a contagem que ela acabou de encerrar sem rede (a mais
-         nova que existe) não ser "a última". É o mesmo defeito que
-         `ultimaContagem` fecha dentro da aba. */
-      const ultimaDeChutes = mesclarRegistros(
-        chutes ? [{ id: "s", started_at: chutes.started_at, kick_count: chutes.kick_count }] : [],
-        pendentesDeChutes,
-      )[0];
-      if (ultimaDeChutes && ultimaDeChutes.kick_count != null) {
-        /* ⚠️ NUNCA `String(started_at).slice(0, 10)`: a coluna é `timestamptz`
-           e o PostgREST devolve em UTC. Medido em São Paulo — uma sessão às
-           21h30 do dia 5 chega como dia 6, não casava com "hoje" nem com
-           "ontem", e o contador SUMIA do bloco. Quem conta movimentos no
-           horário que a tela recomenda era quem nunca via o número. */
-        /* `quandoFoi` continua sendo o FILTRO (hoje ou ontem, senão o número
-           some) — só não vai mais para o texto. */
-        const quando = quandoFoi(ultimaDeChutes.started_at, agora);
-        d["chutes"] = quando
-          ? { valor: String(ultimaDeChutes.kick_count), legenda: "chutes" }
-          : null;
-      }
-      /* ⚠️ As pendentes são recortadas pelo MESMO `desdeMeiaNoite` da consulta:
-         a fila guarda até sete dias, e somá-la inteira poria as contrações de
-         terça no contador de hoje. */
-      const contracoesDeHoje = mesclarRegistros(
-        contr ?? [],
-        pendentesDeContracoes.filter((c) => c.started_at >= desdeMeiaNoite),
-      );
-      if (contracoesDeHoje.length > 0) {
-        /* A consulta já recorta o dia (`desdeMeiaNoite`); o "hoje" e a hora da
-           última saíram do TEXTO a pedido do dono. */
-        d["contracoes"] = { valor: String(contracoesDeHoje.length), legenda: "contrações" };
-      }
-      setDados(d);
-    })().catch(() => {
-      /* silêncio: sem dado, o bloco volta ao rótulo, que sempre foi verdade */
-    });
-    return () => {
-      vivo = false;
-    };
-  }, [ehBancada]);
-  /* ⚠️ Os cinco ladrilhos aparecem SEMPRE. Antes "Saúde da mulher" saía da
-     grade durante a gestação, com um comentário garantindo que "a aba
-     continua listada no menu" — e esse menu é o de computador, escondido no
-     celular. No aparelho a função sumia por nove meses (estudo de navegação,
-     set/2026). O que muda com a fase é a LEGENDA, não a porta. */
-  const itens = HUB_SAUDE.filter((i) => !(careMode && i.key === "chutes")).map((i) => ({
-    ...i,
-    sub:
-      i.key === "Saúde da mulher" && !mostrarSaudeDaMulher(weeks)
-        ? "O que fica para depois do parto"
-        : i.sub,
-    dado: dados[i.key] ?? null,
-  }));
-  if (cabecalhos) {
-    return (
-      <div className="space-y-3">
-        {itens.map((i) => (
-          <VoltarDaGrade key={i.key} rotulo={i.label} ladrilho={i} onVoltar={() => {}} />
-        ))}
-      </div>
-    );
-  }
-  return (
-    <GradeHub
-      itens={itens}
-      /* ⚠️ SEMPRE o bloco grande — e isto foi um RECURSO MORTO por um tempo.
-         A condição aqui era `itens.length === 4`, escrita quando "Saúde da
-         mulher" saía da grade durante a gestação. Quando os cinco ladrilhos
-         passaram a aparecer SEMPRE (o estudo de navegação: no celular a função
-         sumia por nove meses), a condição virou constante FALSA — e com ela
-         morreram as duas coisas que o dono tinha pedido: os blocos que
-         "preenchem a tela" e O NÚMERO DELA dentro deles, que só é desenhado
-         atrás de `preencherTela`. As três consultas ao banco continuavam
-         saindo a cada visita e o resultado era jogado fora.
-
-         Nada mais no app usa `preencherTela` — ele existe para esta grade. */
-      preencherTela
-      onAbrir={(k) => {
-        const item = itens.find((i) => i.key === k);
-        if (item) onAbrir(item.destino, item.subDestino);
-      }}
-    />
-  );
-}
 
 const CAT_STYLE: Record<string, { pill: string; glass: string; accent: string; emoji: string }> = {
   Gestação: {
@@ -3523,113 +3131,6 @@ function WeekMilestoneModal({
 }
 
 /* ---------- Bebê ---------- */
-/**
- * A peça 3D de cada quadrado das três grades — `GradeHub` a desenha no lugar
- * do traço no círculo. Chutes e Contrações REUSAM a arte da Saúde: são o mesmo
- * destino (o hub da Saúde abre `Registros` já na sub-tela certa), e duas artes
- * para a mesma coisa ensinariam que são coisas diferentes.
- *
- * ⚠️ MORA ANTES DA PRIMEIRA GRADE que o lê. `const` de módulo não é içado:
- * declarado depois de `BEMESTAR_SUBTABS`, o módulo inteiro estourava no SSR
- * ("antes de inicializar") e TODA página do app respondia 500 — medido.
- */
-const ARTE_GRADE = {
-  agenda: arteGrade_agenda,
-  preparo: arteGrade_preparo,
-  perguntas: arteGrade_perguntas,
-  checklist: arteGrade_checklist,
-  parto: arteGrade_parto,
-  tele: arteGrade_tele,
-  particular: arteGrade_particular,
-  meditacoes: arteGrade_meditacoes,
-  sons: arteGrade_sons,
-  exercicios: arteGrade_exercicios,
-  humor: arteGrade_humor,
-  apoio: arteGrade_apoio,
-  diario: arteGrade_diario,
-  timeline: arteGrade_timeline,
-  chutes: icChutes,
-  contracoes: icContracoes,
-} as const;
-
-/**
- * Hub "Bem-estar": autocuidado numa tela só (sub-abas) — Meditações, Sons,
- * Exercícios, Humor e Apoio Emocional. Antes eram 5 abas.
- */
-export const BEMESTAR_SUBTABS = [
-  {
-    key: "meditacoes",
-    label: "Meditações",
-    sub: "Meditar com voz e som",
-    Icon: Flower2,
-    imagem: ARTE_GRADE.meditacoes,
-    caixa: "border-violet-200/70 from-violet-50 to-fuchsia-50/60",
-    tinta: "text-violet-600",
-  },
-  /*
-    ⚠️ **ESTE LADRILHO ENTREGAVA OUTRO RECURSO — e um que faz o CONTRÁRIO do
-    que ele promete.**
-
-    Ele dizia "Sons · Relaxar e dormir" e abria `SonsBebêTab`, que são cinco
-    sons feitos em **Web Audio** — e o iOS SUSPENDE o `AudioContext` quando o
-    aparelho bloqueia. Ou seja: o ladrilho de dormir abria um tocador que para
-    no segundo em que ela apoia o celular na mesa de cabeceira. É literalmente
-    o defeito que `sons-para-dormir.tsx` foi escrito para evitar, e o
-    comentário de lá diz isso com todas as letras.
-
-    E o `mapa-do-app` promete, para `tab: "Bem-estar", sub: "sons"`, "Chuva,
-    mar, ventre e mais trinta — **tocam com a tela apagada**". O tocador que
-    cumpre isso (WAV + `<audio loop>`, sobrevive à tela apagada, com card na
-    tela de bloqueio) existia e só era alcançável DENTRO da aba Jogo.
-
-    Agora são dois ladrilhos, cada um dizendo o que entrega.
-  */
-  {
-    key: "sons",
-    label: "Sons para dormir",
-    sub: "Chuva, mar e mais 30 — com a tela apagada",
-    Icon: AudioLines,
-    imagem: ARTE_GRADE.sons,
-    caixa: "border-sky-200/70 from-sky-50 to-blue-50/60",
-    tinta: "text-sky-600",
-  },
-  {
-    key: "sons-bebe",
-    label: "Sons para o bebê",
-    sub: "O que ele escuta daí de dentro",
-    Icon: Baby,
-    imagem: ARTE_GRADE.sons,
-    caixa: "border-indigo-200/70 from-indigo-50 to-violet-50/60",
-    tinta: "text-indigo-600",
-  },
-  {
-    key: "exercicios",
-    label: "Exercícios",
-    sub: "Movimentos leves",
-    Icon: PersonStanding,
-    imagem: ARTE_GRADE.exercicios,
-    caixa: "border-emerald-200/70 from-emerald-50 to-teal-50/60",
-    tinta: "text-emerald-600",
-  },
-  {
-    key: "humor",
-    label: "Humor",
-    sub: "Como você está hoje",
-    Icon: Smile,
-    imagem: ARTE_GRADE.humor,
-    caixa: "border-amber-200/70 from-amber-50 to-yellow-50/60",
-    tinta: "text-amber-600",
-  },
-  {
-    key: "apoio",
-    label: "Apoio emocional",
-    sub: "Quando o peso é grande",
-    Icon: HeartHandshake,
-    imagem: ARTE_GRADE.apoio,
-    caixa: "border-rose-200/70 from-rose-50 to-pink-50/60",
-    tinta: "text-rose-600",
-  },
-] as const;
 
 function BemEstarHub({
   gest,
@@ -3727,52 +3228,6 @@ function BemEstarHub({
     </div>
   );
 }
-
-/**
- * Hub "Registros": tudo que a paciente registra numa tela só (sub-abas) —
- * Diário, Chutes, Contrações e Linha do Tempo. Antes eram 4 abas.
- */
-export const REGISTROS_SUBTABS = [
-  {
-    key: "diario",
-    label: "Diário",
-    sub: "Escrever sobre o dia",
-    Icon: NotebookPen,
-    imagem: ARTE_GRADE.diario,
-    caixa: "border-amber-200/70 from-amber-50 to-orange-50/60",
-    tinta: "text-amber-600",
-  },
-  {
-    /* ⚠️ Chutes e Contrações têm a MESMA família (cor e arte) que no hub da
-       Saúde: são o mesmo destino por duas portas, e quem toca no bloco azul
-       de Chutes na Saúde tem de chegar numa tela azul — não numa rosa. */
-    key: "chutes",
-    label: "Chutes",
-    sub: "Contar os movimentos",
-    Icon: Footprints,
-    imagem: ARTE_GRADE.chutes,
-    caixa: "border-sky-200/70 from-sky-50 to-cyan-50/60",
-    tinta: "text-sky-600",
-  },
-  {
-    key: "contracoes",
-    label: "Contrações",
-    sub: "Cronometrar e ver o padrão",
-    Icon: Timer,
-    imagem: ARTE_GRADE.contracoes,
-    caixa: "border-orange-200/70 from-orange-50 to-amber-50/60",
-    tinta: "text-orange-600",
-  },
-  {
-    key: "timeline",
-    label: "Linha do tempo",
-    sub: "Tudo que já aconteceu",
-    Icon: History,
-    imagem: ARTE_GRADE.timeline,
-    caixa: "border-sky-200/70 from-sky-50 to-cyan-50/60",
-    tinta: "text-sky-600",
-  },
-] as const;
 
 type SubDeRegistros = (typeof REGISTROS_SUBTABS)[number]["key"];
 
@@ -3896,72 +3351,6 @@ function RegistrosHub({
  * a semana, a contagem regressiva, o álbum, os nomes, a carta e o enxoval.
  * Antes eram 6 abas separadas; agora é 1 (menos poluição visual).
  */
-/** A peça 3D de cada quadrado da aba Bebê — `GradeHub` a desenha no lugar do Lucide. */
-const ARTE_BEBE = {
-  semana: arteBebe_semana,
-  contagem: arteBebe_contagem,
-  album: arteBebe_album,
-  nome: arteBebe_nome,
-  carta: arteBebe_carta,
-  quartinho: arteBebe_quartinho,
-} as const;
-
-export const BEBE_SUBTABS = [
-  {
-    key: "semana",
-    label: "Semana",
-    sub: "O que mudou agora",
-    Icon: Baby,
-    imagem: ARTE_BEBE.semana,
-    caixa: "border-pink-200/70 from-pink-50 to-rose-50/60",
-    tinta: "text-pink-600",
-  },
-  {
-    key: "contagem",
-    label: "Contagem",
-    sub: "Quanto falta",
-    Icon: Timer,
-    imagem: ARTE_BEBE.contagem,
-    caixa: "border-violet-200/70 from-violet-50 to-fuchsia-50/60",
-    tinta: "text-violet-600",
-  },
-  {
-    key: "album",
-    label: "Álbum",
-    sub: "As fotos da barriga",
-    Icon: Images,
-    imagem: ARTE_BEBE.album,
-    caixa: "border-sky-200/70 from-sky-50 to-blue-50/60",
-    tinta: "text-sky-600",
-  },
-  {
-    key: "nome",
-    label: "Nomes",
-    sub: "Escolher e votar",
-    Icon: Sparkles,
-    imagem: ARTE_BEBE.nome,
-    caixa: "border-amber-200/70 from-amber-50 to-yellow-50/60",
-    tinta: "text-amber-600",
-  },
-  {
-    key: "carta",
-    label: "Carta",
-    sub: "Escrever para o bebê",
-    Icon: Mail,
-    imagem: ARTE_BEBE.carta,
-    caixa: "border-rose-200/70 from-rose-50 to-orange-50/60",
-    tinta: "text-rose-600",
-  },
-  {
-    key: "quartinho",
-    label: "Enxoval",
-    sub: "A lista do quartinho",
-    Icon: ShoppingBag,
-    imagem: ARTE_BEBE.quartinho,
-    caixa: "border-emerald-200/70 from-emerald-50 to-teal-50/60",
-    tinta: "text-emerald-600",
-  },
-] as const;
 
 function BebeHub({
   profile,
@@ -7661,72 +7050,6 @@ function formatApptDate(ymd: string): string {
  * sub-abas. Antes: Consultas, Pré-consulta, Perguntas, Checklist, Plano de
  * Parto, Teleconsulta (6 abas). Agora: 1.
  */
-
-export const CONSULTAS_SUBTABS = [
-  {
-    key: "agenda",
-    label: "Agenda",
-    sub: "Marcar e remarcar",
-    Icon: CalendarCheck,
-    imagem: ARTE_GRADE.agenda,
-    caixa: "border-sky-200/70 from-sky-50 to-blue-50/60",
-    tinta: "text-sky-600",
-  },
-  {
-    key: "preparo",
-    label: "Preparar",
-    sub: "O que levar e contar",
-    Icon: ClipboardList,
-    imagem: ARTE_GRADE.preparo,
-    caixa: "border-violet-200/70 from-violet-50 to-fuchsia-50/60",
-    tinta: "text-violet-600",
-  },
-  {
-    key: "perguntas",
-    label: "Perguntas",
-    sub: "Anote para a consulta",
-    Icon: MessageCircleQuestion,
-    imagem: ARTE_GRADE.perguntas,
-    caixa: "border-amber-200/70 from-amber-50 to-yellow-50/60",
-    tinta: "text-amber-600",
-  },
-  {
-    key: "checklist",
-    label: "Checklist",
-    sub: "A mala da maternidade",
-    Icon: ListChecks,
-    imagem: ARTE_GRADE.checklist,
-    caixa: "border-emerald-200/70 from-emerald-50 to-teal-50/60",
-    tinta: "text-emerald-600",
-  },
-  {
-    key: "parto",
-    label: "Plano de parto",
-    sub: "Suas preferências",
-    Icon: Scroll,
-    imagem: ARTE_GRADE.parto,
-    caixa: "border-pink-200/70 from-pink-50 to-rose-50/60",
-    tinta: "text-pink-600",
-  },
-  {
-    key: "tele",
-    label: "Teleconsulta",
-    sub: "Consulta por vídeo",
-    Icon: Video,
-    imagem: ARTE_GRADE.tele,
-    caixa: "border-indigo-200/70 from-indigo-50 to-violet-50/60",
-    tinta: "text-indigo-600",
-  },
-  {
-    key: "particular",
-    label: "Particular",
-    sub: "Particular e pagamento",
-    Icon: Wallet,
-    imagem: ARTE_GRADE.particular,
-    caixa: "border-teal-200/70 from-teal-50 to-emerald-50/60",
-    tinta: "text-teal-600",
-  },
-] as const;
 
 type ConsultasSub = (typeof CONSULTAS_SUBTABS)[number]["key"];
 

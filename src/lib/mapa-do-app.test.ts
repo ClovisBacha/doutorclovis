@@ -14,6 +14,19 @@ import {
 } from "./mapa-do-app";
 
 const conta = readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8");
+/**
+ * ⚠️ As QUATRO grades de sub-telas e o HUB DA SAÚDE saíram de `minha-conta.tsx`
+ * (set/2026): eram `export const`/`export function` num arquivo de ROTA, e isso
+ * os içava para o pedaço de ENTRADA que toda página do site baixa.
+ *
+ * ⚠️ **E os três fontes são lidos JUNTOS de propósito.** A varredura de baixo
+ * deriva as chaves que o luto tira do FILTRO escrito nas grades — lendo só a
+ * conta ela passaria a enxergar uma grade em vez de duas, e a comparação das
+ * três listas ficaria frouxa exatamente onde ela existe para ser apertada.
+ */
+const grades = readFileSync("src/components/grades-das-abas.tsx", "utf8");
+const hubSaude = readFileSync("src/components/hub-saude.tsx", "utf8");
+const fontes = conta + "\n" + grades + "\n" + hubSaude;
 
 /** Os rótulos de `TABS`, lidos do fonte — o mapa não pode apontar para aba que não existe. */
 function abasDoApp(): Set<string> {
@@ -25,9 +38,12 @@ function abasDoApp(): Set<string> {
 
 /** As chaves de sub-tela de cada hub, lidas do fonte. */
 function subTelasDe(hub: string): Set<string> {
-  const i = conta.indexOf(`const ${hub}`);
-  const j = conta.indexOf("\n];", i);
-  const bloco = conta.slice(i, j);
+  const i = fontes.indexOf(`const ${hub}`);
+  /* ⚠️ Âncora que não casa devolve −1, e a fatia sairia quase vazia: o hub
+     apareceria SEM sub-telas e as asserções passariam em branco. */
+  expect(i).toBeGreaterThan(-1);
+  const j = fontes.indexOf("\n]", i);
+  const bloco = fontes.slice(i, j);
   return new Set([...bloco.matchAll(/key: "([^"]+)"/g)].map((m) => m[1]));
 }
 
@@ -233,7 +249,7 @@ describe("o mapa e as grades concordam sobre o que some no luto", () => {
    */
   const chavesFiltradasNasGrades = () => {
     const chaves = new Set<string>();
-    for (const m of conta.matchAll(/careMode && i\.key === "([^"]+)"/g)) chaves.add(m[1]);
+    for (const m of fontes.matchAll(/careMode && i\.key === "([^"]+)"/g)) chaves.add(m[1]);
     return chaves;
   };
 

@@ -66,14 +66,6 @@ const CONHECIDOS: Record<string, string[]> = {
     "ConsultorTab",
     "DoctorThinkTab",
   ],
-  "src/routes/_authenticated/minha-conta.tsx": [
-    "mostrarSaudeDaMulher",
-    "HubSaude",
-    "BEMESTAR_SUBTABS",
-    "REGISTROS_SUBTABS",
-    "BEBE_SUBTABS",
-    "CONSULTAS_SUBTABS",
-  ],
   "src/routes/_authenticated/painel.tsx": ["DashboardView"],
 };
 
@@ -154,12 +146,15 @@ describe("os arquivos de rota", () => {
        Se CAIU, alguém pagou dívida — ótimo: abaixe o número aqui, no mesmo
        commit. Um teto frouxo (`<=`) deixaria a lista encolher sem ninguém
        reparar, e a tolerância voltaria a caber num export reintroduzido.
-       Caiu de 32 → 30 → 29 → 28 em set/2026, à medida que `OnboardingRitual`,
-       `CodigoDaEmbaixadora`, `ConquistasTab` e `ChatTab` saíram de
-       `minha-conta.tsx`. */
+       Caiu de 32 → 30 → 29 → 28 → 22 em set/2026, à medida que
+       `OnboardingRitual`, `CodigoDaEmbaixadora`, `ConquistasTab` e `ChatTab`
+       saíram de `minha-conta.tsx` — e, no último corte, `HubSaude`,
+       `mostrarSaudeDaMulher` e as quatro `*_SUBTABS`, que **zeraram** o
+       arquivo: hoje ele exporta só a `Route`, e por isso deixou de ter entrada
+       aqui. */
     const total = Object.values(CONHECIDOS).reduce((n, l) => n + l.length, 0);
-    expect(total).toBe(28);
-    expect(Object.keys(CONHECIDOS)).toHaveLength(5);
+    expect(total).toBe(22);
+    expect(Object.keys(CONHECIDOS)).toHaveLength(4);
   });
 });
 

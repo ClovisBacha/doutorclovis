@@ -20,10 +20,20 @@ import { readFileSync } from "node:fs";
 import { semComentarios } from "@/lib/sem-comentarios";
 
 const CONTA = semComentarios(readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8"));
+/**
+ * ⚠️ O HUB saiu de `minha-conta.tsx` para cá (set/2026) — ele era `export
+ * function` num arquivo de ROTA, e isso o içava para o pedaço de ENTRADA.
+ * O filtro do luto foi junto, e as asserções seguiram o CAMINHO: as duas
+ * negativas abaixo teriam ficado CEGAS lendo só a conta, verdes sobre um
+ * arquivo que já não contém o código que elas proíbem.
+ */
+const HUB = semComentarios(readFileSync("src/components/hub-saude.tsx", "utf8"));
+/** As duas juntas — a proibição de tirar Contrações vale nos DOIS arquivos. */
+const CONTA_E_HUB = CONTA + "\n" + HUB;
 
 describe("⚠️ as duas grades tiram o ladrilho de Chutes no luto", () => {
   test("o hub da Saúde", () => {
-    expect(CONTA).toMatch(/HUB_SAUDE\.filter\(\(i\) => !\(careMode && i\.key === "chutes"\)\)/);
+    expect(HUB).toMatch(/HUB_SAUDE\.filter\(\(i\) => !\(careMode && i\.key === "chutes"\)\)/);
     /* E ele RECEBE o estado — sem a prop, o filtro seria código morto. */
     expect(CONTA).toMatch(/<HubSaude\s+careMode=\{careMode\}/);
   });
@@ -37,8 +47,8 @@ describe("⚠️ as duas grades tiram o ladrilho de Chutes no luto", () => {
   test("⚠️ e NENHUMA das duas tira Contrações", () => {
     /* Tirar o cronômetro seria trocar um defeito por outro pior: quem perdeu a
        gestação pode estar em trabalho de parto. */
-    expect(CONTA).not.toContain('careMode && i.key === "contracoes"');
-    expect(CONTA).not.toContain('i.key !== "contracoes"');
+    expect(CONTA_E_HUB).not.toContain('careMode && i.key === "contracoes"');
+    expect(CONTA_E_HUB).not.toContain('i.key !== "contracoes"');
   });
 
   test("⚠️ e a aba continua se calando POR DENTRO — o ladrilho não é a única defesa", () => {

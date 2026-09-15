@@ -66,15 +66,18 @@ describe("inicioDeHojeISO", () => {
 });
 
 describe("a grade da Saúde usa a régua", () => {
-  const CONTA = semProsa(readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8"));
-  /* Só o bloco dos contadores da grade — o arquivo tem quinze mil linhas, e
-     medir sobre ele inteiro é como uma asserção passa em vazio. */
+  /* ⚠️ O HUB saiu de `minha-conta.tsx` para `src/components/hub-saude.tsx`
+     (set/2026): ele era `export function` num arquivo de ROTA, e isso o içava
+     para o pedaço de ENTRADA. Só o CAMINHO mudou. */
+  const HUB = semProsa(readFileSync("src/components/hub-saude.tsx", "utf8"));
+  /* Só o bloco dos contadores da grade — medir sobre o arquivo inteiro é como
+     uma asserção passa em vazio. */
   const BLOCO = (() => {
-    const i = CONTA.indexOf("const [dados, setDados] = useState<Record<string, Dado | null>>");
+    const i = HUB.indexOf("const [dados, setDados] = useState<Record<string, Dado | null>>");
     expect(i).toBeGreaterThan(-1);
-    const j = CONTA.indexOf("setDados(d);", i);
+    const j = HUB.indexOf("setDados(d);", i);
     expect(j).toBeGreaterThan(i);
-    return CONTA.slice(i, j);
+    return HUB.slice(i, j);
   })();
 
   test("⚠️ o dia do registro sai do INSTANTE, nunca de um corte de string", () => {
@@ -96,11 +99,16 @@ describe("a grade da Saúde usa a régua", () => {
 });
 
 describe("o bloco da Saúde não afirma atualidade sobre dado velho — sem escrever quando", () => {
-  const CONTA = semProsa(readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8"));
+  const HUB = semProsa(readFileSync("src/components/hub-saude.tsx", "utf8"));
   const BLOCO = (() => {
-    const i = CONTA.indexOf("const [dados, setDados] = useState<Record<string, Dado | null>>");
-    const j = CONTA.indexOf("setDados(d);", i);
-    return CONTA.slice(i, j);
+    const i = HUB.indexOf("const [dados, setDados] = useState<Record<string, Dado | null>>");
+    /* ⚠️ Faltava esta conferência: uma âncora que não casa devolve −1, e
+       `slice(-1, j)` devolve string VAZIA — as duas negativas deste bloco
+       ficariam verdes sobre nada. */
+    expect(i).toBeGreaterThan(-1);
+    const j = HUB.indexOf("setDados(d);", i);
+    expect(j).toBeGreaterThan(i);
+    return HUB.slice(i, j);
   })();
 
   test("⚠️ passado o prazo, o número SOME — nunca vira 'há N meses' na legenda", () => {

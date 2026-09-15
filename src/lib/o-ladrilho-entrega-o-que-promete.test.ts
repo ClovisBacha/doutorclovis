@@ -29,6 +29,14 @@ const semComentarios = (f: string) =>
   f.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 
 const CONTA = semComentarios(readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8"));
+/**
+ * ⚠️ As quatro grades de sub-telas saíram de `minha-conta.tsx` (set/2026): eram
+ * `export const` num arquivo de ROTA, e isso as içava para o pedaço de ENTRADA.
+ * As duas juntas, porque este arquivo cobra a CORRENTE entre o ladrilho (que
+ * mora lá) e o componente que ele abre (que mora na rota).
+ */
+const GRADES = semComentarios(readFileSync("src/components/grades-das-abas.tsx", "utf8"));
+const CONTA_E_GRADES = CONTA + "\n" + GRADES;
 
 /** O corpo do `BemEstarHub`, do `function` até a próxima função de topo. */
 function hub() {
@@ -41,11 +49,11 @@ function hub() {
 
 /** A lista de ladrilhos do Bem-estar, como texto. */
 function ladrilhos() {
-  const i = CONTA.indexOf("export const BEMESTAR_SUBTABS");
+  const i = GRADES.indexOf("export const BEMESTAR_SUBTABS");
   expect(i).toBeGreaterThan(-1);
-  const j = CONTA.indexOf("] as const;", i);
+  const j = GRADES.indexOf("] as const;", i);
   expect(j).toBeGreaterThan(i);
-  return CONTA.slice(i, j);
+  return GRADES.slice(i, j);
 }
 
 describe("⚠️ o ladrilho entrega o que o rótulo promete", () => {

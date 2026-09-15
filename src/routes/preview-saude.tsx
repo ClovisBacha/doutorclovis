@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { HubSaude } from "@/routes/_authenticated/minha-conta";
+import { HubSaude } from "@/components/hub-saude";
 
 /**
  * Bancada de design do HUB DA SAÚDE — irmã da /preview-jogo.

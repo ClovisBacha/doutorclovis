@@ -5,7 +5,7 @@ import {
   BEMESTAR_SUBTABS,
   CONSULTAS_SUBTABS,
   REGISTROS_SUBTABS,
-} from "@/routes/_authenticated/minha-conta";
+} from "@/components/grades-das-abas";
 
 /**
  * Bancada das GRADES de sub-abas — as quatro que substituíram as fileiras de

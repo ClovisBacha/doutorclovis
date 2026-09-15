@@ -29,15 +29,23 @@ const conta = readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8");
  * leva; a garantia não mudou uma linha em nenhuma delas.
  */
 const saude = readFileSync("src/components/health-tab.tsx", "utf8");
-/** As duas juntas, para as buscas que não se importam com o arquivo. */
-const contaESaude = conta + "\n" + saude;
+/**
+ * ⚠️ E o HUB saiu depois (set/2026), pelo motivo oposto ao da tela: ele era
+ * `export function` num arquivo de ROTA, e isso o içava para o pedaço de
+ * ENTRADA que toda página do site baixa. Sexta vez nesta leva que uma catraca
+ * fica vermelha só porque o CAMINHO mudou — e de novo sem uma linha de
+ * garantia diferente.
+ */
+const hub = readFileSync("src/components/hub-saude.tsx", "utf8");
+/** As três juntas, para as buscas que não se importam com o arquivo. */
+const contaESaude = conta + "\n" + saude + "\n" + hub;
 
 /** O bloco do `HUB_SAUDE`, do abre-colchete até o fecha. */
 const gradeDaSaude = (() => {
-  const i = conta.indexOf("const HUB_SAUDE: LadrilhoDaSaude[] = [");
+  const i = hub.indexOf("export const HUB_SAUDE: LadrilhoDaSaude[] = [");
   expect(i).toBeGreaterThan(-1);
-  const fim = conta.indexOf("\n];", i);
-  return conta.slice(i, fim);
+  const fim = hub.indexOf("\n];", i);
+  return hub.slice(i, fim);
 })();
 
 describe("o que a grade da Saúde oferece", () => {
