@@ -16643,3 +16643,236 @@ aplicado; entre eles, e sem verificação: a zona verde do gráfico de glicemia 
 PISO (hipoglicemia desenhada como faixa boa), o "Normal" em verde para glicemia
 139, a triagem chegando ao prontuário em CÓDIGO, o ciclo falando de um parto que
 não vai acontecer, e quatro testes da leva anterior com janela larga demais.
+
+## Os quarenta achados da vistoria, conferidos um a um (set/2026)
+
+Pedido do dono: _"continue fazendo a aplicação até que tudo esteja perfeito"_ —
+ou seja, retomar os achados que a seção acima registra como **levantados e não
+aplicados**, porque a fase de céticos morreu no limite de sessão.
+
+O método não foi retomar o workflow: foi **abrir cada arquivo e medir**. É mais
+lento e é a régua da casa — _conferir custa minutos; acreditar custa mexer em
+código correto num app que está em produção_.
+
+⚠️ **E QUATRO DOS QUARENTA CAÍRAM NA CONFERÊNCIA.** Vale tanto quanto os
+consertos, e por isso ficam nomeados: (1) "o Ciclo fala de um parto que não vai
+acontecer no luto" — INALCANÇÁVEL, porque `gest` já é anulado por `careMode` na
+fonte e `gestante` é falso no luto; (2) "a legenda do ladrilho «Saúde da mulher»
+vira «o que fica para depois do parto» no luto" — a mesma cadeia
+(`weeks={gest?.weeks ?? null}`); (3) "o portão `gestante` depende de uma leitura
+cujo erro vira false" — com o perfil ilegível `profile` é nulo, e `gest` seria
+nulo com ou sem o `careMode`; (4) a metade de "as bancadas da Saúde não têm
+`?luto=`" que fala de `preview-saude-mulher` — `SaudeMulherHub` não ACEITA
+`careMode`, então não há estado a fotografar ali (a outra metade, a do hub, era
+real e entrou).
+
+### ⚠️ A GLICEMIA AFIRMAVA NAS DUAS PONTAS
+
+- **A zona verde do gráfico não tinha PISO.** Ela ia de 95 até o FUNDO do
+  desenho (`height={sy(minY) - sy(95)}`), e `minY` desce junto com o menor valor
+  registrado: uma glicemia de **45** — emergência numa gestante em insulina —
+  caía DENTRO da faixa apresentada como boa, com o ponto pintado de VERMELHO por
+  `sinalGlicemia` em cima dela. A tela se contradizendo sobre o mesmo número. É a
+  mesma classe já consertada DUAS vezes neste gráfico: os consertos pegaram o
+  CARTÃO e os PONTOS e deixaram a FAIXA de pé.
+
+- **O cartão escrevia "Normal", em VERDE, para 139 mg/dL.** O limite permissivo
+  de 140 está certo — a nota da régua explica que o app não pergunta se foi em
+  jejum —, e o defeito nunca foi a régua: era a PALAVRA que a tela punha em cima
+  dela. Em jejum o alvo é 95. Os dois prompts que leem a MESMA régua já tinham
+  sido consertados com a regra escrita por extenso; a tela — a única das três que
+  fala com ela sem um modelo no meio, e a única que pintava a afirmação de verde
+  — ficou de pé por uma leva.
+
+⚠️ **As duas pontas saem de `GLICEMIA` e de `leituraDaGlicemia`, em
+`sinais-clinicos.ts`.** Escrever 60 ou 95 no componente seria a QUARTA cópia
+desta escala, e foi a duplicação dela que produziu os dois defeitos anteriores.
+⚠️ E o texto diferencia as duas metades do ramo `normal`: abaixo de 95 o app SABE
+que está dentro das duas referências, e é só entre 95 e 140 que ele pede o
+médico — dizer a mesma frase nas duas faixas assustaria quem tem 85.
+
+⚠️ **A cor virou NEUTRA**, e não `emerald`: verde CODIFICA "está bom", que é
+metade da afirmação que acabou de sair do texto. É o mesmo tom que
+`ESTILO_SINAL.normal` já usa no painel do médico.
+
+⚠️ **E NENHUMA BANCADA TINHA UMA GLICEMIA BAIXA** — foi por isso que a faixa sem
+piso sobreviveu: com 92, 88 e 148, `minY` nunca desce o bastante e o retângulo
+parece começar no fundo por coincidência de escala. `?estado=hipo` tem 45 e 58.
+
+### ⚠️ O QUE CHEGAVA AO MÉDICO CHEGAVA EM CÓDIGO
+
+Três defeitos da MESMA família — a régua aplicada num lugar e deixada de pé no
+vizinho —, com o catálogo único já escrito e um leitor ignorando-o:
+
+- **A triagem chegava como ID.** E não é cosmético: dois dos NOVE SINTOMAS
+  VERMELHOS perdem o QUALIFICADOR no id — `movimentos` é o id de "Redução dos
+  movimentos do bebê" e lê como uma menção neutra; `contracoes` é o de
+  "Contrações regulares antes de 37 semanas". Na FILA ele vê só "Triagem
+  vermelha", então a linha do tempo é o ÚNICO lugar onde ele descobre o que ela
+  marcou. ⚠️ E a **FONTE desempata**, como a linha do `nivel` logo abaixo já
+  fazia: `preconsulta_forms.symptoms` guarda LABELS em português na mesma chave.
+- **O humor chegava como EMOJI.** 💛 é "Conectada", e 😴 ("Cansada") não se
+  distingue de 🥱 ("Com sono") a olho num prontuário.
+- **O rascunho de achados NUNCA nomeava um sintoma.** Dois erros na mesma linha:
+  o filtro exigia `e.texto`, que é a NOTA LIVRE e é OPCIONAL — uma triagem
+  vermelha sem nota desaparecia inteira do texto que o médico assina —, e mesmo
+  com nota o bloco imprimia só o texto. É o mesmo buraco que o bloco de
+  MOVIMENTOS, dez linhas abaixo, foi escrito para fechar.
+
+### ⚠️ UM REGISTRO SÓ COM ANOTAÇÃO NUNCA EXISTIU PARA O CONSULTÓRIO
+
+O ramo de `health_logs` da view termina em `num_nonnulls(...) > 0` sobre as seis
+colunas numéricas: uma linha com os seis nulos e `notes` preenchida dá `0 > 0` e
+é excluída da view INTEIRA — mesmo a view projetando `h.notes AS texto` três
+linhas acima. E o app ACEITA essa linha: o campo "Notas" está vivo ao lado de
+Glicemia, a guarda de `add()` libera a gravação quando só ela está preenchida, e
+a lista "Ver e corrigir meus registros" a DESENHA. Ela escreve "acordei com a
+vista embaçada e não consegui medir a pressão", vê o registro na tela, e ele não
+existe para o médico.
+
+⚠️ O `OR` foi nos DOIS arquivos que montam a view. E o `btrim`/`nullif` importa:
+sem ele, uma nota de espaços em branco vira evento clínico.
+
+⚠️ **A aba Fila clínica passou a perguntar por esse caso** — sem ela o conserto
+seria invisível, porque nada quebra: a view velha continua válida e o recurso
+simplesmente não existe. **O filtro é COMPOSTO nos dois lados**: contar só "tem
+nota" incluiria as linhas com número, que a view velha já devolve, e a tela diria
+"ok" sobre ela. ⚠️ E `colunaNaView` existe porque nem todo campo é chave de
+`dados` — a anotação vive na coluna `texto`, e a tela escrevia "dados.texto"
+para todos.
+
+### A seta da barra volta para o LUGAR
+
+`src/lib/voltar-da-barra.ts`, e ela saiu do `.tsx` porque a garantia precisava
+ser EXECUTADA.
+
+- ⚠️ **`origem` guardava a ABA e nunca a SUB-TELA.** O único botão de contato do
+  cartão vermelho de movimentos reduzidos chama `onNavigate("Consultas")`; na
+  volta a paciente caía na GRADE de "Meu dia a dia" em vez dos Chutes. É a tela
+  que o dono já tinha reclamado, e o conserto anterior fechou a seta de DENTRO do
+  cabeçalho e deixou de pé a volta pelo médico.
+- ⚠️ **A regra do hub roubava a volta de Bem-estar e Alertas.** Ela olhava a
+  SEÇÃO (`tabToSection === "saude"`, cinco abas) e o hub tem cinco LADRILHOS que
+  não são as mesmas cinco: Bem-estar e Alertas estão na seção e não estão na
+  grade. E o caminho é alcançável justamente em MODO CUIDADO, pelo "Apoio
+  emocional" do cartão de acolhimento.
+- ⚠️ **E o RÓTULO sai do mesmo destino**, nunca de `origem` solto: o leitor de
+  tela anunciava "Voltar para Caminho" e a régua do hub levava para a grade da
+  Saúde. Uma seta que promete um lugar e entrega outro é pior que uma sem rótulo.
+
+### ⚠️ O MAPA ESCONDIA O CRONÔMETRO DE CONTRAÇÕES NO LUTO
+
+Contra as DUAS grades que o mantêm. Elas filtram uma chave só
+(`careMode && i.key === "chutes"`), pela razão escrita: **quem perdeu a gestação
+pode estar em trabalho de parto.** São três listas que precisam concordar, e a
+mais nova divergiu — há catraca comparando as três, derivada do filtro real das
+grades e não de uma lista à mão.
+
+E o rodapé anunciava `FUNCOES_DO_APP.length` sobre uma lista FILTRADA: trinta e
+cinco funções embaixo de vinte. Medido: **21 no luto, 34 fora**.
+
+### ⚠️ SETE TESTES QUE MENTIAM — e cada um é um mecanismo já catalogado
+
+A pior foi a **janela de 200 caracteres**: ela deixava passar envolver a tela
+clínica INTEIRA num `{!careMode && (…)}` — 14 de 14 mutações verdes. O guarda de
+um bloco pode estar a mil caracteres das âncoras que ele engole. Hoje o alcance é
+MEDIDO com uma pilha de parênteses.
+
+As outras: o × travado com a **indentação exata**; "mescla a fila local"
+procurando **NOMES e não a corrente** (passar `[]` no lugar das pendentes passava
+verde); o regex do ciclo exigindo **`gestante` como primeiro termo**; `min-h-11`
+reprovando `min-h-[44px]`, a outra grafia do mesmo alvo; e **dois apagadores de
+comentário próprios**, os dois ingênuos, que passaram a usar `sem-comentarios.ts`
+— a régua única existe porque as duas formas ingênuas mordem em sentidos opostos.
+
+⚠️ **E UMA AFIRMAÇÃO DA AUDITORIA NÃO SE REPRODUZ MAIS, medido:** ela registrou
+que o apagador ingênuo "cega 83 linhas de `minha-conta.tsx`, e uma delas é o
+`AlbumTab`". Era verdade quando foi medido; depois dos cortes do arquivo (de
+21.478 para 15.714 linhas) ele engole TREZE linhas e nenhuma âncora daquele teste
+cai lá. O conserto continua certo — o que separa treze de oitenta e três é o
+lugar do próximo comentário de bloco —, e a contraprova passou a medir o que é
+verdade hoje em vez de repetir o número.
+
+### ⚠️ O IMC ERA UMA SEGUNDA CÓPIA, E ELA JÁ DIVERGIA
+
+`curva-de-ganho.ts` exporta `imcPreGestacional` e `faixaDoImc`, e o cabeçalho
+dele afirma por escrito que a régua mora lá "porque já são dois leitores" e que
+"duas cópias divergiriam no primeiro ajuste, e a divergência apareceria como o
+gráfico dizendo uma coisa e a nutricionista dizendo outra sobre o mesmo peso".
+**A divergência EXISTIA:** a tela escrevia "peso normal" e "abaixo do peso" onde
+a régua diz "peso adequado" e "baixo peso" — a mesma mulher lia dois nomes para a
+mesma faixa em duas telas do mesmo app. E a conta inline não tinha as GUARDAS:
+uma altura de 17 cm digitada por engano desenhava um corredor do IOM a partir de
+um IMC impossível.
+
+⚠️ `faltaParaACurva` ganhou o quinto caso (`medida-implausivel`), porque sem ele
+a curva sumiria em SILÊNCIO — que é o estado sem saída que aquela régua nasceu
+para fechar, chegando por outro número.
+
+### ⚠️ TRÊS BANCADAS QUE MENTIAM
+
+- **A do ciclo andava com o relógio.** A rota crava as datas e o "hoje", e o
+  comentário afirma "as DUAS pontas cravadas" — o componente descartava a segunda
+  e lia `new Date()` em três pontos. Medido com o relógio forjado, na MESMA URL:
+  no dia em que foi escrita, "Dia do ciclo 13 · Janela fértil"; nove dias depois
+  teria mudado de FASE; em 23/11 o anel sumiria inteiro. Depois do conserto, os
+  três relógios dão a mesma tela.
+- **`?estado=campovelho` prometia "as doze fontes verdes"** — no cabeçalho do
+  arquivo E no comentário da varredura de CI — e desenhava NOVE: três saíam
+  cinza, desmentindo o alarme logo acima delas, que diz "a fonte está na view,
+  por isso a lista abaixo fica verde".
+- **A grade da Saúde no Modo Cuidado não era fotografável.** `HubSaude` filtra o
+  ladrilho de Chutes no luto e mantém o de Contrações, e a bancada nunca passava
+  a prop: o único estado em que a grade muda de forma não aparecia em foto
+  nenhuma.
+
+### ⚠️ A DATA QUE VIRA DUM NASCIA COM O DIA SEGUINTE
+
+`new Date().toISOString().split("T")[0]` converte para UTC antes de cortar: em
+São Paulo, das 21h à meia-noite o ISO já está no dia SEGUINTE, e o campo abria
+pré-preenchido com amanhã. Essa data vira `lmp_date` e, por ela, a idade
+gestacional e a DPP — um dia de erro numa em cada quatro aberturas, no número que
+decide conduta. Virou o dia CIVIL dela, pela mesma régua que `health-tab.tsx` já
+usa para gravar `log_date`.
+
+### E o resíduo, com as duas afirmações falsas
+
+`gest` era **prop morta** em `HealthTab` (dois chamadores a fabricavam, nenhuma
+linha a lia — a tela calcula a semana de CADA registro por conta própria). E dois
+comentários afirmavam o que o código não faz: um fluxo de "correção de registro
+antigo" que não existe, e "os quatro seguem para o `clinical_events`", quando
+**passos e sono NÃO são projetados pela view**. ⚠️ Não "conserte" isso ampliando
+a view: a decisão registrada é que os quatro não mudam conduta obstétrica, e
+ampliá-la seria desfazê-la pelo caminho de um comentário errado.
+
+### A varredura do ramo sem token, fora da aba Saúde
+
+`if (!s.session?.access_token) { setLoading(false); return; }` existe em mais
+três telas. **Duas entraram**, pela régua de triagem: _se esta leitura voltar
+vazia, o app AFIRMA um fato que ela não tem como saber que é falso, e que muda o
+que ela faz a seguir?_
+
+- **consultas particulares** — "Solicite sua primeira consulta particular acima",
+  dito a quem já solicitou e talvez já PAGOU. Aqui a conclusão custa dinheiro.
+- **Cantinho** — saldo ZERO: a vitrine passa a dizer "faltam 74 🌱" a quem tem
+  setecentas. É a mesma classe que este repositório já pagou com "faltam 10 🏆"
+  dito a quem tem 30.
+
+⚠️ **E A TERCEIRA FICOU DE FORA, de propósito:** em `conquistas-tab` a lista
+vazia não muda o que ela faz a seguir. É o mesmo critério que deixou de pé os
+onze contadores informativos da varredura anterior — **conserto sem dano é
+churn**.
+
+**Aplicar no Supabase:** `supabase/APLICAR_EVENTOS_CLINICOS.sql` (idempotente) —
+é ele que faz o registro só com anotação chegar ao médico. Sem rodar, nada
+quebra: a linha simplesmente continua não existindo para o consultório, e a aba
+**Fila clínica** passa a dizer isso.
+
+**Bancadas novas:** `/preview-saude-registros?estado=hipo` ·
+`/preview-saude?w=20&luto=1` — as duas na varredura de CI. E a do prontuário
+ganhou uma triagem com sintomas, uma SEM nota e um humor: ela só tinha um sintoma
+com texto livre, que é o único caso em que nenhum dos três defeitos aparece.
+
+**Medido ao fim:** 6.483 testes · 217 bancadas · 19 roteiros de interação · zero
+problemas · **26 mutantes conferidos em vermelho** e dois em verde de propósito
+(as duas formas equivalentes, que não podem reprovar).
