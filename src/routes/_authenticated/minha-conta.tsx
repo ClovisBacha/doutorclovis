@@ -14570,6 +14570,12 @@ function LojaTab({
 function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
   const [consultations, setConsultations] = useState<PrivateConsultation[]>([]);
   const [loading, setLoading] = useState(true);
+  /* ⚠️ **"NÃO CONSEGUI LER" TINHA A CARA DE "VOCÊ NUNCA PEDIU NADA" — e aqui a
+     conclusão custa DINHEIRO.** A tela escrevia "Nenhuma consulta ainda ·
+     Solicite sua primeira consulta particular acima" para quem já solicitou, e
+     talvez já tenha PAGO: a leitura razoável é pedir de novo. Os dois ramos
+     falhavam calados — o sem token e o `res.ok === false`. */
+  const [instavel, setInstavel] = useState(false);
   const [step, setStep] = useState<"list" | "new">("list");
   const [selectedType, setSelectedType] = useState(CONSULT_TYPES[0].key);
   const [preferredDates, setPreferredDates] = useState(["", "", ""]);
@@ -14606,11 +14612,15 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
   async function load() {
     const { data: s } = await supabase.auth.getSession();
     if (!s.session?.access_token) {
+      setInstavel(true);
       setLoading(false);
       return;
     }
     const res = await getMyPrivateConsultations({ data: { accessToken: s.session.access_token } });
-    if (res.ok) setConsultations(res.consultations);
+    if (res.ok) {
+      setConsultations(res.consultations);
+      setInstavel(false);
+    } else setInstavel(true);
     /* PIX do médico DELA. Sem chave cadastrada, fica nulo de propósito — a
        tela avisa em vez de mostrar a chave de outra pessoa. */
     const pixRes = await getMyDoctorPix({ data: { accessToken: s.session.access_token } });
@@ -14871,7 +14881,15 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
         </div>
       )}
 
-      {consultations.length === 0 ? (
+      {/* ⚠️ A ORDEM É O CONSERTO: a falha vem ANTES do vazio. Trocadas, quem já
+          pediu — e talvez já pagou — lê "solicite a primeira". */}
+      {instavel ? (
+        <NaoConsegueLer
+          oQue="as suas consultas particulares"
+          sossego="Se você já pediu uma, ela continua lá — isso aqui é a nossa conexão."
+          aoTentar={() => void load()}
+        />
+      ) : consultations.length === 0 ? (
         <div className="py-14 text-center">
           <p className="text-4xl mb-3">📋</p>
           <p className="font-serif text-xl text-foreground/70">Nenhuma consulta ainda</p>

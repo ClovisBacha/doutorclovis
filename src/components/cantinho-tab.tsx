@@ -4,6 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { TabSkeleton } from "@/components/tab-skeleton";
+import { NaoConsegueLer } from "@/components/nao-consegui-ler";
 import { SilencioDoCuidado } from "@/components/silencio-do-cuidado";
 import { CodigoDaEmbaixadora } from "@/components/onboarding-ritual";
 import { OfertaPremium } from "@/components/oferta-premium";
@@ -494,6 +495,8 @@ export function CantinhoTab({
 }) {
   const [loading, setLoading] = useState(true);
   const [saldo, setSaldo] = useState(0);
+  /* ⚠️ Falha de leitura NÃO é saldo zero — ver `NaoConsegueLer`. */
+  const [instavel, setInstavel] = useState(false);
   const [owned, setOwned] = useState<string[]>([]);
   const [premium, setPremium] = useState(false);
   const [sky, setSky] = useState<"v2" | "v1">(skyTheme);
@@ -535,11 +538,20 @@ export function CantinhoTab({
     (async () => {
       const { data: s } = await supabase.auth.getSession();
       if (!s.session?.access_token) {
+        /* ⚠️ **SALDO ZERO SOBRE UMA FALHA É UMA AFIRMAÇÃO FALSA que muda o que
+           ela faz:** a vitrine passa a dizer "faltam 74 🌱" a quem tem
+           setecentas, e os itens que ela JÁ COMPROU aparecem como não-seus. É a
+           mesma classe que este repositório já pagou aqui uma vez — o `catch`
+           do saldo engolindo os enfeites e a loja dizendo "faltam 10 🏆" a quem
+           tem 30. */
+        setInstavel(true);
         setLoading(false);
         return;
       }
       const res = await getCantinho({ data: { accessToken: s.session.access_token } });
+      if (!res.ok) setInstavel(true);
       if (res.ok) {
+        setInstavel(false);
         setSaldo(res.balance);
         setOwned(res.owned);
         setPremium(res.premium);
@@ -601,6 +613,16 @@ export function CantinhoTab({
   }
 
   if (loading) return <TabSkeleton />;
+  /* ⚠️ A falha vem ANTES da vitrine: com o saldo em zero por falha, todo preço
+     vira "faltam N 🌱" e todo item dela vira comprável de novo. */
+  if (instavel)
+    return (
+      <NaoConsegueLer
+        oQue="o seu Cantinho"
+        sossego="As suas Sementinhas e os seus itens continuam lá — isso aqui é a nossa conexão."
+        aoTentar={() => window.location.reload()}
+      />
+    );
 
   const ownedSet = new Set(owned);
   // A cena mostra só decorações que a paciente REALMENTE possui — cenários

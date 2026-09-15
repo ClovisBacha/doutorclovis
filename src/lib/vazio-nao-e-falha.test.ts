@@ -92,6 +92,9 @@ const MULHER = semComentarios(readFileSync("src/components/saude-mulher.tsx", "u
  *  por isso que o helper aceita o arquivo ao lado do nome. */
 const CHUTES = semComentarios(readFileSync("src/components/kicks-tab.tsx", "utf8"));
 
+/** ⚠️ O SEXTO e o SÉTIMO da classe, fora da aba Saúde — ver o bloco no fim. */
+const CANTINHO = semComentarios(readFileSync("src/components/cantinho-tab.tsx", "utf8"));
+
 /** ⚠️ O QUARTO corte (set/2026): peso, pressão e glicemia. Quinta vez que uma
  *  catraca fica vermelha por mudança de caminho — e a razão de o helper aceitar
  *  o arquivo ao lado do nome. */
@@ -409,6 +412,50 @@ describe("o vazio não pode ser a falha", () => {
        `return` da falha. */
     expect(fn.indexOf("if (!r.ok)")).toBeLessThan(fn.indexOf("setEditingKey(null)"));
     expect(fn).toContain("toast.error(");
+  });
+
+  /**
+   * ⚠️ **A MESMA CLASSE FORA DA ABA SAÚDE.** A varredura do ramo
+   * `if (!s.session?.access_token) { setLoading(false); return; }` achou mais
+   * três telas; duas entraram, pela régua de sempre — *se esta leitura voltar
+   * vazia, o app AFIRMA um fato que ela não tem como saber que é falso, e que
+   * muda o que ela faz a seguir?*
+   *
+   *   · **consultas particulares** — "Nenhuma consulta ainda · Solicite sua
+   *     primeira consulta particular acima", dito a quem já solicitou e talvez
+   *     já PAGOU. A leitura razoável é pedir de novo, e aqui isso custa
+   *     dinheiro.
+   *   · **Cantinho** — saldo ZERO: a vitrine passa a dizer "faltam 74 🌱" a
+   *     quem tem setecentas, e os itens que ela já comprou voltam a parecer
+   *     compráveis. É a mesma classe que este repositório já pagou aqui uma
+   *     vez, com "faltam 10 🏆" dito a quem tem 30.
+   *
+   * ⚠️ **E A TERCEIRA FICOU DE FORA, de propósito:** em `conquistas-tab` a
+   * lista vazia não muda o que ela faz a seguir — é informativa, e a régua da
+   * casa recorta exatamente aí (os onze contadores que a varredura anterior
+   * deixou de pé pela mesma razão).
+   */
+  for (const { nome, arquivo, marca } of [
+    { nome: "ConsultaParticularTab", arquivo: CONTA, marca: "setInstavel(true)" },
+    { nome: "CantinhoTab", arquivo: CANTINHO, marca: "setInstavel(true)" },
+  ]) {
+    test(`⚠️ ${nome}: a sessão que não renovou acende o instável`, () => {
+      const c = componente(nome, arquivo);
+      const k = c.indexOf("!s.session?.access_token");
+      expect(k).toBeGreaterThan(-1);
+      const ramo = c.slice(k, c.indexOf("}", k));
+      expect(ramo).toContain(marca);
+      /* E o desenho da falha vem ANTES do texto que afirma o vazio. */
+      const falha = c.search(/<NaoConsegueLer/);
+      expect(falha).toBeGreaterThan(-1);
+      expect(guardaDoJsx(c, falha)).toMatch(/instavel/i);
+    });
+  }
+
+  test("⚠️ e a consulta particular só diz «solicite a primeira» DEPOIS da falha", () => {
+    const c = componente("ConsultaParticularTab", CONTA);
+    const falha = c.search(/<NaoConsegueLer/);
+    expect(c.indexOf("Nenhuma consulta ainda")).toBeGreaterThan(falha);
   });
 
   test("⚠️ o componente da falha é UM só, e não cinco cópias", () => {
