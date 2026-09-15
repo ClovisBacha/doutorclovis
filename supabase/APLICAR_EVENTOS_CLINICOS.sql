@@ -382,7 +382,25 @@ BEGIN
                jsonb_strip_nulls(jsonb_build_object(%s)) AS dados,
                h.notes AS texto
           FROM public.health_logs h
+         /* ⚠️ **O `OR` DA NOTA NÃO É DETALHE: sem ele, um registro só com NOTA
+            nunca entrava na view.** O app ACEITA exatamente essa linha — o
+            formulário tem um campo "Notas" vivo ao lado de Glicemia, e a guarda
+            de `add()` libera a gravação quando só ela está preenchida —, a
+            lista "Ver e corrigir meus registros" DESENHA a linha, e do lado do
+            médico não sobrava caminho nenhum: `clinical.functions.ts` lê só
+            `clinical_events`, e o único outro leitor de `health_logs` no painel
+            usa o retorno apenas para CONTAR.
+
+            O caso concreto: ela escreve "acordei com a vista embaçada e dor de
+            cabeça, não consegui medir a pressão". Fica no banco, fica na tela
+            dela, e não existe para o consultório.
+
+            ⚠️ O `btrim`/`nullif` importa: sem ele, uma nota de espaços em branco
+            vira evento clínico. E os campos de `dados` continuam saindo vazios —
+            `resumo()` já cai no rótulo da espécie, com `texto` desenhado
+            abaixo, então nada muda do lado da leitura. */
          WHERE num_nonnulls(%s) > 0
+            OR nullif(btrim(h.notes), '') IS NOT NULL
       $sql$,
       array_to_string(pares, ', '),
       array_to_string(ARRAY(SELECT 'h.' || c FROM unnest(ARRAY['systolic','diastolic','glucose_mg_dl','weight_kg','spo2','heart_rate_bpm']) c

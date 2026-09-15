@@ -51,10 +51,20 @@ describe("a sonda do campo", () => {
     expect(h).toMatch(/\.not\(c\.colunaDaTabela, "is", null\)/);
   });
 
-  test("⚠️ o lado da VIEW filtra pela CHAVE do jsonb — e não só pela fonte", () => {
+  test("⚠️ o lado da VIEW filtra pelo CAMPO — e não só pela fonte", () => {
     /* Este é o defeito inteiro: contando só `fonte`, a conferência do campo
-       vira a conferência da fonte, e a view velha passa verde para sempre. */
-    expect(h).toMatch(/\.not\(`dados->>\$\{c\.campo\}`, "is", null\)/);
+       vira a conferência da fonte, e a view velha passa verde para sempre.
+
+       ⚠️ **ESTA ASSERÇÃO TRAVAVA A GRAFIA e reprovou um conserto que só AMPLIA
+       a garantia** — a décima oitava vez nesta base. Ela cobrava
+       `` .not(`dados->>${c.campo}`, …) `` LITERAL, e ficou vermelha no dia em
+       que o alvo passou a ser DERIVADO para caber no campo que mora numa
+       COLUNA da view (a anotação do registro vive em `texto`, não em `dados`).
+       O que se cobra é a GARANTIA: o alvo do `.not` vem do campo, e o filtro
+       também recorta a fonte. */
+    const alvo = h.match(/const alvo =([^;]*);/)?.[1] ?? "";
+    expect(alvo).toContain("dados->>${c.campo}");
+    expect(h).toMatch(/\.not\(alvo, "is", null\)/);
     expect(h).toMatch(/\.eq\("fonte", c\.fonte\)/);
   });
 

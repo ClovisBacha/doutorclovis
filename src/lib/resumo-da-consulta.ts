@@ -1,5 +1,11 @@
 import type { EventoClinico } from "./clinical.functions";
 import { episodiosDeContracao, fraseDoEpisodio } from "./episodios-de-contracao";
+import { ALL_SYMPTOMS } from "./triage";
+
+/** ⚠️ O MESMO catálogo que a linha do tempo usa — uma segunda tabela divergiria
+    no primeiro ajuste, e aqui a divergência iria para dentro do prontuário,
+    escrita e assinada. */
+const ROTULO_DO_SINTOMA = new Map(ALL_SYMPTOMS.map((s) => [s.id, s.label]));
 
 /**
  * O QUE ELA REGISTROU DESDE A ÚLTIMA CONSULTA, EM TEXTO.
@@ -96,12 +102,39 @@ export function resumoParaAchados(
     );
   }
 
-  const sintomas = noPeriodo.filter((e) => e.especie === "sintoma" && e.texto);
+  /* ─── A TRIAGEM: OS SINTOMAS QUE ELA MARCOU ──────────────────────────────
+     ⚠️ **ERAM DOIS DEFEITOS NA MESMA LINHA, e o texto que o médico assina
+     nunca nomeava um único sintoma.**
+
+     1. O filtro exigia `e.texto`, que para `triage_logs` é a NOTA LIVRE — e ela
+        é opcional. Uma triagem VERMELHA em que ela marcou sangramento e
+        cefaleia com visão turva e não escreveu nada DESAPARECIA por completo do
+        rascunho.
+     2. E mesmo COM nota, o bloco imprimia só `e.texto`, nunca `d.sintomas`.
+
+     `especie === "sintoma"` é exclusivamente a triagem — o instrumento de
+     bandeira vermelha do app era a única fonte clínica da aba Saúde cujo
+     CONTEÚDO não chegava ao campo de achados. É o mesmo buraco que o bloco de
+     MOVIMENTOS, logo abaixo, foi escrito para fechar ("o texto que o médico
+     assina não trazia uma palavra sobre ela"): fechado para movimento, deixado
+     aberto para triagem.
+
+     ⚠️ O teto de 4 fica, pela razão do cabeçalho: isto é ACHADOS, um campo que
+     ele lê em pé. */
+  const sintomas = noPeriodo.filter(
+    (e) => e.especie === "sintoma" && ((e.dados.sintomas?.length ?? 0) > 0 || e.texto),
+  );
   if (sintomas.length > 0) {
     linhas.push(
       `Relatou: ${sintomas
         .slice(-4)
-        .map((e) => `${e.texto} (${dia(e.ocorrido_em)})`)
+        .map((e) => {
+          const marcados = (e.dados.sintomas ?? [])
+            .map((id) => ROTULO_DO_SINTOMA.get(id) ?? id)
+            .join(", ");
+          const nota = e.texto ? `${marcados ? " — " : ""}"${e.texto}"` : "";
+          return `${marcados}${nota} (${dia(e.ocorrido_em)})`;
+        })
         .join("; ")}`,
     );
   }

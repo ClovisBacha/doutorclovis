@@ -31,7 +31,13 @@ export const Route = createFileRoute("/preview-saude-clinica")({
 
 function montarCampos(estado: string, viewExiste: boolean): EstadoDoCampo[] {
   return CAMPOS_CLINICOS.map((c): EstadoDoCampo => {
-    const base = { ...c, sqlDaColuna: c.sqlDaColuna as string | null };
+    const base = {
+      ...c,
+      sqlDaColuna: c.sqlDaColuna as string | null,
+      /* ⚠️ O MESMO endereço que o servidor monta — a bancada não pode inventar
+         um, senão ela aprova um texto que a produção nunca desenha. */
+      onde: "colunaNaView" in c ? c.colunaNaView : `dados.${c.campo}`,
+    };
     if (estado === "vazio")
       return { ...base, estado: "indeterminado", linhasQuePodem: 0, linhasComOCampo: 0 };
     if (!viewExiste)

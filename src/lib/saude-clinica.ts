@@ -50,6 +50,21 @@ export const FONTES_CLINICAS = [
  * pendências diferentes, com dois consertos diferentes, e juntá-las numa
  * mensagem só mandaria o dono rodar o arquivo errado.
  */
+/**
+ * ⚠️ **AS SEIS COLUNAS NUMÉRICAS DE `health_logs`** — as mesmas que o
+ * `num_nonnulls` da view usa para decidir se a linha entra. Elas são o filtro
+ * do caso "registro SÓ com anotação": a linha existe quando as seis estão
+ * nulas e a nota não.
+ */
+const NUMEROS_DO_REGISTRO = [
+  "systolic",
+  "diastolic",
+  "glucose_mg_dl",
+  "weight_kg",
+  "spo2",
+  "heart_rate_bpm",
+] as const;
+
 export const CAMPOS_CLINICOS = [
   {
     fonte: "kick_sessions",
@@ -66,6 +81,35 @@ export const CAMPOS_CLINICOS = [
     peso: "movimento mais fraco — aOR 2,53 (Heazell 2017)",
     colunaDaTabela: "strength",
     sqlDaColuna: "APLICAR_FORCA_DO_MOVIMENTO.sql",
+  },
+  /**
+   * ⚠️ **O REGISTRO SÓ COM ANOTAÇÃO — e ele não é um campo que falta, é uma
+   * LINHA que a view deixa de fora.** O ramo de `health_logs` terminava em
+   * `num_nonnulls(...) > 0` sobre as seis colunas numéricas: uma linha com os
+   * seis nulos e `notes` preenchida dava `0 > 0` e era excluída da view
+   * INTEIRA — mesmo a view projetando `h.notes AS texto` três linhas acima.
+   *
+   * E o app aceita exatamente essa linha: o formulário tem um campo "Notas"
+   * vivo ao lado de Glicemia, a guarda de `add()` libera a gravação quando só
+   * ela está preenchida, e a lista "Ver e corrigir meus registros" DESENHA a
+   * linha — ou seja, **ela vê o registro na tela e acredita que ele existe**.
+   * Do lado do médico não sobrava caminho nenhum.
+   *
+   * ⚠️ **O filtro é COMPOSTO nos dois lados, e sem isso a sonda falharia
+   * ABERTA:** contar só "tem nota" incluiria as linhas com número, que a view
+   * VELHA já devolve — e a tela diria "ok" sobre a view velha.
+   */
+  {
+    fonte: "health_logs",
+    campo: "texto",
+    nome: "Registro só com anotação",
+    peso: '"acordei com a vista embaçada" sem número nenhum',
+    colunaDaTabela: "notes",
+    sqlDaColuna: null,
+    /** ⚠️ O campo mora numa COLUNA da view, e não numa chave de `dados`. */
+    colunaNaView: "texto",
+    /** As colunas que precisam estar NULAS para a linha ser este caso. */
+    exigeNulos: NUMEROS_DO_REGISTRO,
   },
 ] as const;
 
@@ -119,6 +163,15 @@ export type EstadoDoCampo = {
     | "ok"
     | "indeterminado"
     | "ilegivel";
+  /**
+   * Onde o campo mora na view, em texto legível — `dados.forca` ou `texto`.
+   *
+   * ⚠️ Ele existe porque nem todo campo é chave de `dados`: a anotação do
+   * registro vive numa COLUNA da view, e a tela escrevia "dados.texto" para
+   * todos. Um endereço errado numa tela de diagnóstico manda o dono procurar
+   * no lugar que não é.
+   */
+  onde: string;
   /** Linhas da tabela que PODEM produzir o campo (não o total da tabela). */
   linhasQuePodem: number | null;
   /** Linhas da view, daquela fonte, com o campo preenchido. */

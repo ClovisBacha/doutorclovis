@@ -21,6 +21,25 @@ import type { Gravidade } from "@/lib/sinais-clinicos";
 import { nivelDeForca } from "@/lib/forca-do-movimento";
 import { nivelDeIntensidade } from "@/lib/intensidade-da-contracao";
 import { episodiosDeContracao, fraseDoEpisodio } from "@/lib/episodios-de-contracao";
+import { MOOD_LABEL } from "@/lib/humor-e-saudacao";
+import { ALL_SYMPTOMS } from "@/lib/triage";
+
+/**
+ * ⚠️ **O MÉDICO LIA O ID, ELA MARCOU O RÓTULO.**
+ * `triage_logs.symptoms` guarda os IDS do catálogo, e a linha do tempo imprimia
+ * o array cru. É a mesma classe de "intensidade 2" e da força do movimento,
+ * consertada duas vezes e deixada de pé aqui — com o catálogo único já escrito.
+ *
+ * ⚠️ **E NÃO É COSMÉTICO: dois dos NOVE SINTOMAS VERMELHOS PERDEM O
+ * QUALIFICADOR NO ID.** `movimentos` é o id de "Redução dos movimentos do bebê"
+ * e lê como uma menção neutra a movimentos; `contracoes` é o id de "Contrações
+ * regulares antes de 37 semanas" e lê como contrações quaisquer. O médico podia
+ * ler a linha mais grave do prontuário como uma anotação banal.
+ *
+ * ⚠️ E na FILA ele vê só "Triagem vermelha", sem sintoma nenhum — a linha do
+ * tempo é o ÚNICO lugar onde ele descobre O QUE ela marcou.
+ */
+const ROTULO_DO_SINTOMA = new Map(ALL_SYMPTOMS.map((s) => [s.id, s.label]));
 
 export const ROTULO_ESPECIE: Record<string, string> = {
   medida: "Medida",
@@ -113,7 +132,23 @@ export function resumo(e: EventoClinico): string {
   if (d.weight_kg != null) partes.push(`peso ${d.weight_kg} kg`);
   if (d.spo2 != null) partes.push(`SpO₂ ${d.spo2}%`);
   if (d.heart_rate_bpm != null) partes.push(`FC ${d.heart_rate_bpm} bpm`);
-  if (d.sintomas?.length) partes.push(d.sintomas.join(", "));
+  if (d.sintomas?.length) {
+    /* ⚠️ **A MESMA CHAVE CARREGA DOIS VOCABULÁRIOS, e é a FONTE que desempata**
+       — exatamente como a linha do `nivel`, logo abaixo, já faz.
+       `triage_logs.symptoms` guarda IDS; `preconsulta_forms.symptoms` guarda
+       LABELS em português ("Náuseas ou vômitos", "Redução de movimentos").
+       Traduzir os dois passaria o texto da pré-consulta por um `Map` que não o
+       conhece; não traduzir nenhum deixa a triagem em código.
+
+       ⚠️ O `?? s` é obrigatório: um id que saiu do catálogo (triagem antiga,
+       sintoma removido) tem de continuar aparecendo CRU em vez de sumir da
+       linha — perder o sintoma é pior que mostrá-lo em código. */
+    partes.push(
+      e.fonte === "triage_logs"
+        ? d.sintomas.map((s) => ROTULO_DO_SINTOMA.get(s) ?? s).join(", ")
+        : d.sintomas.join(", "),
+    );
+  }
   /* `nivel` CARREGA DOIS VOCABULÁRIOS. A view projeta na mesma chave o `level`
      de `triage_logs` (vermelho/amarelo/verde) e o de `epds_logs`
      (baixo/moderado/alto/urgente) — e isto imprimia "triagem urgente" para um
@@ -168,7 +203,14 @@ export function resumo(e: EventoClinico): string {
     );
   }
   if (d.nome) partes.push(d.nome);
-  if (d.humor) partes.push(`humor: ${d.humor}`);
+  /* ⚠️ **O HUMOR CHEGAVA COMO EMOJI CRU** — "humor: 💛" onde ela registrou
+     "Conectada". Metade da tabela é indecifrável sem o catálogo: 🙏 é
+     "Gratidão", e 😴 ("Cansada") não se distingue de 🥱 ("Com sono") a olho num
+     prontuário. `MOOD_LABEL` já era usado pela aba Bebê e pelo contexto da
+     nutricionista; o prontuário era o leitor que o ignorava.
+     ⚠️ O `?? d.humor` pela mesma razão do sintoma: emoji fora do catálogo
+     continua aparecendo, nunca some da linha. */
+  if (d.humor) partes.push(`humor: ${MOOD_LABEL[d.humor] ?? d.humor}`);
   if (d.epds != null) partes.push(`EPDS ${d.epds}`);
   if (d.medicamentos) partes.push(`medicações: ${d.medicamentos}`);
   if (d.emocional) partes.push(`emocional: ${d.emocional}`);

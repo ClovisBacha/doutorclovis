@@ -119,6 +119,34 @@ function Bancada() {
       "Pressão acima do esperado",
     ]),
     ev("2026-08-15T19:20:00.000Z", "sintoma", {}, "normal", "Dor nas costas à noite"),
+    /* ⚠️ **A TRIAGEM E O HUMOR NUNCA TINHAM SIDO FOTOGRAFADOS AQUI — e foi por
+       isso que os dois chegavam ao médico em CÓDIGO.** A triagem guarda os IDS
+       do catálogo (`movimentos` é "Redução dos movimentos do bebê", e o id
+       perde o qualificador); o humor guarda o EMOJI. A bancada só tinha um
+       sintoma com TEXTO livre, que é o único caso em que o defeito não
+       aparece.
+
+       ⚠️ A de baixo é SEM NOTA de propósito: a nota é opcional, e a triagem
+       sem ela desaparecia inteira do rascunho de achados. */
+    ev(
+      "2026-08-14T22:10:00.000Z",
+      "sintoma",
+      { sintomas: ["movimentos", "cefaleia_visao"], nivel: "vermelho" },
+      "grave",
+      null,
+      ["Triagem vermelha"],
+      "triage_logs",
+    ),
+    ev(
+      "2026-08-13T20:00:00.000Z",
+      "sintoma",
+      { sintomas: ["vomito"], nivel: "amarelo" },
+      "atencao",
+      "desde ontem, sem conseguir segurar líquido",
+      [],
+      "triage_logs",
+    ),
+    ev("2026-08-11T21:00:00.000Z", "humor", { humor: "💛" }, "normal", null, [], "journal_entries"),
     ev("2026-08-12T08:00:00.000Z", "medida", { weight_kg: perdapeso ? 55.2 : 71.4 }, "normal"),
     ev("2026-08-09T21:40:00.000Z", "medida", { glucose_mg_dl: 96 }, "normal"),
     ev("2026-08-04T09:10:00.000Z", "medida", { systolic: 128, diastolic: 84 }, "normal"),

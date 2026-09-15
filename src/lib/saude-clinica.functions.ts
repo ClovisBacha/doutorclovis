@@ -134,15 +134,34 @@ export const saudeClinica = createServerFn({ method: "POST" })
              linhas a tabela tem". Uma sessão de chutes ainda aberta não produz
              duração nenhuma, e contá-la faria a tela acusar view velha sobre
              uma paciente que só não terminou de contar. */
-          contar(sb, c.fonte, (q: any) => q.not(c.colunaDaTabela, "is", null)),
+          /* ⚠️ E quando o caso EXIGE colunas nulas (o registro só com
+             anotação), o filtro é COMPOSTO nos dois lados — contar só "tem
+             nota" incluiria as linhas com número, que a view velha já devolve,
+             e a tela diria "ok" sobre ela. */
+          contar(sb, c.fonte, (q: any) => {
+            let f = q.not(c.colunaDaTabela, "is", null);
+            for (const col of ("exigeNulos" in c ? c.exigeNulos : []) as readonly string[]) {
+              f = f.is(col, null);
+            }
+            return f;
+          }),
           /* ⚠️ Chave de `jsonb` ausente devolve NULL no `->>`, então este filtro
              conta exatamente as linhas em que a view PROJETOU o campo. Se o
              PostgREST recusar a sintaxe, o erro cai em `ilegivel` — "não
              consegui conferir" nunca vira "ok". */
           viewExiste
-            ? contar(sb, "clinical_events", (q: any) =>
-                q.eq("fonte", c.fonte).not(`dados->>${c.campo}`, "is", null),
-              )
+            ? contar(sb, "clinical_events", (q: any) => {
+                /* ⚠️ `colunaNaView` existe porque nem todo campo é chave de
+                   `dados`: a nota do registro vive na coluna `texto` da view. */
+                const alvo = "colunaNaView" in c ? c.colunaNaView : `dados->>${c.campo}`;
+                let f = q.eq("fonte", c.fonte).not(alvo, "is", null);
+                /* `jsonb_strip_nulls` tira a chave nula, então a ausência dela
+                   no `dados` É o "número não foi registrado". */
+                for (const col of ("exigeNulos" in c ? c.exigeNulos : []) as readonly string[]) {
+                  f = f.is(`dados->>${col}`, null);
+                }
+                return f;
+              })
             : Promise.resolve(NAO_SONDADO),
         ]);
         return {
@@ -151,6 +170,7 @@ export const saudeClinica = createServerFn({ method: "POST" })
           nome: c.nome,
           peso: c.peso,
           sqlDaColuna: c.sqlDaColuna,
+          onde: "colunaNaView" in c ? c.colunaNaView : `dados.${c.campo}`,
           linhasQuePodem: naTabela.n,
           linhasComOCampo: naView.n,
           estado: estadoDoCampo(naTabela, naView, viewExiste),

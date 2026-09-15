@@ -58,7 +58,10 @@ const CORES_CAMPO: Record<EstadoDoCampo["estado"], string> = {
 };
 
 const RECADO_CAMPO: Record<EstadoDoCampo["estado"], string> = {
-  fora_da_view: "A VIEW NÃO PROJETA ESTE CAMPO",
+  /* ⚠️ "NÃO PROJETA ESTE CAMPO" descrevia bem os dois primeiros e MAL o
+     terceiro: o registro só com anotação não é um campo que falta, é uma LINHA
+     que a view deixa de fora. O que vale nos três é o efeito. */
+  fora_da_view: "O DADO EXISTE E A VIEW NÃO O ENTREGA",
   coluna_ausente: "a coluna de origem não existe",
   tabela_ausente: "a tabela não existe",
   ilegivel: "não deu para ler",
@@ -136,9 +139,9 @@ export function SaudeClinicaTab({ bancada }: { bancada?: SaudeClinica | "falhou"
           {d.camposForaDaView > 0 && (
             <div className="rounded-xl border-2 border-red-500/60 bg-red-500/10 p-4">
               <p className="text-base font-bold text-red-600 dark:text-red-400">
-                ⚠️ A view está VELHA: {d.camposForaDaView} campo
+                ⚠️ A view está VELHA: {d.camposForaDaView} registro
                 {d.camposForaDaView === 1 ? "" : "s"} clínico
-                {d.camposForaDaView === 1 ? "" : "s"} que a paciente registra e a view não projeta
+                {d.camposForaDaView === 1 ? "" : "s"} que a paciente faz e o médico não recebe
               </p>
               <p className="mt-2 text-sm">
                 A fonte está na view — por isso a lista abaixo fica verde —, mas a versão dela é
@@ -238,7 +241,7 @@ export function SaudeClinicaTab({ bancada }: { bancada?: SaudeClinica | "falhou"
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">
                     <code>
-                      {c.fonte} → dados.{c.campo}
+                      {c.fonte} → {c.onde}
                     </code>{" "}
                     · {c.peso}
                   </p>
