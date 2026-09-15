@@ -17407,3 +17407,51 @@ arquivo real.
 padrão, que era justamente o único já correto.
 **Medido:** 6.529 testes · 220 bancadas · 19 roteiros · **12 mutantes em
 vermelho** e a contraprova da catraca da inicial.
+
+### ⚠️ E A VARREDURA DE ACESSIBILIDADE NÃO ABRIA A TELA ONDE ELA MARCA CONSULTA
+
+Continuação da mesma leva. `scripts/acessibilidade.mjs` varre `/preview-*` — e
+**`/agendamento` é rota PÚBLICA e real**, nunca medida. É a lição que o próprio
+comentário do arquivo registra ("sem bancada, esta varredura não tinha como
+abri-las. Foi assim que o 👍👎 da nutrição passou meses com alvo de 16×18px"),
+valendo agora para uma tela que nem precisava de bancada.
+
+Medido a 393px: **seis campos com 42px** (abaixo do alvo de toque) e o `<label>`
+IRMÃO do `<input>`, sem `htmlFor` — ou seja, **sem nome acessível** e sem foco ao
+toque no rótulo, nos campos com que ela marca a consulta com o obstetra.
+
+⚠️ **É o MESMO par de defeitos que `components/campo.tsx` consertou**, e esta é
+uma cópia LOCAL que ficou de pé. Ela não pôde simplesmente usar o compartilhado:
+aquele é CONTROLADO (`value`/`onChange`) e este é não-controlado (a tela lê por
+`FormData`) — reusar exigiria reescrever a tela, então o conserto foi na cópia,
+com a mesma razão escrita ao lado. Depois: 44,8px e nome nos sete.
+
+E junto foram os dois alvos do **banner de CTA** (133×34 e 28×28). Ele é montado
+DENTRO da página, e não na moldura do site — então aparece por cima de telas que
+a paciente usa a sério, inclusive **`/epds`**, a Escala de Edinburgh cuja questão
+10 é ideação de autolesão. Mais os dois seletores de período da própria escala
+(95×36, 92×36).
+
+⚠️ **As caixas cresceram por LAYOUT** (`min-h-11`, `h-11 w-11`), nunca por
+`after:-inset`: o link e o ✕ do banner são adjacentes, e um pseudo-elemento
+esticado faria o de trás roubar a borda do da frente — o encavalamento que este
+repositório já mediu duas vezes.
+
+**Medido:** 22 → **24 telas varridas**, e o total de alvos continua **67** — as
+duas rotas novas trouxeram dez achados e os dez foram consertados. `/agendamento`
+e `/epds` entraram na lista permanente.
+
+⚠️ **E DOIS FALSOS ALARMES MEUS, os dois conferidos antes de virar conserto:**
+a foto do `<form>` sugeria que a barra flutuante "Entrar no app" cobria o botão
+de enviar — medido, ele fica acima do viewport no fim da página (há rodapé depois
+dele) e os três pontos do alvo acertam; e o `false` que a sonda devolveu veio de
+`elementFromPoint` **fora do viewport**, a armadilha já catalogada. O
+`mm/dd/yyyy` do campo de data é o locale do Chromium do contêiner, não o do
+produto.
+
+⚠️ **E a varredura de "coluna escrita e nunca lida" rendeu ZERO:** `q10_score` é
+lido pela VIEW `clinical_events` (que o renomeia para `epds_q10`) — minha
+varredura não enxerga leitura em SQL —, e `offered_at` é metadado sem leitor ao
+lado de `offer_deadline`, que É lido e é quem carrega o prazo de 4h da fila. Os
+dois falsos positivos ficam escritos porque **achado sem conferência é
+hipótese**, e conferir custou minutos.

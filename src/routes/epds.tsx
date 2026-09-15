@@ -230,7 +230,7 @@ function EpdsPage() {
         <div className="mt-8 flex gap-2">
           <button
             onClick={() => setPeriod("postpartum")}
-            className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${
+            className={`min-h-11 rounded-full px-4 text-sm font-medium transition-all ${
               period === "postpartum"
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted text-muted-foreground"
@@ -240,7 +240,7 @@ function EpdsPage() {
           </button>
           <button
             onClick={() => setPeriod("prenatal")}
-            className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${
+            className={`min-h-11 rounded-full px-4 text-sm font-medium transition-all ${
               period === "prenatal"
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted text-muted-foreground"

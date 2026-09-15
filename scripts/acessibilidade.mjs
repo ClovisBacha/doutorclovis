@@ -54,6 +54,14 @@ const ROTAS = [
   "/preview-nutricao?estado=socorro&painel=1",
   "/preview-saude-mulher?tela=ciclo",
   "/preview-saude-mulher?tela=preventivos",
+  /* ⚠️ AS DUAS ROTAS PÚBLICAS DO APP. Esta varredura só olhava `/preview-*`, e
+     `/agendamento` — a tela onde a paciente MARCA a consulta com o obstetra —
+     nunca tinha sido medida: os seis campos dela saíam com 42px e sem nome
+     acessível, o mesmo par que `components/campo.tsx` já tinha consertado na
+     cópia compartilhada. É a lição do 👍👎 da nutrição outra vez: o que esta
+     varredura não abre, ninguém mede. */
+  "/agendamento",
+  "/epds",
 ];
 
 const caminho = process.env.PLAYWRIGHT_CHROMIUM ?? "/opt/pw-browsers/chromium";
