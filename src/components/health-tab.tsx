@@ -27,7 +27,14 @@ import { NaoConsegueLer } from "@/components/nao-consegui-ler";
 import { supabase } from "@/integrations/supabase/client";
 import { triggerAchievementsCheck } from "@/lib/checar-conquistas";
 import { computeGestation } from "@/lib/gestacao";
-import { sinalGlicemia, sinalPressao, validaRegistro, vozDaPaciente } from "@/lib/sinais-clinicos";
+import {
+  GLICEMIA,
+  leituraDaGlicemia,
+  sinalGlicemia,
+  sinalPressao,
+  validaRegistro,
+  vozDaPaciente,
+} from "@/lib/sinais-clinicos";
 /* ⚠️ `import type` — o tipo é apagado na compilação, então isto NÃO cria
    dependência de tempo de execução com o arquivo de rota. Mesmo caminho de
    `silencio-do-cuidado.tsx` e `kicks-tab.tsx`. */
@@ -217,8 +224,24 @@ export function HealthTab({
   }, [ehBancada]);
 
   async function add() {
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return;
+    /* ⚠️ **ERA `getUser()`, QUE VAI À REDE, E O RETORNO ERA MUDO.** Numa rede
+       ruim o `error` era descartado, `u.user` vinha nulo e a função saía sem
+       toast, sem estado, sem nada: ela tocava em "Adicionar" e a tela não se
+       mexia — o que lê como o botão não funcionar, e o texto que ela acabou de
+       digitar continua no formulário enquanto o registro não existe.
+
+       Dentro desta MESMA função três dos quatro caminhos de erro já falavam
+       (campo vazio, faixa implausível, erro do insert). Só o primeiro — e o
+       mais provável — era silencioso.
+
+       `getSession()` lê do DISCO e dá o mesmo `user.id`: uma ida à rede a menos
+       na frente de um registro clínico. */
+    const { data: s } = await supabase.auth.getSession();
+    const uid = s.session?.user?.id;
+    if (!uid) {
+      toast.error("Sua sessão expirou. Entre de novo para registrar.");
+      return;
+    }
     if (
       !form.weight_kg &&
       !form.systolic &&
@@ -257,7 +280,7 @@ export function HealthTab({
     // Envia apenas os campos preenchidos (colunas extras podem não existir
     // no banco ainda sem as migrations pendentes) e a data local do navegador.
     const payload: Record<string, unknown> = {
-      user_id: u.user.id,
+      user_id: uid,
       log_date: new Date().toLocaleDateString("en-CA"),
     };
     if (form.weight_kg !== "") payload.weight_kg = Number(String(form.weight_kg).replace(",", "."));
@@ -562,18 +585,30 @@ export function HealthTab({
              "Glicemia muito baixa". Não era falta de alerta, era o alerta
              invertido, e para uma gestante em insulina isso é a diferença entre
              comer agora e desmaiar. Mesma função do painel. */
-          const gSinal = sinalGlicemia(gv);
-          const gVoz = vozDaPaciente(gSinal, "glicemia");
+          /* ⚠️ **A TELA PAROU DE ESCREVER "Normal", E O RÓTULO SAIU DAQUI.**
+             `sinalGlicemia` usa o limite permissivo de 140 de propósito, então
+             95, 118, 125 e 139 caíam todos em `normal` — e este ternário
+             traduzia isso na palavra "Normal", em VERDE. Em jejum o alvo é 95:
+             era o app AFIRMANDO um fato que ele não tem como saber que é falso,
+             na única das três superfícies desta régua que fala com ela sem um
+             modelo no meio. Os dois prompts já tinham sido consertados com a
+             regra escrita por extenso; a tela ficou de pé por uma leva.
+             Quem diz o texto agora é `leituraDaGlicemia`, ao lado da régua. */
+          const gLeitura = leituraDaGlicemia(gv);
           const gColor =
-            gSinal == null
+            gLeitura == null
               ? null
-              : gSinal.gravidade === "grave"
+              : gLeitura.gravidade === "grave"
                 ? "rose"
-                : gSinal.gravidade === "atencao"
+                : gLeitura.gravidade === "atencao"
                   ? "amber"
-                  : "emerald";
-          const gLabel =
-            gSinal == null ? null : gSinal.gravidade === "normal" ? "Normal" : gSinal.nota;
+                  : /* ⚠️ NEUTRO, e não `emerald`: verde CODIFICA "está bom", que
+                       é metade da afirmação que acabou de sair do texto. É o
+                       mesmo tom que `ESTILO_SINAL.normal` já usa no painel do
+                       médico — as duas telas passam a dizer a mesma coisa sobre
+                       o mesmo número. */
+                    "neutro";
+          const gLabel = gLeitura?.rotulo ?? null;
           return (
             <div
               className={`press rounded-3xl p-5 ${gColor === "rose" ? "glass-card glass-rose" : gColor === "amber" ? "glass-card glass-amber" : "glass-card glass-sky"}`}
@@ -586,13 +621,15 @@ export function HealthTab({
               <p className="mt-2 font-serif text-3xl">{gv != null ? `${gv} mg/dL` : "—"}</p>
               {gLabel && (
                 <p
-                  className={`mt-1 text-xs font-medium ${gColor === "rose" ? "text-rose-800" : gColor === "amber" ? "text-amber-900" : "text-emerald-800"}`}
+                  className={`mt-1 text-xs font-medium ${gColor === "rose" ? "text-rose-800" : gColor === "amber" ? "text-amber-900" : "text-muted-foreground"}`}
                 >
                   {gLabel}
                 </p>
               )}
-              {gVoz?.orientacao && (
-                <p className="mt-1 text-xs leading-snug text-muted-foreground">{gVoz.orientacao}</p>
+              {gLeitura?.orientacao && (
+                <p className="mt-1 text-xs leading-snug text-muted-foreground">
+                  {gLeitura.orientacao}
+                </p>
               )}
             </div>
           );
@@ -842,45 +879,99 @@ export function HealthTab({
             <p className="font-serif text-[15px] font-semibold text-primary">
               Histórico de glicemia
             </p>
+            {/* ⚠️ A LEGENDA DIZIA SÓ O TETO, sobre uma régua que tem teto E
+                PISO — e era metade do defeito da faixa verde logo abaixo. */}
             <p className="mt-1 text-xs text-muted-foreground">
-              Referência em jejum: &lt; 95 mg/dL · Pós-prandial: &lt; 140 mg/dL
+              Referência em jejum: &lt; {GLICEMIA.alvoJejum} mg/dL · Pós-prandial: &lt;{" "}
+              {GLICEMIA.tetoPosPrandial} mg/dL · abaixo de {GLICEMIA.piso} também pede atenção
             </p>
             <svg viewBox={`0 0 ${W} ${H}`} className="mt-3 h-32 w-full">
-              {/* zona verde < 95 */}
+              {/* ⚠️ **A ZONA VERDE NÃO TINHA PISO — e isso desenhava
+                  hipoglicemia como faixa boa.** Ela ia de 95 até o FUNDO do
+                  gráfico (`height={sy(minY) - sy(95)}`), e `minY` desce junto
+                  com o menor valor registrado: com uma glicemia de 45 — que
+                  numa gestante em insulina é emergência imediata — o ponto era
+                  pintado de VERMELHO por `sinalGlicemia` e caía DENTRO do
+                  retângulo VERDE. A tela se contradizia sobre o mesmo número.
+
+                  É a mesma classe já consertada DUAS vezes neste gráfico (o
+                  comentário do cartão, acima, conta que 35 mg/dL "saía rotulado
+                  Normal, em verde"): os consertos pegaram o CARTÃO e os PONTOS
+                  e deixaram a FAIXA de pé.
+
+                  ⚠️ O piso sai de `GLICEMIA.piso`, nunca escrito aqui — foi a
+                  duplicação desta escala que produziu os dois defeitos
+                  anteriores. E ele é CLAMPADO em `minY`: sem isso, numa série
+                  toda acima de 70 o retângulo começaria fora do desenho. */}
               <rect
                 x="10"
-                y={sy(95)}
+                y={sy(GLICEMIA.alvoJejum)}
                 width={W - 20}
-                height={sy(minY) - sy(95)}
+                height={sy(Math.max(GLICEMIA.piso, minY)) - sy(GLICEMIA.alvoJejum)}
                 fill={COR.glicemiaOk}
                 opacity="0.08"
               />
+              {/* O piso, desenhado, quando ele cabe no gráfico — ou seja,
+                  quando existe um valor baixo o bastante para que a fronteira
+                  signifique alguma coisa. */}
+              {minY < GLICEMIA.piso && (
+                <>
+                  <line
+                    x1="10"
+                    y1={sy(GLICEMIA.piso)}
+                    x2={W - 10}
+                    y2={sy(GLICEMIA.piso)}
+                    stroke={COR.glicemiaAlta}
+                    strokeWidth="1"
+                    strokeDasharray="4 3"
+                    opacity="0.7"
+                  />
+                  <text
+                    x="12"
+                    y={sy(GLICEMIA.piso) - 5}
+                    fontSize={FONTE_DO_GRAFICO}
+                    fill={COR.glicemiaAltaTexto}
+                  >
+                    {GLICEMIA.piso}
+                  </text>
+                </>
+              )}
               <line
                 x1="10"
-                y1={sy(95)}
+                y1={sy(GLICEMIA.alvoJejum)}
                 x2={W - 10}
-                y2={sy(95)}
+                y2={sy(GLICEMIA.alvoJejum)}
                 stroke={COR.glicemiaOk}
                 strokeWidth="1"
                 strokeDasharray="4 3"
                 opacity="0.7"
               />
-              <text x="12" y={sy(95) - 5} fontSize={FONTE_DO_GRAFICO} fill={COR.glicemiaOkTexto}>
-                95
+              <text
+                x="12"
+                y={sy(GLICEMIA.alvoJejum) - 5}
+                fontSize={FONTE_DO_GRAFICO}
+                fill={COR.glicemiaOkTexto}
+              >
+                {GLICEMIA.alvoJejum}
               </text>
               {/* threshold 140 */}
               <line
                 x1="10"
-                y1={sy(140)}
+                y1={sy(GLICEMIA.tetoPosPrandial)}
                 x2={W - 10}
-                y2={sy(140)}
+                y2={sy(GLICEMIA.tetoPosPrandial)}
                 stroke={COR.glicemiaAlta}
                 strokeWidth="1"
                 strokeDasharray="4 3"
                 opacity="0.7"
               />
-              <text x="12" y={sy(140) - 5} fontSize={FONTE_DO_GRAFICO} fill={COR.glicemiaAltaTexto}>
-                140
+              <text
+                x="12"
+                y={sy(GLICEMIA.tetoPosPrandial) - 5}
+                fontSize={FONTE_DO_GRAFICO}
+                fill={COR.glicemiaAltaTexto}
+              >
+                {GLICEMIA.tetoPosPrandial}
               </text>
               <polyline
                 points={pts}

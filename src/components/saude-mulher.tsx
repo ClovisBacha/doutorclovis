@@ -258,7 +258,16 @@ export function PreventivosTab({
 
   async function load() {
     const { data: s } = await supabase.auth.getSession();
+    /* ⚠️ **ESTE RAMO SAÍA COM A LISTA VAZIA E `instavel` FALSO** — ou seja,
+       "não consegui ler" chegava à tela com a cara de "não há nada". O ramo
+       vizinho (`res.ok === false`, logo abaixo) já tinha sido consertado na
+       leva dos vazios mentirosos; este, que é o de CIMA, ficou de pé.
+
+       E ele é alcançável: o portão de `_authenticated` deixa entrar com token
+       no aparelho, e `getSession()` devolve `session: null` quando o refresh
+       falha — que é o caso da rede ruim, não o do logout. */
     if (!s.session?.access_token) {
+      setInstavel(true);
       setLoading(false);
       return;
     }
@@ -284,7 +293,11 @@ export function PreventivosTab({
     if (!editingKey) return;
     setSaving(true);
     const { data: s } = await supabase.auth.getSession();
+    /* ⚠️ **O RAMO SEM TOKEN VOLTAVA MUDO** — nada gravado, e a única diferença
+       para o ramo vizinho (que TEM toast) era ela não ser avisada. Procurei o
+       comentário que justificasse a diferença e ele não existe. */
     if (!s.session?.access_token) {
+      toast.error("Sua sessão expirou. Entre de novo para registrar o exame.");
       setSaving(false);
       return;
     }

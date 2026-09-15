@@ -92,6 +92,10 @@ const EXTRAS = [
   "/preview-saude-registros?estado=parcial",
   "/preview-saude-registros?estado=instavel",
   "/preview-saude-registros?estado=grave",
+  /* ⚠️ Glicemias de 45 e 58: o estado que prova o PISO da zona verde, e que
+     nenhuma bancada tinha — foi por isso que hipoglicemia era desenhada como
+     faixa boa. O 118 do topo é a outra metade (o cartão escrevia "Normal"). */
+  "/preview-saude-registros?estado=hipo",
   "/preview-saude-registros?estado=normal",
   "/preview-saude-registros?estado=semperfil",
   /* ⚠️ Os três estados da curva do IOM que NÃO tinham foto — e foi por essa

@@ -102,6 +102,26 @@ function notaPressao(sistolica: number, diastolica: number): string {
  * medida depois do almoço. Marcar demais é tão ruim quanto não marcar: o médico
  * aprende a ignorar a cor.
  */
+export const GLICEMIA = {
+  /**
+   * ⚠️ **ABAIXO DESTE NÚMERO A RÉGUA DEIXA DE DIZER "normal".** Ele existe como
+   * constante porque a TELA da paciente precisa desenhar a mesma fronteira: a
+   * zona verde do gráfico ia de 95 até o FUNDO do desenho, então uma glicemia
+   * de 45 — emergência numa gestante em insulina — caía DENTRO da faixa que a
+   * tela apresenta como boa, com o ponto pintado de vermelho por cima dela. A
+   * tela se contradizia sobre o mesmo número.
+   *
+   * Escrever `60` no componente seria a quarta cópia desta escala, e foi
+   * exatamente a duplicação dela que produziu o "35 mg/dL em verde" que o
+   * comentário de `health-tab.tsx` registra ter custado dois consertos.
+   */
+  piso: 60,
+  /** O alvo de JEJUM. A régua não o usa (ver abaixo); a tela o DESENHA. */
+  alvoJejum: 95,
+  /** O limite permissivo que a régua de fato aplica — ver a nota acima. */
+  tetoPosPrandial: 140,
+} as const;
+
 export function sinalGlicemia(valor?: number | null): Sinal | null {
   if (valor == null || !Number.isFinite(valor)) return null;
   /* Abaixo de 20 mg/dL ninguém está consciente para digitar o número. O caso
@@ -127,9 +147,65 @@ export function sinalGlicemia(valor?: number | null): Sinal | null {
      escala estava ancorada no número e não na urgência. */
   if (valor < 50) return { gravidade: "grave", nota: "Glicemia muito baixa" };
   if (valor >= 180) return { gravidade: "grave", nota: "Glicemia alta" };
-  if (valor >= 140) return { gravidade: "atencao", nota: "Glicemia acima do alvo" };
-  if (valor < 60) return { gravidade: "atencao", nota: "Glicemia baixa" };
+  if (valor >= GLICEMIA.tetoPosPrandial)
+    return { gravidade: "atencao", nota: "Glicemia acima do alvo" };
+  if (valor < GLICEMIA.piso) return { gravidade: "atencao", nota: "Glicemia baixa" };
   return { gravidade: "normal", nota: "" };
+}
+
+/**
+ * O QUE A TELA DA PACIENTE ESCREVE EMBAIXO DO NÚMERO DA GLICEMIA.
+ *
+ * ⚠️ **ELA EXISTE PARA O APP PARAR DE ESCREVER "Normal".** `sinalGlicemia` usa
+ * o limite permissivo de 140 DE PROPÓSITO (ver a nota dela), e o efeito
+ * colateral é que 95, 118, 125 e 139 caem todos em `gravidade: "normal"` — que
+ * a tela traduzia na palavra **"Normal"**, em VERDE. Em jejum o alvo é 95: o
+ * app estava afirmando um fato que ele não tem como saber que é falso, e que
+ * muda o que ela faz a seguir (não mostrar ao médico um jejum de 125).
+ *
+ * ⚠️ **É A TERCEIRA SUPERFÍCIE DA MESMA RÉGUA, e as outras duas já tinham sido
+ * consertadas com a regra escrita por extenso** — `nutricao-perfil.ts` manda
+ * "NUNCA diga que este valor está normal, bom ou dentro do alvo" e
+ * `api/chat.ts` manda "NUNCA afirme que este valor está dentro do alvo". A
+ * tela da paciente é a única das três que fala com ela sem um modelo no meio,
+ * e a única que pintava a afirmação de verde. Ficou de pé por uma leva.
+ *
+ * ⚠️ **O CONSERTO NÃO É BAIXAR O CORTE PARA 95.** Aí toda glicemia normal
+ * medida depois do almoço viraria laranja e o médico aprenderia a ignorar a
+ * cor — que é exatamente o que a nota de `sinalGlicemia` existe para impedir.
+ * O defeito não é a régua: é a palavra que a tela põe em cima dela.
+ *
+ * ⚠️ **E O TEXTO DIFERENCIA AS DUAS METADES DO ramo `normal`, porque elas não
+ * são a mesma coisa:** abaixo de 95 o número está dentro das DUAS referências —
+ * e isso o app sabe sem perguntar o momento. Entre 95 e 140 ele só sabe metade,
+ * e é aí (e só aí) que a orientação pede o médico. Dizer a mesma frase nas duas
+ * faixas assustaria quem tem 85.
+ */
+export function leituraDaGlicemia(valor?: number | null): {
+  gravidade: Gravidade;
+  /** O que vai embaixo do número. NUNCA a palavra "Normal". */
+  rotulo: string;
+  /** A próxima ação, quando existe. */
+  orientacao: string | null;
+} | null {
+  const s = sinalGlicemia(valor);
+  if (!s) return null;
+  if (s.gravidade !== "normal") {
+    const voz = vozDaPaciente(s, "glicemia");
+    return { gravidade: s.gravidade, rotulo: s.nota, orientacao: voz?.orientacao ?? null };
+  }
+  if (valor != null && valor < GLICEMIA.alvoJejum) {
+    return {
+      gravidade: "normal",
+      rotulo: `Abaixo de ${GLICEMIA.alvoJejum} mg/dL — dentro das duas referências`,
+      orientacao: null,
+    };
+  }
+  return {
+    gravidade: "normal",
+    rotulo: `Abaixo do limite de depois de comer (${GLICEMIA.tetoPosPrandial} mg/dL)`,
+    orientacao: `Em jejum o alvo é ${GLICEMIA.alvoJejum} mg/dL. Se você mediu em jejum, mostre este número ao seu médico.`,
+  };
 }
 
 /**

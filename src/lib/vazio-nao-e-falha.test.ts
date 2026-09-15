@@ -187,8 +187,23 @@ function guardaDoJsx(texto: string, ate: number): string {
   return i === -1 ? "" : texto.slice(i, ate);
 }
 
-/** Fala de falha de leitura? `error`, `res.ok`, `!r.ok`, `err`… */
-const FALA_DE_ERRO = /\berror\b|\.ok\b|\berr\b/;
+/**
+ * Fala de falha de leitura? `error`, `res.ok`, `!r.ok`, `err`…
+ *
+ * ⚠️ **E TAMBÉM A SESSÃO QUE NÃO RENOVOU** — `!s.session?.access_token`. Este
+ * termo entrou quando a auditoria achou a MESMA classe num segundo ramo da
+ * mesma função: `load()` começa pedindo a sessão, e o ramo de cima saía com a
+ * lista vazia e `instavel` FALSO enquanto o de baixo (`res.ok === false`) já
+ * estava consertado. "Não consegui ler" chegava à tela com a cara de "não há
+ * nada" pela outra porta — e ele é alcançável: o portão de `_authenticated`
+ * deixa entrar com token no aparelho, e `getSession()` devolve `session: null`
+ * quando o refresh falha, que é o caso da rede ruim e não o do logout.
+ *
+ * ⚠️ O termo é ESPECÍFICO de propósito (`access_token`/`session?.`), e não um
+ * `session` solto: um `if` que fale de sessão por qualquer outro motivo não
+ * pode passar a autorizar o desenho do vazio.
+ */
+const FALA_DE_ERRO = /\berror\b|\.ok\b|\berr\b|access_token|session\?\./;
 
 /**
  * O bloco da função que contém um ponto do texto — do `function …` ou do
@@ -294,6 +309,80 @@ describe("o vazio não pode ser a falha", () => {
        `if (instavel)` por `if (false)` mantinha a ordem e passava verde. */
     expect(guardaDoJsx(c, falha)).toMatch(/instavel/i);
     expect(c.indexOf("const overdueCount")).toBeGreaterThan(falha);
+  });
+
+  /**
+   * ⚠️ **O SEGUNDO RAMO DA MESMA FUNÇÃO — o de CIMA, e ele ficou de pé.**
+   *
+   * `load()` começa pedindo a sessão. O ramo `res.ok === false` foi consertado
+   * na leva dos vazios mentirosos, com o comentário explicando o custo; o ramo
+   * `!s.session?.access_token`, três linhas ACIMA, continuou saindo com a lista
+   * vazia e `instavel` FALSO. Mesma tela, mesma função, mesma mentira.
+   *
+   * O bloco acima cobra a direção contrária ("toda ligação está num ramo de
+   * falha") e por construção NÃO pega isto: ele olha as ligações que EXISTEM.
+   * Aqui se cobra o contrário — que este ramo específico ligue.
+   */
+  for (const { nome, arquivo } of [
+    { nome: "PreventivosTab", arquivo: MULHER },
+    { nome: "CicloMenstrualTab", arquivo: CICLO },
+  ]) {
+    test(`⚠️ ${nome}: a sessão que não renovou também acende o instável`, () => {
+      const c = componente(nome, arquivo);
+      const i = c.indexOf("async function load(");
+      expect(i).toBeGreaterThan(-1);
+      const fn = c.slice(i, c.indexOf("\n  }", i));
+      const k = fn.indexOf("!s.session?.access_token");
+      expect(k).toBeGreaterThan(-1);
+      /* O corpo do `if`, até a chave que o fecha — e ele tem de LIGAR a falha
+         antes de sair. Medir "existe setInstavel no arquivo" ficaria verde com
+         esta linha apagada, porque o ramo de baixo continua ligando. */
+      const ramo = fn.slice(k, fn.indexOf("}", k));
+      expect(ramo).toContain("setInstavel(true)");
+      expect(ramo).toContain("return");
+    });
+  }
+
+  /**
+   * ⚠️ **E OS QUATRO CAMINHOS DE ESCRITA VOLTAVAM MUDOS.** Nada gravado, e a
+   * única diferença para o ramo vizinho (que tem `toast`) era ela não ser
+   * avisada — não havia comentário justificando a diferença em nenhum dos
+   * quatro. Numa tela de preventivos isso vira um exame que ela acha que
+   * registrou; no ciclo, uma data que vira DUM e nunca foi gravada.
+   */
+  for (const [arquivo, nomes] of [
+    [CICLO, ["handleLogStart", "handleMarkEnd", "handleDelete"]],
+    [MULHER, ["handleSave"]],
+  ] as [string, string[]][]) {
+    for (const nome of nomes) {
+      test(`⚠️ ${nome}: a sessão que não renovou avisa, nunca volta calada`, () => {
+        const i = arquivo.indexOf(`async function ${nome}(`);
+        expect(i).toBeGreaterThan(-1);
+        const fn = arquivo.slice(i, arquivo.indexOf("\n  }", i));
+        const k = fn.indexOf("!s.session?.access_token");
+        expect(k).toBeGreaterThan(-1);
+        const ramo = fn.slice(k, fn.indexOf("}", k));
+        expect(ramo).toContain("toast.error(");
+      });
+    }
+  }
+
+  /**
+   * ⚠️ **E O `add()` DA TELA CLÍNICA MORRIA NO `getUser()`, QUE VAI À REDE.**
+   * O `error` era descartado e o `return` era mudo: ela tocava em "Adicionar",
+   * a tela não se mexia, e o registro de peso/pressão/glicemia não existia.
+   * Dentro da MESMA função três dos quatro caminhos de erro já falavam.
+   */
+  test("⚠️ HealthTab.add(): a sessão sai do DISCO, e a falha fala", () => {
+    const i = SAUDE.indexOf("async function add(");
+    expect(i).toBeGreaterThan(-1);
+    const fn = SAUDE.slice(i, SAUDE.indexOf("\n  }", i));
+    /* `getUser()` é REDE; `getSession()` lê o disco e dá o mesmo `user.id`. */
+    expect(fn).not.toContain("auth.getUser(");
+    expect(fn).toContain("auth.getSession(");
+    const k = fn.search(/if \(!uid\)/);
+    expect(k).toBeGreaterThan(-1);
+    expect(fn.slice(k, fn.indexOf("}", k))).toContain("toast.error(");
   });
 
   test("⚠️ e salvar um preventivo LÊ a resposta antes de fechar o painel", () => {

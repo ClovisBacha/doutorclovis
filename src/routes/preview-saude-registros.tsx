@@ -20,6 +20,9 @@ import { HealthTab, type HealthLog } from "@/components/health-tab";
  *                          novo não aparece
  *   `?estado=normal`    — histórico com gráficos, tudo dentro da faixa
  *   `?estado=grave`     — uma pressão de 165/105: a conduta tem de estar lá
+ *   `?estado=hipo`      — ⚠️ glicemias de 45 e 58 (o piso da régua) e uma de
+ *                         118 (a faixa permissiva). Os dois defeitos de
+ *                         glicemia da vistoria, na mesma foto.
  *   `?estado=semperfil` — sem altura nem peso pré-gestacional (sem curva IOM)
  *   `?estado=semaltura`   — ⚠️ peso pré-gestacional SIM, altura NÃO: o estado
  *                            SEM SAÍDA que a vistoria achou. Os dois campos são
@@ -90,6 +93,27 @@ const NORMAL: HealthLog[] = [
 
 const GRAVE: HealthLog[] = [log(0, 69.2, 165, 105, 148), ...NORMAL.slice(1)];
 
+/**
+ * ⚠️ **NENHUMA BANCADA TINHA UMA GLICEMIA BAIXA — e foi por isso que a zona
+ * verde sem piso sobreviveu.** Os estados existentes só têm 92, 88 e 148: com
+ * eles, `minY` nunca desce abaixo de 65 e o retângulo verde parece começar no
+ * fundo por coincidência de escala. Aqui há 45 (GRAVE por `sinalGlicemia`) e 58
+ * (ATENÇÃO), que são exatamente os dois valores que caíam DENTRO da faixa
+ * apresentada como boa, com o ponto pintado de vermelho por cima dela.
+ *
+ * ⚠️ E o 118 do topo é a OUTRA metade: `gravidade: "normal"` pela régua
+ * permissiva de 140, que o cartão traduzia na palavra "Normal", em verde. Em
+ * jejum o alvo é 95 — os dois defeitos moram na mesma tela e se fotografam
+ * juntos.
+ */
+const HIPO: HealthLog[] = [
+  log(0, 68.4, 118, 76, 118),
+  log(1, 68.0, 116, 74, 45),
+  log(2, 67.6, 120, 78, 58),
+  log(3, 67.1, 114, 72, 92),
+  log(4, 66.5, 118, 76, 101),
+];
+
 function Pagina() {
   const { w, estado, luto, pos } = Route.useSearch();
 
@@ -100,18 +124,20 @@ function Pagina() {
         ? { logs: NORMAL, instavel: true }
         : estado === "grave"
           ? { logs: GRAVE }
-          : estado === "normal" || estado === "semperfil"
-            ? { logs: NORMAL }
-            : /* ⚠️ `semaltura` e `sempeso` são o ESTADO SEM SAÍDA que a vistoria
+          : estado === "hipo"
+            ? { logs: HIPO }
+            : estado === "normal" || estado === "semperfil"
+              ? { logs: NORMAL }
+              : /* ⚠️ `semaltura` e `sempeso` são o ESTADO SEM SAÍDA que a vistoria
                  achou, e que nunca teve foto: os dois campos do Perfil são
                  independentes e opcionais, então preencher UM deles deixava a
                  tela sem a curva E sem o convite. `semregistro` é o terceiro
                  caso — os dois campos preenchidos e nenhum peso lançado. */
-              estado === "semaltura" || estado === "sempeso"
-              ? { logs: NORMAL }
-              : estado === "semregistro"
-                ? { logs: [] }
-                : { logs: [] };
+                estado === "semaltura" || estado === "sempeso"
+                ? { logs: NORMAL }
+                : estado === "semregistro"
+                  ? { logs: [] }
+                  : { logs: [] };
 
   /* ⚠️ **O QUE DESTRAVA A CURVA DO IOM SÃO TRÊS COISAS, e este comentário
      afirmava DUAS.** Altura e peso pré-gestacional dão o IMC; o que faltava era
