@@ -817,7 +817,7 @@ export function ContracoesTab({
           <li>· a bolsa rompeu, mesmo sem contração nenhuma;</li>
           <li>· houver sangramento vermelho-vivo;</li>
           <li>· a dor for constante e forte, sem alívio entre as contrações;</li>
-          <li>· o bebê estiver se mexendo menos que o normal dele.</li>
+          <li>· o bebê estiver se mexendo menos que o normal.</li>
         </ul>
         <p className="mt-2 text-sm">
           Nenhuma delas depende do cronômetro — não espere fechar um padrão.

@@ -968,7 +968,7 @@ export function KicksTab({
           {instavel && todas.length === 0 && (
             <NaoConsegueLer
               oQue="o seu histórico de chutes"
-              sossego="As suas contagens continuam salvas. E se você está sentindo o bebê se mexer menos que o normal dele, não espere por esta tela: fale com o seu médico ou procure atendimento."
+              sossego="As suas contagens continuam salvas. E se você está sentindo o bebê se mexer menos que o normal, não espere por esta tela: fale com o seu médico ou procure atendimento."
               aoTentar={() => void load()}
             />
           )}

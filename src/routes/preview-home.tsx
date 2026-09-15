@@ -53,6 +53,15 @@ export const Route = createFileRoute("/preview-home")({
        uma aba que publicou atalhos, e no app quem publica é o feed — atrás do
        login. Sem isto, a nuvem seria mais uma tela que ninguém olhou. */
     atalhos: s.atalhos === true || String(s.atalhos ?? "") === "1",
+    /* `?medico=com|sem|carregando|ilegivel` — os QUATRO estados do cartão do
+       médico. A bancada nunca passou `medico`, então ela só desenhava um deles
+       (o "sem"), e era justamente o único que já estava certo: os outros três
+       nasceram, viveram e quebraram sem ninguém nunca ter olhado. */
+    medico: (["com", "sem", "carregando", "ilegivel"] as const).includes(
+      String(s.medico ?? "") as never,
+    )
+      ? (String(s.medico) as "com" | "sem" | "carregando" | "ilegivel")
+      : ("sem" as const),
   }),
   head: () => ({
     meta: [{ title: "Bancada da home" }, { name: "robots", content: "noindex" }],
@@ -61,7 +70,7 @@ export const Route = createFileRoute("/preview-home")({
 });
 
 function PreviewHome() {
-  const { w, notif, quantos, clima, atalhos, dica } = Route.useSearch();
+  const { w, notif, quantos, clima, atalhos, dica, medico } = Route.useSearch();
   const { slot } = useSkyNow(null);
   const escuro = slot.dark;
 
@@ -95,6 +104,21 @@ function PreviewHome() {
           babyTone={0}
           careMode={false}
           skyTheme="v2"
+          /* ⚠️ O DADO e o ESTADO vêm juntos, como na produção: um médico
+             carregado com estado "perguntando" é uma corrida que o app não
+             produz, e fabricá-la aqui aprovaria uma tela que não existe. */
+          medico={
+            medico === "com"
+              ? { nome: "Dra. Marina Costa", specialty: "Obstetrícia", crm: "CRM-MG 12345" }
+              : null
+          }
+          estadoDoMedico={
+            medico === "carregando"
+              ? "perguntando"
+              : medico === "ilegivel"
+                ? "ilegivel"
+                : "respondeu"
+          }
           temNaoLidas={notif}
           naoLidas={quantos}
           dica={

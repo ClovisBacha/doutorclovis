@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import icCoracao from "@/assets/saude/saude.webp";
 import { toast } from "sonner";
 import { destravarSomDeUI, tocarSomDeUI } from "@/lib/tocar-som-de-ui";
+import { cartaoDoMedico, type EstadoDoMedico } from "@/lib/cartao-do-medico";
 import { hapticoDeAviso, tocarPadrao } from "@/lib/nativo";
 import { RED_SYMPTOMS } from "@/lib/triage";
 import { esquemaWhatsApp, linkTel, linkWhatsApp } from "@/lib/telefone";
@@ -43,6 +44,7 @@ export function EmergencySheet({
   tituloDaFicha,
   medico,
   medicoResolvido,
+  estadoDoMedico,
   fichaResolvida = true,
   onClose,
   onOpenCard,
@@ -87,6 +89,13 @@ export function EmergencySheet({
   medico?: DoctorContato | null;
   /** `false` = ainda não sabemos se ela tem médico. Ver `medicoResolvido`. */
   medicoResolvido?: boolean;
+  /**
+   * O DESFECHO da pergunta, que `medicoResolvido` sozinho não distingue:
+   * "ainda não perguntei" e "perguntei e não obtive resposta" pedem textos
+   * diferentes, e nenhum dos dois autoriza dizer que ela não tem médico.
+   * Ver `lib/cartao-do-medico.ts` — a régua é a MESMA do cartão da home.
+   */
+  estadoDoMedico?: EstadoDoMedico;
   /**
    * `false` = o PERFIL ainda não chegou. Não é o mesmo que "ela não preencheu".
    *
@@ -134,8 +143,18 @@ export function EmergencySheet({
      prometia o que o disparo não entrega. Agora, sem vínculo, o botão do
      médico dá lugar ao 193 e o texto não cita nome nenhum. */
   const temVinculo = !!medico?.nome?.trim();
-  /* Não sabemos ainda: nem afirma que ela tem médico, nem que não tem. */
-  const medicoIndefinido = medicoResolvido === false && !temVinculo;
+  /* Não sabemos: nem afirma que ela tem médico, nem que não tem.
+     
+     ⚠️ A régua vem de `cartaoDoMedico`, e não de um segundo `if` aqui: esta
+     tela e o cartão da home precisam concordar, e duas cópias divergiriam no
+     primeiro ajuste — a divergência apareceria como a home negando o médico
+     que o SOS mostra. O `estadoDoMedico` é opcional, então quem ainda passa só
+     `medicoResolvido` continua com o comportamento de sempre. */
+  const estadoDoCartao = cartaoDoMedico(
+    temVinculo,
+    estadoDoMedico ?? (medicoResolvido === false ? "perguntando" : "respondeu"),
+  );
+  const medicoIndefinido = estadoDoCartao === "carregando" || estadoDoCartao === "ilegivel";
   const medNome = temVinculo ? medico!.nome.trim() : "";
   const medCrm = temVinculo ? (medico!.crm ?? "").trim() : "";
   const medZap = temVinculo ? linkWhatsApp(medico!.whatsapp) : null;
@@ -957,9 +976,14 @@ export function EmergencySheet({
           <p className="mt-2.5 rounded-2xl bg-amber-50 px-3.5 py-2.5 text-center text-xs leading-snug text-amber-900 dark:bg-amber-500/12 dark:text-amber-200">
             {medNome
               ? `${medNome} ainda não cadastrou um telefone no app. Use o 192 ou o 193 acima.`
-              : medicoIndefinido
+              : estadoDoCartao === "carregando"
                 ? "Carregando os dados do seu médico… o 192 e o 193 acima funcionam agora."
-                : "Você ainda não tem um médico vinculado no app. Use o 192 ou o 193 acima."}
+                : estadoDoCartao === "ilegivel"
+                  ? /* ⚠️ Diz o que ACONTECEU. Antes isto caía na frase de baixo
+                       e o app negava, numa emergência, o vínculo que ninguém
+                       conseguiu ler. */
+                    "Não consegui carregar os dados do seu médico. O 192 e o 193 acima funcionam agora."
+                  : "Você ainda não tem um médico vinculado no app. Use o 192 ou o 193 acima."}
           </p>
         )}
         {medTel && (

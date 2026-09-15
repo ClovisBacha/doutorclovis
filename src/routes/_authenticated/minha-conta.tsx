@@ -136,6 +136,7 @@ import {
   validaRegistro,
   vozDaPaciente,
 } from "@/lib/sinais-clinicos";
+import type { EstadoDoMedico } from "@/lib/cartao-do-medico";
 import { lerPressaoDigitada } from "@/lib/pressao-digitada";
 import { checkIsAdmin } from "@/lib/admin.functions";
 import {
@@ -1321,7 +1322,17 @@ function MinhaContaPage() {
      que é justamente uma emergência — fazia a tela AFIRMAR "você ainda não tem
      um médico vinculado" e esconder os dois botões de ligar para ele. Uma frase
      falsa, não uma degradação. */
-  const [medicoResolvido, setMedicoResolvido] = useState(false);
+  /* ⚠️ E SÃO TRÊS DESFECHOS, não dois — `medicoResolvido` fazia dois
+     trabalhos ("ou eu sei, ou desisti") e as duas coisas pedem telas
+     diferentes. O cartão da home lia só o `meuMedico` e, por isso, afirmava
+     "Você ainda não tem médico" em TODA abertura (a pergunta está em voo, e
+     `liberarCedo` solta a tela antes dela, de propósito) e também quando a
+     leitura falhava. Quem decide o que a tela tem o direito de dizer é
+     `cartaoDoMedico` — a régua única desta tela e da Central. */
+  const [estadoDoMedico, setEstadoDoMedico] = useState<EstadoDoMedico>("perguntando");
+  /* O que a Central sempre consumiu: "a pergunta terminou?". Derivado, para
+     não haver dois estados que precisem concordar. */
+  const medicoResolvido = estadoDoMedico !== "perguntando";
   /** Cadastro profissional começado neste aparelho e ainda sem perfil. */
   const [querSerMedicoAqui, setQuerSerMedicoAqui] = useState(false);
   useEffect(() => {
@@ -1335,13 +1346,22 @@ function MinhaContaPage() {
       try {
         const { data: s } = await supabase.auth.getSession();
         if (!s.session) {
-          if (vivo) setMedicoResolvido(true);
+          /* Sem sessão não sabemos QUEM É ELA — o que é diferente de saber que
+             ela não tem médico. A Central segue liberando o 192 e o 193
+             (`medicoResolvido` continua verdadeiro); o que muda é que nenhuma
+             tela afirma o vínculo que ninguém conferiu. */
+          if (vivo) setEstadoDoMedico("ilegivel");
           return;
         }
         const r = await getMyDoctorContact({ data: { accessToken: s.session.access_token } });
-        if (vivo && r.ok) {
+        if (!vivo) return;
+        if (r.ok) {
           setMeuMedico(r.doctor);
-          setMedicoResolvido(true);
+          setEstadoDoMedico("respondeu");
+        } else {
+          /* ⚠️ Antes este ramo não fazia NADA: a tela ficava "perguntando"
+             para sempre e o SOS nunca liberava os outros caminhos. */
+          setEstadoDoMedico("ilegivel");
         }
       } catch {
         /* Uma falha de transporte não pode deixar a tela em "carregando" para
@@ -1356,12 +1376,20 @@ function MinhaContaPage() {
             const r2 = await getMyDoctorContact({
               data: { accessToken: s2.session.access_token },
             });
-            if (vivo && r2.ok) setMeuMedico(r2.doctor);
+            if (vivo && r2.ok) {
+              setMeuMedico(r2.doctor);
+              setEstadoDoMedico("respondeu");
+            }
           }
         } catch {
           /* segunda falha: segue para o `finally` */
         } finally {
-          if (vivo) setMedicoResolvido(true);
+          /* ⚠️ `ilegivel`, e nunca `respondeu`: aqui a pergunta TERMINOU sem
+             resposta. A Central libera o 192 e o 193 como sempre; o cartão
+             passa a dizer que não conseguiu carregar, em vez de negar o
+             médico dela. E o `setState` funcional não desfaz um `respondeu`
+             que a segunda tentativa acabou de gravar. */
+          if (vivo) setEstadoDoMedico((e) => (e === "respondeu" ? e : "ilegivel"));
         }
       }
     })();
@@ -1979,6 +2007,7 @@ function MinhaContaPage() {
           }}
           medico={meuMedico}
           medicoResolvido={medicoResolvido}
+          estadoDoMedico={estadoDoMedico}
           /* ⚠️ `!!profile` e não `!loading`: o que a ficha precisa é o PERFIL,
              e ele é a única coisa que a torna verdadeira. Amarrá-la a `loading`
              faria a ficha se dizer resolvida no instante em que o app libera a
@@ -2169,7 +2198,20 @@ function MinhaContaPage() {
                 toast.error("Sua conta tem perfil de médico — o seu espaço é o painel.");
                 return;
               }
-              await supabase.auth.updateUser({ data: { role: null } });
+              /* ⚠️ `updateUser` devolve `{ error }` e NÃO LANÇA em erro de
+                 API — o `catch` abaixo só pega falha de transporte. Descartando
+                 o retorno, a tela dizia "Pronto" e recarregava: a marca `role`
+                 continuava, e ela voltava para ESTA MESMA tela de bloqueio.
+
+                 E este botão é a ÚNICA saída de um beco sem volta (ver o
+                 comentário acima: a gestante que tocou em "Criar conta grátis"
+                 na página de médicos por curiosidade). Mentir aqui a deixa
+                 presa sem ter o que apontar — ela toca de novo, e de novo. */
+              const { error } = await supabase.auth.updateUser({ data: { role: null } });
+              if (error) {
+                toast.error("Não consegui trocar agora. Tente de novo em instantes.");
+                return;
+              }
               toast.success("Pronto — abrindo o app da gestante.");
               window.location.reload();
             } catch {
@@ -2499,6 +2541,9 @@ function MinhaContaPage() {
                         }
                       : null
                   }
+                  /* Sem isto o cartão do médico NEGA o vínculo enquanto a
+                     pergunta está em voo — ou seja, em toda abertura. */
+                  estadoDoMedico={estadoDoMedico}
                   temNaoLidas={naoLidas > 0}
                   naoLidas={naoLidas}
                   /* O mascote leva DIRETO à central, sem passar pelo menu: ele

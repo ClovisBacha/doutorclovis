@@ -9,6 +9,7 @@
 import { useState, useEffect, useSyncExternalStore, type ComponentType } from "react";
 import { Baby, ChevronRight, Gamepad2, Heart, LifeBuoy, Menu } from "lucide-react";
 import { IconeAmigas } from "@/components/icones-jogo";
+import { inicialDoMedico } from "@/lib/nome-do-medico";
 import portrait from "@/assets/dr-clovis-portrait.jpg";
 import icMedico from "@/assets/avisos/medico.webp";
 import { DOCTOR } from "@/lib/doctor.config";
@@ -21,6 +22,7 @@ import { MascoteDaHome } from "@/components/mascote-da-home";
 import { humorDaJornada } from "@/components/bolha";
 import { diaLocalDe, fraseDoDia, periodoDaHora, tempoDoMomento } from "@/lib/frases-do-mascote";
 import { babyForWeek } from "@/lib/gestacao";
+import { cartaoDoMedico, type EstadoDoMedico } from "@/lib/cartao-do-medico";
 import { hapticTap } from "@/lib/haptics";
 import { barraDeStatus } from "@/lib/nativo";
 import { getApproxLocation } from "@/lib/local.functions";
@@ -1076,6 +1078,7 @@ export function AppHomeScreen({
   onNavigate,
   onOpenMenu,
   medico,
+  estadoDoMedico = "respondeu",
   babyTone = 0,
   careMode = false,
   skyTheme = "v2",
@@ -1111,6 +1114,14 @@ export function AppHomeScreen({
    * médico nenhum. Ela via um rosto que não é o dela rotulado como o dela.
    */
   medico?: { nome: string; title?: string; specialty?: string; crm?: string } | null;
+  /**
+   * O DESFECHO da pergunta "ela tem médico?" — ver `lib/cartao-do-medico.ts`.
+   *
+   * ⚠️ Sem ele o cartão lia só `medico` e, com isso, AFIRMAVA "Você ainda não
+   * tem médico" enquanto a resposta estava em voo — ou seja, em toda abertura,
+   * porque `liberarCedo` solta a tela antes dela, de propósito.
+   */
+  estadoDoMedico?: EstadoDoMedico;
   /**
    * Há notificação por abrir.
    *
@@ -1440,13 +1451,29 @@ export function AppHomeScreen({
      COM vínculo, valem só os dados dele; a foto (que é do dono) aparece apenas
      quando o médico É o dono, senão entra a inicial do nome. Melhor uma
      inicial certa que um rosto errado. */
-  const semMedico = !medico?.nome?.trim();
-  const vinculadaAoDono = !semMedico && medico!.nome.trim() === DOCTOR.name;
-  const medNome = semMedico ? "Você ainda não tem médico" : medico!.nome.trim();
-  const medEspec = semMedico
-    ? "Toque para encontrar um obstetra no app"
-    : (medico!.specialty ?? medico!.title ?? "").trim();
-  const medCrm = semMedico ? "" : (medico!.crm ?? "").trim();
+  /* ⚠️ QUATRO ESTADOS DE TELA, e não dois. "Ainda não perguntei", "perguntei e
+     não obtive resposta" e "ela não tem médico" são fatos diferentes, e só o
+     último autoriza a frase que nega o vínculo. Quem separa é a régua única
+     (`cartaoDoMedico`), a mesma que a Central de Emergência consome. */
+  const estadoDoCartao = cartaoDoMedico(!!medico?.nome?.trim(), estadoDoMedico);
+  const temMedico = estadoDoCartao === "com";
+  const semMedico = estadoDoCartao === "sem";
+  const vinculadaAoDono = temMedico && medico!.nome.trim() === DOCTOR.name;
+  const medNome = temMedico
+    ? medico!.nome.trim()
+    : semMedico
+      ? "Você ainda não tem médico"
+      : estadoDoCartao === "ilegivel"
+        ? "Não consegui carregar agora"
+        : "";
+  const medEspec = temMedico
+    ? (medico!.specialty ?? medico!.title ?? "").trim()
+    : semMedico
+      ? "Toque para encontrar um obstetra no app"
+      : estadoDoCartao === "ilegivel"
+        ? "Toque para ver o seu médico"
+        : "";
+  const medCrm = temMedico ? (medico!.crm ?? "").trim() : "";
 
   /* A MOLDURA do iOS em modo standalone.
 
@@ -2163,11 +2190,14 @@ export function AppHomeScreen({
             />
           ) : (
             <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-primary/12 font-serif text-2xl text-primary ring-1 ring-primary/20">
-              {semMedico ? (
-                /* A peça do médico (a mesma do aviso de convite), no lugar da 🔍. */
+              {!temMedico ? (
+                /* A peça do médico (a mesma do aviso de convite), no lugar da 🔍.
+                   ⚠️ `!temMedico` e não `semMedico`: sem NOME não há inicial, e
+                   o recuo `|| "?"` desenhava uma interrogação gigante nos dois
+                   estados em que o app ainda não sabe de nada. */
                 <img src={icMedico} alt="" aria-hidden className="h-11 w-11 object-contain" />
               ) : (
-                medNome.replace(/^(Dr|Dra)\.?\s*/i, "").charAt(0) || "?"
+                inicialDoMedico(medNome)
               )}
             </span>
           )}
@@ -2175,9 +2205,37 @@ export function AppHomeScreen({
             <p className="font-serif text-[15px] font-semibold text-primary">
               {semMedico ? "Encontre o seu médico" : "Seu médico"}
             </p>
-            <p className="mt-0.5 font-serif text-lg leading-tight text-foreground">{medNome}</p>
-            <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{medEspec}</p>
-            {medCrm && <p className="mt-1 text-xs text-muted-foreground">{medCrm}</p>}
+            {/* ⚠️ O esqueleto vai DENTRO do mesmo `<p>`, e não no lugar dele: é
+                o `<p>` que define a altura da linha, e trocar as duas frases por
+                caixas soltas faria o cartão encolher e crescer — o mesmo pisca,
+                por outro caminho. */}
+            <p className="mt-0.5 font-serif text-lg leading-tight text-foreground">
+              {estadoDoCartao === "carregando" ? (
+                <span className="skeleton inline-block h-[0.8em] w-36 rounded align-middle" />
+              ) : (
+                medNome
+              )}
+            </p>
+            <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+              {estadoDoCartao === "carregando" ? (
+                <span className="skeleton inline-block h-[0.8em] w-28 rounded align-middle" />
+              ) : (
+                medEspec
+              )}
+            </p>
+            {/* ⚠️ A QUARTA LINHA existe no carregando só para a caixa não PULAR.
+                Medido a 393px: sem ela o cartão nascia com 98px e crescia para
+                117 quando a resposta chegava — trocaríamos o pisca do texto por
+                um pisca de layout, que empurra o cartão do médico e tudo abaixo
+                dele. A altura reservada é a do caso COMUM (ela tem médico:
+                nome numa linha mais o CRM), e não a de um estado raro. */}
+            {estadoDoCartao === "carregando" ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                <span className="skeleton inline-block h-[0.8em] w-20 rounded align-middle" />
+              </p>
+            ) : (
+              medCrm && <p className="mt-1 text-xs text-muted-foreground">{medCrm}</p>
+            )}
           </div>
           <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 group-hover:translate-x-1" />
         </div>

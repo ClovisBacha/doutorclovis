@@ -163,6 +163,13 @@ const EXTRAS = [
   /* ⚠️ A saúde da mulher SOME por nove meses — numa conta de gestante ela não
      existe —, então era a mais difícil de olhar. E é onde o anel de fases
      derrubava a hidratação por 17 dígitos num `cx` de SVG. */
+  /* ⚠️ Os QUATRO estados do cartão do médico. A varredura de disco abre só o
+     padrão (`?medico=sem`), que era justamente o único já correto: os outros
+     três nasceram e quebraram sem ninguém nunca ter olhado — e um deles é o de
+     TODA abertura do app. */
+  "/preview-home?w=20&medico=com",
+  "/preview-home?w=20&medico=carregando",
+  "/preview-home?w=20&medico=ilegivel",
   "/preview-saude-mulher?tela=ciclo",
   "/preview-saude-mulher?tela=ciclo&estado=instavel",
   "/preview-saude-mulher?tela=ciclo&gestante=1",

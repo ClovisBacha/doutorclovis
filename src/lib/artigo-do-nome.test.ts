@@ -18,8 +18,19 @@
  * travessão, dois-pontos, vírgula, ou a frase é reescrita.
  */
 import { describe, expect, test } from "bun:test";
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { semComentarios } from "./sem-comentarios";
 import { join } from "node:path";
+
+/** Todo `.ts`/`.tsx` de produção — o pronome erra em qualquer tela. */
+function fontesDoApp(dir = "src", out: string[] = []): string[] {
+  for (const n of readdirSync(dir)) {
+    const p = join(dir, n);
+    if (statSync(p).isDirectory()) fontesDoApp(p, out);
+    else if (/\.tsx?$/.test(n) && !/\.test\.tsx?$/.test(n)) out.push(p);
+  }
+  return out;
+}
 
 /**
  * Os padrões que tentam adivinhar o gênero a partir do nome.
@@ -88,5 +99,59 @@ describe("⚠️ o artigo antes do nome do bebê", () => {
     expect(porVogal("Helena")).toBe("o"); // errado: Helena é feminino
     expect(porVogal("Ariel")).toBe("a"); // errado: pode ser os dois
     expect(porVogal("Miguel")).toBe("o"); // certo por acaso, não por regra
+  });
+});
+
+/**
+ * ⚠️ E O PRIMO DELE: O PRONOME.
+ *
+ * A mesma premissa falsa ("o nome diz o gênero") produz um segundo defeito, e
+ * ele apareceu duas vezes mais:
+ *
+ *   4. a linha de socorro dos chutes — "menos que o normal DELE", consertada em
+ *      set/2026 numa das TRÊS ocorrências do mesmo arquivo;
+ *   5. o resumo da semana da aba Bebê — `{baby_name ? "ele" : "seu bebê"}`, que
+ *      escrevia "ele vai ter o tamanho de mamão" para a mãe de uma menina.
+ *
+ * A régua: quando o app precisa se referir ao bebê, usa **o NOME** (que é o que
+ * ela escreveu) ou reescreve a frase. Nunca um pronome escolhido a partir da
+ * existência do nome.
+ *
+ * ⚠️ E "dele" NÃO é proibido por si só: em "A última ficou acima **dele**" o
+ * antecedente é *o intervalo*, masculino gramatical, e está correto. Uma
+ * catraca que reprovasse isso reprovaria português certo — e catraca que
+ * reprova o estado correto é catraca que alguém desliga.
+ */
+describe("⚠️ o PRONOME do bebê — a mesma premissa falsa, outra forma", () => {
+  test("nenhuma tela escolhe o pronome a partir do nome do bebê", () => {
+    const culpados: string[] = [];
+    for (const arq of fontesDoApp()) {
+      const codigo = semComentarios(readFileSync(arq, "utf8"));
+      /* A construção exata: um ternário sobre o nome do bebê cujo ramo
+         verdadeiro é um pronome masculino. */
+      if (/(baby_?[Nn]ame|babyName)[^?\n]{0,30}\?\s*"(ele|dele|nele)"/.test(codigo)) {
+        culpados.push(arq);
+      }
+    }
+    expect(culpados).toEqual([]);
+  });
+
+  test("a frase do socorro não volta a ter dono", () => {
+    /* "menos que o normal dele" fala SEMPRE do bebê — conferido nas duas
+       ocorrências que existiam (a linha de socorro dos chutes e as bandeiras
+       vermelhas da ACOG no cronômetro de contrações). */
+    const culpados: string[] = [];
+    for (const arq of fontesDoApp()) {
+      const codigo = semComentarios(readFileSync(arq, "utf8"));
+      if (/normal dele/i.test(codigo)) culpados.push(arq);
+    }
+    expect(culpados).toEqual([]);
+  });
+
+  test("⚠️ e a catraca NÃO reprova o 'dele' com antecedente masculino", () => {
+    /* Contraprova: a frase certa do gráfico de chutes continua existindo, e
+       nenhuma das duas regras acima a alcança. */
+    const chutes = semComentarios(readFileSync("src/components/kicks-tab.tsx", "utf8"));
+    expect(chutes.includes("A última ficou acima dele.")).toBe(true);
   });
 });

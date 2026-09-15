@@ -14,6 +14,7 @@
  */
 
 import { formatarDinheiro } from "@/lib/dinheiro";
+import { inicialDoMedico } from "@/lib/nome-do-medico";
 
 export function PreviaCardMedico({
   nome,
@@ -47,10 +48,7 @@ export function PreviaCardMedico({
   crm: string;
 }) {
   const nomeVisivel = nome.trim() || "Seu nome aqui";
-  const inicial = nomeVisivel
-    .replace(/^(Dr|Dra)\.?\s*/i, "")
-    .charAt(0)
-    .toUpperCase();
+  const inicial = inicialDoMedico(nomeVisivel);
   const linhasFormacao = formacoes
     .split("\n")
     .map((l) => l.trim())

@@ -22,6 +22,7 @@ import { toast } from "sonner";
 
 import drPortrait from "@/assets/dr-clovis-portrait.jpg";
 import { BabyIllustration } from "@/components/baby-illustration";
+import { inicialDoMedico } from "@/lib/nome-do-medico";
 import { CompartilharMomento } from "@/components/compartilhar-momento";
 import { HeartbeatFeel } from "@/components/heartbeat-feel";
 import { Stagger, StaggerItem } from "@/components/motion-primitives";
@@ -46,18 +47,26 @@ import type { Gest, Profile } from "@/routes/_authenticated/minha-conta";
 function WeeklyRecapCard({ profile, gest }: { profile: Profile; gest: NonNullable<Gest> }) {
   const [moods, setMoods] = useState<string[]>([]);
   const [loaded, setLoaded] = useState(false);
+  /* ⚠️ "NÃO CONSEGUI LER" NÃO É "ELA NÃO REGISTROU". O erro era descartado e a
+     lista caía em `data ?? []`: com a leitura falhando, esta seção AFIRMAVA
+     "Você ainda não registrou seu humor esta semana — o check-in no topo leva 1
+     toque" para quem registrou todos os dias, e ela registrava de novo. É a
+     sétima tela da classe que `NaoConsegueLer` fechou em seis. */
+  const [instavel, setInstavel] = useState(false);
 
   useEffect(() => {
     (async () => {
       const since = new Date(Date.now() - 7 * 86400000).toLocaleDateString("en-CA");
-      const { data } = await (supabase as any)
+      const { data, error } = await (supabase as any)
         .from("journal_entries")
         .select("mood, entry_date")
         .gte("entry_date", since)
         .order("entry_date", { ascending: true });
-      setMoods(
-        ((data ?? []) as { mood: string | null }[]).map((d) => d.mood ?? "").filter(Boolean),
-      );
+      if (error) setInstavel(true);
+      else
+        setMoods(
+          ((data ?? []) as { mood: string | null }[]).map((d) => d.mood ?? "").filter(Boolean),
+        );
       setLoaded(true);
     })();
   }, []);
@@ -80,6 +89,13 @@ function WeeklyRecapCard({ profile, gest }: { profile: Profile; gest: NonNullabl
         <p className="text-sm font-semibold text-foreground">Como foi seu humor</p>
         {!loaded ? (
           <div className="skeleton mt-2 h-6 w-40 rounded-full" />
+        ) : instavel ? (
+          /* Diz de quem é a culpa, e o que continua verdadeiro — nunca convida
+             a registrar de novo o que já está registrado. */
+          <p className="mt-1 text-sm text-muted-foreground">
+            Não consegui carregar seus check-ins agora — isso é a nossa conexão. O que você
+            registrou continua salvo. 💛
+          </p>
         ) : moods.length === 0 ? (
           <p className="mt-1 text-sm text-muted-foreground">
             Você ainda não registrou seu humor esta semana — o check-in no topo leva 1 toque. 💛
@@ -116,7 +132,13 @@ function WeeklyRecapCard({ profile, gest }: { profile: Profile; gest: NonNullabl
         <span className="text-lg">🔜</span>
         <span className="text-muted-foreground">
           Semana <strong className="text-foreground">{week + 1}</strong> chegando —{" "}
-          {profile.baby_name ? "ele" : "seu bebê"} vai ter o tamanho de{" "}
+          {/* ⚠️ O NOME NÃO DIZ O GÊNERO DE NINGUÉM, e o app não tem esse campo.
+              Com nome cadastrado a frase saía "ele vai ter o tamanho de" — para
+              a mãe de uma menina também. Quinta aparição desta família aqui (o
+              bolão, o agradecimento do chá, o título da lista de presentes e a
+              linha de socorro dos chutes); a saída é sempre a mesma: usar o
+              NOME, que é o que ela escreveu, ou nada. */}
+          {profile.baby_name ? profile.baby_name : "seu bebê"} vai ter o tamanho de{" "}
           <strong className="text-foreground">{nextBaby.fruit.toLowerCase()}</strong>.
         </span>
       </div>
@@ -266,7 +288,7 @@ function DoctorPresenceCard({
           />
         ) : (
           <span className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/12 font-serif text-xl text-primary ring-2 ring-primary/20">
-            {nomeMedico.replace(/^(Dr|Dra)\.?\s*/i, "").charAt(0) || "?"}
+            {inicialDoMedico(nomeMedico)}
           </span>
         )}
         <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground ring-2 ring-card">

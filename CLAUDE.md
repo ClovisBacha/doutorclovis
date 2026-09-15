@@ -17257,3 +17257,153 @@ torta. Nenhuma asserção estava perto disso.
 problemas · **9 mutantes em vermelho** e as duas contraprovas da varredura
 (porta morta e bancada inexistente) saindo 1 · e o número honesto do app:
 **75 → 67 alvos**, com os 374 da moldura do site ditos à parte.
+
+## ⚠️ A HOME NEGAVA O MÉDICO DELA EM TODA ABERTURA (set/2026)
+
+Varredura das classes já catalogadas, aplicada às telas que ainda não tinham
+passado por elas. Cinco defeitos, e o primeiro atinge **toda paciente, toda
+vez que ela abre o app**.
+
+### ⚠️ 1. "Você ainda não tem médico" — dito antes de perguntar
+
+O cartão do médico é a terceira coisa da home, e decidia o texto por um
+booleano: `!medico?.nome`. Com isso ele AFIRMAVA **"Você ainda não tem médico —
+toque para encontrar um obstetra no app"** em três situações diferentes:
+
+1. ⚠️ **Enquanto a pergunta está em voo — ou seja, em TODA ABERTURA.** E não é
+   acidente: `liberarCedo` (a correção de abertura de set/2026) solta a tela
+   assim que o PERFIL chega, **de propósito**, sem esperar o médico. O cartão
+   nascia negando o vínculo e trocava pelo nome um instante depois. É o "pisca"
+   que o dono relatou como _"dá a sensação de que o app está estragado"_, aqui
+   sobre o dado que mais importa — **a otimização de abertura tornou o defeito
+   inevitável**.
+2. **Quando a leitura falhou** — e aí a negação é permanente.
+3. Quando ela de fato não tem médico — o único caso em que a frase é verdade.
+
+⚠️ **A afirmação não é cosmética:** numa gestação de alto risco, concluir que
+se está sem obstetra muda o que ela faz — ela toca e vai procurar outro,
+achando que o vínculo caiu. É o mesmo vínculo de que o SOS depende para avisar
+alguém.
+
+⚠️ **E A CENTRAL DE EMERGÊNCIA JÁ FAZIA CERTO** (`medicoIndefinido`, com o texto
+"Carregando os dados do seu médico… o 192 e o 193 acima funcionam agora"). A
+régua estava aplicada numa tela e de pé na vizinha — a forma mais comum de
+defeito deste repositório —, e o comentário de `medicoResolvido`, três linhas
+acima do estado, **descreve exatamente este defeito** consertado lá.
+
+- **`src/lib/cartao-do-medico.ts`** é a régua única dos dois. Enterrada no
+  `.tsx` ela só poderia ser exercitada lendo o FONTE e procurando palavras.
+- ⚠️ **`medicoResolvido` FAZIA DOIS TRABALHOS** ("ou eu sei, ou desisti"), e as
+  duas coisas pedem telas diferentes — a mesma separação que "TEM ACESSO" ≠
+  "ESTÁ PAGANDO" já custou aqui. Virou `EstadoDoMedico` de três valores
+  (`perguntando` · `respondeu` · `ilegivel`), com `medicoResolvido` **derivado**
+  dele: nenhum chamador da Central mudou, e não há dois estados que precisem
+  concordar.
+- ⚠️ **`temVinculo` vem PRIMEIRO na régua**, e não é ordem estética: ter o nome
+  na mão já É a resposta, e apagá-lo por causa de um estado atrasado seria o
+  pisca ao contrário.
+- ⚠️ **E o padrão do parâmetro é `"respondeu"`** — o comportamento de hoje.
+  Falhar para "carregando" deixaria uma tela eternamente em esqueleto para quem
+  não foi migrado, que é pior que a afirmação que se está consertando.
+
+⚠️ **E A RAIZ ERA NO SERVIDOR: `getMyDoctorContact` SEMPRE DEVOLVIA `ok: true`.**
+O `catch` dela transformava falha em "ela não tem médico", com um comentário
+dizendo que "a tela usa o padrão" — só que o padrão da tela é a frase que nega
+o vínculo. Falha ABERTA no dado mais caro desta tela. Hoje `{ ok: false }`
+separa os dois, e os três vazios LEGÍTIMOS (sem `doctor_id`, médico sem
+cadastro, tabela `doctors` ausente) continuam sendo sucesso — a tabela ausente
+não cai no `catch`, ela devolve `{ data: null }` sem lançar.
+
+⚠️ **E O ESQUELETO PRECISOU RESERVAR A QUARTA LINHA.** Medido a 393px: sem ela o
+cartão nascia com **98px e crescia para 117** quando a resposta chegava —
+trocaríamos o pisca do texto por um pisca de LAYOUT, que empurra tudo abaixo do
+cartão. A altura reservada é a do caso COMUM (ela tem médico: nome numa linha
+mais o CRM), nunca a de um estado raro. Depois: 116,8 nos dois.
+
+### ⚠️ 2. A FOTO PEGOU UM "a" MINÚSCULO NO LUGAR DO NOME DA MÉDICA
+
+Ao fotografar o estado "com médico" — que **nunca tinha sido olhado**, porque a
+bancada jamais passou `medico` —, o círculo sem foto apareceu com um **"a"
+minúsculo**.
+
+A causa: `/^(Dr|Dra)\.?\s*/i`. **A alternância é resolvida da ESQUERDA para a
+direita**, e com o espaço OPCIONAL não há retrocesso: em "Dra. Marina Costa"
+ela casa **"Dr"**, sobra `"a. Marina"`, e `charAt(0)` é `"a"`. Ou seja: **toda
+obstetra do app aparecia com um "a" no lugar do nome** — e eram **cinco cópias
+da mesma expressão**, em cinco arquivos, duas delas ainda sem `toUpperCase`.
+
+`inicialDoMedico` mora em `nome-do-medico.ts`, onde a régua do título já
+morava — e ela testa a **parte inteira** (`/^(dr|dra|drª)\.?$/i`), que é o que
+faz "Drauzio" continuar sendo "D" em vez de "uzio".
+
+⚠️ **E A CATRACA QUASE NASCEU REPROVANDO CÓDIGO CORRETO.** Ela achou uma SEXTA
+cópia (`crm-conferencia`), e essa **está certa**: com o espaço OBRIGATÓRIO
+(`\s+`) a expressão força o retrocesso — casar só "Dr" deixaria um "a" onde o
+espaço é exigido — e acerta. A catraca passou a proibir só a forma com espaço
+OPCIONAL, e o teste **PROVA a diferença executando as duas**, em vez de
+afirmá-la. Catraca que reprova o estado correto é catraca que alguém desliga.
+
+⚠️ **E o comentário que explica a regex FECHOU O PRÓPRIO COMENTÁRIO** — a
+expressão contém a sequência de fechamento de bloco. É a armadilha que
+`sem-comentarios.ts` documenta, mordendo dentro do texto que a explica; a
+regex é descrita por extenso.
+
+### ⚠️ 3. A ÚNICA SAÍDA DE UM BECO SEM VOLTA DIZIA "PRONTO" SEM CONFERIR
+
+`supabase.auth.updateUser` devolve `{ error }` numa resposta normal e **NÃO
+LANÇA** — o `catch` em volta só pega falha de transporte. O botão "Não sou
+médico(a)" descartava o retorno, dizia **"Pronto — abrindo o app da gestante"**
+e recarregava: a marca `role` continuava e ela voltava para a MESMA tela de
+bloqueio. E o comentário ao lado descreve quem depende dele: a gestante que
+tocou em "Criar conta grátis" na página de médicos por curiosidade. Mentir ali
+a deixa presa sem ter o que apontar — ela toca de novo, e de novo.
+
+### 4. O resumo da semana afirmava que ela não registrou humor
+
+Sétima tela da classe que `NaoConsegueLer` fechou em seis: erro descartado,
+`data ?? []`, e a seção dizia _"Você ainda não registrou seu humor esta
+semana — o check-in no topo leva 1 toque"_ para quem registrou todos os dias.
+Ela registra de novo. ⚠️ O ramo da falha vem ANTES do vazio, e o texto **não
+convida a registrar** — diz de quem é a culpa e que o que ela escreveu continua
+salvo.
+
+### ⚠️ 5. O GÊNERO CRAVADO DO BEBÊ — quinta aparição, e o conserto anterior
+
+### tinha pego UMA de três ocorrências
+
+`kicks-tab` consertou "do normal DELE" numa linha (com o comentário explicando)
+e deixou de pé as outras duas: o `sossego` do `NaoConsegueLer` na MESMA tela, e
+— pior — a mesma frase dentro das **QUATRO BANDEIRAS VERMELHAS da ACOG** no
+cronômetro de contrações, que é o texto que manda ir ao hospital. Mais
+`baby-tab`, que escrevia `{baby_name ? "ele" : "seu bebê"} vai ter o tamanho
+de` — "ele" para a mãe de uma menina.
+
+A catraca de `artigo-do-nome.test.ts` cobria o ARTIGO ("o Helena") e ganhou o
+primo, o PRONOME. ⚠️ **E "dele" NÃO é proibido por si só**: em "A última ficou
+acima **dele**" o antecedente é _o intervalo_, masculino gramatical, e está
+correto — há contraprova cobrando que essa frase continue existindo.
+
+### O que a varredura mediu e NÃO virou conserto
+
+- **Selects de coluna nova sem degrau: 25 achados, ZERO defeitos.** Quase todos
+  são de `APLICAR_PENDENTES.sql`, que o dono já rodou. **O número bruto nunca é
+  a resposta** — é a mesma lição das varreduras de 523, 66 e 474.
+- **`clipboard.writeText` sem ler o retorno (8 telas): correto** — ele LANÇA em
+  falha, e o `catch` pega.
+- **Três "vazios" que pareciam defeito e não eram**: as complicações da gestação
+  anterior (vêm do perfil já carregado), e duas frases de `kicks-tab` cujo
+  "dele" é o intervalo.
+
+⚠️ **E uma armadilha de MEDIÇÃO nova: o número de linha do código sem
+comentários NÃO é o número de linha do arquivo.** `semComentarios` REMOVE
+linhas, então um script que varre o código limpo e imprime `i + 1` aponta para
+o lugar errado — a minha primeira varredura acusou um efeito de carregamento do
+médico no lugar do botão de troca de papel. Ancore pelo TEXTO e procure no
+arquivo real.
+
+**Sem SQL.** Tudo sai de colunas e tabelas que já existem.
+**Bancada:** `/preview-home?w=20&medico=com` · `&medico=carregando` ·
+`&medico=ilegivel` — os três entraram na varredura de CI; a de disco abre só o
+padrão, que era justamente o único já correto.
+**Medido:** 6.529 testes · 220 bancadas · 19 roteiros · **12 mutantes em
+vermelho** e a contraprova da catraca da inicial.
