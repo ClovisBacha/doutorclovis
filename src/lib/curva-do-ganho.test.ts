@@ -132,3 +132,43 @@ describe("a tela deriva as DUAS metades da mesma régua", () => {
     expect(tab.slice(i, i + 300)).not.toContain("Configure");
   });
 });
+
+describe("o IMC vem da régua única, e a medida implausível não some em silêncio", () => {
+  /**
+   * ⚠️ **A TELA CALCULAVA O IMC À MÃO, E JÁ DIVERGIA.** `curva-de-ganho.ts`
+   * exporta `imcPreGestacional` e `faixaDoImc` e afirma por escrito que a régua
+   * mora lá "porque já são dois leitores". A cópia inline escrevia "peso
+   * normal" e "abaixo do peso" onde a régua diz "peso adequado" e "baixo peso":
+   * a mesma mulher lia dois nomes para a mesma faixa em duas telas do mesmo
+   * app. E a cópia não tinha as GUARDAS de plausibilidade.
+   */
+  test("altura implausível não vira curva — vira convite que EXPLICA", () => {
+    const f = faltaParaACurva({ alturaCm: 17, pesoPreKg: 62, registrosDePeso: 5 });
+    expect(f).toBe("medida-implausivel");
+    const c = conviteDaCurva(f!);
+    expect(c.texto).toContain("não parecem certos");
+    expect(c.acao).toBeTruthy();
+  });
+
+  test("peso implausível também", () => {
+    expect(faltaParaACurva({ alturaCm: 165, pesoPreKg: 12, registrosDePeso: 5 })).toBe(
+      "medida-implausivel",
+    );
+  });
+
+  test("a medida boa continua passando", () => {
+    expect(faltaParaACurva({ alturaCm: 165, pesoPreKg: 62, registrosDePeso: 5 })).toBe(null);
+  });
+
+  test("⚠️ a tela não redefine o IMC nem os rótulos de faixa", () => {
+    /* A asserção que faltava: o nome do teste vizinho afirmava "uma régua só"
+       sobre uma checagem que conferia um terço dela. */
+    const tela = semComentarios(readFileSync("src/components/health-tab.tsx", "utf8"));
+    expect(tela).toContain("imcPreGestacional(");
+    expect(tela).toContain("faixaDoImc(");
+    /* Nenhuma segunda conta de IMC, e nenhum rótulo de faixa escrito à mão. */
+    expect(tela).not.toMatch(/heightM \* heightM/);
+    expect(tela).not.toContain('"peso normal"');
+    expect(tela).not.toContain('"abaixo do peso"');
+  });
+});

@@ -64,7 +64,16 @@ function montar(estado: string): SaudeClinica | "falhou" {
        APLICAR_ posterior ao da view. */
     if (estado === "fora" && f.tabela === "epds_logs")
       return { ...f, estado: "fora_da_view" as const, linhasNaTabela: 37, linhasNaView: 0 };
-    if (i > 8)
+    /* ⚠️ **AS TRÊS ÚLTIMAS FONTES SAÍAM CINZA NO `campovelho` — e o cabeçalho
+       deste arquivo e o comentário da varredura de CI afirmavam, os dois, que
+       ele é "as DOZE fontes verdes e a view velha".** Medido: nove "chegando" e
+       três "sem dados". O alarme desenhado logo acima delas diz por escrito "a
+       fonte está na view — por isso a lista abaixo fica verde", então o único
+       estado cuja tese é essa era o que a desmentia na própria tela.
+
+       O corte de `i > 8` serve ao estado PADRÃO (`?estado=ok`), onde uma base
+       com tabelas vazias é realista. */
+    if (estado !== "campovelho" && i > 8)
       return { ...f, estado: "indeterminado" as const, linhasNaTabela: 0, linhasNaView: 0 };
     return { ...f, estado: "ok" as const, linhasNaTabela: 40 + i * 13, linhasNaView: 40 + i * 13 };
   });

@@ -89,6 +89,9 @@ const EXTRAS = [
   "/preview-saude-clinica?estado=semcoluna",
   "/preview-saude-clinica?estado=vazio",
   "/preview-saude-clinica?estado=semview",
+  /* ⚠️ O único estado em que a GRADE muda de forma: o ladrilho de Chutes sai
+     no luto e o de Contrações fica. Nunca tinha sido fotografado. */
+  "/preview-saude?w=20&luto=1",
   "/preview-saude-registros?estado=parcial",
   "/preview-saude-registros?estado=instavel",
   "/preview-saude-registros?estado=grave",

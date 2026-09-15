@@ -193,13 +193,7 @@ function Pagina() {
         Bancada · estado <strong>{estado}</strong> · semana <strong>{w}</strong>
         {luto ? " · Modo Cuidado" : ""}
       </p>
-      <HealthTab
-        gest={{ weeks: w, days: 0, totalDays: w * 7 } as never}
-        profile={perfil}
-        onNavigate={() => {}}
-        careMode={luto}
-        bancada={bancada}
-      />
+      <HealthTab profile={perfil} onNavigate={() => {}} careMode={luto} bancada={bancada} />
     </div>
   );
 }

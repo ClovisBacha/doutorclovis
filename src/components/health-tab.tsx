@@ -22,7 +22,7 @@ import { toast } from "sonner";
 
 import { Field } from "@/components/campo";
 import { conviteDaCurva, faltaParaACurva } from "@/lib/curva-do-ganho";
-import { iomGain } from "@/lib/curva-de-ganho";
+import { faixaDoImc, imcPreGestacional, iomGain } from "@/lib/curva-de-ganho";
 import { NaoConsegueLer } from "@/components/nao-consegui-ler";
 import { supabase } from "@/integrations/supabase/client";
 import { triggerAchievementsCheck } from "@/lib/checar-conquistas";
@@ -38,7 +38,7 @@ import {
 /* ⚠️ `import type` — o tipo é apagado na compilação, então isto NÃO cria
    dependência de tempo de execução com o arquivo de rota. Mesmo caminho de
    `silencio-do-cuidado.tsx` e `kicks-tab.tsx`. */
-import type { Gest, Profile } from "@/routes/_authenticated/minha-conta";
+import type { Profile } from "@/routes/_authenticated/minha-conta";
 
 /**
  * AS CORES DOS GRÁFICOS, E POR QUE ELAS SÃO CONSTANTES NOMEADAS.
@@ -105,13 +105,17 @@ export type HealthLog = {
 };
 
 export function HealthTab({
-  gest,
   profile,
   onNavigate,
   careMode,
   bancada,
 }: {
-  gest: Gest;
+  /* ⚠️ **`gest` SAIU: era prop MORTA.** Dois chamadores a fabricavam e nenhuma
+     linha do corpo a lia — a tela calcula a semana de CADA registro por conta
+     própria, com `computeGestation` sobre o `profile`, que é o que a curva
+     precisa. A prop AFIRMAVA que a tela conhece a idade gestacional que recebe,
+     e na bancada isso custava uma volta: `gest.weeks` e `perfil.lmp_date` eram
+     duas fontes para a mesma semana e só a segunda era lida. */
   profile: Profile | null;
   /* A sub-tela viaja junto — é ela que abre a linha do tempo direto, e não a
      grade. `goToTab` já aceita os dois argumentos. */
@@ -177,10 +181,17 @@ export function HealthTab({
     sleep_hours: "",
     notes: "",
   });
-  /* `showWearable` saiu junto com o bloco que ele abria. Os campos do
-     formulário (`form.spo2` e companhia) continuam no estado e no `payload`:
-     o INSERT segue aceitando as colunas, e um registro antigo aberto para
-     correção não perde os valores por passar por aqui. */
+  /* ⚠️ **ESTE COMENTÁRIO AFIRMAVA UM FLUXO QUE NÃO EXISTE.** Ele dizia que "um
+     registro antigo aberto para correção não perde os valores por passar por
+     aqui" — e não há correção de registro antigo nesta tela: `setForm` é
+     chamado nos cinco campos visíveis e no reset, e a linha da lista que ABRE
+     só revela o botão de apagar, nunca carrega o registro no formulário.
+
+     O que é VERDADE, e o que sobrou: `form.spo2` e companhia são strings vazias
+     permanentes, então os quatro `if (form.X !== "")` do payload nunca
+     disparam. Eles ficam porque o INSERT continua aceitando as colunas no dia
+     em que alguém reintroduzir os campos — e porque tirá-los seria mexer no
+     caminho que grava peso, pressão e glicemia por causa de código inerte. */
 
   /**
    * ⚠️ "NÃO CONSEGUI LER" TINHA A CARA DE "VOCÊ NUNCA REGISTROU NADA" — e esta
@@ -373,8 +384,19 @@ export function HealthTab({
   const prePregW = profile?.pre_pregnancy_weight_kg
     ? Number(profile.pre_pregnancy_weight_kg)
     : null;
-  const heightM = profile?.height_cm ? profile.height_cm / 100 : null;
-  const bmi = prePregW && heightM ? prePregW / (heightM * heightM) : null;
+  /* ⚠️ **ERA UMA SEGUNDA CÓPIA DA RÉGUA, e ela já divergia.**
+     `curva-de-ganho.ts` exporta `imcPreGestacional` e `faixaDoImc`, e o
+     cabeçalho dele afirma por escrito que a régua mora lá "porque já são dois
+     leitores" e que "duas cópias divergiriam no primeiro ajuste, e a
+     divergência apareceria como o gráfico dizendo uma coisa e a nutricionista
+     dizendo outra sobre o mesmo peso". A divergência EXISTIA: a tela escrevia
+     "peso normal" e "abaixo do peso" onde a régua diz "peso adequado" e "baixo
+     peso" — a mesma mulher lia dois nomes para a mesma faixa em duas telas. E a
+     conta inline não tinha as GUARDAS de plausibilidade. */
+  const bmi =
+    prePregW != null && profile?.height_cm != null
+      ? imcPreGestacional(prePregW, profile.height_cm)
+      : null;
 
   /**
    * ⚠️ **"GANHO TOTAL" NÃO ERA O GANHO TOTAL.**
@@ -486,16 +508,7 @@ export function HealthTab({
     ).join(" ");
   const actualPts = weightByWeek.map((p) => `${toSvgX(p.week)},${toSvgY(p.weight)}`).join(" ");
 
-  const bmiLabel =
-    bmi == null
-      ? null
-      : bmi < 18.5
-        ? "abaixo do peso"
-        : bmi < 25
-          ? "peso normal"
-          : bmi < 30
-            ? "sobrepeso"
-            : "obesidade";
+  const bmiLabel = bmi == null ? null : faixaDoImc(bmi);
 
   /* ⚠️ A ORDEM É O CONSERTO: a falha vem ANTES do vazio. Trocadas, quem
      registra há meses lê quatro traços e "Você ainda não registrou nada." */
@@ -643,9 +656,15 @@ export function HealthTab({
             da tela mais clínica do app.
 
             Os valores JÁ REGISTRADOS não sumiram: as colunas continuam em
-            `health_logs`, aparecem na lista de correção mais abaixo e seguem
-            para o `clinical_events` que o médico lê. Parar de pedir é uma
-            decisão; apagar o que ela já mandou seria outra. */}
+            `health_logs` e aparecem na lista de correção mais abaixo. Parar de
+            pedir é uma decisão; apagar o que ela já mandou seria outra.
+
+            ⚠️ **E O QUE CHEGA AO MÉDICO É METADE**, ao contrário do que este
+            comentário afirmava: SpO₂ e frequência seguem para
+            `clinical_events`; passos e sono NÃO — a view não os projeta. Não
+            "conserte" isso ampliando a view: a decisão registrada é que os
+            quatro não mudam conduta obstétrica, e ampliá-la seria desfazê-la
+            pelo caminho de um comentário errado. */}
       </div>
 
       {/* IOM weight corridor chart — Feature #9 */}

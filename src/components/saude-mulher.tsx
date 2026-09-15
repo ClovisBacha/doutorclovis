@@ -86,7 +86,13 @@ export function SaudeMulherHub({
           <CicloMenstrualTab
             gestante={gestante}
             bancada={
-              bancada && { cycles: bancada.cycles ?? [], instavel: bancada.instavel ?? false }
+              bancada && {
+                cycles: bancada.cycles ?? [],
+                instavel: bancada.instavel ?? false,
+                /* ⚠️ O `hoje` ia só para os preventivos — e o ciclo é o estado
+                   PADRÃO da rota, ou seja o primeiro que a varredura abre. */
+                hoje: bancada.hoje,
+              }
             }
           />
         )}

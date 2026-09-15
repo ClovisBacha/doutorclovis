@@ -20,13 +20,22 @@
  * afirmando o que o código não faz.
  */
 
+import { imcPreGestacional } from "@/lib/curva-de-ganho";
+
 export type FaltaParaACurva =
   /** Nem altura nem peso pré-gestacional. */
   | "os-dois"
   | "altura"
   | "peso-pre"
   /** Os dois estão lá; falta ela registrar um peso para haver o que desenhar. */
-  | "registro-de-peso";
+  | "registro-de-peso"
+  /**
+   * ⚠️ Os dois campos estão preenchidos e o IMC não sai: a altura ou o peso
+   * está fora da faixa que `imcPreGestacional` admite. Sem este caso a curva
+   * sumia em SILÊNCIO — que é exatamente o estado sem saída que esta régua
+   * nasceu para fechar, chegando por outro número.
+   */
+  | "medida-implausivel";
 
 /**
  * `null` = a curva pode ser desenhada. Qualquer outro valor é o que falta.
@@ -46,6 +55,11 @@ export function faltaParaACurva(o: {
   if (!temAltura && !temPeso) return "os-dois";
   if (!temAltura) return "altura";
   if (!temPeso) return "peso-pre";
+  /* ⚠️ **O IMC SAI DA RÉGUA ÚNICA, e é ela que tem as guardas.** A tela
+     calculava `peso / (altura/100)²` à mão, sem faixa de plausibilidade: uma
+     altura de 17 cm digitada por engano desenhava um corredor do IOM a partir
+     de um IMC impossível. Aqui a curva não aparece e o convite DIZ por quê. */
+  if (imcPreGestacional(o.pesoPreKg!, o.alturaCm!) == null) return "medida-implausivel";
   if (o.registrosDePeso <= 0) return "registro-de-peso";
   return null;
 }
@@ -74,6 +88,12 @@ export function conviteDaCurva(f: FaltaParaACurva): { texto: string; acao: strin
         texto:
           "Falta o seu peso antes da gestação para eu desenhar a curva de ganho recomendada pelo IOM — a altura você já preencheu.",
         acao: "Preencher no Perfil",
+      };
+    case "medida-implausivel":
+      return {
+        texto:
+          "A altura ou o peso antes da gestação que estão no seu Perfil não parecem certos — confira os dois para eu desenhar a curva.",
+        acao: "Conferir no Perfil",
       };
     case "registro-de-peso":
       return {

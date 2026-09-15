@@ -55,8 +55,8 @@ const TPM_SYMPTOMS = [
   "Ansiedade",
 ];
 
-function CicloHero({ model }: { model: CycleModel }) {
-  const today = startOfDay(new Date());
+function CicloHero({ model, agora }: { model: CycleModel; agora: Date }) {
+  const today = startOfDay(agora);
   const dayInCycle = cycleDayFor(today, model);
   const { phase } = classifyDay(today, model);
   const meta = PHASE_META[phase];
@@ -130,7 +130,7 @@ function CicloHero({ model }: { model: CycleModel }) {
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <div className="rounded-2xl bg-secondary/60 px-3 py-2.5">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+              <p className="font-serif text-[15px] font-semibold text-muted-foreground">
                 Próximo período
               </p>
               <p className="font-serif text-lg">{fmt(marks.nextPeriod)}</p>
@@ -145,12 +145,14 @@ function CicloHero({ model }: { model: CycleModel }) {
               )}
             </div>
             <div className="rounded-2xl bg-secondary/60 px-3 py-2.5">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Ovulação</p>
+              <p className="font-serif text-[15px] font-semibold text-muted-foreground">Ovulação</p>
               <p className="font-serif text-lg">{fmt(marks.ovulation)}</p>
               <p className="text-xs text-muted-foreground">estimada</p>
             </div>
             <div className="col-span-2 rounded-2xl bg-secondary/60 px-3 py-2.5 sm:col-span-1">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Janela fértil</p>
+              <p className="font-serif text-[15px] font-semibold text-muted-foreground">
+                Janela fértil
+              </p>
               <p className="font-serif text-base">
                 {fmt(marks.fertileStart)} – {fmt(marks.fertileEnd)}
               </p>
@@ -167,9 +169,9 @@ function CicloHero({ model }: { model: CycleModel }) {
   );
 }
 
-function CicloCalendario({ model }: { model: CycleModel }) {
+function CicloCalendario({ model, agora }: { model: CycleModel; agora: Date }) {
   const [monthOffset, setMonthOffset] = useState(0);
-  const today = startOfDay(new Date());
+  const today = startOfDay(agora);
   const base = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
   const monthLabel = base.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
   const gridStart = addDays(base, -base.getDay());
@@ -261,18 +263,37 @@ export function CicloMenstrualTab({
      desenho. O anel de fases e o calendário só existem com ciclos gravados, e
      a faixa de "não consegui ler" só nasce de uma falha de rede — sem isto,
      conferir esta tela exigia uma conta com meses de registro. */
-  bancada?: { cycles?: MenstrualCycle[]; instavel?: boolean };
+  /* ⚠️ **`hoje` É OBRIGATÓRIO NUMA BANCADA QUE CRAVA AS DATAS.** A rota crava
+     os ciclos e o "hoje", e este componente descartava o segundo: lia
+     `new Date()` em três pontos. Medido no navegador com o relógio forjado,
+     mesma URL: no dia em que a bancada foi escrita dava "Dia do ciclo 13 ·
+     Ovulação"; nove dias depois, "Dia do ciclo 22 · Fase lútea" — a bancada
+     mudou de FASE sozinha —, e dois meses adiante o anel some inteiro. Duas
+     fotos de dias diferentes deixam de se comparar, que é o oposto do que uma
+     bancada existe para fazer. */
+  bancada?: { cycles?: MenstrualCycle[]; instavel?: boolean; hoje?: string };
 }) {
+  /* Na produção é o relógio DELA; só a bancada crava. */
+  const agora = bancada?.hoje ? new Date(bancada.hoje) : new Date();
+  /**
+   * ⚠️ **O DIA CIVIL DELA, e nunca `toISOString().slice(0,10)`.** Aquele
+   * converte para UTC antes de cortar: em São Paulo, das 21h à meia-noite o ISO
+   * já está no dia SEGUINTE, e o campo abria pré-preenchido com amanhã. Esta
+   * data vira a DUM (`lmp_date`) e, por ela, a idade gestacional e a DPP — um
+   * dia de erro numa em cada quatro aberturas, no número que decide conduta.
+   * A régua é a mesma de `health-tab.tsx`, que já grava `log_date` assim.
+   */
+  const hojeLocal = agora.toLocaleDateString("en-CA");
   const [cycles, setCycles] = useState<MenstrualCycle[]>(bancada?.cycles ?? []);
   const [loading, setLoading] = useState(!bancada);
   const [showForm, setShowForm] = useState(false);
-  const [newStartDate, setNewStartDate] = useState(new Date().toISOString().split("T")[0]);
+  const [newStartDate, setNewStartDate] = useState(hojeLocal);
   const [newFlow, setNewFlow] = useState("normal");
   const [newSymptoms, setNewSymptoms] = useState<string[]>([]);
   const [newNotes, setNewNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [endingId, setEndingId] = useState<string | null>(null);
-  const [endDate, setEndDate] = useState(new Date().toISOString().split("T")[0]);
+  const [endDate, setEndDate] = useState(hojeLocal);
   /* ⚠️ Falha de leitura NÃO é lista vazia — ver `NaoConsegueLer`. */
   const [instavel, setInstavel] = useState(bancada?.instavel ?? false);
   /* ⚠️ Guarda BOOLEANO, e não o objeto: um literal remontado a cada render
@@ -382,7 +403,7 @@ export function CicloMenstrualTab({
      motivo mais comum de ele envelhecer — mas depois do parto, ou para quem
      parou de registrar, projetar a partir de um período de meses atrás daria
      um "dia do ciclo" fabricado. Ver `previsaoAindaVale`. */
-  const historicoVelho = model != null && !previsaoAindaVale(model.lastStart, new Date());
+  const historicoVelho = model != null && !previsaoAindaVale(model.lastStart, agora);
   const mostraPrevisao = model != null && !gestante && !historicoVelho;
 
   if (loading) return <TabSkeleton />;
@@ -448,10 +469,10 @@ export function CicloMenstrualTab({
         gestante || historicoVelho || instavel ? null : model ? (
           <Stagger className="space-y-4">
             <StaggerItem>
-              <CicloHero model={model} />
+              <CicloHero model={model} agora={agora} />
             </StaggerItem>
             <StaggerItem>
-              <CicloCalendario model={model} />
+              <CicloCalendario model={model} agora={agora} />
             </StaggerItem>
           </Stagger>
         ) : (

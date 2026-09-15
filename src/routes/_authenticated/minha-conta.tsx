@@ -3244,12 +3244,7 @@ function MinhaContaPage() {
                 {tab === "Saúde" && (
                   <div className="space-y-5">
                     <CabecalhoDaSaude chave="Saúde" />
-                    <HealthTab
-                      gest={gest}
-                      profile={profile}
-                      onNavigate={goToTab}
-                      careMode={careMode}
-                    />
+                    <HealthTab profile={profile} onNavigate={goToTab} careMode={careMode} />
                   </div>
                 )}
                 {tab === "Nutrição" && (
