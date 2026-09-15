@@ -22,6 +22,32 @@ const hub = semComentarios(readFileSync("src/routes/_authenticated/minha-conta.t
 const grade = semComentarios(readFileSync("src/components/grade-hub.tsx", "utf8"));
 const ciclo = semComentarios(readFileSync("src/components/ciclo-menstrual-tab.tsx", "utf8"));
 
+/**
+ * OS INTERVALOS DE TEXTO QUE UM TERMO GATEIA NO JSX.
+ *
+ * ⚠️ **ISTO SUBSTITUI UMA JANELA DE 200 CARACTERES, e a janela deixava passar
+ * o pior mutante que este arquivo podia ter:** envolver a tela clínica INTEIRA
+ * num `{!careMode && (…)}` e apagar peso, pressão, glicemia e a lista para quem
+ * está em luto. A distância nunca é a garantia — o guarda de um bloco pode
+ * estar a mil caracteres das âncoras que ele engole, e esta base já pagou isso
+ * mais de dez vezes.
+ *
+ * Ela acha cada `cond && (` que fale do termo e mede o ALCANCE dele contando
+ * parênteses. Quem cair dentro está gateado, more o guarda onde morar.
+ */
+function guardasAbertosEm(fonte: string, pos: number): string[] {
+  const pilha: number[] = [];
+  for (let i = 0; i < pos; i++) {
+    const c = fonte[i];
+    if (c === "(") pilha.push(i);
+    else if (c === ")") pilha.pop();
+  }
+  /* O CABEÇALHO de cada parêntese ainda aberto: é onde o guarda mora
+     (`{cond && (`, `cond ? (`). Cento e vinte caracteres cobrem uma condição
+     quebrada em três linhas pelo prettier. */
+  return pilha.map((i) => fonte.slice(Math.max(0, i - 120), i));
+}
+
 /** O corpo de uma função, da assinatura até a próxima do mesmo nível. */
 function corpoDe(fonte: string, assinatura: string): string {
   const i = fonte.indexOf(assinatura);
@@ -35,8 +61,13 @@ describe("o apagar de um registro clínico", () => {
   /* ⚠️ O que havia era um `<button>` cujo único conteúdo era o glifo `×`:
      medido a 393px, 8×18 pixels, apagando peso/pressão/glicemia na hora. As
      duas abas irmãs resolveram isto com a linha que ABRE. */
+  /* ⚠️ **ERA COM A INDENTAÇÃO EXATA** — dezesseis espaços antes do × e catorze
+     antes do `</button>` —, ou seja, ela só reconhecia o defeito se ele
+     voltasse formatado do mesmo jeito. Qualquer reformatação do prettier o
+     deixava passar. O que se cobra é a FORMA: nenhum botão cujo conteúdo seja
+     só o glifo. */
   test("não é um glifo solto — o × sumiu", () => {
-    expect(saude).not.toContain(">\n                ×\n              </button>");
+    expect(saude).not.toMatch(/>\s*×\s*<\/button>/);
     expect(saude).not.toContain('aria-label="Apagar este registro"');
   });
 
@@ -47,7 +78,11 @@ describe("o apagar de um registro clínico", () => {
 
   test("tem alvo de 44px e diz o que apagar", () => {
     const bloco = saude.slice(saude.indexOf("Apagar este registro"));
-    expect(saude).toMatch(/min-h-11[^"]*"\s*>\s*Apagar este registro/);
+    /* ⚠️ **AS DUAS FORMAS QUE O REPOSITÓRIO USA PARA O MESMO ALVO DE 44px.**
+       Travar `min-h-11` reprovava `min-h-[44px]`, que é a grafia de outros
+       arquivos daqui — e um teste que reprova a forma equivalente é um teste
+       que ensina alguém a relaxá-lo. */
+    expect(saude).toMatch(/(?:min-h-11|min-h-\[44px\])[^"]*"\s*>\s*Apagar este registro/);
     expect(bloco).toContain("Apague só o que não aconteceu");
   });
 
@@ -83,6 +118,11 @@ describe("o Modo Cuidado na tela de peso, pressão e glicemia", () => {
      FALAR DO BEBÊ, nunca de MEDIR a paciente. Um teste que só cobrisse o
      portão aprovaria alguém "consertando" o luto ao custo dos números dela. */
   test("peso, pressão, glicemia e a lista NÃO são gateados", () => {
+    /* ⚠️ **ERA UMA JANELA DE 200 CARACTERES ANTES DA ÂNCORA — e ela deixava
+       passar o pior mutante possível:** envolver a tela clínica inteira num
+       `{!careMode && (…)}`, que apaga peso, pressão, glicemia, os gráficos e a
+       lista para quem está em luto. O guarda fica longe das âncoras, e a janela
+       não o via. Agora se mede o ALCANCE do guarda, contando parênteses. */
     for (const ancora of [
       "Último peso",
       "Histórico de pressão arterial",
@@ -92,8 +132,8 @@ describe("o Modo Cuidado na tela de peso, pressão e glicemia", () => {
     ]) {
       const i = saude.indexOf(ancora);
       if (i < 0) throw new Error(`âncora não encontrada: ${ancora}`);
-      /* nada de `careMode` nas duzentas posições anteriores à âncora */
-      expect(saude.slice(Math.max(0, i - 200), i)).not.toContain("careMode");
+      const gateada = guardasAbertosEm(saude, i).some((g) => /\bcareMode\b/.test(g));
+      expect({ ancora, gateada }).toEqual({ ancora, gateada: false });
     }
   });
 
@@ -106,11 +146,24 @@ describe("o número do bloco no hub da Saúde", () => {
   /* ⚠️ Contar só o servidor faz o bloco afirmar um número MENOR do que ela
      cronometrou, num dia de trabalho de parto — as duas abas guardam registro
      no aparelho desde set/2026. */
+  /* ⚠️ **AS TRÊS ASSERÇÕES ANTERIORES PROCURAVAM NOMES, NUNCA A CORRENTE** —
+     passar `[]` no lugar das pendentes deixava as três strings no arquivo e o
+     teste verde. É a armadilha "o nome continua sendo chamado" pela enésima
+     vez: o que importa é o RESULTADO da fila chegar à mescla. */
   test("mescla a fila local nas duas fontes", () => {
-    expect(hub).toContain("lerFilaDeChutes(uid");
-    expect(hub).toContain("lerFilaDeContracoes(uid");
-    /* uma mescla para cada bloco */
-    expect(hub.match(/mesclarRegistros\(/g)?.length).toBeGreaterThanOrEqual(2);
+    const pendentes = {
+      chutes: hub.match(/const (\w+) = uid \? lerFilaDeChutes\(uid/)?.[1],
+      contracoes: hub.match(/const (\w+) = uid \? lerFilaDeContracoes\(uid/)?.[1],
+    };
+    expect(pendentes.chutes).toBeTruthy();
+    expect(pendentes.contracoes).toBeTruthy();
+
+    /* Cada mescla recebe a variável que a fila produziu — e não uma lista
+       vazia, nem a outra fila. */
+    const mesclas = [...hub.matchAll(/mesclarRegistros\(([\s\S]*?)\n {6}\)/g)].map((m) => m[1]);
+    expect(mesclas.length).toBeGreaterThanOrEqual(2);
+    expect(mesclas.some((m) => m.includes(pendentes.chutes!))).toBe(true);
+    expect(mesclas.some((m) => m.includes(pendentes.contracoes!))).toBe(true);
   });
 
   /* A fila guarda sete dias; somá-la inteira poria terça no contador de hoje. */
@@ -149,8 +202,17 @@ describe("o convite do ciclo", () => {
     expect(ciclo).not.toContain("!mostraPrevisao ? null :");
   });
 
+  /* ⚠️ **A REGEX EXIGIA `gestante` COMO PRIMEIRO TERMO** — trocar a ordem dos
+     três, que é uma reescrita sem mudança de comportamento, reprovava. O que se
+     cobra é que os três estejam na MESMA condição, em qualquer ordem. */
   test("é barrado pela gestação, pelo histórico velho e pela FALHA de leitura", () => {
-    const cond = ciclo.match(/\n\s*gestante \|\|[^?]*\?/)?.[0] ?? "";
+    /* A condição do CONVITE é a que termina em `? null :` — ela existe para
+       BARRAR, e o convite mora no ramo de baixo. Encontrada pelos termos, em
+       qualquer ordem. */
+    const cond =
+      ciclo.match(/\n\s*[^\n]*\binstavel\b[^\n]*\?\s*null\s*:/)?.[0] ??
+      ciclo.match(/\n\s*[^\n]*\bgestante\b[^\n]*\?\s*null\s*:/)?.[0] ??
+      "";
     expect(cond).toContain("gestante");
     expect(cond).toContain("historicoVelho");
     /* sem isto, "Registre seu período abaixo" é dito a quem tem meses de

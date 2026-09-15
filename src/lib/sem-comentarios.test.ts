@@ -99,6 +99,25 @@ describe("a tela que motivou a régua", () => {
     expect(ingenuo(cru)).not.toContain(DEPOIS);
     expect(semComentarios(cru)).toContain(DEPOIS);
   });
+  test("⚠️ e no arquivo REAL ele engole código a partir do seletor de foto", () => {
+    /* ⚠️ **A MEDIDA, e não uma afirmação de memória.** A auditoria registrou
+       "83 linhas cegadas, e uma delas é o `AlbumTab`" — e isso era verdade
+       quando foi medido. Depois dos cortes de `minha-conta.tsx` a distância
+       encolheu: hoje o ingênuo engole treze linhas a partir do
+       `accept="image/…"`, e nenhuma âncora daquele teste cai lá.
+
+       O hazard continua: o que separa treze linhas de oitenta e três é o lugar
+       do próximo comentário de bloco, ou seja, nada que alguém controle. Por
+       isso a régua única — e por isso esta contraprova mede o que É verdade
+       hoje em vez de repetir o número antigo. */
+    const bruto = readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8");
+    const ingenuo = bruto.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\{\/\*[\s\S]*?\*\/\}/g, " ");
+    const ancora = "Toque na foto para";
+    expect(bruto).toContain(ancora);
+    expect(ingenuo).not.toContain(ancora);
+    expect(semComentarios(bruto)).toContain(ancora);
+  });
+
   test("e a prosa dela some de verdade", () => {
     /* `visualViewport` aparece SÓ em comentário nesta tela — é o que permite a
        um teste vizinho cobrar, por asserção negativa, que ela não meça a

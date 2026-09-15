@@ -31,20 +31,18 @@
 import { describe, test, expect } from "bun:test";
 import { readFileSync } from "node:fs";
 
+import { semComentarios } from "@/lib/sem-comentarios";
+
 /* A prosa deste arquivo e a dos dois alvos CITAM o que proíbem ("itens.length
    === 4", "auto-rows-fr"). Sem tirar os comentários, a busca mentiria nas duas
    direções — aprovando o defeito documentado ou reprovando o conserto que o
    explica. */
-function semComentarios(src: string): string {
-  return src
-    .split("\n")
-    .filter((l) => {
-      const t = l.trim();
-      return !(t.startsWith("//") || t.startsWith("*") || t.startsWith("/*"));
-    })
-    .join("\n");
-}
-
+/* ⚠️ **O APAGADOR PRÓPRIO NÃO RECONHECIA COMENTÁRIO DE JSX** — ele testava
+   `t.startsWith("/*")`, e um comentário de JSX começa com `{`. Então
+   um comentário de JSX sobrevivia inteiro, e a prosa nova podia REPROVAR
+   código correto (ou aprovar o defeito documentado). A régua única é
+   `src/lib/sem-comentarios.ts`, e ela existe justamente porque as duas formas
+   ingênuas — a de regex e a de linha — mordem nos dois sentidos. */
 const GRADE = semComentarios(readFileSync("src/components/grade-hub.tsx", "utf8"));
 const CONTA = semComentarios(readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8"));
 

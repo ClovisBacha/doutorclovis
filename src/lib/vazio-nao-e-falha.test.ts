@@ -30,6 +30,8 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
+import { semComentarios } from "@/lib/sem-comentarios";
+
 /** ⚠️ A prosa deste repositório CITA o que ela proíbe — sai antes da busca. */
 /** ⚠️ Corta na próxima função exportada, nunca num `});` — o primeiro deles
  *  é o `.order(..., { ascending: false });`, e cortar ali deixava de fora
@@ -39,8 +41,13 @@ const proximoExport = (f: string, i: number) => {
   return j === -1 ? undefined : j;
 };
 
-const semComentarios = (t: string) =>
-  t.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\{\/\*[\s\S]*?\*\/\}/g, " ");
+/* ⚠️ **O APAGADOR INGÊNUO CEGAVA 83 LINHAS DE `minha-conta.tsx`.** A forma de
+   regex abre um "comentário" na barra-asterisco que vive DENTRO de uma string
+   (`accept="image/…"`) e só o fecha centenas de linhas abaixo — e uma delas era
+   o `AlbumTab`, cuja frase proibida reaparecia e deixava a asserção NEGATIVA
+   verde. É exatamente a armadilha que `src/lib/sem-comentarios.ts` foi escrito
+   para substituir: ela ancora a abertura no COMEÇO DA LINHA, que é onde todo
+   comentário de bloco deste repositório começa. */
 
 const CONTA = semComentarios(readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8"));
 
