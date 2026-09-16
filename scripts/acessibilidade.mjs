@@ -60,6 +60,10 @@ const ROTAS = [
      acessível, o mesmo par que `components/campo.tsx` já tinha consertado na
      cópia compartilhada. É a lição do 👍👎 da nutrição outra vez: o que esta
      varredura não abre, ninguém mede. */
+  /* ⚠️ A tela do CONSENTIMENTO de push: ela ganhou um botão de desligar em
+     set/2026, e controle novo sem medida é como o 👍👎 da nutrição passou meses
+     com alvo de 16×18. */
+  "/preview-avisos?estado=ativo",
   "/agendamento",
   "/epds",
 ];

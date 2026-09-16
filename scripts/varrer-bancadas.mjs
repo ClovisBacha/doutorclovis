@@ -167,6 +167,12 @@ const EXTRAS = [
      padrão (`?medico=sem`), que era justamente o único já correto: os outros
      três nasceram e quebraram sem ninguém nunca ter olhado — e um deles é o de
      TODA abertura do app. */
+  /* ⚠️ Os três estados dos AVISOS que a varredura de disco não abre. O padrão
+     é `ativo`; "desligado" é justamente o que nunca existiu até set/2026 — e
+     um estado que ninguém abre é um estado que nasce sem ninguém ter olhado. */
+  "/preview-avisos?estado=desligado",
+  "/preview-avisos?estado=bloqueado",
+  "/preview-avisos?estado=nunca",
   "/preview-home?w=20&medico=com",
   "/preview-home?w=20&medico=carregando",
   "/preview-home?w=20&medico=ilegivel",

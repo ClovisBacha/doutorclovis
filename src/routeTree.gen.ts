@@ -62,6 +62,7 @@ import { Route as PreviewBolhaRouteImport } from './routes/preview-bolha'
 import { Route as PreviewBebeTabRouteImport } from './routes/preview-bebe-tab'
 import { Route as PreviewBebeRouteImport } from './routes/preview-bebe'
 import { Route as PreviewBancoRouteImport } from './routes/preview-banco'
+import { Route as PreviewAvisosRouteImport } from './routes/preview-avisos'
 import { Route as PreviewAssinaturaRouteImport } from './routes/preview-assinatura'
 import { Route as PreviewAmigasRouteImport } from './routes/preview-amigas'
 import { Route as PreviewAgendaRouteImport } from './routes/preview-agenda'
@@ -385,6 +386,11 @@ const PreviewBancoRoute = PreviewBancoRouteImport.update({
   path: '/preview-banco',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PreviewAvisosRoute = PreviewAvisosRouteImport.update({
+  id: '/preview-avisos',
+  path: '/preview-avisos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PreviewAssinaturaRoute = PreviewAssinaturaRouteImport.update({
   id: '/preview-assinatura',
   path: '/preview-assinatura',
@@ -693,6 +699,7 @@ export interface FileRoutesByFullPath {
   '/preview-agenda': typeof PreviewAgendaRoute
   '/preview-amigas': typeof PreviewAmigasRoute
   '/preview-assinatura': typeof PreviewAssinaturaRoute
+  '/preview-avisos': typeof PreviewAvisosRoute
   '/preview-banco': typeof PreviewBancoRoute
   '/preview-bebe': typeof PreviewBebeRoute
   '/preview-bebe-tab': typeof PreviewBebeTabRoute
@@ -803,6 +810,7 @@ export interface FileRoutesByTo {
   '/preview-agenda': typeof PreviewAgendaRoute
   '/preview-amigas': typeof PreviewAmigasRoute
   '/preview-assinatura': typeof PreviewAssinaturaRoute
+  '/preview-avisos': typeof PreviewAvisosRoute
   '/preview-banco': typeof PreviewBancoRoute
   '/preview-bebe': typeof PreviewBebeRoute
   '/preview-bebe-tab': typeof PreviewBebeTabRoute
@@ -915,6 +923,7 @@ export interface FileRoutesById {
   '/preview-agenda': typeof PreviewAgendaRoute
   '/preview-amigas': typeof PreviewAmigasRoute
   '/preview-assinatura': typeof PreviewAssinaturaRoute
+  '/preview-avisos': typeof PreviewAvisosRoute
   '/preview-banco': typeof PreviewBancoRoute
   '/preview-bebe': typeof PreviewBebeRoute
   '/preview-bebe-tab': typeof PreviewBebeTabRoute
@@ -1027,6 +1036,7 @@ export interface FileRouteTypes {
     | '/preview-agenda'
     | '/preview-amigas'
     | '/preview-assinatura'
+    | '/preview-avisos'
     | '/preview-banco'
     | '/preview-bebe'
     | '/preview-bebe-tab'
@@ -1137,6 +1147,7 @@ export interface FileRouteTypes {
     | '/preview-agenda'
     | '/preview-amigas'
     | '/preview-assinatura'
+    | '/preview-avisos'
     | '/preview-banco'
     | '/preview-bebe'
     | '/preview-bebe-tab'
@@ -1248,6 +1259,7 @@ export interface FileRouteTypes {
     | '/preview-agenda'
     | '/preview-amigas'
     | '/preview-assinatura'
+    | '/preview-avisos'
     | '/preview-banco'
     | '/preview-bebe'
     | '/preview-bebe-tab'
@@ -1360,6 +1372,7 @@ export interface RootRouteChildren {
   PreviewAgendaRoute: typeof PreviewAgendaRoute
   PreviewAmigasRoute: typeof PreviewAmigasRoute
   PreviewAssinaturaRoute: typeof PreviewAssinaturaRoute
+  PreviewAvisosRoute: typeof PreviewAvisosRoute
   PreviewBancoRoute: typeof PreviewBancoRoute
   PreviewBebeRoute: typeof PreviewBebeRoute
   PreviewBebeTabRoute: typeof PreviewBebeTabRoute
@@ -1813,6 +1826,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PreviewBancoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/preview-avisos': {
+      id: '/preview-avisos'
+      path: '/preview-avisos'
+      fullPath: '/preview-avisos'
+      preLoaderRoute: typeof PreviewAvisosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/preview-assinatura': {
       id: '/preview-assinatura'
       path: '/preview-assinatura'
@@ -2252,6 +2272,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreviewAgendaRoute: PreviewAgendaRoute,
   PreviewAmigasRoute: PreviewAmigasRoute,
   PreviewAssinaturaRoute: PreviewAssinaturaRoute,
+  PreviewAvisosRoute: PreviewAvisosRoute,
   PreviewBancoRoute: PreviewBancoRoute,
   PreviewBebeRoute: PreviewBebeRoute,
   PreviewBebeTabRoute: PreviewBebeTabRoute,

@@ -26,7 +26,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { ehNativo, plataforma } from "@/lib/nativo";
-import { registrarTokenNativo } from "@/lib/push-nativo.functions";
+import { esquecerTokenNativo, registrarTokenNativo } from "@/lib/push-nativo.functions";
 import { caminhoSeguroDoPush } from "@/lib/destino-do-push";
 
 export type ResultadoPush = { ok: boolean; reason?: string };
@@ -64,6 +64,46 @@ export async function inscreverPushNativo(): Promise<ResultadoPush> {
       data: { accessToken, token, plataforma: plataforma() },
     });
     return r.ok ? { ok: true } : { ok: false, reason: r.reason };
+  } catch {
+    return { ok: false, reason: "error" };
+  }
+}
+
+/**
+ * DESLIGAR os avisos neste aparelho.
+ *
+ * ⚠️ **Só devolve `ok` quando a linha saiu do banco.** É ela que o servidor lê
+ * na hora de enviar: enquanto estiver lá, o push continua chegando — e um
+ * botão que diz "desliguei" sobre um canal que continua tocando é pior que não
+ * ter o botão, porque ela para de procurar o interruptor de verdade (o das
+ * Configurações do sistema, que leva o aviso de consulta e o retorno do SOS
+ * junto).
+ *
+ * ⚠️ **O token vem do MESMO `esperarToken` da inscrição**, e não de um cache: o
+ * Capacitor não guarda o token, quem guarda é o sistema, e ele pode ter sido
+ * rotacionado desde a última vez. Sem rede o token não chega — e aí a resposta
+ * é `sem-token`, nunca um "pronto" otimista.
+ */
+export async function cancelarPushNativo(): Promise<ResultadoPush> {
+  if (!ehNativo()) return { ok: false, reason: "nao-nativo" };
+  try {
+    const { PushNotifications } = await import("@capacitor/push-notifications");
+
+    const token = await esperarToken(PushNotifications);
+    if (!token) return { ok: false, reason: "sem-token" };
+
+    const { data: s } = await supabase.auth.getSession();
+    const accessToken = s.session?.access_token;
+    if (!accessToken) return { ok: false, reason: "no-session" };
+
+    const r = await esquecerTokenNativo({ data: { accessToken, token } });
+    if (!r.ok) return { ok: false, reason: r.reason };
+
+    /* Depois de a linha sair: o sistema para de entregar a este aparelho. Um
+       `unregister` que falhe não desfaz o que importa — o servidor já não tem
+       para onde mandar —, então ele não decide o desfecho. */
+    await PushNotifications.unregister().catch(() => {});
+    return { ok: true };
   } catch {
     return { ok: false, reason: "error" };
   }

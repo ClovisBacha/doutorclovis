@@ -17455,3 +17455,104 @@ varredura não enxerga leitura em SQL —, e `offered_at` é metadado sem leitor
 lado de `offer_deadline`, que É lido e é quem carrega o prazo de 4h da fila. Os
 dois falsos positivos ficam escritos porque **achado sem conferência é
 hipótese**, e conferir custou minutos.
+
+## ⚠️ NÃO HAVIA COMO DESLIGAR OS AVISOS — e o consentimento descrevia um décimo do canal (set/2026)
+
+Achado por uma varredura de **exports de `src/lib` sem nenhum uso** (327 módulos,
+22 candidatos). ⚠️ **O número bruto não era a resposta, de novo**: a maioria é
+constante de medição ou resíduo. Um era recurso inteiro sem porta.
+
+`unsubscribeFromPush` estava escrita desde que o push nasceu, com **zero
+chamadores**. A tela "Dicas semanais" oferecia, no estado ativo, uma caixa verde
+e um botão de **teste** — e mais nada. **Parar de receber só era possível pelas
+Configurações do sistema, que silenciam o app INTEIRO.**
+
+⚠️ **E o custo disso já está escrito neste arquivo, duas vezes:** _"o incidente
+não é 'ela desliga o som', é **ela silenciar o app inteiro nas Configurações do
+iPhone**"_ — o mesmo canal por onde chegam a confirmação da consulta, o lembrete
+de 24h e o pedido de pré-consulta. A leva das preferências da Comunidade
+consertou o grão FINO (por espécie de aviso da rede) e deixou o grosso de pé.
+
+### ⚠️ A METADE QUE QUASE PASSOU: o título mentia por omissão
+
+A tela se chamava **"Dicas semanais"** e prometia _"uma dica personalizada
+baseada na sua semana gestacional toda segunda-feira"_. Medido: **23 módulos**
+disparam push, e por esse mesmo registro chegam consulta confirmada,
+contraproposta, vaga liberada, lembretes de 24h e 4h, pedido de pré-consulta,
+recados do consultório, presente, dupla e Comunidade.
+
+Esta é a tela do CONSENTIMENTO, e ela descrevia um décimo do que o canal faz:
+quem lia "dicas semanais" concluía que era divulgação e não ligava; quem ligava
+achava que tinha assinado só a dica.
+
+⚠️ **E O PEDIDO DE SOCORRO NÃO ENTROU NA LISTA.** Eu ia escrever "o retorno de
+um pedido de socorro" — conferido em `emergencia.functions.ts`, **o push do SOS
+vai para o MÉDICO, não para ela**. Era exatamente o tipo de afirmação que o app
+não pode fazer, e o que a impediu foi abrir o arquivo antes de escrever o texto.
+
+### O que faz o botão valer alguma coisa
+
+- ⚠️ **`renovarAvisosSeJaAutorizado` roda na ABERTURA e re-inscreve** sempre que
+  o sistema diz "permitido". Sem uma marca da escolha dela, o botão seria
+  DECORATIVO: ela desligaria, e o app a re-inscreveria na próxima vez que
+  abrisse. O portão dela é a primeira linha da função.
+- ⚠️ **A marca mora no APARELHO** (`dc-avisos-desligados`), e não é economia: a
+  inscrição É por aparelho (`push_subscriptions.endpoint`,
+  `native_push_tokens.token`). Desligar no celular não pode calar o tablet.
+  ⚠️ E a chave **não** leva o prefixo `dc-path-` — aquele viaja no blob do
+  `journey_state` e agenda um PUSH por gravação; uma preferência sobre push
+  disparando push seria a piada mais cara do arquivo.
+- ⚠️ **NÃO CONSEGUIR LER A MARCA VALE LIGADO — nunca o contrário.** O pior caso
+  de um `false` errado é um push que ela não queria; o de um `true` errado é o
+  silêncio de um canal que carrega o lembrete da consulta, e esse não deixa
+  rastro nenhum. Modo privado, cota estourada e SSR caem todos aí.
+- ⚠️ **A ORDEM É CANCELAR E DEPOIS MARCAR.** Marcando antes, um cancelamento que
+  falhasse deixaria o pior estado possível: a linha viva no banco (o push
+  continua saindo), a marca impedindo a renovação, e a tela afirmando que está
+  desligado.
+- ⚠️ **E FALHAR AO MARCAR É FALHAR AO DESLIGAR.** Sem a marca, a escolha dela
+  duraria até fechar o app. Dizer "pronto" sobre isso é a mentira que esta leva
+  veio tirar do produto.
+- ⚠️ **`unsubscribeFromPush` passou a devolver desfecho**, e o erro do DELETE
+  decide: a linha de `push_subscriptions` é o que o servidor lê na hora de
+  enviar — enquanto ela estiver lá, o push CONTINUA chegando.
+- ⚠️ **O nativo precisou de `esquecerTokenNativo`** (servidor, como a inscrição:
+  a tabela é escrita com a chave de serviço). O recorte é `(user_id, token)`,
+  nunca só o token — é o simétrico do `neq` que a inscrição já faz.
+- ⚠️ **O recado de falha NÃO manda ir às Configurações do sistema**: seria
+  empurrá-la justamente para o interruptor que este botão existe para evitar.
+- ⚠️ **"Desligado" é ESTADO PRÓPRIO**, e não o de "nunca ativou": o sistema
+  continua autorizando, e quem desligou foi ELA. E a frase do que ela perde vem
+  ANTES do toque — um botão de desligar sem isso é uma armadilha educada.
+
+### ⚠️ O BLOCO SAIU DE `minha-conta.tsx` PARA PODER SER OLHADO
+
+Enterrado num arquivo de quinze mil linhas atrás de uma sessão, ele só aparecia
+numa conta real com push autorizado pelo SISTEMA — e foi assim que passou a vida
+do produto sem um botão de desligar. `src/components/avisos-do-app.tsx` é um
+**move puro** (o corpo não mudou); o que mudou é que agora existe
+`/preview-avisos`. `minha-conta.tsx`: 15.184 → **15.008 linhas**.
+
+⚠️ **E A VARREDURA DE ACESSIBILIDADE ACHOU UM DEFEITO NO TEXTO NOVO**, no mesmo
+dia: `text-green-600` sobre `green-50` mede **3,08:1**. A classe era a de antes
+— o que mudou é que a tela passou a ser medida. Conserto pela lição dos botões
+da Loja: escurecer o TEXTO (`green-800`), nunca clarear o fundo.
+
+### ⚠️ E A CATRACA DE PORTA NASCEU PASSANDO EM VAZIO
+
+`import` **NÃO é uso** — importar sem chamar É o defeito —, e a primeira versão
+filtrava linha a linha o que começa com `import`. Só que o import é
+**MULTI-LINHA**: `  desligarAvisos,`, no meio de um import de quatro nomes, não
+começa com nada disso e contava como uso. Medido: a mutação que apaga a chamada
+passou **VERDE**. Hoje o import é apagado inteiro, e a catraca cobre as DUAS
+pontas (o componente chama, e o app monta o componente) — nenhuma sozinha basta,
+porque um componente que ninguém monta é a mesma órfã com mais arquivos.
+
+⚠️ **E os testes NÃO usam `mock.module`**: ele escreve num registro compartilhado
+entre arquivos, e todos são importados antes de qualquer um rodar. Aqui os
+globais do navegador são forjados e restaurados, que é o que o código de fato lê.
+
+**Sem SQL.** Tudo sai de tabelas e colunas que já existem.
+**Bancada:** `/preview-avisos?estado=ativo` · `desligado` · `bloqueado` ·
+`nunca` — os três últimos entraram na varredura de CI, e `?estado=ativo` na de
+acessibilidade.

@@ -108,7 +108,7 @@ import { carimbarModoCuidado, tocarSomDeUI } from "@/lib/tocar-som-de-ui";
 import { creditarSementinhas, ouvirSementinhas } from "@/lib/evento-sementinhas";
 import { BONUS_INFLUENCIADORA } from "@/lib/economia-sementinhas";
 import { ouvirConquistasAResgatar, publicarConquistasAResgatar } from "@/lib/evento-conquistas";
-import { ativarAvisos, renovarAvisosSeJaAutorizado } from "@/lib/avisos";
+import { AvisosDoApp } from "@/components/avisos-do-app";
 import { ExcluirConta } from "@/components/excluir-conta";
 import { ExportarDados } from "@/components/exportar-dados";
 import { apagarMinhasConversas } from "@/lib/conta.functions";
@@ -4151,7 +4151,6 @@ function ProfileTab({
   /* O bloco de emergência muda de moldura por causa disto: vermelho quando
      falta, verde quando está pronto. */
   const faltaEmergencia = !form.emergency_email.trim() || !form.emergency_contact.trim();
-  const [notifPermission, setNotifPermission] = useState<string>("default");
   const [corporateCode, setCorporateCode] = useState("");
   /* ⚠️ O DESFECHO É UM BOOLEANO, NUNCA O PRIMEIRO CARACTERE DO TEXTO.
      Isto era `corporateMsg.startsWith("✅")` decidindo a COR: o estado de
@@ -4160,18 +4159,6 @@ function ProfileTab({
      que deu certo, sem erro nenhum e sem nada quebrado para apontar. */
   const [corporateMsg, setCorporateMsg] = useState<{ ok: boolean; texto: string } | null>(null);
   const [joiningCorporate, setJoiningCorporate] = useState(false);
-  useEffect(() => {
-    if (typeof window !== "undefined" && "Notification" in window) {
-      setNotifPermission(Notification.permission);
-    }
-    /* Já autorizou antes? Garante que o registro existe no banco — permissão
-       concedida com banco vazio não entrega nada, e é um estado comum (trocar
-       de aparelho, limpar dados, reinstalar o app).
-       Passa por `renovarAvisosSeJaAutorizado` e não por `subscribeToPush` para
-       cobrir também o app nativo, onde não existe `Notification.permission`
-       nem chave VAPID: quem sabe da permissão ali é o sistema. */
-    void renovarAvisosSeJaAutorizado();
-  }, []);
 
   // Completion percentage
   const completionFields = [
@@ -4708,83 +4695,10 @@ function ProfileTab({
         )}
       </div>
 
-      {/* Feature 17: Push notifications */}
-      <div className="rounded-3xl card-material p-6">
-        <p className="font-serif text-lg">Dicas semanais</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Receba uma dica personalizada baseada na sua semana gestacional toda segunda-feira.
-        </p>
-        <div className="mt-4">
-          {notifPermission === "granted" ? (
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 rounded-2xl bg-green-50 border border-green-200 p-4">
-                <span className="text-2xl">🔔</span>
-                <div>
-                  <p className="text-sm font-medium text-green-700">Notificações ativas</p>
-                  <p className="text-xs text-green-600">
-                    Você receberá dicas semanais personalizadas.
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={async () => {
-                  const { data: s } = await supabase.auth.getSession();
-                  if (!s.session?.access_token) return;
-                  const res = await sendTestPushToMe({
-                    data: { accessToken: s.session.access_token },
-                  });
-                  if (res.ok) toast.success("Enviei uma notificação de teste 🔔");
-                  else if (res.reason === "not-configured")
-                    toast("As notificações ainda estão sendo configuradas. Já já ficam ativas 💛");
-                  else if (res.reason === "no-subscription")
-                    toast("Reative os lembretes neste aparelho para receber o teste.");
-                  else toast("Não consegui enviar o teste agora.");
-                }}
-                className="rounded-full border border-border px-4 py-2 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary"
-              >
-                Enviar notificação de teste
-              </button>
-            </div>
-          ) : notifPermission === "denied" ? (
-            <div className="rounded-2xl bg-secondary p-4 text-sm text-muted-foreground">
-              Notificações bloqueadas neste navegador. Para ativar, vá nas configurações do
-              navegador e permita notificações para este site.
-            </div>
-          ) : (
-            <button
-              onClick={async () => {
-                /* Sem o `Notification in window` como porteiro: dentro da
-                   casca nativa quem entrega é o sistema, e essa API pode nem
-                   existir. `ativarAvisos` escolhe o caminho. */
-                const res = await ativarAvisos();
-                if (res.ok) {
-                  setNotifPermission("granted");
-                  toast.success("Lembretes ativados 🔔");
-                } else if (res.reason === "denied") {
-                  setNotifPermission("denied");
-                } else if (res.reason === "ios-not-installed") {
-                  toast(
-                    "No iPhone, adicione o app à Tela de Início primeiro (botão Compartilhar → Adicionar à Tela de Início) para receber lembretes.",
-                  );
-                } else if (res.reason === "no-key") {
-                  // Chaves de push ainda não configuradas no ambiente: mantém o
-                  // comportamento antigo (só pede permissão) para não regredir.
-                  const perm = await Notification.requestPermission();
-                  setNotifPermission(perm);
-                  if (perm === "granted" && "serviceWorker" in navigator) {
-                    navigator.serviceWorker.register("/sw.js").catch(() => {});
-                  }
-                } else {
-                  toast("Não consegui ativar os lembretes agora. Tente novamente.");
-                }
-              }}
-              className="rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-white"
-            >
-              🔔 Ativar dicas semanais
-            </button>
-          )}
-        </div>
-      </div>
+      {/* ⚠️ Ele mora em `components/avisos-do-app.tsx` para PODER SER OLHADO:
+          enterrado aqui, o bloco só aparecia numa conta real — e foi assim que
+          ele passou a vida do produto sem um botão de desligar. */}
+      <AvisosDoApp />
 
       {/* Feature 50: Corporate */}
       {/* Excluir a conta. Fica no fim do Perfil de propósito: é o último item,
