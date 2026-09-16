@@ -23,8 +23,15 @@ export const Route = createFileRoute("/preview-cantinho")({
        na segunda passada chega `null` — `Number(null)` é 0. Armadilha que o
        CLAUDE.md documenta em `preview-saude` e `preview-jogo`. */
     saldo: q.saldo == null ? 420 : Number(q.saldo),
-    luto: q.luto === "1" || q.luto === true,
-    vazio: q.vazio === "1" || q.vazio === true,
+    /* ⚠️ `String(...)` E `=== true`, NUNCA `=== "1"` sozinho: o router
+       JSON-parseia a query, então `?x=1` chega como o NÚMERO 1 e a comparação
+       estrita com a string falha em SILÊNCIO — a bancada abre no estado
+       PADRÃO e a URL volta reescrita como `?x=false`. Medido: era assim aqui,
+       e a varredura de bancadas não tem como ver (ela lê o console, e uma
+       tela que desenha o estado errado não registra erro nenhum).
+       (`=== true` fica porque `String(true)` é `"true"`, não `"1"`.) */
+    luto: q.luto === true || String(q.luto ?? "") === "1",
+    vazio: q.vazio === true || String(q.vazio ?? "") === "1",
     trofeus: q.trofeus == null ? 12 : Number(q.trofeus),
   }),
 });

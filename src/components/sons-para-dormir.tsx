@@ -35,11 +35,8 @@ import {
   faltando,
   quandoDesligar,
   rotuloDoTempo,
-  FAMILIAS,
-  FAMILIA_DO_SOM,
+  familiasDeSom,
   ROTULO_DO_SOM,
-  ofertaveis,
-  SONS_CONTINUOS,
   TEMPOS,
   type SomKey,
   type Tempo,
@@ -59,20 +56,15 @@ import { HistoriaDaNoite } from "@/components/historia-da-noite";
  */
 const ROTULO = ROTULO_DO_SOM;
 
-/** Os sons de cada família, na ordem em que o módulo os declara. */
 /**
- * ⚠️ E ELA RECEBE `careMode` — porque "Coração do bebê" e "Ventre" não podem
- * ser oferecidos a quem acabou de perder a gestação. São os únicos do catálogo
- * cujo NOME afirma sobre uma gestação em curso, e numa lista de trinta e dois
- * seriam a única coisa da tela falando do bebê, no presente.
+ * ⚠️ O AGRUPAMENTO TAMBÉM SAI DO MÓDULO, e pela mesma razão do catálogo acima.
+ *
+ * `familiasDeSom` já traz as famílias recortadas pelo Modo Cuidado — "Coração
+ * do bebê" e "Ventre" são os únicos do catálogo cujo NOME afirma sobre uma
+ * gestação em curso, e numa lista de trinta e dois seriam a única coisa da
+ * tela falando do bebê, no presente. Esta tela tinha a sua própria cópia da
+ * expressão; uma terceira, num arquivo vizinho, já tinha ESQUECIDO o recorte.
  */
-function porFamilia(luto: boolean) {
-  const ok = new Set<string>(ofertaveis(luto));
-  return FAMILIAS.map((f) => ({
-    familia: f,
-    sons: SONS_CONTINUOS.filter((k) => FAMILIA_DO_SOM[k] === f && ok.has(k)),
-  })).filter((g) => g.sons.length > 0);
-}
 
 export function SonsParaDormir({
   aoFechar,
@@ -81,7 +73,7 @@ export function SonsParaDormir({
   aoFechar: () => void;
   careMode?: boolean;
 }) {
-  const POR_FAMILIA = porFamilia(careMode);
+  const POR_FAMILIA = familiasDeSom(careMode);
   const [som, setSom] = useState<SomKey | null>(null);
   const [carregando, setCarregando] = useState<SomKey | null>(null);
   const [tempo, setTempo] = useState<Tempo>(30);

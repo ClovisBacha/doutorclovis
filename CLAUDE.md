@@ -17556,3 +17556,134 @@ globais do navegador são forjados e restaurados, que é o que o código de fato
 **Bancada:** `/preview-avisos?estado=ativo` · `desligado` · `bloqueado` ·
 `nunca` — os três últimos entraram na varredura de CI, e `?estado=ativo` na de
 acessibilidade.
+
+## As três limpezas, e a bancada que nunca desenhou o luto (set/2026)
+
+Pedido do dono: **"Faça os três"** — as três limpezas que eu tinha levantado e
+oferecido. ⚠️ **Conferi as três no código antes de mexer**, porque este arquivo
+registra três vezes uma lista de pendências ter vencido; desta vez as três
+existiam, e uma era pior do que eu a tinha descrito.
+
+### ⚠️ 1. A NOTA CLÍNICA SE PERDIA EM SILÊNCIO — e eu descrevi o caminho errado
+
+`doSaveNote` (`painel.tsx`) descartava o retorno de `saveDoctorClinicalNote` e
+não tinha `try/catch`. Os dois desfechos ruins eram MUDOS:
+
+- ⚠️ **Recusa.** O servidor devolve `{ ok: false }` numa resposta **200
+  NORMAL** — sessão inválida, sessão de outro médico, erro do banco — e nenhum
+  desses casos LANÇA, então um `try/catch` sozinho nunca os pegaria. A tela
+  ficava em silêncio absoluto: o botão voltava de "Salvando…" para "💾 Salvar
+  nota", **exatamente como no sucesso**.
+- ⚠️ **Rede.** A promessa rejeitava e `setSavingNote(null)` nunca rodava: o
+  botão ficava preso em "Salvando…" até o F5, sem nem poder tentar de novo. É a
+  forma do SOS sem teto de tempo, que este repositório já pagou.
+
+⚠️ **E A MINHA DESCRIÇÃO ORIGINAL ERA IMPRECISA, o que importa corrigir:** eu
+tinha escrito "a nota some da tela". Não some — `generatedNote` é estado LOCAL
+e sobrevive ao refresh. **E é isso que fecha a armadilha**: ele lê a nota na
+tela, conclui que salvou, fecha, e o estado local morre com a navegação. O dano
+final é o mesmo (a nota clínica não existe); o caminho é outro, e escrever o
+caminho errado ensina a procurar o defeito no lugar errado.
+
+⚠️ **O padrão inteiro já existia em `doGenerateNote`, DEZ LINHAS ACIMA, na
+mesma tela** — a régua aplicada num lugar e deixada de pé no vizinho.
+
+⚠️ **E `onRefresh()` só roda no SUCESSO**: recarregar depois de uma recusa é o
+que tornaria a frase "o texto continua aqui" dependente de sorte.
+
+Cinco mutações em vermelho, inclusive o defeito original.
+
+### 2. As famílias de som: três cópias, e a morta era a perigosa
+
+`SOUNDSCAPES_POR_FAMILIA` (`soundscapes.ts`) tinha **zero chamadores** — a
+única ocorrência no repositório era a própria definição.
+
+⚠️ **O perigo não era a repetição: era que ela não passava por `ofertaveis`.**
+Um agrupamento sem esse recorte oferece "Coração do bebê" e "Ventre" a quem
+acabou de perder a gestação — o furo de Modo Cuidado que a folha de sons já
+pagou uma vez. Morta, ela não fazia mal; **ligada por quem precisasse de um
+agrupamento amanhã, faria — e nem o `tsc` nem o lint diriam nada, porque o tipo
+estava certo.** É a mesma família do `emCuidado` sem leitor: campo morto que
+falha ABERTO é armadilha para o próximo.
+
+`familiasDeSom(luto)` mora em **`som-receitas.ts`**, porque a pergunta ("quais
+sons tem cada família?") é do CATÁLOGO — não do motor ao vivo (`soundscapes.ts`)
+nem do render em WAV (`som-continuo.ts`), que são dois consumidores dele.
+
+⚠️ **Família VAZIA não vira grupo**, e no Modo Cuidado isso não é hipótese:
+"Corpo" tem exatamente os dois sons que o recorte retira, então ela some
+INTEIRA. Um título com nada embaixo lê como um som que sumiu.
+
+⚠️ E `soundscapes.ts` ficou com um **import morto** de `FAMILIA_DO_SOM` que o
+eslint não acusou — a mesma classe do "`import` não é uso", pelo outro lado.
+
+### 3. O resíduo da economia antiga
+
+`achievementBig` (100), `achievementDefault` (20) e `BIG_ACHIEVEMENTS` eram da
+economia anterior; a régua viva é `sementinhasDaRaridade` desde ago/2026. Zero
+leitores — o `tsc` passou limpo ao apagá-los.
+
+⚠️ **Constante morta de PREÇO é a pior espécie de resíduo**: não quebra nada, e
+a próxima pessoa a calibrar a economia lê `achievementBig: 100` num arquivo que
+abre dizendo que os valores da economia vivem nele, e acredita. Este
+repositório já pagou exatamente isso com três preços mortos que a prosa da Loja
+citava como se valessem.
+
+⚠️ **A história FICA escrita** — o comentário de `achievements.functions.ts`
+cita os dois nomes para contar por que saíram, e há teste cobrando que ele
+continue lá. Apagar o porquê é como o resíduo volta.
+
+### ⚠️ E A VERIFICAÇÃO ACHOU O DEFEITO MAIS CARO DA LEVA: `?x=1` NÃO CHEGAVA
+
+Ao medir se a folha de sons ainda desenhava o Modo Cuidado, a tela veio
+**idêntica nos dois estados**. Não era regressão minha (`git diff` vazio no
+arquivo): a URL voltava **`?luto=false`**.
+
+**O router JSON-parseia a query**, então `?luto=1` chega como o **NÚMERO** 1 e
+`q.luto === "1"` é falso. A bancada abre no estado PADRÃO e reescreve a URL.
+Medido em **quatro parâmetros de três bancadas**, todos documentados aqui como
+se funcionassem:
+
+| bancada                     | estado que nunca foi desenhado          |
+| --------------------------- | --------------------------------------- |
+| `/preview-sons?luto=1`      | a folha sem "Ritmo de ninar" e "Ventre" |
+| `/preview-cantinho?luto=1`  | o Cantinho no Modo Cuidado              |
+| `/preview-cantinho?vazio=1` | o vazio que ensina                      |
+| `/preview-jogo?premium=1`   | a assinante                             |
+
+⚠️ **E A VARREDURA DE BANCADAS NÃO TEM COMO VER.** Ela abre a página e lê o
+CONSOLE — uma tela que desenha o estado ERRADO não registra erro nenhum, e as
+quatro passavam verdes há levas. Mesma cegueira que já deixou uma bancada
+aprovar uma frase que o servidor nunca produziria.
+
+⚠️ **É a QUARTA aparição desta família** (`Number(true)`→1 em `preview-home`,
+`Number(null)`→0 em `preview-saude`, e agora o número que não casa a string).
+E a causa foi PROVADA, não deduzida: `preview-saude.tsx` já tinha
+`|| q.luto === 1`, e era o único dos cinco medidos que voltava `?luto=true`.
+
+A forma segura é `q.x === true || String(q.x ?? "") === "1"` — `=== true` fica
+porque `String(true)` é `"true"`, não `"1"`. Medido depois: no luto a folha de
+sons perde a família "Corpo" inteira, dois botões e os dois rótulos.
+
+### ⚠️ E DUAS AFIRMAÇÕES MINHAS FORAM DESMENTIDAS PELA PRÓPRIA MUTAÇÃO
+
+As duas sobre `semComentarios`, e as duas na mesma sessão:
+
+1. Em `familias-de-som.test.ts` escrevi que sem ele o teste ficaria vermelho.
+   **Falso**: nenhum comentário do `src/` escreve a forma literal que o padrão
+   procura. Ele fica como PRECAUÇÃO declarada, e a prosa passou a dizer isso.
+2. Em `parametro-de-bancada.test.ts` escrevi o mesmo. **Também falso, e por um
+   motivo pior**: o comentário CASA o padrão e escapa só porque a heurística
+   absolve qualquer `=== "1"` precedido de `String(` — e as três notas por
+   acaso dizem `String(...)` antes de citar o padrão. Depender desse acidente é
+   deixar a catraca acusar o arquivo que a documenta na primeira reescrita da
+   frase.
+
+⚠️ **Nos dois casos a saída foi corrigir a PROSA, nunca fabricar um caso para o
+teste morder** — e no segundo entrou uma asserção que prova o ponto com um
+comentário construído, independente da redação de hoje. Um mutante verde não é
+necessariamente um teste fraco: às vezes é uma frase minha que precisa ser
+reescrita.
+
+**Sem SQL.** Portão verde (**6.568 testes**, +25) · 224 bancadas · 19 roteiros ·
+**10 mutantes em vermelho** e 2 verdes de propósito, registrados acima.

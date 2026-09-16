@@ -4261,14 +4261,50 @@ function TeleconsultasSection({
     }
   }
 
+  /**
+   * ⚠️ O DESFECHO É LIDO, e o `{ ok: false }` chega numa resposta 200 NORMAL.
+   *
+   * `saveDoctorClinicalNote` recusa em três casos — sessão inválida, sessão de
+   * outro médico, erro do banco — e nenhum deles LANÇA. A versão anterior
+   * descartava o retorno e não tinha `try/catch`, então:
+   *
+   *  · na RECUSA a tela ficava em silêncio absoluto (o botão voltava de
+   *    "Salvando…" para "💾 Salvar nota", exatamente como no sucesso). O texto
+   *    continuava na tela por acidente — `generatedNote` é estado local e
+   *    sobrevive ao refresh —, e é justamente isso que fecha a armadilha: ele
+   *    lê a nota na tela, conclui que salvou, fecha, e o estado local morre com
+   *    a navegação. A nota clínica deixa de existir sem nada ter dito.
+   *  · na falha de REDE a promessa rejeitava e `setSavingNote(null)` nunca
+   *    rodava: o botão ficava preso em "Salvando…" até o F5, e ele não
+   *    conseguia nem tentar de novo.
+   *
+   * É o registro que outro profissional lê depois. Perdê-lo em silêncio é o
+   * desfecho que esta tela não pode ter — e o padrão inteiro já existia em
+   * `doGenerateNote`, dez linhas acima, na mesma tela.
+   *
+   * ⚠️ E `onRefresh()` só roda no SUCESSO: recarregar depois de uma recusa é
+   * o que tornaria a frase "o texto continua aqui" dependente de sorte.
+   */
   async function doSaveNote(id: string) {
     const note = generatedNote[id] ?? noteBullets[id] ?? "";
     if (!note.trim()) return;
     setSavingNote(id);
-    const tk = await tokenFn();
-    await saveDoctorClinicalNote({ data: { accessToken: tk, id, clinicalNote: note } });
-    setSavingNote(null);
-    onRefresh();
+    try {
+      const tk = await tokenFn();
+      const res = await saveDoctorClinicalNote({
+        data: { accessToken: tk, id, clinicalNote: note },
+      });
+      if (!res.ok) {
+        toast.error("Não foi possível salvar a nota. O texto continua aqui — tente de novo.");
+        return;
+      }
+      toast.success("Nota clínica salva.");
+      onRefresh();
+    } catch {
+      toast.error("Não foi possível salvar a nota. O texto continua aqui — tente de novo.");
+    } finally {
+      setSavingNote(null);
+    }
   }
 
   return (

@@ -33,17 +33,28 @@ import { PREFIXO_ATIVIDADE, trofeusDasChaves } from "@/lib/trofeus";
  * negócio, e não este.
  */
 
-/** Valores de ganho — transparentes e calibráveis sem migração. */
+/**
+ * Valores de ganho — transparentes e calibráveis sem migração.
+ *
+ * ⚠️ **A RECOMPENSA DA CONQUISTA NÃO MORA AQUI**, e isso é decisão, não
+ * esquecimento. Ela sai da RARIDADE (`sementinhasDaRaridade`, em
+ * `conquistas.ts`), que é a mesma régua que pinta o anel do cartão — cor e
+ * número não têm como discordar.
+ *
+ * Esta tabela chegou a ter `achievementDefault` (20) e `achievementBig` (100),
+ * com um `Set` de duas chaves decidindo qual valia. Eles saíram quando a
+ * raridade nasceu e ficaram aqui, sem um leitor sequer, por uma leva inteira:
+ * três constantes com cara de fonte da verdade, num arquivo que abre dizendo
+ * que os valores da economia vivem nele. **Constante morta de PREÇO é a pior
+ * espécie de resíduo** — ela não quebra nada, e a próxima pessoa a calibrar a
+ * economia a lê e acredita. Este repositório já pagou isso uma vez, com três
+ * preços mortos que a prosa da Loja citava como se valessem.
+ */
 export const SEMENTINHAS = {
   dailyCheckin: 5,
   weekMilestone: 25,
   trimesterMilestone: 100,
-  achievementDefault: 20,
-  achievementBig: 100,
 } as const;
-
-/** Conquistas "grandes" que valem mais (marcos de conclusão). */
-export const BIG_ACHIEVEMENTS = new Set(["course_complete", "prenatal_done"]);
 
 type Db = ReturnType<typeof typedDb>;
 // dedupeKey é obrigatório: ganho sem chave duplicaria (NULL não conflita no
