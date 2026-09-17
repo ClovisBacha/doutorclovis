@@ -17687,3 +17687,114 @@ reescrita.
 
 **Sem SQL.** Portão verde (**6.568 testes**, +25) · 224 bancadas · 19 roteiros ·
 **10 mutantes em vermelho** e 2 verdes de propósito, registrados acima.
+
+## A varredura passou a conferir o PARÂMETRO, e os seis órfãos saíram (set/2026)
+
+Pedido do dono: **"Pode continuar oq ainda falta"** — as duas pendências
+técnicas que ficaram da leva anterior. ⚠️ **Conferi as duas no código antes de
+mexer**, porque este arquivo registra três vezes uma lista de pendências ter
+vencido — e desta vez a varredura achou **dois órfãos a mais** do que a lista
+dizia.
+
+### ⚠️ A VARREDURA DE CONSOLE É CEGA AO ESTADO ERRADO — e agora não é mais
+
+A leva anterior consertou quatro bancadas que abriam no PADRÃO em vez do
+estado pedido (`?luto=1` voltando `?luto=false`, porque o router JSON-parseia
+a query e `q.luto === "1"` é falso). Os quatro estavam documentados aqui como
+se funcionassem, e passaram levas verdes: **uma tela que desenha o estado
+ERRADO não registra erro nenhum no console**, e console é tudo o que a
+varredura lia.
+
+`scripts/parametro-preservado.mjs` fecha isso de forma geral — ela não conhece
+forma nenhuma de defeito, **compara o que foi pedido com a URL que o router
+devolveu**. As duas catracas se complementam e nenhuma substitui a outra:
+
+|                                           | o que pega                                                     | quando                               |
+| ----------------------------------------- | -------------------------------------------------------------- | ------------------------------------ |
+| `parametro-de-bancada.test.ts` (estática) | a forma conhecida (`=== "1"` sem `String(...)`) no fonte       | `bun test`, antes de a bancada abrir |
+| `parametro-preservado.mjs` (dinâmica)     | **qualquer** forma de descarte, inclusive a que ninguém previu | na varredura, com a página assentada |
+
+⚠️ **CADA LINHA DA RÉGUA SAIU DE MEDIÇÃO, e não de suposição.** Rodei pedido
+vs efetivo nos **172 alvos com parâmetro** antes de escrever uma linha:
+
+- **`"1" → "true"`, 38 casos** — a normalização LEGÍTIMA de booleano. Idem
+  `"0" → "false"`.
+- ⚠️ **`"3" → "true"`, e é o caso que DEFINE a régua.** `/preview-home?notif=3`
+  volta como `notif=true&quantos=3`: o valor **não se perdeu**, foi para o
+  campo que este arquivo já descreve. Uma régua ingênua acusaria aqui — e
+  **catraca que reprova o estado correto é catraca que alguém desliga.** Por
+  isso truthy virando `true` não acusa, o que é um falso NEGATIVO consciente e
+  é o preço de não ter o falso positivo.
+- **Omissão: ZERO casos.** Medido, o router escreve TODOS os parâmetros com os
+  padrões na URL — e até `?inexistente=1`, que nenhuma rota declara, volta
+  intacto. Então uma chave que sumiu foi DESCARTADA, e acusar ausência é
+  seguro.
+
+⚠️ **E o que ela acusa é a direção do DANO:** pedido truthy virando falsy
+(`""`, `"0"`, `"false"`), a chave sumindo, ou o valor trocado por outro. Nunca
+"a URL ficou diferente".
+
+**A régua mora em `scripts/` como `.mjs` porque a varredura roda por `node`,
+fora do build, e não importa `.ts`** — e `src/lib/parametro-preservado.test.ts`
+a **importa e EXECUTA** (13 testes), em vez de ler o fonte e procurar palavras.
+Sem cópia: uma segunda régua em `.ts` faria a varredura e o teste medirem
+coisas diferentes, e a divergência apareceria como a catraca aprovando o
+defeito que ela documenta.
+
+⚠️ **E ELA PRECISOU DE UM `.d.mts`, senão o `tsc` reprova o teste que a
+exercita** (TS7016) — o portão local pegou isto antes do commit. A saída fácil
+seria duplicar a régua; o arquivo de declaração custa dez linhas e mantém uma
+só.
+
+⚠️ **A CONTRAPROVA É DE PONTA A PONTA, e não só de unidade:** reintroduzi
+`q.luto === "1"` em `preview-sons.tsx` e rodei a varredura naquela rota —
+**código correto sai 0; com o defeito, `❌ PARÂMETRO ?luto=1 — caiu no padrão
+desligado (efetivo: false)`, saída 1.** Mais cinco mutantes da régua em
+vermelho, inclusive **o do falso positivo** (tirar a linha do `?notif=3` faz o
+teste reprovar): ela morde nos dois sentidos.
+
+⚠️ E `p.url()` é lido DEPOIS da espera, nunca antes — o router revalida a
+query e reescreve a URL, e é na **segunda** passada que o descarte aparece.
+
+### Os seis órfãos, e os dois que a lista não conhecia
+
+A lista dizia quatro (`animated-counter`, `baby-evolution`, `tech-fx`,
+`testimonials-section`). A varredura de módulos sem uso achou mais dois:
+
+- **`ui/testimonials-columns-1`** — órfão em CADEIA: o único importador era o
+  `testimonials-section` que estava saindo.
+- ⚠️ **`whatsapp-button`** — e ele carregava a **segunda cópia do número do
+  consultório**. `doctor.config.ts` tem `whatsappUrl`/`whatsappDisplay`, e o
+  órfão tinha `WHATSAPP_URL`/`WHATSAPP_DISPLAY` com o mesmo número — **já
+  divergidos no formato** (`"+55 (31) 98634-2903"` contra `"(31) 98634-2903"`).
+  Ligá-lo amanhã mostraria dois formatos do mesmo número no site. E o
+  comentário de `doctor.config.ts` **afirmava** que ele era "usado pelo
+  componente whatsapp-button" — prosa descrevendo um uso que não existe, a
+  classe que já enganou alguém quatro vezes aqui.
+
+  ⚠️ O botão saiu do `__root.tsx` em ago/2026 **por decisão medida** (cobria
+  19,7% da tela) e o componente ficou para trás; a razão continua escrita lá,
+  que é o que importa preservar.
+
+⚠️ **O NÚMERO BRUTO DA VARREDURA NÃO ERA A RESPOSTA — quinta vez.** Ela acusou
+**45 candidatos**, e 39 são falsos positivos de três famílias: `components/ui/*`
+é a **biblioteca shadcn** (componente não usado ali é biblioteca, não resíduo, e
+não entra no pacote), `router.tsx`/`start.ts`/`test-setup.ts` são pontos de
+entrada alcançados por CONFIGURAÇÃO (o último por `bunfig.toml`), e `types/*.d.ts`
+são declarações globais.
+
+⚠️ **E `auth-middleware.ts` é órfão REAL e ficou de pé, de propósito**: ele abre
+com _"This file is automatically generated. Do not edit it directly."_ e cita o
+Lovable Cloud na mensagem de erro. Apagar arquivo GERADO é churn — ele volta.
+Fica registrado como resíduo do Lovable, ao lado dos outros três.
+
+⚠️ **E não houve ganho de pacote, o que é dito aqui para ninguém procurar:** os
+seis eram órfãos, então nunca estiveram no grafo de imports. O ganho é de
+leitura — e, no caso do WhatsApp, de uma cópia a menos do número do consultório.
+Conferido depois de apagar: `tsc` limpo, e nenhum export de `gestacao.ts` ficou
+órfão em cadeia (`babyForWeek` 32 usos, `consultaForWeek` 7, `trimesterForWeek`
+11, `WEEK_MAX` 6, `WEEK_MIN` 7).
+
+**Medido ao fim:** portão verde (**6.581 testes**, +13) · **224 bancadas, agora
+com a conferência de parâmetro ligada, 0 com problema** · 19 roteiros de
+interação · 5 mutantes da régua em vermelho + a contraprova de ponta a ponta.

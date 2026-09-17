@@ -12,11 +12,17 @@
  * de render, `undefined` no caminho de desenho, import quebrado, e a tela que
  * simplesmente não renderiza nada.
  *
+ * ⚠️ **E, desde set/2026, o PARÂMETRO QUE NÃO SOBREVIVEU** — a bancada que
+ * abre no estado padrão em vez do que foi pedido. Ela era cega a isso: uma
+ * tela que desenha o estado ERRADO não registra erro nenhum, e quatro estados
+ * documentados no CLAUDE.md nunca tinham sido desenhados.
+ *
  * Uso:  node scripts/varrer-bancadas.mjs [--porta=8080]
  * Sai com código 1 se qualquer bancada tiver erro de console ou não renderizar.
  */
 import { chromium } from "playwright";
 import { existsSync, readdirSync } from "node:fs";
+import { parametrosPerdidos } from "./parametro-preservado.mjs";
 
 const porta = (process.argv.find((a) => a.startsWith("--porta=")) ?? "").split("=")[1] || "8080";
 const base = `http://127.0.0.1:${porta}`;
@@ -361,6 +367,17 @@ async function abrir(rota) {
        `domcontentloaded` a varredura passava por cima de um mismatch real. */
     await p.goto(base + rota, { waitUntil: "networkidle", timeout: 30000 });
     await p.waitForTimeout(1800);
+    /* ⚠️ **O PARÂMETRO PEDIDO SOBREVIVEU?** A varredura de console é CEGA a
+       isto: uma tela que desenha o estado ERRADO não registra erro nenhum, e
+       foi assim que `?luto=1`, `?vazio=1` e `?premium=1` passaram levas
+       abrindo no padrão — com a prosa do CLAUDE.md documentando os estados
+       como se funcionassem. A régua (e a razão de cada linha dela) vive em
+       `parametro-preservado.mjs`, e é exercitada por
+       `src/lib/parametro-preservado.test.ts`.
+
+       ⚠️ Lê-se `p.url()` DEPOIS da espera, e nunca antes: o router revalida a
+       query e reescreve a URL — é na segunda passada que o descarte aparece. */
+    parametrosPerdidos(rota, p.url()).forEach((x) => erros.push("PARÂMETRO " + x));
     /* Tela que não desenha nada é defeito, mesmo sem erro no console. */
     const texto = (
       await p
