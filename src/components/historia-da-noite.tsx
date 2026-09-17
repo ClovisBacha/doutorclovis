@@ -23,6 +23,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { IconeDoSom } from "@/components/arte-dos-sons";
 import { emConteudo, emRepouso } from "@/lib/sessao-de-audio";
 import { pausaDepoisDo, type Historia } from "@/lib/historias-para-dormir";
 import { faixaDoBloco } from "@/lib/voz-da-noite";
@@ -271,9 +272,7 @@ export function HistoriaDaNoite({
         </div>
 
         <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
-          <span className="text-5xl" aria-hidden>
-            {historia.emoji}
-          </span>
+          <IconeDoSom chave={historia.chave} emoji={historia.emoji} tamanho={96} />
           <h3 className="mt-5 font-serif text-[24px] font-semibold">{historia.titulo}</h3>
           {/* O texto NÃO aparece: ler acorda, e a tela existe para o contrário.
               O que se vê é só quanto já andou. */}
@@ -283,7 +282,7 @@ export function HistoriaDaNoite({
               style={{ width: `${((i + 1) / total) * 100}%` }}
             />
           </div>
-          <p className="mt-4 text-[11px] text-white/30">
+          <p className="mt-4 text-xs text-white/30">
             {pausado ? "Pausado" : "A tela vai escurecer sozinha"}
           </p>
         </div>

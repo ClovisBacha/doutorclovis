@@ -302,13 +302,13 @@ function AgendamentoPage() {
               ) : (
                 <div className="grid gap-5 sm:grid-cols-2">
                   <Field label="Data preferida" type="date" name="date" min={today} required />
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium">Horário preferido</label>
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-sm font-medium">Horário preferido</span>
                     <select
                       name="time"
                       required
                       defaultValue=""
-                      className="rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
+                      className="min-h-11 rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
                     >
                       <option value="" disabled>
                         Selecione…
@@ -319,7 +319,7 @@ function AgendamentoPage() {
                         </option>
                       ))}
                     </select>
-                  </div>
+                  </label>
                 </div>
               )}
               <Field
@@ -328,15 +328,15 @@ function AgendamentoPage() {
                 required
                 placeholder="Ex.: pré-natal, gestação de alto risco, primeira consulta…"
               />
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium">Observações (opcional)</label>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-sm font-medium">Observações (opcional)</span>
                 <textarea
                   name="notes"
                   rows={4}
                   className="rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
                   placeholder="Conte algo que ajude o doutor a se preparar para a consulta."
                 />
-              </div>
+              </label>
 
               {error && <p className="text-sm text-destructive">{error}</p>}
 
@@ -362,13 +362,23 @@ function Field({
   ...props
 }: { label: string; hint?: string } & React.InputHTMLAttributes<HTMLInputElement>) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-sm font-medium">{label}</label>
+    /* ⚠️ **O `<label>` ERA IRMÃO DO `<input>`**, sem `htmlFor` e sem `id`: não
+       dava nome acessível ao campo nem levava o foco ao toque no rótulo — nos
+       seis campos com que ela MARCA A CONSULTA. Envolver é o conserto sem `id`,
+       porque um `id` fixo num componente usado várias vezes na mesma página
+       produziria ids repetidos, que é outro defeito.
+
+       ⚠️ E o `min-h-11`: medido a 393px, os campos saíam com 42px — abaixo do
+       alvo de toque. É o MESMO par de defeitos que `components/campo.tsx`
+       consertou; esta é a cópia LOCAL (não-controlada, porque a tela lê por
+       `FormData`) que ficou de pé. */
+    <label className="flex flex-col gap-1.5">
+      <span className="text-sm font-medium">{label}</span>
       <input
         {...props}
-        className="rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
+        className="min-h-11 rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
       />
-      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
-    </div>
+      {hint && <span className="block text-[11px] text-muted-foreground">{hint}</span>}
+    </label>
   );
 }

@@ -32,7 +32,14 @@
  */
 
 /** A página de onde o convite está sendo mostrado. Muda a FRASE, nada mais. */
-export type OndeConvida = "presentes" | "album" | "nome" | "acompanhante" | "perfil";
+export type OndeConvida =
+  | "presentes"
+  | "album"
+  | "nome"
+  | "acompanhante"
+  | "perfil"
+  /** A página de UMA publicação (`/pub/<codigo>`). */
+  | "post";
 
 /**
  * A frase, por página.
@@ -67,6 +74,13 @@ export function fraseDoRodape(
       return {
         titulo: "Este álbum vive no Obstétrica",
         sub: "O app onde ela acompanha a gestação, semana a semana.",
+      };
+    case "post":
+      /* ⚠️ Fala do que a pessoa ACABOU DE VER — uma foto —, e não do app em
+         abstrato. E não promete nada clínico: quem abriu pode estar grávida. */
+      return {
+        titulo: "Esta foto vive no Obstétrica",
+        sub: "O app onde ela guarda a gestação, semana a semana.",
       };
     case "nome":
       /* ⚠️ **NÃO é a frase do álbum, e essa era a que estava lá.** `/votar-nome`

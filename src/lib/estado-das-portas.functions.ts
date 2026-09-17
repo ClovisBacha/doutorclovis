@@ -106,18 +106,46 @@ export const estadoDasPortas = createServerFn({ method: "POST" })
             return null;
           }
         })(),
+        /* ⚠️ **`patient_user_id`, e não `user_id`.** Conferido no schema
+           (`20260608190000_family_features.sql`): a tabela tem `id`,
+           `patient_user_id`, `author_name`, `caption`, `image_data`, `emoji` e
+           `created_at`. É o mesmo nome que `getMyAlbumPosts` sempre usou — eu
+           inventei `user_id` aqui, e o custo era invisível: o PostgREST
+           devolveria `42703`, `contar` engoliria, o contador viraria `null`, e
+           `null` **não desenha nada**. A porta do Álbum prometia "12 fotos no
+           álbum" e entregava o subtítulo desde o primeiro dia, sem erro em
+           lugar nenhum. */
         contar(() =>
           sb
             .from("family_album_posts")
             .select("id", { count: "exact", head: true })
-            .eq("user_id", eu),
+            .eq("patient_user_id", eu),
         ),
-        contar(() =>
-          sb
-            .from("baby_name_entries")
-            .select("id", { count: "exact", head: true })
-            .eq("user_id", eu),
-        ),
+        /* ⚠️ **AQUI NÃO ERA TROCA DE NOME — `baby_name_entries` NÃO TEM
+           COLUNA DE USUÁRIO NENHUMA.** As colunas são `id`, `session_id`,
+           `name`, `suggested_by` e `created_at`: quem sugere um nome é a
+           família, por um link público, e essa gente não tem conta. O elo com a
+           paciente passa por `baby_name_sessions.patient_user_id` — o mesmo
+           recorte em dois passos do chá de bebê logo acima, e o mesmo caminho
+           que `getOrCreateNameSession` percorre. */
+        (async () => {
+          try {
+            const { data: sessao, error } = await sb
+              .from("baby_name_sessions")
+              .select("id")
+              .eq("patient_user_id", eu)
+              .maybeSingle();
+            if (error || !sessao) return null;
+            return await contar(() =>
+              sb
+                .from("baby_name_entries")
+                .select("id", { count: "exact", head: true })
+                .eq("session_id", sessao.id),
+            );
+          } catch {
+            return null;
+          }
+        })(),
         /* ⚠️ `expires_at`, e não `revoked_at` — esta coluna eu também tinha
            inventado. Conferido no schema: a tabela tem `token`,
            `companion_name`, `created_at` e `expires_at`, e mais nada.

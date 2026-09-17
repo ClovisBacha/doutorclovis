@@ -14,7 +14,14 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
 const fonte = readFileSync("src/lib/historico-chat.functions.ts", "utf8");
-const tela = readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8");
+/* ⚠️ O chat (ChatTab, WABubble, buildPatientContext…) saiu de minha-conta.tsx
+   para src/components/chat-tab.tsx em set/2026. Este teste confere coisas dos
+   DOIS arquivos, então lê os dois juntos — uma asserção que procura texto do
+   chat aqui continua encontrando. */
+const tela =
+  readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8") +
+  "\n" +
+  readFileSync("src/components/chat-tab.tsx", "utf8");
 
 describe("a leitura devolve a conversa recente, e só a dela", () => {
   test("ordena do mais novo e inverte — senão traz o começo da gravidez", () => {

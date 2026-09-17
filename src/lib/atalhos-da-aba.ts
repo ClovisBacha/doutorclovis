@@ -36,7 +36,9 @@ export type IconeDeAtalho =
   | "marcador"
   /** O balão de fala — a caixinha de perguntas. */
   | "balao"
-  | "engrenagem";
+  | "engrenagem"
+  /** Os três pontos — a bolinha "Mais", que abre a folha com o resto. */
+  | "pontos";
 
 export type AtalhoDaAba = {
   /** Estável — a barra usa como `key` e para animar sem remontar tudo. */

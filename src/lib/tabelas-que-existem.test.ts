@@ -140,23 +140,23 @@ describe("as tabelas que o código pede existem no schema", () => {
  * `null` e o recurso ficaria **invisível, sem nunca dar erro** — a mesma falha
  * silenciosa que esta noite passou consertando, cometida por mim.
  *
- * ─── POR QUE A CATRACA NÃO EXISTE ───────────────────────────────────────────
+ * ─── A CATRACA DE COLUNA EXISTE, E MORA EM OUTRO ARQUIVO ────────────────────
  *
- * A fonte natural seria `types.ts`, que é GERADO do banco. Medido: ele conhece
- * **27 tabelas de 112** e **não sabe o que é `doctor_id`** — está muito atrás do
- * schema. Uma varredura sobre ele acusou **37 falsos positivos**, incluindo
- * `patient_profiles.doctor_id`, que o app inteiro usa.
+ * ⚠️ **ESTA PROSA DIZIA QUE ELA ERA IMPOSSÍVEL, E ESTAVA VENCIDA.** O argumento
+ * era real e a FONTE é que estava errada: `types.ts` é gerado e conhece 27
+ * tabelas de 131, então uma varredura sobre ele acusava 37 falsos positivos —
+ * inclusive `patient_profiles.doctor_id`, que o app inteiro usa. Pela via do
+ * **SQL**, medido: 131 tabelas, 1.564 colunas de `select`, 1.354 filtros
+ * literais, zero falsos positivos.
  *
- * ⚠️ **Catraca com falso positivo é catraca que alguém desliga**, e aí ela deixa
- * de pegar o defeito de verdade. Preferi não ter a essa.
+ * Quem confere coluna hoje é `colunas-que-existem.test.ts`, nos DOIS lados
+ * (`select` e filtro) e para o repositório inteiro. Ela achou os dois nomes que
+ * o parágrafo acima diz ter consertado e que continuavam de pé
+ * (`family_album_posts.user_id`, `baby_name_entries.user_id`), mais um terceiro
+ * que nenhuma lista à mão teria coberto (`kick_sessions.created_at`, que
+ * tornava duas conquistas impossíveis).
  *
- * ─── O QUE DESTRAVA, quando alguém quiser ───────────────────────────────────
- *
- * Regenerar `types.ts` a partir do banco (`supabase gen types typescript`).
- * Feito isso, a varredura passa a ser possível e vale a pena — o recorte certo
- * é só `.eq("col", …)` COLADO num `.from("tabela")`, no mesmo encadeamento:
- * tentar casar qualquer coluna com qualquer tabela dá falso positivo em cascata.
- *
- * Enquanto isso, a defesa é humana: **conferir a coluna no `supabase/*.sql`
- * antes de escrever o filtro.** Foi assim que este erro foi achado.
+ * ⚠️ **O `types.ts` continua sendo assunto do dono**, agora por outra razão: não
+ * é mais um teste que não dá para escrever — é o autocompletar e a checagem de
+ * tipo do Supabase valendo para um quarto do banco.
  */

@@ -377,7 +377,7 @@ export function LojaSementinhas({
                        recorte: precisa acompanhar o cartão quando ele muda de
                        largura, e o texto precisa ser texto. */
                   <span
-                    className="pointer-events-none absolute -left-[52px] top-[26px] z-10 w-[168px] -rotate-45 py-1.5 text-center text-[11px] font-extrabold uppercase leading-tight tracking-wide text-white shadow-sm"
+                    className="pointer-events-none absolute -left-[52px] top-[26px] z-10 w-[168px] -rotate-45 py-1.5 text-center text-xs font-extrabold uppercase leading-tight tracking-wide text-white shadow-sm"
                     style={{ background: PALETA.fita }}
                   >
                     Melhor
@@ -421,10 +421,10 @@ export function LojaSementinhas({
                         como 12.500 de saldo por qualquer pessoa — a soma
                         acontece na cabeça de quem lê, mesmo sem estar escrita.
                         O que impede isso é a frase, não o layout. */}
-                    <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-white/75 px-2.5 py-1 text-[12px] font-semibold text-slate-700">
+                    <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-white/75 px-2.5 py-1 text-xs font-semibold text-slate-700">
                       <span aria-hidden>🎁</span> +{numeroBR(p.bonusParaPresentear)} para presentear
                     </p>
-                    <p className="mt-1.5 border-t border-dashed border-black/10 pt-1.5 text-[12px] leading-snug text-slate-600">
+                    <p className="mt-1.5 border-t border-dashed border-black/10 pt-1.5 text-xs leading-snug text-slate-600">
                       {numeroBR(gastavel)} para o seu Cantinho · {numeroBR(p.bonusParaPresentear)}{" "}
                       só para dar às suas amigas
                     </p>
@@ -495,7 +495,7 @@ export function LojaSementinhas({
             <button
               onClick={() => setVerExtrato((v) => !v)}
               aria-expanded={verExtrato}
-              className="press w-full rounded-2xl border border-border bg-white px-4 py-2.5 text-[12.5px] font-semibold text-slate-600"
+              className="press w-full rounded-2xl border border-border bg-white px-4 py-2.5 text-xs font-semibold text-slate-600"
             >
               {verExtrato ? "Esconder" : "Ver"} minhas últimas movimentações
             </button>
@@ -503,17 +503,17 @@ export function LojaSementinhas({
               <ul className="mt-2 divide-y divide-border/60 overflow-hidden rounded-2xl border border-border bg-white">
                 {extrato.slice(0, 8).map((l, i) => (
                   <li key={i} className="flex items-center justify-between gap-3 px-3 py-2">
-                    <span className="min-w-0 flex-1 truncate text-[12px] text-foreground">
+                    <span className="min-w-0 flex-1 truncate text-xs text-foreground">
                       {l.reason ?? "Movimentação"}
                     </span>
-                    <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+                    <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                       {new Date(l.created_at).toLocaleDateString("pt-BR", {
                         day: "2-digit",
                         month: "2-digit",
                       })}
                     </span>
                     <span
-                      className={`shrink-0 text-[12px] font-bold tabular-nums ${
+                      className={`shrink-0 text-xs font-bold tabular-nums ${
                         l.amount >= 0 ? "text-emerald-600" : "text-muted-foreground"
                       }`}
                     >
@@ -532,7 +532,7 @@ export function LojaSementinhas({
             do seu médico depende delas" — e estava a **2,46:1**, o pior
             contraste da tela. A frase que mais importa não pode ser a mais
             apagada; `slate-600` dá 7,58:1 e continua discreta ao lado do resto. */}
-        <p className="mx-auto mt-4 max-w-[24rem] text-center text-[11px] leading-relaxed text-slate-600">
+        <p className="mx-auto mt-4 max-w-[24rem] text-center text-xs leading-relaxed text-slate-600">
           Sementinhas compram só enfeites do Meu Cantinho. Nenhuma aula, exame, alerta ou orientação
           do seu médico depende delas.
         </p>

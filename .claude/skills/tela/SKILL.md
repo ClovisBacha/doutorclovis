@@ -30,12 +30,12 @@ telas não era layout — era arte, e a arte estava no arquivo dele o tempo todo
 **2. Troquei dado que faltava por genérico, em silêncio.** A referência mostrava
 foto e status de cada amiga. O app não tinha nenhum dos dois, então pus a mesma
 bolha para todas e nenhum status — sem avisar. O resultado foi "uma lista em que
-todo mundo é igual". O certo era dizer: *"a referência pede dois dados que não
-existem; quer que eu os crie ou desenho sem eles?"*
+todo mundo é igual". O certo era dizer: _"a referência pede dois dados que não
+existem; quer que eu os crie ou desenho sem eles?"_
 
 **3. Nunca pus as duas imagens lado a lado.** Eu olhava o código, achava
 parecido e entregava. A documentação do Claude Code chama isto de
-**trust-then-verify gap**: *"If you can't verify it, don't ship it."*
+**trust-then-verify gap**: _"If you can't verify it, don't ship it."_
 
 **4. Acrescentei o que ninguém pediu.** Uma caixa de aviso âmbar que ocupava um
 quarto da primeira dobra e não estava na referência.
@@ -48,11 +48,11 @@ quarto da primeira dobra e não estava na referência.
 
 Faça a tabela, por escrito, para a tela inteira:
 
-| o que é                                       | como entra                                    |
-| --------------------------------------------- | --------------------------------------------- |
-| **arte que nunca muda** (fundo, personagem, título pintado, selo, ícones ilustrados) | UMA imagem, colada como o ilustrador compôs   |
-| **dado** (nome, preço, contador, saldo, hora)  | código, sempre                                |
-| **controle** (botão, campo, aba)               | código, sempre — com alvo de 44px             |
+| o que é                                                                              | como entra                                  |
+| ------------------------------------------------------------------------------------ | ------------------------------------------- |
+| **arte que nunca muda** (fundo, personagem, título pintado, selo, ícones ilustrados) | UMA imagem, colada como o ilustrador compôs |
+| **dado** (nome, preço, contador, saldo, hora)                                        | código, sempre                              |
+| **controle** (botão, campo, aba)                                                     | código, sempre — com alvo de 44px           |
 
 ⚠️ **Um recorte só, e não cinco.** Extrair bolha + corações + balão em arquivos
 separados para o CSS recompor responde à pergunta errada: nada ali é dado. Um
