@@ -56,6 +56,36 @@ function roundedText(
 }
 
 /**
+ * A LETRA DO CARTÃO É A DO APP — Nunito, a mesma de toda tela (set/2026).
+ *
+ * O cartão sai para o WhatsApp e o Instagram com o nome do consultório; em
+ * Georgia ele era a única peça do produto numa família que o app não usa em
+ * lugar nenhum. Os pesos seguem a régua da letra: 800 para título e número,
+ * 700 para o chapéu, 500/600 para o corpo.
+ *
+ * ⚠️ O canvas NÃO espera fonte: `fillText` com uma família ainda não carregada
+ * desenha na RESERVA e não avisa. Por isso os dois caminhos assíncronos
+ * chamam `garantirLetra()` antes de desenhar. O síncrono
+ * (`momentoComoDataUrl`) roda depois de a tela já estar pintada em Nunito, e
+ * um `fonts.load` que já resolveu é síncrono na prática — mas quem chamar
+ * esse caminho ANTES da primeira pintura verá a reserva.
+ */
+const LETRA = '"Nunito", "Nunito Reserva", ui-rounded, system-ui, sans-serif';
+const PESOS_USADOS = ["500 46px", "600 36px", "700 34px", "800 72px", "italic 500 44px"];
+
+async function garantirLetra(): Promise<void> {
+  const fontes = (document as Document & { fonts?: FontFaceSet }).fonts;
+  if (!fontes?.load) return;
+  /* Teto de 1,5 s: uma fonte que não chega não pode segurar o compartilhar —
+     o pior caso é o cartão sair na reserva, que é o que já acontecia. */
+  const teto = new Promise<void>((r) => setTimeout(r, 1500));
+  await Promise.race([
+    Promise.all(PESOS_USADOS.map((f) => fontes.load(`${f} ${LETRA}`))).then(() => undefined),
+    teto,
+  ]).catch(() => undefined);
+}
+
+/**
  * Desenha um momento qualquer.
  *
  * ⚠️ **A régua decide o TEXTO; aqui só se desenha.** Nada neste arquivo escolhe
@@ -73,38 +103,39 @@ function desenharMomento(m: Momento, quem: { motherName?: string | null }): HTML
   ctx.textAlign = "center";
   const cx = W / 2;
 
-  /* O chapéu, espaçado — é a linha que dá o contexto sem competir. */
+  /* O chapéu — a linha que dá o contexto sem competir. Já foi caixa alta
+     espaçada letra a letra; saiu junto com os rótulos espaçados do app. */
   ctx.fillStyle = "#a85a44";
-  ctx.font = "600 34px Georgia, serif";
-  ctx.fillText(m.chapeu.toLocaleUpperCase("pt-BR").split("").join(" "), cx, 200);
+  ctx.font = `700 34px ${LETRA}`;
+  ctx.fillText(m.chapeu, cx, 200);
 
   ctx.font = "220px sans-serif";
   ctx.fillText(m.emoji, cx, 520);
 
   if (m.numero !== null) {
     ctx.fillStyle = "#5b3225";
-    ctx.font = "700 300px Georgia, serif";
+    ctx.font = `800 300px ${LETRA}`;
     ctx.fillText(String(m.numero), cx, 800);
     if (m.unidade) {
       ctx.fillStyle = "#8a5c4c";
-      ctx.font = "500 70px Georgia, serif";
+      ctx.font = `600 70px ${LETRA}`;
       ctx.fillText(m.unidade, cx, 880);
     }
     ctx.fillStyle = "#5b3225";
-    ctx.font = "400 46px Georgia, serif";
+    ctx.font = `500 46px ${LETRA}`;
     roundedText(ctx, m.titulo, cx, 1010, W - 200, 62);
   } else {
     /* ⚠️ Sem número, o TÍTULO ocupa o corpo do cartão — e não um espaço vazio
        onde o número estaria. Um cartão com um buraco no meio lê como imagem
        que falhou ao carregar. */
     ctx.fillStyle = "#5b3225";
-    ctx.font = "700 72px Georgia, serif";
+    ctx.font = `800 72px ${LETRA}`;
     roundedText(ctx, m.titulo, cx, 790, W - 220, 96);
   }
 
   if (quem.motherName) {
     ctx.fillStyle = "#a85a44";
-    ctx.font = "italic 500 44px Georgia, serif";
+    ctx.font = `italic 500 44px ${LETRA}`;
     ctx.fillText(`— ${quem.motherName}`, cx, 1130);
   }
 
@@ -142,7 +173,7 @@ function fundo(ctx: CanvasRenderingContext2D): void {
  */
 function marca(ctx: CanvasRenderingContext2D): void {
   ctx.fillStyle = "rgba(91,50,37,0.55)";
-  ctx.font = "600 36px sans-serif";
+  ctx.font = `600 36px ${LETRA}`;
   ctx.textAlign = "center";
   ctx.fillText("obstetrica.com.br", W / 2, H - 70);
 }
@@ -165,27 +196,27 @@ function drawCard(opts: CardOpts): HTMLCanvasElement {
   const cx = W / 2;
 
   ctx.fillStyle = "#a85a44";
-  ctx.font = "600 34px Georgia, serif";
-  ctx.fillText("M I N H A   G E S T A Ç Ã O", cx, 200);
+  ctx.font = `700 34px ${LETRA}`;
+  ctx.fillText("Minha gestação", cx, 200);
 
   ctx.font = "220px sans-serif";
   ctx.fillText(fruitEmoji(opts.fruit), cx, 520);
 
   ctx.fillStyle = "#5b3225";
-  ctx.font = "700 300px Georgia, serif";
+  ctx.font = `800 300px ${LETRA}`;
   ctx.fillText(String(opts.week), cx, 800);
   ctx.fillStyle = "#8a5c4c";
-  ctx.font = "500 70px Georgia, serif";
+  ctx.font = `600 70px ${LETRA}`;
   ctx.fillText("semanas", cx, 880);
 
   ctx.fillStyle = "#5b3225";
-  ctx.font = "400 46px Georgia, serif";
+  ctx.font = `500 46px ${LETRA}`;
   const who = opts.babyName ? opts.babyName : "meu bebê";
   roundedText(ctx, `${who} do tamanho de ${opts.fruit.toLowerCase()} 💛`, cx, 1010, W - 200, 62);
 
   if (opts.motherName) {
     ctx.fillStyle = "#a85a44";
-    ctx.font = "italic 500 44px Georgia, serif";
+    ctx.font = `italic 500 44px ${LETRA}`;
     ctx.fillText(`— ${opts.motherName}`, cx, 1130);
   }
 
@@ -226,6 +257,7 @@ export type ShareResult = "shared" | "downloaded" | "unsupported" | "error";
 export async function shareMilestoneCard(opts: CardOpts): Promise<ShareResult> {
   if (typeof document === "undefined") return "unsupported";
   try {
+    await garantirLetra();
     const canvas = drawCard(opts);
     const blob = await canvasToBlob(canvas);
     if (!blob) return "error";
@@ -277,6 +309,7 @@ export async function compartilharMomento(
 ): Promise<ShareResult> {
   if (typeof document === "undefined") return "unsupported";
   try {
+    await garantirLetra();
     const canvas = desenharMomento(m, quem);
     const blob = await canvasToBlob(canvas);
     if (!blob) return "error";

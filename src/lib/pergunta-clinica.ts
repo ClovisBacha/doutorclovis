@@ -47,13 +47,32 @@ export const BANDEIRA_VERMELHA = new RegExp(
       "perdi (?:o|a|meu|minha) (?:beb(?:ê|e)|gesta(?:ç|c)(?:ã|a)o|gravidez|filh\\w*)|perda gestacional",
       "convuls(?:ã|a)\\w*|desmai\\w*|desmaiei|apagu(?:ei|ou)|conv(?:ú|u)ls\\w*",
       "pr(?:é|e)[- ]?ecl(?:â|a)mps\\w*|ecl(?:â|a)mps\\w*|press(?:ã|a)o (?:alta|nas alturas)",
-      "vis(?:ã|a)o (?:embaçada|emba(?:ç|c)ada|turva|escura)|vendo (?:pontos|estrelas)",
+      /* ⚠️ **A FOLGA PRECISA ACEITAR ACENTO, e `\\w` do JavaScript não aceita.**
+         `\\w` é `[A-Za-z0-9_]`: uma folga escrita com ele NUNCA atravessa
+         "está", que é a palavra que separa o substantivo do adjetivo em
+         praticamente toda frase real ("minha visão **está** embaçada"). Medido
+         numa bateria de frases: as quatro formas de vista turva ficavam de
+         fora, e a régua só pegava "visão embaçada" colado. É a mesma família
+         da lição de `\\b` ser ASCII e não ver fronteira depois de "ê".
+         `visão` e `vista` viraram UMA alternativa: eram duas listas de
+         adjetivos que precisavam concordar, e a mais nova já divergia. */
+      "(?:vis(?:ã|a)o|vista)\\s+(?:[a-zà-ÿ]+\\s+){0,2}?(?:emba(?:ç|c)\\w*|turv\\w*|escur\\w*|estranha|dupla|nublad\\w*|borrad\\w*)",
+      /* ⚠️ "pontinhos", e não só "pontos": o diminutivo é como ela escreve. */
+      "vendo\\s+(?:[a-zà-ÿ]+\\s+){0,2}?(?:pont\\w*|estrel\\w*|luzes|manchas)",
       "falta de ar|n(?:ã|a)o (?:consigo|estou conseguindo) respirar|sufoca\\w*|dispnei\\w*",
       "trombos\\w*|emboli\\w*|infart\\w*|avc|derrame",
       "bolsa (?:rompeu|estourou|rota)|perdendo l(?:í|i)quido|contra(?:ç|c)(?:õ|o)es fortes",
       "beb(?:ê|e) n(?:ã|a)o (?:mexe|est(?:á|a) mexendo)|parou de mexer|n(?:ã|a)o sinto o beb",
       "quero morrer|me matar|me machucar|tirar minha vida|acabar com tudo|suic(?:í|i)d\\w*",
-      "febre alta|39 graus|40 graus|convulsion\\w*|n(?:ã|a)o para de vomitar",
+      "febre alta|39 graus|40 graus|convulsion\\w*",
+      /* ⚠️ **VÔMITO EM PRIMEIRA PESSOA.** A lista tinha só "não **para** de
+         vomitar" — a terceira pessoa, que é como se fala do vômito de outra
+         gente. Quem escreve na caixinha fala do PRÓPRIO corpo: "não paro",
+         "não consigo parar", "vomitando sem parar", "vomito tudo o que como".
+         As quatro passavam batidas, e vômito persistente é metade da definição
+         de hiperêmese — a outra metade, a perda de 5%, já tem régua. */
+      "n(?:ã|a)o (?:paro|para|consigo parar|estou conseguindo parar) de vomitar",
+      "vomit\\w*\\s+sem\\s+parar|vomitando (?:muito|demais)|vomito tudo",
       /* ⚠️ **MOVIMENTO REDUZIDO, e não só ausente.** A lista pegava "não mexe"
          e "parou de mexer" — e deixava passar "mexeu bem menos hoje", que é a
          frase que a paciente de verdade escreve e o motivo obstétrico número um
@@ -62,8 +81,6 @@ export const BANDEIRA_VERMELHA = new RegExp(
       "menos movimento|pouco movimento|quase n(?:ã|a)o (?:mexe|sinto)",
       /* ⚠️ "perdi líquido" — a lista tinha só "perdendo líquido". */
       "perdi\\s+(?:um pouco de\\s+)?l(?:í|i)quido|perdendo l(?:í|i)quido|molhou a calcinha",
-      /* ⚠️ A VISTA, em linguagem de gente: a lista pedia "embaçada/turva". */
-      "vista\\s+(?:\\w+\\s+){0,2}?(?:estranha|escura|escurec\\w*|emba(?:ç|c)\\w*|turva)",
       /* Ideação por eufemismo. ⚠️ "não aguento mais" fica de FORA de propósito:
          é hipérbole cotidiana ("não aguento mais essa azia"), e abrir a Central
          de Emergência nela ensinaria a ignorar o alarme. Só as inequívocas. */
@@ -86,10 +103,73 @@ export const BANDEIRA_VERMELHA = new RegExp(
  * números, ou o par escrito com **"por"** por extenso — que é como se fala
  * pressão e não é como se escreve data.
  */
+/**
+ * ⚠️ **O QUE DESQUALIFICA UM PAR DE NÚMEROS COMO PRESSÃO É O SUBSTANTIVO, e não
+ * "ter palavra depois".**
+ *
+ * A primeira versão desta trava exigia que o par TERMINASSE ali
+ * (`(?!\s*[a-zà-ÿ])`) — e isso derrubou um caso real: **"deu 15 por 10 agora"**
+ * saía publicável, medido numa bateria de 40 frases. Quem relata pressão quase
+ * sempre põe uma palavra de tempo depois ("agora", "hoje", "de manhã").
+ *
+ * Quem escreve QUANTIDADE é que põe o substantivo: "12 por 10 pessoas",
+ * "3 por 2 na farmácia", "1 por 2 metros". A lista é curta de propósito — ela
+ * cobre o que aparece num app de gestação, e errar para o lado de ROTEAR uma
+ * quantidade é muito mais barato que deixar passar uma pressão de 16 por 11.
+ */
+/**
+ * ⚠️ **E O OBJETO ANTES do par também desqualifica.**
+ *
+ * Medido: "o berço é 130 por 70" e "comprei um quadro 20 por 15" abriam a
+ * Central de Emergência — os dois pares caem dentro das faixas plausíveis de
+ * pressão, e a lista de quantidade não ajuda quando não há unidade depois.
+ * Móvel, quadro e tapete têm nome ANTES da medida; pressão não tem.
+ */
+const NAO_TEM_OBJETO_ANTES =
+  /* ⚠️ **A JANELA É LARGA (25 caracteres), e a primeira versão usava `\\s{1,3}`
+     — que não cobria "o berço **é** 130 por 70" nem "o tapete **mede** 200 por
+     150". O objeto e a medida quase nunca ficam colados. O V8 aceita
+     lookbehind de comprimento variável; o `[^.!?\\n]` impede atravessar frase. */
+  "(?<!\\b(?:ber[çc]o|quadro|tapete|mesa|cama|colch(?:ã|a)o|sof(?:á|a)|" +
+  "arm(?:á|a)rio|c(?:ô|o)moda|tela|foto|papel|caixa|banheira|" +
+  "carrinho|manta|len(?:ç|c)ol|cortina|almofada|tapetinho)\\b[^.!?\\n]{0,25})";
+
+const NAO_E_QUANTIDADE =
+  "(?!\\s*(?:pessoas?|convidad\\w*|reais|real|d[ií]as?|semanas?|m[eê]s|meses|horas?|" +
+  "minutos?|metros?|cm|cent[ií]metros?|unidades?|itens?|item|pacotes?|vezes|vez|" +
+  "anos?|quilos?|kg|litros?|ml|por[çc][õo]es|fraldas?|lugares?)\\b)";
+
 export const PRESSAO_EM_NUMEROS = new RegExp(
   [
     "(?:press(?:ã|a)o|\\bpa\\b)[^0-9]{0,20}\\d{1,3}\\s*(?:por|x|\\/)\\s*\\d{1,3}",
-    "\\d{1,3}\\s*por\\s*\\d{1,3}",
+    /**
+     * ⚠️ **O PAR SOLTO PRECISA DAS DUAS FAIXAS DE PRESSÃO, e o ramo antigo não
+     * tinha nenhuma — qualquer `N por N` virava EMERGÊNCIA.**
+     *
+     * Medido: "marcamos o chá de bebê pra 12 por 10 pessoas" abria a Central de
+     * Emergência. E o custo desse falso positivo é o maior de todos nesta
+     * régua: ela aprende que o alarme dispara por qualquer coisa e passa a
+     * ignorá-lo — inclusive no dia em que a pressão dela estiver mesmo em
+     * 16 por 10.
+     *
+     * A sistólica de uma gestante fica entre 8 e 25 (falada) ou 80 e 250
+     * (escrita); a diastólica, entre 4 e 16 ou 40 e 160. Fora disso é outra
+     * coisa: quantidade, preço, horário, pessoas.
+     */
+    /**
+     * ⚠️ **E O PAR SOLTO NÃO PODE SER SEGUIDO DE PALAVRA.** As faixas sozinhas
+     * não bastavam: "marcamos o chá pra 12 por 10 pessoas" cai dentro delas, e
+     * continuava abrindo a Central de Emergência. Quem escreve pressão termina
+     * o par ali ("deu 15 por 10.") ou já disse a palavra `pressão` — e esse
+     * caso é do ramo de cima. Quem escreve quantidade sempre põe o substantivo
+     * depois: pessoas, reais, dias, convidados, unidades.
+     */
+    NAO_TEM_OBJETO_ANTES +
+      "\\b(?:[89]|1\\d|2[0-5])\\s*por\\s*(?:[4-9]|1[0-6])(?![0-9])" +
+      NAO_E_QUANTIDADE,
+    NAO_TEM_OBJETO_ANTES +
+      "\\b(?:[89]\\d|1\\d\\d|2[0-4]\\d|250)\\s*por\\s*(?:[4-9]\\d|1[0-6]\\d)(?![0-9])" +
+      NAO_E_QUANTIDADE,
   ].join("|"),
   "i",
 );
@@ -195,10 +275,89 @@ export const ENTREGA_DE_CONDUTA = new RegExp(
     /* Relato de conduta na primeira pessoa do passado — o mais persuasivo. */
     "\\b(?:eu\\s+)?n(?:ã|a)o (?:fui|precisei|liguei|corri|procurei|internei)\\b",
     "\\bno meu caso\\b|\\bcomigo foi\\b|\\bcomigo aconteceu\\b|\\bnem precisei\\b",
-    "\\bpassou sozinh|\\bdeu tudo certo\\b|\\bn(?:ã|a)o deu nada\\b",
-    /* Condicional de conselho. */
+    /**
+     * ⚠️ **"DEU TUDO CERTO" SAIU DAQUI, e a razão é medida.**
+     *
+     * Ela entrou como tranquilização anedótica ("comigo deu tudo certo, não
+     * precisei ir") — o que é verdade. Mas ela é também, e sobretudo, a frase
+     * com que se anuncia um NASCIMENTO: "deu tudo certo, ele nasceu 3,2kg".
+     * Medido: esse post era RECUSADO como orientação de saúde — o app barrando
+     * o momento mais feliz da paciente, com um recado que a acusa de dar
+     * conselho médico.
+     *
+     * O que ficou é o que só serve para minimizar risco alheio. E a forma
+     * perigosa continua pega pelos OUTROS ramos: "comigo foi", "no meu caso",
+     * "não precisei", "passou sozinho".
+     */
+    "\\bpassou sozinh|\\bn(?:ã|a)o deu nada\\b",
+    /**
+     * ⚠️ **"DEU TUDO CERTO" VOLTA — mas só com o ENQUADRAMENTO ANEDÓTICO.**
+     *
+     * A frase saiu inteira porque é como se anuncia um nascimento ("deu tudo
+     * certo, ele nasceu 3,2kg"). Tirá-la abriu buraco: "comigo deu tudo certo"
+     * — tranquilização sobre o risco alheio — passou a sair publicável.
+     *
+     * O que roteia é o "comigo"/"no meu caso" COLADO nela. O post de
+     * nascimento não tem esse enquadramento, e continua passando.
+     */
+    "\\bcomigo\\s+deu tudo certo\\b|\\bdeu tudo certo\\s+comigo\\b",
+    "\\bno meu caso\\s+deu tudo certo\\b",
+    /**
+     * Condicional de conselho.
+     *
+     * ⚠️ **"SE EU FOSSE VOCÊ" ESTAVA COM A PESSOA TROCADA e passava inteira.**
+     * O padrão só reconhecia "se fosse eu" e "se fosse comigo" — e a forma mais
+     * comum em português é justamente a que faltava. Medido: "se eu fosse você
+     * eu esperava até amanhã" saía como publicável.
+     */
+    /**
+     * ⚠️ **SEM `\\b` NO FIM, e essa é a razão de a primeira correção ter
+     * falhado.** `\\b` do JavaScript é ASCII: depois do `ê` de "você" ele NÃO
+     * enxerga fronteira, então `se eu fosse você ` não casava — só a forma sem
+     * acento passava. Medido nas duas grafias.
+     *
+     * É a mesma armadilha que `temPalavraOculta` documenta em
+     * `comentarios.ts`, aparecendo num arquivo diferente no mesmo dia.
+     */
     "\\b(?:no seu lugar|se fosse (?:eu|comigo))\\b",
+    "\\bse eu fosse (?:voc(?:ê|e)|tu)(?![a-zà-ÿ])",
     "\\b(?:ficaria|esperaria|deixaria|iria|n(?:ã|a)o iria|tomaria|n(?:ã|a)o tomaria)\\b",
+    /**
+     * ⚠️ **O IMPERATIVO AFIRMATIVO PASSAVA INTEIRO, e ele é a forma mais direta
+     * de dar conduta que existe.**
+     *
+     * A lista só tinha a NEGATIVA ("não tome", "não vá"). Medido: "toma
+     * buscopan que resolve" saía publicável — uma paciente mandando outra tomar
+     * um antiespasmódico, com o nome do consultório em volta.
+     *
+     * ⚠️ **O OBJETO É OBRIGATÓRIO, e é isso que salva o recurso.** "Toma um
+     * café", "toma cuidado", "usa esse carrinho" são conversa normal; o que
+     * roteia é o verbo seguido de coisa de tratamento. Sem o objeto, metade da
+     * conversa da aba iria para o consultório.
+     */
+    /**
+     * ⚠️ **O PASSADO EM PRIMEIRA PESSOA — a forma MAIS persuasiva, e ela
+     * passava inteira.** Medido: "tomei buscopan e resolveu" saía publicável.
+     * O imperativo manda; o relato CONVENCE ("comigo funcionou"), e é
+     * exatamente o padrão dos 20,9% de conselho errado que fecharam os
+     * comentários por meses.
+     */
+    "\\b(?:tomei|usei|bebi|passei|apliquei|tomava|usava)\\s+" +
+      "(?:um[a]?\\s+|o\\s+|a\\s+|esse\\s+|essa\\s+)?" +
+      "(?:rem(?:é|e)dio|medicament\\w*|comprimid\\w*|antibi(?:ó|o)tic\\w*|" +
+      "buscopan|dipirona|paracetamol|ibuprofen\\w*|dorflex|luftal|omeprazol)\\b",
+    "\\b(?:tom[ae]|us[ae]|beb[ae]|passa|aplica|faz(?:\\s+o)?)\\s+" +
+      "(?:um[a]?\\s+|o\\s+|a\\s+|esse\\s+|essa\\s+|este\\s+|esta\\s+)?" +
+      "(?:rem(?:é|e)dio|medicament\\w*|comprimid\\w*|antibi(?:ó|o)tic\\w*|" +
+      "buscopan|dipirona|paracetamol|ibuprofen\\w*|dorflex|luftal|omeprazol|" +
+      /* ⚠️ **CHÁ É LISTA FECHADA, e nunca `chá de \\w+`.** Medido: "faz um chá
+         de bebê pra mim" era recusado como conduta clínica — o nome de um
+         recurso INTEIRO deste app. A lista traz o que tem efeito obstétrico
+         (uterotônico, abortivo caseiro, digestivo usado como remédio). */
+      "ch(?:á|a)\\s+de\\s+(?:canela|arruda|buchinha|sene|boldo|camomila|erva[- ]doce|" +
+      "hortel(?:ã|a)|gengibre|losna|artemisia|art(?:e|ê)misia|poejo|carqueja|" +
+      "cavalinha|maca|abacaxi\\s+com\\s+canela)|pomada|inje(?:ç|c)(?:ã|a)o|soro|" +
+      "vitamina\\s+\\w+)\\b",
   ].join("|"),
   "i",
 );

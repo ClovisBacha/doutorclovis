@@ -24,7 +24,8 @@
     "app:android": "cap open android",
     "varrer:bancadas": "node scripts/varrer-bancadas.mjs",
     "verificar": "bash scripts/verificar.sh",
-    "acessibilidade": "node scripts/acessibilidade.mjs"
+    "acessibilidade": "node scripts/acessibilidade.mjs",
+    "varrer:interacao": "node scripts/varrer-interacao.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.80",

@@ -102,21 +102,39 @@ export async function subscribeToPush(): Promise<PushSupport> {
   }
 }
 
-/** Cancela a inscrição no navegador e remove a linha do banco. */
-export async function unsubscribeFromPush(): Promise<void> {
+/**
+ * Cancela a inscrição no navegador e remove a linha do banco.
+ *
+ * ⚠️ **DEVOLVE O DESFECHO, e não `void`.** Quem chama precisa poder dizer "não
+ * consegui": a linha de `push_subscriptions` é o que o servidor lê na hora de
+ * enviar, então enquanto ela estiver lá o push CONTINUA chegando. Afirmar
+ * "desliguei" por cima disso faz a paciente parar de procurar o interruptor de
+ * verdade — o das Configurações do sistema, que leva junto o aviso de consulta
+ * e o retorno do SOS.
+ *
+ * ⚠️ **Sem inscrição é SUCESSO**, não falha: não há o que desligar, e é o
+ * estado que ela pediu.
+ */
+export async function unsubscribeFromPush(): Promise<{ ok: boolean; reason?: string }> {
   try {
     const reg = await navigator.serviceWorker.getRegistration();
     const sub = await reg?.pushManager.getSubscription();
-    if (!sub) return;
+    if (!sub) return { ok: true };
     const endpoint = sub.endpoint;
     await sub.unsubscribe();
     const { data: u } = await supabase.auth.getUser();
-    if (u.user) {
-      await (
+    if (!u.user) return { ok: false, reason: "no-session" };
+    {
+      const { error } = await (
         supabase as unknown as {
           from: (t: string) => {
             delete: () => {
-              eq: (c: string, v: string) => { eq: (c: string, v: string) => Promise<unknown> };
+              eq: (
+                c: string,
+                v: string,
+              ) => {
+                eq: (c: string, v: string) => Promise<{ error: unknown }>;
+              };
             };
           };
         }
@@ -125,8 +143,11 @@ export async function unsubscribeFromPush(): Promise<void> {
         .delete()
         .eq("user_id", u.user.id)
         .eq("endpoint", endpoint);
+      /* ⚠️ A linha sobrevivendo quer dizer que o envio continua. */
+      if (error) return { ok: false, reason: "db" };
     }
+    return { ok: true };
   } catch {
-    /* best-effort */
+    return { ok: false, reason: "error" };
   }
 }

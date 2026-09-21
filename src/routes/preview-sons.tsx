@@ -16,7 +16,14 @@ type Busca = { luto?: boolean };
 
 export const Route = createFileRoute("/preview-sons")({
   validateSearch: (q: Record<string, unknown>): Busca => ({
-    luto: q.luto === "1" || q.luto === true,
+    /* ⚠️ `String(...)` E `=== true`, NUNCA `=== "1"` sozinho: o router
+       JSON-parseia a query, então `?x=1` chega como o NÚMERO 1 e a comparação
+       estrita com a string falha em SILÊNCIO — a bancada abre no estado
+       PADRÃO e a URL volta reescrita como `?x=false`. Medido: era assim aqui,
+       e a varredura de bancadas não tem como ver (ela lê o console, e uma
+       tela que desenha o estado errado não registra erro nenhum).
+       (`=== true` fica porque `String(true)` é `"true"`, não `"1"`.) */
+    luto: q.luto === true || String(q.luto ?? "") === "1",
   }),
   head: () => ({
     meta: [{ title: "Bancada dos sons" }, { name: "robots", content: "noindex" }],

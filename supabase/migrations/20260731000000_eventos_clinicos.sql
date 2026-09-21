@@ -325,6 +325,9 @@ $tc$;
 DO $view$
 DECLARE
   partes text[] := ARRAY[]::text[];
+  /* Qual expressão usar para a força do movimento — ver o bloco de
+     `kick_sessions`: a coluna nasce num `APLICAR_` que pode não ter rodado. */
+  forca_col text := 'NULL::smallint';
   pares  text[];
   sql    text;
 BEGIN
@@ -352,7 +355,25 @@ BEGIN
                jsonb_strip_nulls(jsonb_build_object(%s)) AS dados,
                h.notes AS texto
           FROM public.health_logs h
+         /* ⚠️ **O `OR` DA NOTA NÃO É DETALHE: sem ele, um registro só com NOTA
+            nunca entrava na view.** O app ACEITA exatamente essa linha — o
+            formulário tem um campo "Notas" vivo ao lado de Glicemia, e a guarda
+            de `add()` libera a gravação quando só ela está preenchida —, a
+            lista "Ver e corrigir meus registros" DESENHA a linha, e do lado do
+            médico não sobrava caminho nenhum: `clinical.functions.ts` lê só
+            `clinical_events`, e o único outro leitor de `health_logs` no painel
+            usa o retorno apenas para CONTAR.
+
+            O caso concreto: ela escreve "acordei com a vista embaçada e dor de
+            cabeça, não consegui medir a pressão". Fica no banco, fica na tela
+            dela, e não existe para o consultório.
+
+            ⚠️ O `btrim`/`nullif` importa: sem ele, uma nota de espaços em branco
+            vira evento clínico. E os campos de `dados` continuam saindo vazios —
+            `resumo()` já cai no rótulo da espécie, com `texto` desenhado
+            abaixo, então nada muda do lado da leitura. */
          WHERE num_nonnulls(%s) > 0
+            OR nullif(btrim(h.notes), '') IS NOT NULL
       $sql$,
       array_to_string(pares, ', '),
       array_to_string(ARRAY(SELECT 'h.' || c FROM unnest(ARRAY['systolic','diastolic','glucose_mg_dl','weight_kg','spo2','heart_rate_bpm']) c
@@ -433,13 +454,46 @@ BEGIN
   END IF;
 
   IF to_regclass('public.kick_sessions') IS NOT NULL THEN
-    partes := array_append(partes, $sql$
+    -- ⚠️ ESTE BLOCO DIVERGIU DO `APLICAR_EVENTOS_CLINICOS.sql` E A FORÇA SE
+    -- PERDIA NUM BANCO NOVO. A migration montava a mesma view SEM `forca`:
+    -- quem aplicasse só as migrations teria a coluna gravada, o chip na tela
+    -- da paciente, e NADA no prontuário — sem erro nenhum, porque a view
+    -- continua válida. Os dois arquivos montam a MESMA view e têm de dizer a
+    -- mesma coisa.
+    --
+    -- `strength` nasce em APLICAR_FORCA_DO_MOVIMENTO.sql, que pode não ter
+    -- rodado ainda: sem este teste, o CREATE VIEW falharia INTEIRO e as onze
+    -- fontes cairiam junto por causa de uma coluna nova.
+    SELECT CASE WHEN EXISTS (
+             SELECT 1 FROM information_schema.columns
+              WHERE table_schema = 'public' AND table_name = 'kick_sessions'
+                AND column_name = 'strength'
+           ) THEN 'k.strength' ELSE 'NULL::smallint' END
+      INTO forca_col;
+    partes := array_append(partes, replace($sql$
       SELECT 'kick_sessions'::text, k.id, k.user_id, k.started_at,
              'movimento'::text,
-             jsonb_build_object('chutes', k.kick_count),
+             jsonb_strip_nulls(jsonb_build_object(
+               'chutes', k.kick_count,
+               'forca', $FORCA$,
+               -- ⚠️ A DURAÇÃO É O DADO CLÍNICO, e ela não vinha. O que se mede
+               -- aqui é o TEMPO ATÉ 10 MOVIMENTOS: "4 movimentos" no prontuário
+               -- era indistinguível de uma sessão que ela encerrou em cinco
+               -- minutos E do alarme vermelho que a tela dela mostra a partir
+               -- de duas horas. Sem esta linha o painel não tinha como saber a
+               -- diferença — e a régua de movimentos reduzidos, que é um dos
+               -- nove sintomas VERMELHOS, não tinha em que se apoiar.
+               --
+               -- Sessão aberta (`ended_at` nulo) ou instante invertido por
+               -- relógio torto viram NULL e o `strip_nulls` os descarta: um
+               -- "-3 min" no prontuário é pior que campo ausente.
+               'duracao_min', CASE WHEN k.ended_at > k.started_at
+                 THEN ROUND(EXTRACT(EPOCH FROM (k.ended_at - k.started_at)) / 60)::int
+               END
+             )),
              k.notes
         FROM public.kick_sessions k
-    $sql$);
+    $sql$, '$FORCA$', forca_col));
   END IF;
 
   IF to_regclass('public.journal_entries') IS NOT NULL THEN
