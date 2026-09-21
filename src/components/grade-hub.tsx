@@ -241,7 +241,7 @@ export function VoltarDaGrade({
     <button
       onClick={onVoltar}
       aria-label="Voltar"
-      className="press flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-white/70 text-primary transition-colors hover:bg-white"
+      className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-white/70 text-primary transition-colors hover:bg-white"
     >
       <ChevronLeft className="h-[18px] w-[18px]" strokeWidth={2} />
     </button>

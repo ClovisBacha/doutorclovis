@@ -911,7 +911,7 @@ export function ChatTab({
             type="button"
             onClick={onVoltar}
             aria-label="Voltar"
-            className="press -ml-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-foreground md:hidden"
+            className="press -ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-foreground md:hidden"
           >
             <ChevronLeft className="h-6 w-6" strokeWidth={2} />
           </button>
