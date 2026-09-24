@@ -17632,3 +17632,15 @@ Quinto lote da avaliação do app iOS — este não toca produto.
 - **`restos-20260822-020904.patch`** saiu da raiz: era a cópia de segurança
   que o hook de início fez em 22/08, e o conteúdo dela (`editarPost`) já está
   no código.
+- **A varredura de interação ganhou a segunda chance da de bancadas.** O CI
+  deste lote caiu com `busca · digitar` acusando "Failed to fetch dynamically
+  imported module: virtual:tanstack-start-client-entry" — o Vite recarregando
+  a entrada no meio da navegação — num commit que só mudava Markdown, e o
+  mesmo job tinha passado cinco minutos antes com código idêntico. A de
+  bancadas já repetia uma vez, sozinha; a de interação reprovava na
+  primeira. Agora cada roteiro roda numa função, os que falham voltam para
+  UMA segunda passada, e só ela conta (`segunda-chance-da-interacao.test.ts`).
+  ⚠️ Rodando a varredura a partir de uma worktree com `node_modules` em
+  symlink, TODOS os roteiros caem com o mesmo erro: é o cache do Vite
+  (`node_modules/.vite`) apontando para a outra árvore, não defeito das
+  telas — rode a partir do clone dono do `node_modules`.
