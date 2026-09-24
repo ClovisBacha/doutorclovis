@@ -28,6 +28,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { hapticTap } from "@/lib/haptics";
 import { hapticoDeAviso } from "@/lib/nativo";
 import { analyzeContractions } from "@/lib/analise-de-contracoes";
+import { bandeirasDoParto } from "@/lib/bandeiras-do-parto";
 import {
   INTENSIDADE_PADRAO,
   NIVEIS_DE_INTENSIDADE,
@@ -94,8 +95,15 @@ export function ContracoesTab({
   weeks,
   onNavigate,
   bancada,
+  careMode = false,
 }: {
   weeks: number | null;
+  /**
+   * ⚠️ Modo Cuidado: o cronômetro FICA (quem perdeu a gestação pode estar em
+   * trabalho de parto), mas a caixa vermelha para de falar do bebê — ver
+   * `bandeirasDoParto`.
+   */
+  careMode?: boolean;
   /**
    * ⚠️ O caminho do MÉDICO DELA, e ele vem antes do 192 em todo estado que não
    * é emergência: a régua toda manda LIGAR, e ligar para quem a acompanha é a
@@ -133,6 +141,7 @@ export function ContracoesTab({
   const [active, setActive] = useState<Contraction | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [intensity, setIntensity] = useState(INTENSIDADE_PADRAO);
+  const bandeiras = bandeirasDoParto(careMode);
   const startRef = useRef<number>(0);
   /* ⚠️ A LEITURA FALHANDO SUPRIMIA O BOTÃO DO 192.
      `data ?? []` transformava erro de rede em "ela não cronometrou nada", e o
@@ -396,10 +405,11 @@ export function ContracoesTab({
      *
      * `emSessao` porque o cronômetro É uma sessão que ela abriu.
      *
-     * ⚠️ Sem `careMode` aqui: este componente não o recebe, e o cronômetro de
-     * contrações é justamente uma tela que continua valendo no Modo Cuidado —
-     * quem perdeu a gestação pode estar em trabalho de parto. `podeSoar` já
-     * barra o resto; este som é sobre o corpo dela, não sobre o bebê.
+     * ⚠️ `careMode` chega a este componente só para a caixa vermelha (ver
+     * `bandeirasDoParto`); este som NÃO passa por ele, de propósito: o
+     * cronômetro continua valendo no Modo Cuidado — quem perdeu a gestação
+     * pode estar em trabalho de parto —, `podeSoar` já barra o resto, e este
+     * som é sobre o corpo dela, não sobre o bebê.
      */
     tocarSomDeUI("intervalo", { emSessao: true });
 
@@ -810,14 +820,19 @@ export function ContracoesTab({
           padrão fechar enquanto sangra. Por isso elas não moram atrás de um
           link nem de um acordeão: moram na tela, acima do histórico, em todo
           estado — inclusive quando a análise diz que as contrações estão
-          espaçadas. */}
+          espaçadas.
+
+          ⚠️ No Modo Cuidado a quarta (o bebê se mexendo menos) SAI, e as três
+          do corpo dela ficam — a lista vem de `bandeirasDoParto`. */}
       <div className="rounded-2xl border border-rose-200 bg-rose-50/70 p-4 text-rose-900">
         <p className="text-sm font-semibold">Procure a maternidade agora se:</p>
         <ul className="mt-1 space-y-0.5 text-sm">
-          <li>· a bolsa rompeu, mesmo sem contração nenhuma;</li>
-          <li>· houver sangramento vermelho-vivo;</li>
-          <li>· a dor for constante e forte, sem alívio entre as contrações;</li>
-          <li>· o bebê estiver se mexendo menos que o normal.</li>
+          {bandeiras.map((b, i) => (
+            <li key={b}>
+              · {b}
+              {i === bandeiras.length - 1 ? "." : ";"}
+            </li>
+          ))}
         </ul>
         <p className="mt-2 text-sm">
           Nenhuma delas depende do cronômetro — não espere fechar um padrão.

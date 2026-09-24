@@ -514,7 +514,15 @@ function SiteShell() {
       <div className="chrome-publico print:hidden">
         <PublicBottomNav />
       </div>
-      <Toaster position="bottom-right" richColors mobileOffset={{ bottom: 96 }} />
+      {/* ⚠️ ACIMA DA BARRA E DO BOTÃO DO BEBÊ. O deslocamento era 96px fixos: nos
+          iPhones com Face ID a barra sobe com a área segura (34px) e o círculo
+          do bebê avança 28px acima dela — o aviso caía em cima dos dois. A
+          conta usa a mesma variável que posiciona a barra (`--safe-bottom`). */}
+      <Toaster
+        position="bottom-right"
+        richColors
+        mobileOffset={{ bottom: "calc(var(--safe-bottom) + 120px)" }}
+      />
       <PWAInstallBanner />
     </div>
   );

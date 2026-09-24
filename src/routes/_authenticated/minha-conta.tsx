@@ -43,6 +43,7 @@ import drPortrait from "@/assets/dr-clovis-portrait.jpg";
    (PSNR 46–50 dB). Substituem os traços do Lucide nos blocos grandes: um bloco
    de 300px pedia um objeto com volume, não um contorno de 1,7px. */
 import { ymdLocal } from "@/lib/utils";
+import { anunciarLocalizacao, marcarLocalizacaoAutorizada } from "@/lib/localizacao-do-ceu";
 import { getMyDoctor } from "@/lib/doctors.functions";
 import { minhasConsultas, type ConsultaDaPaciente } from "@/lib/clinical.functions";
 import {
@@ -1046,8 +1047,17 @@ function MinhaContaPage() {
           rotulo: "Ativar localização",
           executar: () => {
             navigator.geolocation?.getCurrentPosition(
-              () => window.location.reload(),
-              () => toast("Ative a localização nos ajustes do navegador para este site."),
+              ({ coords }) => {
+                /* Sem recarregar a página: o céu ouve o evento e troca para o
+                   GPS no lugar (`useWeather`), e a autorização fica lembrada
+                   neste aparelho para as próximas aberturas. */
+                marcarLocalizacaoAutorizada();
+                anunciarLocalizacao({ lat: coords.latitude, lon: coords.longitude });
+              },
+              () =>
+                toast(
+                  "Não consegui acessar a sua localização. Confira a permissão nos ajustes do aparelho.",
+                ),
               { timeout: 8000 },
             );
           },
@@ -3383,7 +3393,7 @@ function RegistrosHub({
           />
         )}
         {sub === "contracoes" && (
-          <ContracoesTab weeks={gest?.weeks ?? null} onNavigate={onNavigate} />
+          <ContracoesTab weeks={gest?.weeks ?? null} onNavigate={onNavigate} careMode={careMode} />
         )}
         {sub === "timeline" && <TimelineTab profile={profile} gest={gest} />}
       </Fade>

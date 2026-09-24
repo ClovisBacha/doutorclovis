@@ -27,6 +27,12 @@ import { hapticTap } from "@/lib/haptics";
 import { barraDeStatus } from "@/lib/nativo";
 import { getApproxLocation } from "@/lib/local.functions";
 import {
+  aoReceberLocalizacao,
+  localizacaoJaAutorizada,
+  permissaoDeLocalizacao,
+  podePedirAoMontar,
+} from "@/lib/localizacao-do-ceu";
+import {
   assinarAtalhos,
   atalhosDe,
   SEM_ATALHOS,
@@ -353,20 +359,35 @@ function useWeather(
     }
     void pisoAproximado();
 
-    if ("geolocation" in navigator) {
+    const usarGps = (lat: number, lon: number) => {
+      if (cancelled) return;
+      temGps = true;
+      setOrigemLocal({ tipo: "gps", cidade: null });
+      void load(lat, lon);
+    };
+    /* ⚠️ O GPS NÃO É PEDIDO AO MONTAR — só se o sistema já disse sim, ou se ela
+       já autorizou pelo cartão neste aparelho. Antes, a primeira caixa de
+       diálogo do app (na casca, com o texto de permissão do SOS) aparecia no
+       primeiro segundo da home, para pintar o clima. Quem ainda não autorizou
+       fica com o piso aproximado, e o cartão "Ativar localização" é a porta
+       (ver `localizacao-do-ceu.ts`). */
+    void permissaoDeLocalizacao().then((permissao) => {
+      if (cancelled || temGps) return;
+      if (!podePedirAoMontar(permissao, localizacaoJaAutorizada())) return;
+      if (!("geolocation" in navigator)) return;
       navigator.geolocation.getCurrentPosition(
-        ({ coords }) => {
-          temGps = true;
-          setOrigemLocal({ tipo: "gps", cidade: null });
-          void load(coords.latitude, coords.longitude);
-        },
+        ({ coords }) => usarGps(coords.latitude, coords.longitude),
         // Erro/negação/timeout: o piso já está na tela, não há o que fazer.
         () => {},
         { timeout: 8000, maximumAge: 300_000 },
       );
-    }
+    });
+    /* O cartão "Ativar localização" entrega a coordenada por evento: o céu
+       troca para o GPS no lugar, sem recarregar a página. */
+    const pararDeOuvir = aoReceberLocalizacao(({ lat, lon }) => usarGps(lat, lon));
     return () => {
       cancelled = true;
+      pararDeOuvir();
     };
   }, [cidadeCadastro?.lat, cidadeCadastro?.lon, cidadeCadastro?.nome]);
   return { weather, origem: origemLocal };
