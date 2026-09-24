@@ -64,7 +64,10 @@ export function ExcluirConta({ ehMedico = false }: { ehMedico?: boolean }) {
            uma sessão apontando para um usuário apagado deixa o app em estados
            que ninguém previu. */
         await supabase.auth.signOut();
-        window.location.href = "/";
+        /* Para o LOGIN, e não para a home pública do site: dentro do app a home
+           do site é uma página sem cabeçalho nem volta, e no site a tela de
+           entrada é o lugar honesto para quem acabou de apagar a conta. */
+        window.location.href = "/auth";
         return;
       }
       toast.error(textoDoErro(r.motivo), { duration: 8000 });
@@ -84,8 +87,7 @@ export function ExcluirConta({ ehMedico = false }: { ehMedico?: boolean }) {
           um toque desligaria o SOS de quem está grávida agora. Por isso a exclusão de conta de
           médico passa por um pedido no suporte, onde a transferência das pacientes e a guarda do
           prontuário são tratadas antes.{" "}
-          <strong className="text-foreground">Escreva para o suporte pelo site</strong> e a gente
-          conduz.
+          <strong className="text-foreground">Escreva para o suporte</strong> e a gente conduz.
         </p>
       ) : !aberto ? (
         <>
@@ -166,10 +168,10 @@ function textoDoErro(motivo: string): string {
     case "sessao":
       return "Sua sessão expirou. Entre de novo e tente outra vez.";
     case "medico":
-      return "Contas de médico são encerradas pelo suporte — fale com a gente pelo site.";
+      return "Contas de médico são encerradas pelo suporte — fale com a gente.";
     default:
       /* "falhou" quase sempre é o banco recusando por vínculo — e a paciente
          não pode ficar achando que apagou quando não apagou. */
-      return "Não consegui concluir a exclusão. Nada foi apagado. Fale com o suporte pelo site e a gente resolve.";
+      return "Não consegui concluir a exclusão. Nada foi apagado. Fale com o suporte e a gente resolve.";
   }
 }
