@@ -44,6 +44,12 @@ import drPortrait from "@/assets/dr-clovis-portrait.jpg";
    de 300px pedia um objeto com volume, não um contorno de 1,7px. */
 import { ymdLocal } from "@/lib/utils";
 import { anunciarLocalizacao, marcarLocalizacaoAutorizada } from "@/lib/localizacao-do-ceu";
+import {
+  PREFIXO_RETRATO_DA_HOME,
+  gravarRetratoDaHome,
+  lerRetratoDaHome,
+  podePintarDoRetrato,
+} from "@/lib/retrato-da-home";
 import { getMyDoctor } from "@/lib/doctors.functions";
 import { minhasConsultas, type ConsultaDaPaciente } from "@/lib/clinical.functions";
 import {
@@ -1566,6 +1572,23 @@ function MinhaContaPage() {
       const { data: s } = await supabase.auth.getSession();
       const token = s.session?.access_token;
       const idDaSessao = s.session?.user?.id ?? null;
+      /* ── ⚠️ O RETRATO PINTA ANTES DA REDE (set/2026) ──────────────────────
+         A saudação, a semana e o bebê esperavam o `select` do perfil voltar
+         em TODA abertura — a mesma linha que o aparelho já tinha recebido na
+         abertura anterior. Agora a home pinta do retrato guardado
+         (`retrato-da-home.ts`) e a rede corrige quando responde: o
+         `setProfile(data)` lá embaixo sobrescreve SEMPRE, inclusive com
+         "não consegui ler". A regra de quem pinta é a MESMA do `liberarCedo`
+         abaixo — âncora gestacional e sem marca de médico —, lida da sessão,
+         que é local. Médico e admin nunca gravam retrato. */
+      const marcaDeMedicoNaSessao =
+        (s.session?.user?.user_metadata as { role?: string } | null | undefined)?.role === "doctor";
+      const retrato = idDaSessao ? lerRetratoDaHome(idDaSessao) : null;
+      if (retrato && idDaSessao && podePintarDoRetrato(retrato, marcaDeMedicoNaSessao)) {
+        setProfile(retrato as Profile);
+        setUserId(idDaSessao);
+        setLoading(false);
+      }
       /* ⚠️ `Promise.resolve(...)` de propósito: o construtor de consulta do
          PostgREST é PREGUIÇOSO — só dispara a requisição quando alguém chama
          o `then`. Guardado cru na variável, ele só sairia no `await` lá
@@ -1656,7 +1679,10 @@ function MinhaContaPage() {
       if (marcaDeMedico) setPodeSerMedico(true);
       const ancora = !!(data?.lmp_date || data?.due_date || data?.reference_date);
       const liberarCedo = ancora && !marcaDeMedico;
-      if (liberarCedo) setLoading(false);
+      if (liberarCedo) {
+        setLoading(false);
+        gravarRetratoDaHome(u.user.id, data);
+      }
       const papel = await papelEmVoo;
 
       // Para quem NÃO foi liberada acima, o papel vem ANTES de liberar o
@@ -1811,7 +1837,13 @@ function MinhaContaPage() {
     try {
       for (let i = localStorage.length - 1; i >= 0; i--) {
         const k = localStorage.key(i);
-        if (k && (k.startsWith("dc-path-") || k === "dc-journey-synced-at")) {
+        if (
+          k &&
+          (k.startsWith("dc-path-") ||
+            k === "dc-journey-synced-at" ||
+            /* O retrato da home é o perfil dela: some com a sessão. */
+            k.startsWith(PREFIXO_RETRATO_DA_HOME))
+        ) {
           localStorage.removeItem(k);
         }
       }

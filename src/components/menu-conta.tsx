@@ -391,6 +391,18 @@ export function MenuDaConta({
             </span>
             Sair
           </button>
+          {/* Os Termos e a Privacidade eram inalcançáveis de dentro do app: a rota
+              existia e nenhum link chegava nela. Abrem fora da folha, no
+              navegador, para a paciente não perder onde estava. */}
+          <p className="px-4 pb-1 pt-1.5 text-center text-[13px] text-muted-foreground">
+            <a href="/termos" target="_blank" rel="noopener" className="underline">
+              Termos de uso
+            </a>
+            {" · "}
+            <a href="/privacidade" target="_blank" rel="noopener" className="underline">
+              Privacidade
+            </a>
+          </p>
         </div>
       </div>
     </div>

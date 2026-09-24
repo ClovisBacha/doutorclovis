@@ -176,6 +176,7 @@ export function prepararNativo(): void {
   void carregar().then(({ App }) => {
     esconderSplash();
     ligarBotaoVoltar(App);
+    ligarVoltaDoSegundoPlano(App);
   });
   /* O toque num aviso leva ao lugar do aviso — ver `ligarToqueNoAviso`. Ele é
      carregado à parte porque o plugin de push é pesado e só existe na casca. */
@@ -207,6 +208,41 @@ function ligarBotaoVoltar(App?: AppPlugin): void {
       return;
     }
     void App.minimizeApp().catch(() => {});
+  }).catch(() => {});
+}
+
+/**
+ * A volta do segundo plano.
+ *
+ * Num app nativo a página não "carrega de novo" quando ela volta: fica dias
+ * viva. Duas coisas dependiam de a página recarregar, e por isso não
+ * aconteciam:
+ *
+ *  1. **A sessão do Supabase.** O cliente renova o token por TIMER, e o iOS
+ *     congela timers em segundo plano. Depois de uma noite fechado, a
+ *     primeira chamada voltava com token vencido. `stopAutoRefresh` ao sair e
+ *     `startAutoRefresh` ao voltar é o par que a documentação do Supabase
+ *     manda ligar ao `appStateChange` em Capacitor — o `start` renova na
+ *     hora se já venceu.
+ *  2. **O token de push.** `renovarAvisosSeJaAutorizado` só rodava quando o
+ *     cartão de avisos montava; um token trocado pelo sistema ficava velho
+ *     até ela abrir aquela tela.
+ *
+ * Os dados das abas NÃO entram aqui: o WKWebView dispara `visibilitychange`
+ * na volta, e é isso que as telas já escutam. Tudo por `import()` dinâmico,
+ * como o resto deste arquivo: o navegador não paga por código da casca.
+ */
+function ligarVoltaDoSegundoPlano(App?: AppPlugin): void {
+  if (!App) return;
+  void App.addListener("appStateChange", ({ isActive }) => {
+    void import("@/integrations/supabase/client")
+      .then(({ supabase }) =>
+        isActive ? supabase.auth.startAutoRefresh() : supabase.auth.stopAutoRefresh(),
+      )
+      .catch(() => {});
+    if (isActive) {
+      void import("@/lib/avisos").then((m) => m.renovarAvisosSeJaAutorizado()).catch(() => {});
+    }
   }).catch(() => {});
 }
 

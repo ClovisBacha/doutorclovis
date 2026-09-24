@@ -17834,3 +17834,31 @@ entregue ao dono.
 ⚠️ **O que continua não verificado em aparelho:** o diálogo de permissão de
 localização e o toast acima da barra. **Portão:** tsc · lint · 6.607 testes
 (+26) · bancadas.
+
+## A volta ao app: retrato da home, sessão que renova, e os Termos com caminho (set/2026)
+
+Terceiro lote da avaliação do app iOS, em cima do primeiro. Três coisas que
+um app nativo faz e uma página não fazia.
+
+- **A home pinta do aparelho antes de a rede responder** (`retrato-da-home.ts`).
+  A saudação, a semana e o bebê esperavam o `select` do perfil em TODA
+  abertura — a mesma linha que o aparelho já tinha recebido na anterior. O
+  retrato segue a MESMA regra do `liberarCedo` (âncora gestacional e sem
+  marca de médico, lida da sessão), é gravado no mesmo ponto em que a home
+  libera cedo, e a resposta da rede sobrescreve sempre, inclusive com "não
+  consegui ler". Chave com `uid`, `id` conferido na leitura, e some no
+  `signOut` junto com a jornada local. Médico e admin nunca gravam.
+- **A casca ouve a volta do segundo plano** (`appStateChange`, em
+  `nativo.ts`). O token do Supabase renova por timer, e o iOS congela timers
+  em segundo plano: depois de uma noite fechado, a primeira chamada voltava
+  vencida. `stopAutoRefresh`/`startAutoRefresh` é o par que a documentação do
+  Supabase manda ligar a esse evento. E o token de push é renovado na volta —
+  antes só quando o cartão de avisos montava.
+- **Os Termos têm caminho.** `/termos` existia e nenhum link chegava nela; o
+  cadastro não pedia aceite. Agora o cadastro diz "ao criar a conta, você
+  concorda com os Termos de uso e com a Política de privacidade", com os dois
+  links, e o rodapé do menu da conta leva aos dois. Abrem fora da tela (o app
+  não tem voltar em página pública — é o item 27 da lista).
+
+⚠️ **Não verificado em aparelho:** o `appStateChange` de fato disparando e o
+retrato pintando antes da rede. **Portão:** tsc · lint · 6.624 testes (+17).
