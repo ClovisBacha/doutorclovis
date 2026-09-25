@@ -271,7 +271,7 @@ export function ListaDePresentesPublica({
           <button
             type="button"
             onClick={() => setAberto(null)}
-            className="press flex-1 rounded-xl border border-border px-3 py-2 text-sm font-medium"
+            className="pill-3d press min-h-11 flex-1 rounded-xl px-3 py-2 text-sm font-semibold"
           >
             Voltar
           </button>
@@ -279,7 +279,7 @@ export function ListaDePresentesPublica({
             type="button"
             onClick={() => reservar(item)}
             disabled={enviando}
-            className="press flex-[2] rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+            className="btn-3d press min-h-11 flex-[2] rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
           >
             {enviando ? "Guardando…" : "Vou dar esse 💛"}
           </button>
@@ -301,7 +301,7 @@ export function ListaDePresentesPublica({
 
       {/* ─── AS FRALDAS ────────────────────────────────────────────────── */}
       {fraldas.length > 0 && (
-        <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+        <section className="rounded-3xl card-material p-4">
           <h2 className="font-semibold">Fraldas</h2>
           <p className="mt-1 text-xs text-muted-foreground">
             Os tamanhos maiores duram muito mais — e são os que costumam faltar.
@@ -344,7 +344,7 @@ export function ListaDePresentesPublica({
                       <button
                         type="button"
                         onClick={() => setAberto(f.id)}
-                        className="press mt-2 w-full rounded-xl border border-primary/40 px-3 py-1.5 text-sm font-medium text-primary"
+                        className="pill-3d press mt-2 min-h-11 w-full rounded-xl px-3 py-1.5 text-sm font-semibold text-primary"
                       >
                         Quero dar desse
                       </button>
@@ -366,9 +366,7 @@ export function ListaDePresentesPublica({
             return (
               <div
                 key={i.id}
-                className={`rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)] ${
-                  feito ? "opacity-70" : ""
-                }`}
+                className={`card-material rounded-2xl p-4 ${feito ? "opacity-70" : ""}`}
               >
                 <div className="flex items-baseline justify-between gap-2">
                   <h3 className="font-semibold">{i.titulo}</h3>
@@ -402,7 +400,7 @@ export function ListaDePresentesPublica({
                     <button
                       type="button"
                       onClick={() => setAberto(i.id)}
-                      className="press mt-2 w-full rounded-xl border border-primary/40 px-3 py-1.5 text-sm font-medium text-primary"
+                      className="pill-3d press mt-2 min-h-11 w-full rounded-xl px-3 py-1.5 text-sm font-semibold text-primary"
                     >
                       {cota ? "Quero entrar nesse" : "Vou dar esse"}
                     </button>
@@ -419,7 +417,7 @@ export function ListaDePresentesPublica({
         </p>
       )}
 
-      <p className="pb-4 text-center text-[11px] text-muted-foreground">
+      <p className="pb-4 text-center text-xs text-muted-foreground">
         Nada é cobrado por aqui — você combina direto com {lista.donaNome}.
       </p>
     </div>

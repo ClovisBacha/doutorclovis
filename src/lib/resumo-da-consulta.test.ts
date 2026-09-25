@@ -246,3 +246,77 @@ describe("5. a linha que não se cruza", () => {
     expect(r).toContain("por ela no app");
   });
 });
+
+describe("⚠️ os movimentos entram nos achados", () => {
+  /* Redução de movimentos fetais é um dos NOVE SINTOMAS VERMELHOS de
+     `triage.ts`, e o texto que o médico assina não trazia uma palavra sobre
+     ela. */
+  const contagem = (em: string, p: Partial<EventoClinico> = {}) =>
+    ev({ ocorrido_em: em, especie: "movimento", fonte: "kick_sessions", ...p });
+
+  test("a noite do alarme entra, com a data", () => {
+    const r = resumoParaAchados(
+      [
+        contagem("2026-08-05T22:00:00Z", {
+          dados: { chutes: 4, duracao_min: 130 },
+          gravidade: "grave",
+        }),
+      ],
+      DESDE,
+      AGORA,
+    );
+    expect(r).toContain("sem chegar a 10 em 2h");
+    expect(r).toContain("05/08");
+  });
+
+  test("⚠️ as noites NORMAIS não entram — trinta linhas afogariam a que importa", () => {
+    const normais = Array.from({ length: 12 }, (_, i) =>
+      contagem(`2026-08-${String(i + 2).padStart(2, "0")}T22:00:00Z`, {
+        dados: { chutes: 10, duracao_min: 12 },
+      }),
+    );
+    const r = resumoParaAchados(normais, DESDE, AGORA);
+    expect(r).not.toContain("sem chegar a 10");
+    expect(r).not.toContain("mais fracos");
+  });
+
+  test("⚠️ a força vai com DENOMINADOR — 2 de 9 é outra conversa que 2 de 2", () => {
+    const eventos = [
+      ...Array.from({ length: 7 }, (_, i) =>
+        contagem(`2026-08-${String(i + 2).padStart(2, "0")}T22:00:00Z`, {
+          dados: { chutes: 10, forca: 2, duracao_min: 12 },
+        }),
+      ),
+      contagem("2026-08-10T22:00:00Z", { dados: { chutes: 10, forca: 1, duracao_min: 20 } }),
+      contagem("2026-08-11T22:00:00Z", { dados: { chutes: 10, forca: 1, duracao_min: 22 } }),
+    ];
+    expect(resumoParaAchados(eventos, DESDE, AGORA)).toContain("em 2 de 9 contagens");
+  });
+
+  test("⚠️ nenhum limite clínico é escrito aqui — quem separa é a gravidade", () => {
+    const fonte = readFileSync("src/lib/resumo-da-consulta.ts", "utf8");
+    const i = fonte.indexOf("const movimentos = noPeriodo.filter");
+    expect(i).toBeGreaterThan(-1);
+    const bloco = fonte.slice(i, fonte.indexOf("const emergencias", i));
+    expect(bloco).toContain('e.gravidade !== "normal"');
+    /* Nem "10", nem "120", nem um corte de "quantas noites fracas importam". */
+    expect(bloco.replace(/`[^`]*`/g, "")).not.toMatch(/\b(10|120|28)\b/);
+  });
+
+  test("a emergência continua sendo a ÚLTIMA linha", () => {
+    /* Decisão escrita: é a linha que não pode ser cortada por rolagem. */
+    const r = resumoParaAchados(
+      [
+        contagem("2026-08-05T22:00:00Z", {
+          dados: { chutes: 4, duracao_min: 130 },
+          gravidade: "grave",
+        }),
+        ev({ ocorrido_em: "2026-08-06T10:00:00Z", especie: "emergencia" }),
+      ],
+      DESDE,
+      AGORA,
+    );
+    const linhas = r.split("\n");
+    expect(linhas[linhas.length - 1]).toContain("emergência");
+  });
+});

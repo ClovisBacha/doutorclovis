@@ -42,6 +42,20 @@ function renderizacoesDePost(): string[] {
   return saida;
 }
 
+/**
+ * A FONTE SEM A PROSA.
+ *
+ * ⚠️ **Toda busca de texto neste arquivo passa por aqui.** Um comentário que
+ * EXPLICA uma remoção contém a string removida — então um `not.toContain`
+ * contra a fonte crua fica vermelho exatamente quando o defeito está
+ * documentado. Já aconteceu três vezes nesta base (a catraca de portas, o
+ * teste do código da embaixadora, e este).
+ */
+const semComentarios = FONTE.replace(/\/\*[\s\S]*?\*\//g, " ").replace(
+  /\{\/\*[\s\S]*?\*\/\}/g,
+  " ",
+);
+
 describe("toda lista de posts", () => {
   test("existe mais de uma — feed e sugeridos, no mínimo", () => {
     expect(renderizacoesDePost().length).toBeGreaterThanOrEqual(2);
@@ -66,10 +80,26 @@ describe("toda lista de posts", () => {
   /* ⚠️ E a zona de sugeridos NÃO oferece apagar: nenhum post ali é dela, e um
      ⋯ com "apagar" sobre a publicação de uma desconhecida seria uma promessa
      que o servidor recusa. */
-  test("⚠️ os sugeridos levam o rótulo obrigatório e não oferecem apagar", () => {
+  test("⚠️ TODA publicação de fora leva o rótulo", () => {
+    /**
+     * ⚠️ **ESTE TESTE JÁ ENVELHECEU DUAS VEZES, e as duas por travar a
+     * ESTRUTURA em vez da promessa.** Primeiro cobrava `toHaveLength(1)` (uma
+     * lista só, a zona do fim); depois `>= 2` (duas listas, com a interlaçada).
+     * Hoje é UMA de novo — a zona do rodapé saiu porque duplicava —, e a
+     * contagem reprovou uma remoção que consertou um defeito.
+     *
+     * O que NUNCA envelheceu, e é a proteção inteira da mistura: **nenhuma
+     * publicação de fora pode aparecer sem o rótulo.** Misturar desconhecidas
+     * sem avisar faria a paciente ler um relato duro sem saber de quem veio.
+     * É isso, e só isso, que se cobra aqui.
+     */
     const sug = renderizacoesDePost().filter((r) => /\bsugerido\b/.test(r));
-    expect(sug).toHaveLength(1);
-    expect(sug[0]).not.toContain("aoApagar=");
+    expect(sug.length).toBeGreaterThanOrEqual(1);
+
+    /* ⚠️ E o rótulo é CALCULADO por publicação, nunca cravado: um `sugerido`
+       fixo marcaria as amigas dela como estranhas, e um `false` fixo apagaria o
+       aviso justamente onde ele passou a fazer falta. */
+    expect(sug.some((r) => r.includes("idsSugeridos"))).toBe(true);
   });
 });
 
@@ -126,20 +156,46 @@ describe("o rascunho do compositor", () => {
     const efeito = FONTE.slice(i, FONTE.indexOf("}, [texto, vis, opcoes", i));
     expect(efeito).toContain("if (primeiraPintura.current)");
     expect(efeito).toContain("primeiraPintura.current = false");
-    /* E o `return` vem ANTES do `setTimeout`, senão o adiamento continua
-       agendado e o rascunho é apagado do mesmo jeito. */
-    expect(efeito.indexOf("primeiraPintura.current = false")).toBeLessThan(
-      efeito.indexOf("setTimeout"),
-    );
+    /**
+     * ⚠️ **O `return` PRECISA SER ASSERIDO, e não só descrito no comentário.**
+     *
+     * A versão anterior media a ORDEM (`= false` antes do `setTimeout`) e
+     * prometia o `return` na prosa. Apagando a linha `return;`, as três
+     * asserções continuavam verdadeiras — a atribuição segue antes do
+     * `setTimeout` — e a suíte ficava verde com o efeito agendando a gravação
+     * na PRIMEIRA passada: o rascunho guardado era apagado ao abrir o
+     * compositor, e a faixa "você tinha um rascunho" continuava na tela porque
+     * o texto já estava em memória. Quem tocasse em "Recuperar" na hora não via
+     * nada de errado; quem voltasse depois perdia o texto para sempre.
+     *
+     * Cobra-se a guarda INTEIRA: o `if`, a marcação e a saída, nessa ordem, sem
+     * nada entre eles.
+     */
+    const guarda =
+      /if \(primeiraPintura\.current\)\s*\{\s*primeiraPintura\.current = false;\s*return;\s*\}/;
+    expect({ temGuardaCompleta: guarda.test(efeito) }).toEqual({ temGuardaCompleta: true });
+    /* E ela vem ANTES do adiamento. */
+    expect(efeito.search(guarda)).toBeLessThan(efeito.indexOf("setTimeout"));
   });
 });
 
 describe("a enquete do story", () => {
-  const visor = FONTE.slice(FONTE.indexOf("{atual.enquete && ("));
+  /* ⚠️ Ancorado em `atual.enquete && (` SEM a chave: a âncora `{atual.enquete`
+     quebrou no dia em que o bloco ganhou o portão do véu
+     (`{!borrado && atual.enquete && (`), e `indexOf` devolvendo −1 fazia
+     `slice(-1)` entregar UM caractere — o teste reprovava sobre uma tela que
+     estava certa. Décima segunda vez que uma âncora de grafia envelhece aqui. */
+  const iEnquete = FONTE.indexOf("atual.enquete && (");
+  const visor = iEnquete < 0 ? "" : FONTE.slice(iEnquete);
 
   /* ⚠️ "67%" são dois votos de três, e numa base pequena a porcentagem
      transforma três pessoas numa maioria. O post do feed já dizia os dois; o
      story dizia só a fração — a mesma enquete contando duas histórias. */
+  test("a âncora existe (senão o describe inteiro passa em vazio)", () => {
+    expect(iEnquete).toBeGreaterThan(-1);
+    expect(visor.length).toBeGreaterThan(1000);
+  });
+
   test("⚠️ mostra o NÚMERO junto da porcentagem", () => {
     const bloco = visor.slice(0, visor.indexOf("Toque para votar"));
     expect(bloco).toContain("{fatia}%");
@@ -254,11 +310,6 @@ describe("convidar pela Comunidade", () => {
    ONDE ELA PAROU DE LER — a plumaria de DOM (a régua está em `lugar-no-feed`)
    ══════════════════════════════════════════════════════════════════════════ */
 describe("o lugar no feed", () => {
-  const semComentarios = FONTE.replace(/\/\*[\s\S]*?\*\//g, " ").replace(
-    /\{\/\*[\s\S]*?\*\/\}/g,
-    " ",
-  );
-
   /* ⚠️ A âncora é o ID DO POST, e não pixels: as fotos chegam por URL assinada
      depois da primeira pintura, então a altura da lista muda embaixo de
      qualquer número de rolagem. */
@@ -336,8 +387,22 @@ describe("o lembrete do então e agora", () => {
 
   /* ⚠️ Dois cartões empilhados entre os stories e o primeiro post empurram o
      feed para fora da dobra — o arranjo que o dono pediu para corrigir. */
-  test("⚠️ um cartão de cada vez: a retrospectiva ganha", () => {
-    expect(semComentarios).toContain("{!retro && lembreteEntao && aoCompararAgora");
+  test("⚠️ um cartão de cada vez: o lembrete cede aos dois de cima", () => {
+    /**
+     * ⚠️ **A GARANTIA É "o lembrete cede", e não a lista exata de quem passa na
+     * frente.** A asserção travava `{!retro && lembreteEntao` e ficou vermelha
+     * quando a MEMÓRIA entrou na fila — uma cobertura estritamente MAIOR. É a
+     * décima terceira vez que uma âncora de grafia envelhece aqui.
+     *
+     * A ordem é por QUEM VOLTA: a retrospectiva só existe aos domingos, a
+     * memória não volta NUNCA (a Trava 4 vale para a vida toda), e o lembrete
+     * reaparece por conta própria. Perder a memória é perder para sempre.
+     */
+    const i = semComentarios.indexOf("lembreteEntao && aoCompararAgora");
+    expect(i).toBeGreaterThan(-1);
+    const cond = semComentarios.slice(semComentarios.lastIndexOf("{", i), i);
+    expect(cond).toContain("!retro");
+    expect(cond).toContain("!memoria");
   });
 
   /* ⚠️ Sem isto, tocar em "Comparar" abriria o compositor com a comparação
@@ -346,5 +411,144 @@ describe("o lembrete do então e agora", () => {
     expect(semComentarios).toContain("useState<string | null>(entaoInicial ?? null)");
     expect(semComentarios).toContain("entaoInicial={entaoEscolhido}");
     expect(semComentarios).toContain("setEntaoEscolhido(null)");
+  });
+});
+
+describe('⚠️ o interruptor "Só quem eu sigo"', () => {
+  /**
+   * ⚠️ **A CONDIÇÃO ESTAVA INVERTIDA, e o interruptor fazia o OPOSTO do que
+   * promete.** Com a chave LIGADA, a zona de sugeridas aparecia no rodapé — e o
+   * caminho é o normal: ela abre no modo misturado (as sugestões são buscadas),
+   * liga a chave, o feed principal para de interlaçar, e as publicações de
+   * desconhecidas reaparecem todas juntas embaixo.
+   *
+   * A tela promete por escrito: "Seu feed mostra apenas quem você segue".
+   */
+  test("⚠️ a zona de sugeridas do RODAPÉ não existe mais — ela duplicava", () => {
+    /**
+     * ⚠️ **A VERSÃO ANTERIOR DESTE TESTE TRAVOU A GRAFIA DE UM DEFEITO.**
+     *
+     * Ele cobrava `soSeguindo ? false :` na linha de `sobrouSugestao` — o que
+     * fecha a zona com a chave LIGADA, e era metade do conserto. A outra metade
+     * ninguém tinha olhado: no modo MISTURADO (o padrão de toda paciente)
+     * `intercalarDescobertas` já empurra TODAS as sobras para o fim do feed, e
+     * a zona repetia as mesmas publicações no rodapé — a mesma foto duas vezes
+     * na mesma rolagem, com a mesma chave de React.
+     *
+     * A zona não tinha estado válido em modo nenhum, e saiu. O que se cobra
+     * hoje é a ausência dela — nunca a grafia de uma condição.
+     */
+    /* ⚠️ Contra `semComentarios`, nunca contra `FONTE`: a prosa que EXPLICA a
+       remoção contém a string removida, e o teste ficaria vermelho exatamente
+       quando o defeito estivesse documentado. Terceira vez que esta armadilha
+       aparece nesta base. */
+    expect(semComentarios).not.toContain("Publicações sugeridas");
+    /* E as descobertas continuam chegando por UM caminho só. */
+    expect(semComentarios).toContain("intercalarDescobertas(posts, sugestoes)");
+  });
+
+  test("⚠️ e o feed principal não interlaça com a chave ligada", () => {
+    const i = semComentarios.indexOf("intercalarDescobertas(posts, sugestoes)");
+    expect(i).toBeGreaterThan(-1);
+    expect(semComentarios.slice(Math.max(0, i - 120), i)).toContain("soSeguindo ? posts :");
+  });
+
+  test("⚠️ mas a fileira de PESSOAS fica", () => {
+    /* A distinção é a do texto: ela é descoberta de gente para seguir, não
+       conteúdo do feed. Sem ela, quem ligou a chave nunca teria como fazer o
+       feed fechado ter conteúdo. */
+    /* ⚠️ **ANCORADA NA FILEIRA, e a primeira versão não era.** Ela cobrava a
+       string `pessoas.length > 0 || mesmaFase` em qualquer lugar do arquivo —
+       e a condição da zona de FORA contém a mesma string. Trocando a condição
+       da fileira por `false`, o teste continuava verde: a mutação passava. */
+    const i = semComentarios.indexOf("<FileiraDePessoas");
+    expect(i).toBeGreaterThan(-1);
+    expect(semComentarios.slice(Math.max(0, i - 90), i)).toMatch(
+      /pessoas\.length > 0 \|\| mesmaFase/,
+    );
+  });
+
+  test("⚠️ e o CONVITE não sumiu junto com a zona", () => {
+    /* Ele vivia pendurado na condição da zona. Tirando `sobrouSugestao` de lá
+       sem mais nada, ele desapareceria para quem não tem nenhuma pessoa
+       sugerida — que é justamente quem mais precisa trazer alguém. */
+    const i = semComentarios.indexOf("{!temMais && (");
+    expect(i).toBeGreaterThan(-1);
+    /* Até o fim da LINHA da condição — nunca até um fechamento de parênteses
+       específico, que muda de forma no primeiro termo acrescentado. */
+    expect(semComentarios.slice(i, semComentarios.indexOf("\n", i))).toContain("convite");
+  });
+});
+
+describe("⚠️ o story ganhou texto, e o texto ganhou rascunho", () => {
+  /**
+   * ⚠️ **O COMPOSITOR DE STORY NÃO TINHA CAMPO DE TEXTO, e o servidor esperava
+   * por ele desde o primeiro dia**: `publicarStory` aceita 200 caracteres, roda
+   * a régua clínica neles e grava a coluna — e a tela mandava `texto: null`
+   * cravado. Era o gênero inteiro faltando; um story sem legenda é uma foto
+   * muda. É a mesma família das sete funções de servidor que existiam sem
+   * porta.
+   */
+  test("⚠️ `texto: null` cravado NÃO volta", () => {
+    const i = semComentarios.indexOf("async function publicarStory");
+    expect(i).toBeGreaterThan(-1);
+    const corpo = semComentarios.slice(i, semComentarios.indexOf("\n  }", i));
+    expect(corpo).not.toMatch(/texto:\s*null\s*,/);
+    expect(corpo).toContain("texto.trim() || null");
+  });
+
+  test("o campo lê o teto da régua, e não um número digitado", () => {
+    /* O `200` já existia cravado no `zod` do servidor. Um segundo `200` na tela
+       seria a divergência que aparece como ela digitando até o fim e o servidor
+       recusando sem dizer por quê. */
+    expect(semComentarios).toContain("TEXTO_DO_STORY_MAX");
+    const i = semComentarios.indexOf("export function ConferirStory");
+    const corpo = semComentarios.slice(i, i + 6000);
+    expect(corpo).not.toMatch(/slice\(0,\s*200\)/);
+  });
+
+  test("⚠️ o rascunho OFERECE, e não preenche sozinho", () => {
+    /* Encher o campo com o texto de ontem no momento em que ela abre para
+       publicar outra coisa é como um story sai errado — e story não se edita
+       depois de publicado. */
+    const i = semComentarios.indexOf("export function ConferirStory");
+    const corpo = semComentarios.slice(i, i + 9000);
+    expect(corpo).toContain("Recuperar");
+    expect(corpo).toContain("Descartar");
+    /* O estado inicial é VAZIO: nenhum `useState` do compositor nasce do
+       rascunho. */
+    expect(corpo).toContain('const [texto, setTexto] = useState("")');
+  });
+
+  test("⚠️ a primeira pintura NÃO grava — senão o rascunho é apagado ao abrir", () => {
+    /**
+     * É o defeito que o compositor de post já pagou: sem o `return`, o efeito
+     * roda na montagem com os campos vazios e, 700 ms depois, `paraGuardar`
+     * devolve `guardar: false` (a regra certa: rascunho vazio apaga). A faixa
+     * continuava na tela porque o texto já estava em memória — então quem
+     * tocasse em "Recuperar" na hora não via nada de errado, e quem voltasse
+     * depois perdia o texto para sempre.
+     */
+    const i = semComentarios.indexOf("export function ConferirStory");
+    const corpo = semComentarios.slice(i, i + 9000);
+    expect(corpo).toMatch(
+      /if \(primeiraPintura\.current\) \{\s*primeiraPintura\.current = false;\s*return;/,
+    );
+  });
+
+  test("⚠️ publicar APAGA o rascunho, pela função do STORY", () => {
+    /* Sem isto, a próxima abertura oferece de volta o story que ela acabou de
+       publicar. E o nome importa: `guardarRascunho` (sem sufixo) é o do POST, e
+       chamá-lo aqui apagaria o rascunho da publicação dela. */
+    const i = semComentarios.indexOf("async function publicarStory");
+    const corpo = semComentarios.slice(i, semComentarios.indexOf("\n  }", i));
+    expect(corpo).toContain("guardarRascunhoDoStory(null)");
+  });
+
+  test("⚠️ as duas chaves de rascunho são DIFERENTES", () => {
+    /* Post e story convivem no mesmo aparelho e na mesma conta. Uma chave só
+       faria abrir o compositor de story com o texto de um post. */
+    expect(semComentarios).toContain("chaveDoRascunhoDeStory");
+    expect(semComentarios).toContain("chaveDoRascunho(");
   });
 });

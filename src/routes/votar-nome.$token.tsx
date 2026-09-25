@@ -72,7 +72,7 @@ function VotarNomePage() {
       setEntries(res.entries);
       setMotherName(res.motherName ?? null);
     } catch {
-      // Falha de rede: sem isso a tela ficava em "Carregando..." p/ sempre.
+      // Falha de rede: sem isso a tela ficava em "Carregando…" p/ sempre.
       setError("Não foi possível carregar a votação. Verifique a conexão e recarregue.");
     } finally {
       setLoading(false);
@@ -85,9 +85,21 @@ function VotarNomePage() {
     try {
       localStorage.setItem("voter_name", voterName);
       const voterToken = getVoterToken();
-      await voteForName({
+      const r = await voteForName({
         data: { shareToken, entryId, voterName: voterName.trim(), voterToken },
       });
+      /* ⚠️ `{ ok: false }` CHEGA NUMA RESPOSTA 200 NORMAL — o `catch` abaixo
+         não pega. A votação pode ter sido encerrada, ou o INSERT recusado, e a
+         tela gravava "já votou" no `localStorage` mesmo assim: o voto da avó
+         nunca entrava na contagem E ela ficava impedida de tentar de novo. O
+         nome do bebê saía de uma apuração silenciosamente incompleta.
+         ⚠️ E a régua certa mora QUINZE LINHAS ABAIXO, em `handleAddName`:
+         `const res = await addPublicNameEntry(...); if (res.ok) { … }`. Mesmo
+         arquivo, mesma forma de retorno, uma função lia e a outra não. */
+      if (!r.ok) {
+        toast.error(r.error ?? "Não foi possível registrar o voto — tente novamente.");
+        return;
+      }
       localStorage.setItem(`voted_${shareToken}`, entryId);
       setVotedEntryId(entryId);
       await load();
@@ -124,7 +136,7 @@ function VotarNomePage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground">
-        Carregando...
+        Carregando…
       </div>
     );
   }
@@ -204,7 +216,7 @@ function VotarNomePage() {
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleAddName()}
-                placeholder="Nome do bebê..."
+                placeholder="Nome do bebê…"
                 className="flex-1 rounded-xl border border-border bg-background px-4 py-2 text-sm"
               />
               <button
@@ -212,7 +224,7 @@ function VotarNomePage() {
                 disabled={submittingName || !newName.trim() || !voterName.trim()}
                 className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-white disabled:opacity-40"
               >
-                {submittingName ? "..." : "Sugerir"}
+                {submittingName ? "Enviando…" : "Sugerir"}
               </button>
             </div>
             {addedName && (
@@ -292,7 +304,11 @@ function VotarNomePage() {
                                 : "bg-primary/10 text-primary hover:bg-primary hover:text-white disabled:opacity-40"
                           }`}
                         >
-                          {submittingVote === entry.id ? "..." : isMyVote ? "✓ Votei" : "Votar"}
+                          {submittingVote === entry.id
+                            ? "Votando…"
+                            : isMyVote
+                              ? "✓ Votei"
+                              : "Votar"}
                         </button>
                       )}
                     </div>

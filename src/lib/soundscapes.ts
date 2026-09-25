@@ -22,9 +22,8 @@
 import { criarMusica } from "./musica-audio";
 import { carregarGravado, ganhoGravado, temGravacao } from "./som-gravado";
 import {
-  FAMILIAS,
-  FAMILIA_DO_SOM,
   NIVEL_AO_VIVO,
+  familiasDeSom,
   ofertaveis,
   ROTULO_DO_SOM,
   SONS_CONTINUOS,
@@ -85,9 +84,9 @@ export const SOUNDSCAPES: { key: SoundscapeKey; label: string; emoji: string; su
  */
 export const GRUPOS_DE_SOM: { familia: string; sons: SoundscapeKey[] }[] = [
   { familia: "", sons: ["musica", "silencio"] as SoundscapeKey[] },
-  ...FAMILIAS.map((f) => ({
-    familia: f as string,
-    sons: SONS_CONTINUOS.filter((k) => FAMILIA_DO_SOM[k] === f) as SoundscapeKey[],
+  ...familiasDeSom(false).map((g) => ({
+    familia: g.familia as string,
+    sons: g.sons as SoundscapeKey[],
   })),
 ].filter((g) => g.sons.length > 0);
 
@@ -107,14 +106,20 @@ export function gruposDeSom(
   luto: boolean,
   comMusica = true,
 ): { familia: string; sons: SoundscapeKey[] }[] {
-  const ok = new Set<string>(ofertaveis(luto));
-  return GRUPOS_DE_SOM.map((g) => ({
-    familia: g.familia,
-    sons: g.sons.filter(
-      (k) =>
-        (k === "musica" ? comMusica : true) && (k === "musica" || k === "silencio" || ok.has(k)),
-    ),
-  })).filter((g) => g.sons.length > 0);
+  /* ⚠️ A primeira fileira é a que NÃO é ambiente, e por isso ela não sai de
+     `familiasDeSom`: `musica` e `silencio` não pertencem a família nenhuma e
+     nem estão em `SONS_CONTINUOS`. O que o Modo Cuidado recorta são os sons,
+     e disso quem cuida é a régua única. */
+  const fileira = (["musica", "silencio"] as SoundscapeKey[]).filter(
+    (k) => k !== "musica" || comMusica,
+  );
+  return [
+    { familia: "", sons: fileira },
+    ...familiasDeSom(luto).map((g) => ({
+      familia: g.familia as string,
+      sons: g.sons as SoundscapeKey[],
+    })),
+  ].filter((g) => g.sons.length > 0);
 }
 
 /**
@@ -128,12 +133,6 @@ export function sonsOfertados(luto: boolean, comMusica = true) {
       (s.key === "musica" || s.key === "silencio" || ok.has(s.key)),
   );
 }
-
-/** Agrupados, para a folha de escolha não virar uma lista de vinte. */
-export const SOUNDSCAPES_POR_FAMILIA = FAMILIAS.map((f) => ({
-  familia: f,
-  sons: SONS_CONTINUOS.filter((k) => FAMILIA_DO_SOM[k] === f),
-})).filter((g) => g.sons.length > 0);
 
 export type Soundscape = {
   /** Sobe o volume até o alvo (0..1 relativo). Idempotente. */

@@ -33,17 +33,28 @@ import { PREFIXO_ATIVIDADE, trofeusDasChaves } from "@/lib/trofeus";
  * negócio, e não este.
  */
 
-/** Valores de ganho — transparentes e calibráveis sem migração. */
+/**
+ * Valores de ganho — transparentes e calibráveis sem migração.
+ *
+ * ⚠️ **A RECOMPENSA DA CONQUISTA NÃO MORA AQUI**, e isso é decisão, não
+ * esquecimento. Ela sai da RARIDADE (`sementinhasDaRaridade`, em
+ * `conquistas.ts`), que é a mesma régua que pinta o anel do cartão — cor e
+ * número não têm como discordar.
+ *
+ * Esta tabela chegou a ter `achievementDefault` (20) e `achievementBig` (100),
+ * com um `Set` de duas chaves decidindo qual valia. Eles saíram quando a
+ * raridade nasceu e ficaram aqui, sem um leitor sequer, por uma leva inteira:
+ * três constantes com cara de fonte da verdade, num arquivo que abre dizendo
+ * que os valores da economia vivem nele. **Constante morta de PREÇO é a pior
+ * espécie de resíduo** — ela não quebra nada, e a próxima pessoa a calibrar a
+ * economia a lê e acredita. Este repositório já pagou isso uma vez, com três
+ * preços mortos que a prosa da Loja citava como se valessem.
+ */
 export const SEMENTINHAS = {
   dailyCheckin: 5,
   weekMilestone: 25,
   trimesterMilestone: 100,
-  achievementDefault: 20,
-  achievementBig: 100,
 } as const;
-
-/** Conquistas "grandes" que valem mais (marcos de conclusão). */
-export const BIG_ACHIEVEMENTS = new Set(["course_complete", "prenatal_done"]);
 
 type Db = ReturnType<typeof typedDb>;
 // dedupeKey é obrigatório: ganho sem chave duplicaria (NULL não conflita no
@@ -93,6 +104,8 @@ function todayKeySaoPaulo(): string {
  * não há dado gestacional (pós-parto ou perfil incompleto) — aí não dá pra
  * validar por data e caímos no limite do conteúdo finito + dedupe.
  */
+import { cicloDoPerfil } from "./ciclo-da-gestacao";
+
 async function loadCycleAndGestation(
   admin: typeof import("@/integrations/supabase/client.server").supabaseAdmin,
   uid: string,
@@ -109,7 +122,10 @@ async function loadCycleAndGestation(
     reference_days?: number | null;
     birth_date?: string | null;
   } | null;
-  const cycle = p?.lmp_date ?? p?.reference_date ?? p?.birth_date ?? "x";
+  /* ⚠️ A expressão mora em `ciclo-da-gestacao.ts` desde que as MEMÓRIAS da
+     rede passaram a carimbar o ciclo na publicação. Duas cópias divergiriam, e
+     aqui a divergência aparece como troféu sumindo. */
+  const cycle = cicloDoPerfil(p);
   const gest = computeGestation({
     lmp: p?.lmp_date ?? null,
     referenceDate: p?.reference_date ?? null,

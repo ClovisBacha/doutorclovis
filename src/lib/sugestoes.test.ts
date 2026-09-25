@@ -8,6 +8,7 @@ import {
   ordenarSugestoes,
   POSTS_POR_AUTORA,
   type CandidataASugestao,
+  intercalarDescobertas,
 } from "./sugestoes";
 
 /* Um instante cravado: as funções recebem o `agora`, então nada aqui depende do
@@ -140,5 +141,49 @@ describe("⚠️ o que NÃO pode virar sinal", () => {
     const tela = semComentarios(readFileSync("src/components/rede-instagram.tsx", "utf8"));
     expect(tela).not.toContain("elosEmComum");
     expect(tela).not.toMatch(/[Ss]eguid[oa] por/);
+  });
+});
+
+describe("⚠️ o feed misturado", () => {
+  const seg = (n: number) => Array.from({ length: n }, (_, i) => `s${i}`);
+  const des = (n: number) => Array.from({ length: n }, (_, i) => `d${i}`);
+
+  test("⚠️ a descoberta NUNCA é a primeira coisa da tela", () => {
+    /* Ela abre o app para ver as amigas; receber um estranho na cara é o pior
+       caso desta mudança. A primeira leva é sempre de quem ela escolheu. */
+    for (let cad = 1; cad <= 6; cad++) {
+      const r = intercalarDescobertas(seg(10), des(10), cad);
+      expect({ cad, primeiro: r[0] }).toEqual({ cad, primeiro: "s0" });
+    }
+  });
+
+  test("uma descoberta a cada quatro publicações", () => {
+    const r = intercalarDescobertas(seg(8), des(2), 4);
+    expect(r).toEqual(["s0", "s1", "s2", "s3", "d0", "s4", "s5", "s6", "s7", "d1"]);
+  });
+
+  test("⚠️ as sobras vão para o fim, nunca são descartadas", () => {
+    /* Quem segue duas pessoas tem duas publicações e vinte descobertas; jogar
+       dezoito fora deixaria a tela vazia para quem mais precisa descobrir. */
+    const r = intercalarDescobertas(seg(2), des(5), 4);
+    expect(r.length).toBe(7);
+    expect(r.filter((x) => x.startsWith("d")).length).toBe(5);
+  });
+
+  test("nenhuma publicação some, e nenhuma se repete", () => {
+    const r = intercalarDescobertas(seg(9), des(4), 3);
+    expect(r.length).toBe(13);
+    expect(new Set(r).size).toBe(13);
+  });
+
+  test("listas vazias não quebram", () => {
+    expect(intercalarDescobertas([], des(3))).toEqual(["d0", "d1", "d2"]);
+    expect(intercalarDescobertas(seg(3), [])).toEqual(["s0", "s1", "s2"]);
+    expect(intercalarDescobertas([], [])).toEqual([]);
+  });
+
+  test("cadência inválida não trava o laço", () => {
+    expect(intercalarDescobertas(seg(3), des(3), 0).length).toBe(6);
+    expect(intercalarDescobertas(seg(3), des(3), -5).length).toBe(6);
   });
 });

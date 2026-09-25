@@ -82,6 +82,22 @@
         font-size: 0.75rem;
         color: rgba(244, 240, 248, 0.45);
       }
+      button {
+        width: 100%;
+        max-width: 20rem;
+        padding: 0.9rem 1rem;
+        border: 0;
+        border-radius: 999px;
+        background: #f4f0f8;
+        color: #241a33;
+        font: inherit;
+        font-weight: 600;
+        font-size: 0.95rem;
+        -webkit-tap-highlight-color: transparent;
+      }
+      button:active {
+        opacity: 0.7;
+      }
     </style>
   </head>
   <body>
@@ -91,11 +107,69 @@
       funcionam sem rede.
     </p>
 
+    <!--
+      ⚠️ ESTA TELA NÃO SABE DE QUEM É A PACIENTE — e por isso ela não pode
+      oferecer um consultório como se fosse o dela.
+
+      O app é multi-tenant (`patient_profiles.doctor_id`), e a casca do
+      Capacitor não tem acesso a nada da conta: ela é um arquivo estático
+      dentro do aparelho, sem sessão e sem banco. Aqui havia
+      `tel:+5531986342903` rotulado só "Consultório" — o número do consultório
+      FUNDADOR (`src/lib/doctor.config.ts`), oferecido a paciente de qualquer
+      médico da plataforma.
+
+      É exatamente o que `emergency-sheet.tsx` gastou uma decisão inteira para
+      não fazer, com a razão escrita lá: "um SOS que liga para o médico errado
+      é pior que um SOS que não liga para ninguém, porque ela vai esperar do
+      outro lado uma resposta que não vem".
+
+      O 192 fica, e é a melhor coisa desta tela: ele é certo para todo mundo,
+      em qualquer cidade, e funciona sem rede. O consultório vira uma
+      INSTRUÇÃO, não um número — quem sabe o telefone do próprio obstetra é
+      ela, e o telefone está na agenda dela.
+    -->
     <div class="telefones">
       <a class="samu" href="tel:192">Ligar para o SAMU · 192</a>
-      <a class="consultorio" href="tel:+5531986342903">Consultório · (31) 98634-2903</a>
     </div>
 
-    <p class="nota">Assim que houver sinal, feche e abra o app.</p>
+    <p class="nota">
+      Se for com o seu obstetra, ligue direto para ele — o app não precisa estar aberto.
+    </p>
+    <!--
+      ⚠️ ELA VOLTA SOZINHA, E TEM BOTÃO. "Feche e abra o app" era a única saída,
+      e a paciente no elevador não sabe que a rede voltou. O botão recarrega o
+      site; o evento `online` faz o mesmo sem toque. A URL é a MESMA de
+      `capacitor.config.ts` (`server.url`) — `casca-ios.test.ts` cobra que as
+      duas não divirjam, porque esta página é estática e não lê a config.
+    -->
+    <button id="tentar" type="button">Tentar de novo</button>
+    <p class="nota">Assim que houver sinal, o app volta sozinho.</p>
+    <!--
+      ⚠️ O CAPACITOR CARREGA ESTA PÁGINA EM QUALQUER FALHA DE NAVEGAÇÃO — não só
+      sem rede. Uma navegação atropelada por outra (código -999, "cancelled")
+      também cai aqui, COM rede, e a paciente veria "Sem conexão" no meio de um
+      app funcionando. Nesse caso a página anterior ainda está no histórico do
+      WebView (a que falhou nunca chegou a existir): voltar é o que devolve a
+      tela em que ela estava, com o link profundo intacto. Sem histórico (abertura
+      fria), é falta de rede mesmo, e a saída é recarregar o servidor.
+    -->
+    <script>
+      var SERVIDOR = "https://www.obstetrica.com.br/auth";
+      function tentarDeNovo() {
+        if (window.history.length > 1) {
+          window.history.back();
+          return;
+        }
+        window.location.replace(SERVIDOR);
+      }
+      document.getElementById("tentar").addEventListener("click", tentarDeNovo);
+      window.addEventListener("online", tentarDeNovo);
+      /* Chegou aqui com rede e com uma página atrás: foi atropelo, não queda.
+         Volta sozinha, sem nem desenhar a mensagem de "sem conexão". */
+      if (navigator.onLine && window.history.length > 1) {
+        document.body.style.visibility = "hidden";
+        window.history.back();
+      }
+    </script>
   </body>
 </html>

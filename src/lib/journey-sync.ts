@@ -117,15 +117,16 @@ function scheduleJourneySync() {
     try {
       await initialPullGate; // espera o pull do mount (instantâneo se já resolvido)
       const { supabase } = await import("@/integrations/supabase/client");
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return;
+      const { data: s } = await supabase.auth.getSession();
+      const uid = s.session?.user?.id;
+      if (!uid) return;
       // LWW de blob INTEIRO: dois aparelhos online no mesmo dia → o push mais
       // tardio vence por completo (perda granular aceita pelo produto).
       // updated_at é do SERVIDOR (trigger touch_journey_updated_at) para o
       // relógio do aparelho não distorcer o last-write-wins.
       const { data: row, error } = await (supabase as any)
         .from("journey_state")
-        .upsert({ user_id: u.user.id, data: collectJourneyBlob() })
+        .upsert({ user_id: uid, data: collectJourneyBlob() })
         .select("updated_at")
         .maybeSingle();
       if (!error && row?.updated_at) {
@@ -206,12 +207,18 @@ export async function pullJourneyFromProfile(retries = 2): Promise<boolean> {
   for (let attempt = 0; ; attempt++) {
     try {
       const { supabase } = await import("@/integrations/supabase/client");
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return false;
+      /* ⚠️ `getSession`, e não `getUser` (set/2026): o segundo é uma ida ao
+         servidor de auth só para obter um id que a sessão já tem, e ela é
+         local. A RLS de `journey_state` continua sendo quem decide o que
+         volta — o id só aponta a linha. Era uma ida à rede a mais na frente
+         da chama e do saldo em todo aparelho novo. */
+      const { data: s } = await supabase.auth.getSession();
+      const uid = s.session?.user?.id;
+      if (!uid) return false;
       const { data: row, error } = await (supabase as any)
         .from("journey_state")
         .select("data,updated_at")
-        .eq("user_id", u.user.id)
+        .eq("user_id", uid)
         .maybeSingle();
       if (error) throw error; // rede/servidor: tenta de novo
       if (!row?.data) return false; // sem jornada na nuvem (não é erro)

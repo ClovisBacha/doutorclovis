@@ -18,6 +18,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { ScrollProgress } from "@/components/motion-fx";
 import { PublicBottomNav } from "@/components/public-bottom-nav";
 import { ehPedacoQueSumiu } from "@/lib/pedaco-que-sumiu";
+import { ehAppInstalado } from "@/lib/nativo";
 
 /**
  * ⚠️ O CHATBOT DO SITE SAIU DO PACOTE DE ENTRADA — e isso é a maior conta do app.
@@ -258,16 +259,15 @@ export const Route = createRootRoute({
       { rel: "icon", href: "/favicon.ico", sizes: "any" },
       { rel: "icon", href: "/icon-192.png", type: "image/png", sizes: "192x192" },
       { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      // A letra do app é self-hosted (ver styles.css). O link do Google saiu:
+      // pedia DM Sans + Nunito + Inter (482 KB referenciados) e no iPhone
+      // nenhuma era usada. O preload é só do peso normal; o itálico é raro.
       {
         rel: "preload",
-        as: "style",
-        href: "https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=Nunito:wght@700;800&family=Inter:wght@300;400;500;600&display=swap",
-      },
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=Nunito:wght@700;800&family=Inter:wght@300;400;500;600&display=swap",
+        as: "font",
+        type: "font/woff2",
+        href: "/fontes/nunito.woff2",
+        crossOrigin: "anonymous",
       },
       {
         rel: "stylesheet",
@@ -470,6 +470,11 @@ function SiteShell() {
      lugar só, em vez de repetida dentro de cada componente. */
   const semChromePublico =
     location.pathname.startsWith("/minha-conta") || location.pathname.startsWith("/painel");
+  /* As telas do próprio app e a de login não ganham "Voltar ao app": lá a
+     volta é o próprio app, ou não faz sentido. */
+  const semVoltaAoApp = ["/minha-conta", "/painel", "/admin", "/auth"].some((p) =>
+    location.pathname.startsWith(p),
+  );
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       <a
@@ -485,6 +490,7 @@ function SiteShell() {
           <SiteHeader />
         </div>
       )}
+      {!semChromePublico && !semVoltaAoApp && <VoltarAoApp />}
       <main id="main-content" className="flex-1 pb-[72px] md:pb-0">
         <Outlet />
       </main>
@@ -514,7 +520,15 @@ function SiteShell() {
       <div className="chrome-publico print:hidden">
         <PublicBottomNav />
       </div>
-      <Toaster position="bottom-right" richColors mobileOffset={{ bottom: 96 }} />
+      {/* ⚠️ ACIMA DA BARRA E DO BOTÃO DO BEBÊ. O deslocamento era 96px fixos: nos
+          iPhones com Face ID a barra sobe com a área segura (34px) e o círculo
+          do bebê avança 28px acima dela — o aviso caía em cima dos dois. A
+          conta usa a mesma variável que posiciona a barra (`--safe-bottom`). */}
+      <Toaster
+        position="bottom-right"
+        richColors
+        mobileOffset={{ bottom: "calc(var(--safe-bottom) + 120px)" }}
+      />
       <PWAInstallBanner />
     </div>
   );
@@ -525,6 +539,16 @@ function PWAInstallBanner() {
   const [isIOS, setIsIOS] = useState(false);
 
   useEffect(() => {
+    /* ⚠️ NUNCA DENTRO DO APP JÁ INSTALADO. `navigator.standalone` é indefinido
+       na casca do Capacitor, então o ramo do iPhone dava `true` lá dentro: a
+       paciente que baixou o app da loja recebia, na primeira tela, um cartão
+       mandando "toque em compartilhar ↑" — numa tela sem barra de navegador.
+       ⚠️ E o convite CONTINUA no Safari comum do iPhone, de propósito: é lá
+       que instalar destrava o push, que é o canal do aviso de consulta e do
+       retorno do SOS. Esconder ali tiraria dela o caminho da emergência.
+       ⚠️ A decisão é aqui, num efeito — no render ela quebraria a hidratação
+       (`capacidade-fora-do-render.test.ts`). */
+    if (ehAppInstalado()) return;
     // Só mostra uma vez
     if (localStorage.getItem("pwa-banner-dismissed")) return;
 
@@ -611,6 +635,28 @@ function PWAInstallBanner() {
           ✕
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * A volta ao app nas páginas públicas abertas de dentro da casca.
+ *
+ * Dentro do app o cabeçalho e o rodapé do site somem (`.nativo .chrome-publico`),
+ * e com eles qualquer caminho de volta — no iPhone não há botão de voltar do
+ * sistema. `/agendamento` aberta pelo app era um beco sem saída. A barra só
+ * aparece no app (`.voltar-ao-app` é `display: none` fora dele) e leva a
+ * `/auth`, que despacha cada papel para a sua área.
+ */
+function VoltarAoApp() {
+  return (
+    <div className="voltar-ao-app sticky top-0 z-40 items-center border-b border-border/60 bg-background/90 backdrop-blur">
+      <Link
+        to="/auth"
+        className="press flex min-h-11 items-center gap-1 px-4 text-sm font-semibold text-primary"
+      >
+        <span aria-hidden="true">‹</span> Voltar ao app
+      </Link>
     </div>
   );
 }

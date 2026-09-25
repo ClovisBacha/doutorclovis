@@ -14,8 +14,10 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import {
+  PERDA_DE_PESO_PCT,
   diasDeSilencio,
   sinalGlicemia,
+  sinalPerdaDePeso,
   sinalPressao,
   sinalSaturacao,
   sinalSilencio,
@@ -97,9 +99,13 @@ describe("glicemia", () => {
     expect(r?.nota).toContain("unidade");
   });
 
-  test("zero e absurdos não passam como normal", () => {
+  test("zero não passa como normal — e o número ALTO é grave, não implausível", () => {
     expect(sinalGlicemia(0)?.gravidade).toBe("atencao");
-    expect(sinalGlicemia(1200)?.gravidade).toBe("atencao");
+    /* ⚠️ Isto já foi `atencao`, e era o defeito: com o teto de 900, uma glicemia
+       de 1200 saía "implausível" e ordenava ABAIXO de um 185 rotulado grave, na
+       fila de trabalho do médico. Um número alto demais para ser plausível é,
+       antes disso, um número alto — e cetoacidose é emergência. */
+    expect(sinalGlicemia(1200)?.gravidade).toBe("grave");
   });
 });
 
@@ -160,10 +166,15 @@ describe("validação na entrada", () => {
   });
 
   /* DEFEITO REAL: `if (form.systolic)` com estado em string — "0" é truthy. */
-  test("recusa o impossível", () => {
+  test("recusa o impossível — o que é impossível, e não o que é incomum", () => {
     expect(validaRegistro({ systolic: "0", diastolic: "0" })).toBeTruthy();
-    expect(validaRegistro({ weight_kg: "999" })).toBeTruthy();
+    /* ⚠️ `weight_kg: "999"` era recusado aqui, e o dono derrubou esse teto: um
+       peso alto é o peso de alguém. O que continua impossível é o que não é
+       medida — zero, negativo — e o que a DEFINIÇÃO da grandeza proíbe. */
+    expect(validaRegistro({ weight_kg: "999" })).toBe(null);
+    expect(validaRegistro({ weight_kg: "0" })).toBeTruthy();
     expect(validaRegistro({ spo2: "10" })).toBeTruthy();
+    expect(validaRegistro({ spo2: "101" })).toBeTruthy();
   });
 
   test("pressão pela metade é recusada com a frase certa", () => {
@@ -212,13 +223,107 @@ describe("contrações regulares antes das 37 semanas", () => {
   test("o cronômetro usa a régua, e o teste da semana vem ANTES dos cortes de parto", () => {
     /* Sem a ordem, o caso perigoso — padrão leve antes do termo — só seria
        alcançado depois de passar pelos cortes de trabalho de parto ativo, que
-       o classificariam como normal. */
-    const conta = readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8");
-    const i = conta.indexOf("function analyzeContractions(");
-    const corpo = conta.slice(i, conta.indexOf("\nfunction ContracoesTab", i));
-    expect(corpo).toContain("sinalContracoesPrematuras({ semanas: weeks");
-    expect(corpo.indexOf("sinalContracoesPrematuras")).toBeLessThan(
-      corpo.indexOf("avgInterval <= 3"),
-    );
+       o classificariam como normal.
+
+       ⚠️ **ESTA ASSERÇÃO JÁ ENVELHECEU DUAS VEZES, e da segunda ela estava
+       ESCONDENDO dois defeitos.** Ela cobrava a string
+       `sinalContracoesPrematuras({ semanas: weeks` — ou seja, provava que a
+       CHAMADA existia, e nada sobre o que ela recebia nem sobre quando era
+       alcançada. Por baixo dela a régua ficava barrada por uma duração que não
+       usa, e a MÉDIA do intervalo apagava o alerta. As duas coisas silenciavam
+       o "Ligue para o seu médico agora" antes das 37 semanas.
+
+       O conserto não foi escrever mais uma asserção de texto: a régua saiu do
+       componente para `src/lib/analise-de-contracoes.ts`, onde é pura, e o que
+       a guarda agora é `analise-de-contracoes.test.ts`, que a EXERCITA. O que
+       fica aqui é só a ORDEM — a única garantia que se lê melhor no fonte que
+       no comportamento. */
+    /* ⚠️ SEM OS COMENTÁRIOS. O comentário que EXPLICA por que a régua tem de
+       vir antes do corte de `completed` contém, por definição, a string
+       `completed.length < 2` — e a primeira versão desta asserção ficou
+       vermelha por causa da própria prosa que documenta o conserto. É a
+       enésima vez nesta base, e ela quebra nos dois sentidos. */
+    const arq = readFileSync("src/lib/analise-de-contracoes.ts", "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/(^|[^:])\/\/.*$/gm, "$1");
+    const i = arq.indexOf("export function analyzeContractions(");
+    expect(i).toBeGreaterThan(-1);
+    const corpo = arq.slice(i);
+    /* ⚠️ `indexOf` devolve −1 quando a âncora SOME, e `x < -1` é falso: a
+       asserção reprova alto neste sentido e passaria em silêncio no outro
+       (`toBeGreaterThan(-1)`). `onde` recusa o −1 nomeando quem sumiu — foi
+       assim que esta asserção envelheceu pela TERCEIRA vez, quando os cortes
+       de parto trocaram de nome na reescrita por semana gestacional. */
+    const onde = (alvo: string) => {
+      const j = corpo.indexOf(alvo);
+      expect(`${alvo}: ${j > -1}`).toBe(`${alvo}: true`);
+      return j;
+    };
+    const regua = onde("sinalContracoesPrematuras(");
+    /* Antes dos cortes de trabalho de parto — que hoje moram numa função
+       PRÓPRIA (`cortesDoPadrao`), porque eles também rodam quando a semana é
+       desconhecida. O que se cobra continua sendo a ORDEM. */
+    expect(regua).toBeLessThan(onde("cortesDoPadrao({"));
+    /* ⚠️ E NENHUM ramo exige mais contração TERMINADA para escalar — era isso
+       que barrava o alerta com a segunda contração ainda em curso, e o defeito
+       tinha voltado pelo lado do TERMO, onde os três degraus pediam
+       `duracao >= 60 | 45 | 30`. Hoje o intervalo sozinho já escala, e o que se
+       cobra é isso: existem cortes que olham SÓ o intervalo. */
+    const cortes = arq.slice(arq.indexOf("function cortesDoPadrao("));
+    expect(cortes).toContain("if (intervalo <= 5)");
+    expect(cortes).toContain("if (intervalo <= 10)");
+  });
+});
+
+describe("⚠️ perda de peso na gestação em curso", () => {
+  /* O app tinha os dois pesos e nunca fazia esta conta: a única menção a perda
+     de peso no prompt da nutricionista vinha de carona na linha de enjoo, e só
+     quando ela marcava "Mal-estar" duas vezes no diário. Quem registrava o
+     peso caindo há um mês e não escrevia no diário não disparava nada. */
+  test("abaixo do corte não é sinal — o enjoo do 1º trimestre é comum", () => {
+    /* 68 → 65,6 kg é 3,5%: perda real, e abaixo do que pede avaliação. */
+    expect(sinalPerdaDePeso(65.6, 68)?.gravidade).toBe("normal");
+  });
+
+  test(`a partir de ${PERDA_DE_PESO_PCT}% do peso pré-gestacional, atenção`, () => {
+    const s = sinalPerdaDePeso(66.5, 70); // 5% exatos
+    expect(s?.gravidade).toBe("atencao");
+    expect(s?.nota).toMatch(/3[,.]5 kg/);
+    expect(s?.nota).toMatch(/5% do peso/);
+  });
+
+  test("⚠️ NUNCA `grave` — perda isolada não é emergência de minutos", () => {
+    /* Marcar grave aqui poria uma queda de peso acima de um SANGRAMENTO na
+       fila do consultório, que é a ordenação ao contrário. */
+    for (const atual of [60, 50, 40, 30]) {
+      expect(sinalPerdaDePeso(atual, 70)?.gravidade).not.toBe("grave");
+    }
+  });
+
+  test("ganhar peso não é perder — e zero também não", () => {
+    expect(sinalPerdaDePeso(74, 70)?.gravidade).toBe("normal");
+    expect(sinalPerdaDePeso(70, 70)?.gravidade).toBe("normal");
+  });
+
+  test("sem um dos dois pesos ela CALA, nunca chuta", () => {
+    expect(sinalPerdaDePeso(null, 70)).toBeNull();
+    expect(sinalPerdaDePeso(66, null)).toBeNull();
+    expect(sinalPerdaDePeso(undefined, undefined)).toBeNull();
+  });
+
+  test("número impossível não vira alarme", () => {
+    expect(sinalPerdaDePeso(NaN, 70)).toBeNull();
+    expect(sinalPerdaDePeso(0, 70)).toBeNull();
+    expect(sinalPerdaDePeso(66, -70)).toBeNull();
+    expect(sinalPerdaDePeso(66, Infinity)).toBeNull();
+  });
+
+  test("⚠️ o limite mora AQUI, e não numa cópia dentro da nutrição", () => {
+    /* `sinais-clinicos` declara que nenhum limite clínico se escreve fora
+       dele. A nutricionista é a primeira leitora; o painel do médico pode ser
+       a segunda, e as duas têm de dizer a mesma coisa sobre o mesmo peso. */
+    const nutricao = readFileSync("src/lib/nutricao-contexto.ts", "utf8");
+    expect(nutricao).toContain("sinalPerdaDePeso");
+    expect(nutricao).not.toMatch(/\b5\s*\/\s*100|0\.05\b/);
   });
 });
