@@ -215,7 +215,8 @@ const navegador = await chromium.launch({
 const ctx = await navegador.newContext({ viewport: { width: 393, height: 852 } });
 let ruins = 0;
 
-for (const t of ROTEIRO) {
+/** Roda UM roteiro numa página nova e devolve o que ele acusou. */
+async function rodar(t) {
   const p = await ctx.newPage();
   const erros = [];
   p.on("console", (m) => {
@@ -282,14 +283,42 @@ for (const t of ROTEIRO) {
     erros.push("NAVEGAÇÃO " + String(x.message).split("\n")[0].slice(0, 80));
   }
 
-  if (erros.length) {
-    ruins++;
-    console.log(`  ⚠️  ${t.nome} (${toques} toques)`);
-    for (const e of erros) console.log(`       ${e}`);
-  } else {
-    console.log(`  ✅ ${t.nome} (${toques} toques)`);
-  }
   await p.close();
+  return { erros, toques };
+}
+
+/* ⚠️ A SEGUNDA CHANCE, a mesma da varredura de bancadas (`varrer-bancadas.mjs`)
+   e pelo mesmo motivo: um roteiro que falha uma vez em vinte por tropeço do
+   servidor de desenvolvimento é PIOR que roteiro nenhum — as pessoas passam a
+   re-rodar sem ler. Medido no runner (set/2026): `busca · digitar` caiu com
+   "Failed to fetch dynamically imported module: virtual:tanstack-start-client-entry"
+   — o Vite recarregando a entrada no meio da navegação ("optimized
+   dependencies changed. reloading" no log) — num commit que só mudava
+   Markdown, e o mesmo job tinha passado cinco minutos antes com o código
+   idêntico. Um defeito determinístico falha nas duas passadas; um tropeço do
+   servidor, não. ⚠️ E ela continua sendo UMA só: três tentativas começariam a
+   esconder corrida de verdade, que é coisa que este app tem. */
+const suspeitos = [];
+for (const t of ROTEIRO) {
+  const { erros, toques } = await rodar(t);
+  if (erros.length) {
+    suspeitos.push({ t, primeira: erros });
+    continue;
+  }
+  console.log(`  ✅ ${t.nome} (${toques} toques)`);
+}
+for (const { t, primeira } of suspeitos) {
+  const { erros, toques } = await rodar(t);
+  if (erros.length === 0) {
+    console.log(
+      `  ⚠️  ${t.nome} — falhou na primeira e passou sozinha na segunda (tropeço do servidor)`,
+    );
+    console.log(`       primeira: ${primeira[0]}`);
+    continue;
+  }
+  ruins++;
+  console.log(`  ❌ ${t.nome} (${toques} toques)`);
+  for (const e of erros) console.log(`       ${e}`);
 }
 
 await navegador.close();
