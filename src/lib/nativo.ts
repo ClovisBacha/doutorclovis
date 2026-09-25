@@ -173,9 +173,23 @@ export function prepararNativo(): void {
      Como `prepararNativo` roda no escopo do módulo do `router.tsx`, isto
      acontece antes de o React hidratar: nenhum quadro com o menu errado. */
   document.documentElement.classList.add("nativo");
+  /* Sem zoom por pinça nem por duplo toque: dentro do app, a página É a tela,
+     e um app que dá zoom na própria interface é o sinal mais barato de "site
+     embrulhado". O WKWebView respeita `user-scalable=no` (o Safari, desde o
+     iOS 10, ignora — por isso a meta do SITE não o traz), e `styles.css`
+     reforça com `touch-action` em `.nativo`. Letra maior é o Dynamic Type,
+     não o zoom da página. Feito aqui, antes de o React hidratar, e não no
+     `head()` da rota, que é o mesmo para o site. */
+  document
+    .querySelector('meta[name="viewport"]')
+    ?.setAttribute(
+      "content",
+      "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
+    );
   void carregar().then(({ App }) => {
     esconderSplash();
     ligarBotaoVoltar(App);
+    ligarVoltaDoSegundoPlano(App);
   });
   /* O toque num aviso leva ao lugar do aviso — ver `ligarToqueNoAviso`. Ele é
      carregado à parte porque o plugin de push é pesado e só existe na casca. */
@@ -207,6 +221,60 @@ function ligarBotaoVoltar(App?: AppPlugin): void {
       return;
     }
     void App.minimizeApp().catch(() => {});
+  }).catch(() => {});
+}
+
+/**
+ * A volta do segundo plano.
+ *
+ * Num app nativo a página não "carrega de novo" quando ela volta: fica dias
+ * viva. O token de push só era renovado quando o cartão de avisos montava; um
+ * token trocado pelo sistema ficava velho até ela abrir aquela tela. Aqui ele é
+ * renovado na volta — COM CALMA: `inscreverPushNativo` faz `register()` e uma
+ * escrita no servidor, e dez trocas de app numa sessão de contrações não podem
+ * virar dez registros iguais na frente dos dados que as telas estão relendo.
+ * No máximo uma vez a cada `INTERVALO_DE_RENOVACAO_MS`, lembrado no aparelho.
+ *
+ * ⚠️ A SESSÃO DO SUPABASE NÃO ENTRA AQUI, de propósito. O supabase-js já ouve
+ * `visibilitychange` (para o relógio de renovação ao esconder, recupera e
+ * renova ao voltar), e o WKWebView dispara esse evento na volta do segundo
+ * plano. Ligar `stopAutoRefresh`/`startAutoRefresh` ao `appStateChange` seria
+ * uma segunda mão no mesmo relógio — e um comentário atribuindo token vencido a
+ * um gancho que a biblioteca já tem esconderia a causa real, se ela existir.
+ *
+ * Os dados das abas também não entram: `visibilitychange` é o que elas escutam.
+ * Tudo por `import()` dinâmico, como o resto deste arquivo.
+ */
+export const INTERVALO_DE_RENOVACAO_MS = 12 * 60 * 60 * 1000;
+const CHAVE_DA_RENOVACAO = "dc-avisos-renovados-em";
+
+/** A regra pura: passou o intervalo desde a última renovação (ou nunca houve)? */
+export function deveRenovarAvisos(ultimaEm: number | null, agora: number): boolean {
+  if (ultimaEm === null || !Number.isFinite(ultimaEm)) return true;
+  return agora - ultimaEm >= INTERVALO_DE_RENOVACAO_MS;
+}
+
+function renovarAvisosComCalma(): void {
+  let ultima: number | null = null;
+  try {
+    const cru = localStorage.getItem(CHAVE_DA_RENOVACAO);
+    ultima = cru === null ? null : Number(cru);
+  } catch {
+    /* sem armazenamento: renova, é barato uma vez */
+  }
+  if (!deveRenovarAvisos(ultima, Date.now())) return;
+  try {
+    localStorage.setItem(CHAVE_DA_RENOVACAO, String(Date.now()));
+  } catch {
+    /* idem */
+  }
+  void import("@/lib/avisos").then((m) => m.renovarAvisosSeJaAutorizado()).catch(() => {});
+}
+
+function ligarVoltaDoSegundoPlano(App?: AppPlugin): void {
+  if (!App) return;
+  void App.addListener("appStateChange", ({ isActive }) => {
+    if (isActive) renovarAvisosComCalma();
   }).catch(() => {});
 }
 

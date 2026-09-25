@@ -1188,6 +1188,26 @@ button:active > .duo3d {
   display: none;
 }
 
+/* Dentro da casca a página não dá zoom: `pan-x pan-y` deixa rolar e barra a
+   pinça e o duplo toque (WebKit 13+ e Chromium). É o reforço em CSS do
+   `user-scalable=no` que `prepararNativo` põe na meta. */
+.nativo,
+.nativo body {
+  touch-action: pan-x pan-y;
+}
+
+/* A volta ao app nas páginas públicas abertas de dentro da casca. Só existe
+   no app: no site o cabeçalho já tem caminho, e no iPhone não há botão de
+   voltar do sistema — sem esta barra, `/agendamento` aberta do app era um
+   beco sem saída. */
+.voltar-ao-app {
+  display: none;
+}
+.nativo .voltar-ao-app {
+  display: flex;
+  padding-top: var(--safe-top);
+}
+
 /* ── Segundo Cérebro: visual tecnológico do card de score ─────────────── */
 @keyframes brainPulse {
   0%,

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, Mic, Send } from "lucide-react";
+import { ChevronLeft, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Bolha } from "@/components/bolha";
 import { avisoQuePodeAparecer, lerLinhaDoStream, passoDaDigitacao } from "@/lib/chat-stream";
@@ -847,10 +847,6 @@ export function ChatTab({
     }
   }
 
-  function handleAudioSoon() {
-    toast("Mensagens de áudio em breve — por enquanto, envie texto.");
-  }
-
   /* ─── A TELA INTEIRA NO CELULAR, e o teclado sem empurrar nada ──────────
      Pedido do dono: "quando eu clico para digitar, por algum motivo desce o
      texto, a tela se desloca". Eram duas causas somadas:
@@ -1066,22 +1062,21 @@ export function ChatTab({
           >
             <span className="block h-3 w-3 rounded-[3px] bg-current" />
           </button>
-        ) : input.trim() ? (
+        ) : (
+          /* ⚠️ O MICROFONE SAIU. Ele só mostrava "mensagens de áudio em breve": um
+             controle na barra principal que não faz nada — a revisão da Apple
+             reprova placeholder visível (2.1), e a paciente tocava e nada vinha.
+             Quando o áudio existir (`gravador.ts` + `/api/transcrever-diario`
+             já fazem isso no diário e no direct), ele volta aqui, funcionando.
+             Até lá o Enviar fica no lugar, desabilitado sem texto, para o campo
+             não mudar de forma a cada letra. */
           <button
             onClick={() => sendText()}
-            disabled={loading}
+            disabled={loading || !input.trim()}
             aria-label="Enviar"
-            className="btn-3d press flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground"
+            className="btn-3d press flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground disabled:opacity-50"
           >
             <Send className="h-[21px] w-[21px] -translate-x-px translate-y-px" strokeWidth={1.9} />
-          </button>
-        ) : (
-          <button
-            onClick={handleAudioSoon}
-            aria-label="Mensagem de voz"
-            className="pill-3d press flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-primary"
-          >
-            <Mic className="h-[21px] w-[21px]" strokeWidth={1.9} />
           </button>
         )}
       </div>

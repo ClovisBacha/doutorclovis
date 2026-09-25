@@ -43,6 +43,14 @@ import drPortrait from "@/assets/dr-clovis-portrait.jpg";
    (PSNR 46–50 dB). Substituem os traços do Lucide nos blocos grandes: um bloco
    de 300px pedia um objeto com volume, não um contorno de 1,7px. */
 import { ymdLocal } from "@/lib/utils";
+import { anunciarLocalizacao, marcarLocalizacaoAutorizada } from "@/lib/localizacao-do-ceu";
+import {
+  gravarRetratoDaHome,
+  lerRetratoDaHome,
+  podePintarDoRetrato,
+  type PerfilRetratado,
+} from "@/lib/retrato-da-home";
+import { limparRastrosLocaisDaConta } from "@/lib/rastros-locais";
 import { getMyDoctor } from "@/lib/doctors.functions";
 import { minhasConsultas, type ConsultaDaPaciente } from "@/lib/clinical.functions";
 import {
@@ -1030,7 +1038,15 @@ function MinhaContaPage() {
       });
     }
 
-    if (origemLocal && (origemLocal.tipo === "aprox" || origemLocal.tipo === "padrao")) {
+    /* `cadastro` entra: desde que o GPS deixou de ser pedido ao montar, o cartão
+       é a ÚNICA porta para a localização exata — e quem tem cidade no cadastro
+       ficaria sem porta nenhuma. Ele some assim que a origem vira `gps`. */
+    if (
+      origemLocal &&
+      (origemLocal.tipo === "aprox" ||
+        origemLocal.tipo === "padrao" ||
+        origemLocal.tipo === "cadastro")
+    ) {
       derivadas.push({
         /* O id carrega a CIDADE: quando o app passa a errar outra cidade, é
            um aviso novo e a bolinha volta — que é o comportamento certo, já
@@ -1046,8 +1062,17 @@ function MinhaContaPage() {
           rotulo: "Ativar localização",
           executar: () => {
             navigator.geolocation?.getCurrentPosition(
-              () => window.location.reload(),
-              () => toast("Ative a localização nos ajustes do navegador para este site."),
+              ({ coords }) => {
+                /* Sem recarregar a página: o céu ouve o evento e troca para o
+                   GPS no lugar (`useWeather`), e a autorização fica lembrada
+                   neste aparelho para as próximas aberturas. */
+                marcarLocalizacaoAutorizada();
+                anunciarLocalizacao({ lat: coords.latitude, lon: coords.longitude });
+              },
+              () =>
+                toast(
+                  "Não consegui acessar a sua localização. Confira a permissão nos ajustes do aparelho.",
+                ),
               { timeout: 8000 },
             );
           },
@@ -1301,6 +1326,16 @@ function MinhaContaPage() {
   useEffect(() => {
     carimbarModoCuidado(careMode);
   }, [careMode]);
+  /* ⚠️ O RETRATO ACOMPANHA O PERFIL. Gravado só na abertura, ele envelhecia no
+     mesmo minuto em que ela ligava o Modo Cuidado (o estado local muda, a
+     linha guardada não): a abertura seguinte pintava bebê e semana para quem
+     acabou de perder a gestação, até a rede responder. Toda mudança de
+     `profile` regrava, com a mesma régua de papel (médico e admin nunca
+     gravam; a âncora gestacional é exigida pela própria função). */
+  useEffect(() => {
+    if (!userId || !profile || isDoctor || isAdmin || podeSerMedico) return;
+    gravarRetratoDaHome(userId, profile as unknown as PerfilRetratado);
+  }, [userId, profile, isDoctor, isAdmin, podeSerMedico]);
   async function toggleCareMode(on: boolean) {
     const { data: s } = await supabase.auth.getSession();
     if (!s.session?.access_token) return;
@@ -1556,6 +1591,25 @@ function MinhaContaPage() {
       const { data: s } = await supabase.auth.getSession();
       const token = s.session?.access_token;
       const idDaSessao = s.session?.user?.id ?? null;
+      /* ── ⚠️ O RETRATO PINTA ANTES DA REDE (set/2026) ──────────────────────
+         A saudação, a semana e o bebê esperavam o `select` do perfil voltar
+         em TODA abertura — a mesma linha que o aparelho já tinha recebido na
+         abertura anterior. Agora a home pinta do retrato guardado
+         (`retrato-da-home.ts`) e a rede corrige quando responde: o
+         `setProfile(data)` lá embaixo sobrescreve SEMPRE, inclusive com
+         "não consegui ler". A regra de quem pinta é a MESMA do `liberarCedo`
+         abaixo — âncora gestacional e sem marca de médico —, lida da sessão,
+         que é local. Médico e admin nunca gravam retrato. */
+      const marcaDeMedicoNaSessao =
+        (s.session?.user?.user_metadata as { role?: string } | null | undefined)?.role === "doctor";
+      const retrato = idDaSessao ? lerRetratoDaHome(idDaSessao) : null;
+      let pintouDoRetrato = false;
+      if (retrato && idDaSessao && podePintarDoRetrato(retrato, marcaDeMedicoNaSessao)) {
+        setProfile(retrato as Profile);
+        setUserId(idDaSessao);
+        setLoading(false);
+        pintouDoRetrato = true;
+      }
       /* ⚠️ `Promise.resolve(...)` de propósito: o construtor de consulta do
          PostgREST é PREGUIÇOSO — só dispara a requisição quando alguém chama
          o `then`. Guardado cru na variável, ele só sairia no `await` lá
@@ -1571,7 +1625,14 @@ function MinhaContaPage() {
           )
         : null;
       const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return;
+      if (!u.user) {
+        /* ⚠️ Pintou do retrato e o servidor NÃO confirmou a sessão (revogada,
+           conta apagada noutro aparelho, ou sem rede): a home guardada não
+           pode ficar de pé como se fosse verdade. `perfilInstavel` é o estado
+           honesto que o resto do app já conhece — o mesmo da leitura falhada. */
+        if (pintouDoRetrato) setPerfilInstavel(true);
+        return;
+      }
 
       /* ─── ⚠️ "ELA APARECEU" — sem isto, a aba das Amigas mente por omissão ──
          `last_seen_at` é o que vira "há 2h" na lista de amigas. Se ninguém
@@ -1798,16 +1859,7 @@ function MinhaContaPage() {
     // Limpa a jornada local (dc-path-*) e o marcador de sync: num aparelho
     // compartilhado, a próxima conta NÃO pode ver nem re-subir os dados de
     // saúde da conta anterior (vazamento entre contas).
-    try {
-      for (let i = localStorage.length - 1; i >= 0; i--) {
-        const k = localStorage.key(i);
-        if (k && (k.startsWith("dc-path-") || k === "dc-journey-synced-at")) {
-          localStorage.removeItem(k);
-        }
-      }
-    } catch {
-      /* modo privado/quota: sem cache local a limpar */
-    }
+    limparRastrosLocaisDaConta();
     navigate({ to: "/" });
   }
 
@@ -2889,6 +2941,7 @@ function MinhaContaPage() {
                     profile={profile}
                     gest={gest}
                     careMode={careMode}
+                    luto={lutoDoPerfil}
                     onNavigate={goToTab}
                     aoVoltarDeFora={voltarDaBarra}
                     initialSub={consultasSub}
@@ -3280,6 +3333,7 @@ function RegistrosHub({
   profile,
   gest,
   careMode = false,
+  luto = false,
   onNavigate,
   aoVoltarDeFora,
   initialSub = null,
@@ -3287,6 +3341,14 @@ function RegistrosHub({
   profile: Profile | null;
   gest: Gest;
   careMode?: boolean;
+  /**
+   * ⚠️ SÓ O LUTO DE VERDADE — nunca a instabilidade de leitura. `careMode`
+   * é `perfilInstavel || luto`, e serve para o app se calar sobre o bebê
+   * quando não sabe; a caixa vermelha do cronômetro é aviso de SEGURANÇA,
+   * e a rede oscilando não pode tirar "o bebê se mexendo menos" de quem
+   * está grávida.
+   */
+  luto?: boolean;
   onNavigate?: (t: Tab) => void;
   /**
    * ⚠️ **A SETA DE DENTRO, QUANDO ELA VEIO DE FORA — e este era o defeito que
@@ -3383,7 +3445,7 @@ function RegistrosHub({
           />
         )}
         {sub === "contracoes" && (
-          <ContracoesTab weeks={gest?.weeks ?? null} onNavigate={onNavigate} />
+          <ContracoesTab weeks={gest?.weeks ?? null} onNavigate={onNavigate} careMode={luto} />
         )}
         {sub === "timeline" && <TimelineTab profile={profile} gest={gest} />}
       </Fade>

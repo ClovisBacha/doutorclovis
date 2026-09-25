@@ -572,16 +572,26 @@ describe("⚠️ a SÉTIMA — a carteirinha de emergência (set/2026)", () => {
     /* ⚠️ A âncora NÃO é `setProfile(data)`: ele aparece CINCO vezes neste
        arquivo, e a primeira é outra leitura — a armadilha de substring que
        este repositório já pagou uma dúzia de vezes. Quem identifica o lugar é
-       o estado que decide a tela. */
-    const i = CONTA.indexOf("setPerfilInstavel(");
-    expect(i).toBeGreaterThan(-1);
-    const decisao = CONTA.slice(i, CONTA.indexOf(";", i));
-    /* E ela sai do ERRO da leitura, nunca de um booleano solto: com
-       `setPerfilInstavel(false)` cravado, a tela volta a acusar a paciente. */
-    const nomeDoErro = decisao.match(/!!\s*(\w+)/)?.[1];
+       o estado que decide a tela — TODAS as vezes em que ele é escrito. */
+    const chamadas = [...CONTA.matchAll(/setPerfilInstavel\(([^)]*)\)/g)];
+    expect(chamadas.length).toBeGreaterThan(0);
+    /* Nenhuma crava `false`: com `setPerfilInstavel(false)` cravado, a tela
+       volta a acusar a paciente. */
+    for (const c of chamadas) expect(c[1].trim()).not.toBe("false");
+    /* A que decide a partir da leitura sai do ERRO dela, nunca de um booleano
+       solto — e o nome vem da desestruturação da própria leitura. */
+    const decisoes = chamadas.filter((c) => /!!\s*\w+/.test(c[1]));
+    expect(decisoes.length).toBe(1);
+    const decisao = decisoes[0];
+    const nomeDoErro = decisao[1].match(/!!\s*(\w+)/)?.[1];
     expect(nomeDoErro).toBeTruthy();
-    const desestrutura = CONTA.slice(CONTA.lastIndexOf("const {", i), i);
+    const desestrutura = CONTA.slice(CONTA.lastIndexOf("const {", decisao.index), decisao.index);
     expect(desestrutura).toContain(`error: ${nomeDoErro}`);
+    /* A única outra escrita aceita é o `true` de quem pintou do retrato e não
+       teve a sessão confirmada pelo servidor (ver `retrato-da-home.test.ts`). */
+    for (const c of chamadas) {
+      if (c !== decisao) expect(c[1].trim()).toBe("true");
+    }
   });
 
   test("⚠️ a falha vem ANTES do vazio — trocadas, ela lê a acusação", () => {

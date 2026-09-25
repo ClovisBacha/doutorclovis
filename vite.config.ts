@@ -81,7 +81,18 @@ export default defineConfig({
        (Vite 7 + TanStack Start) o prerenderer roda ANTES de o ambiente de
        servidor ser construído, e a rota volta 404 — "Prerendered 0 routes". */
     ...({
-      routeRules: { "/minha-conta": { isr: { expiration: false } } },
+      routeRules: {
+        "/minha-conta": { isr: { expiration: false } },
+        /* ⚠️ E `/auth` TAMBÉM, porque é por ela que a CASCA NATIVA entra
+           (`capacitor.config.ts`, `server.url`). Guardar só `/minha-conta`
+           deixou a única porta do app instalado fora da borda: toda abertura
+           fria acordava a função para montar um formulário de login que é
+           IDÊNTICO para todo mundo — a sessão é lida no telefone, num
+           `useEffect`, e o despacho por papel acontece depois. Mesma regra,
+           mesmo motivo, mesma ressalva sobre `allowQuery` (a query — como o
+           retorno do login social — é guardada à parte). */
+        "/auth": { isr: { expiration: false } },
+      },
       /* ⚠️ **A FUNÇÃO RODA EM SÃO PAULO, e não em Washington (set/2026).**
 
          O banco está em `sa-east-1` (São Paulo) — conferido no painel do

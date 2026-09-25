@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import icFesta from "@/assets/avisos/festa.webp";
 import { supabase } from "@/integrations/supabase/client";
 import { dueDateFromLmp } from "@/lib/gestacao";
+import { ymdLocal } from "@/lib/utils";
 import { codificarFoto } from "@/lib/codificar-imagem";
 import { creditarSementinhas } from "@/lib/evento-sementinhas";
 import { BONUS_INFLUENCIADORA } from "@/lib/economia-sementinhas";
@@ -84,7 +85,10 @@ export function OnboardingRitual({
   const [name, setName] = useState(initialName);
   const [mode, setMode] = useState<"dum" | "us">("dum");
   const [lmp, setLmp] = useState("");
-  const [usDate, setUsDate] = useState(new Date().toISOString().split("T")[0]);
+  /* ⚠️ O DIA CIVIL, nunca o dia UTC: das 21h à meia-noite `toISOString()` já
+     está em amanhã, e a data do ultrassom pré-preenchida à noite empurrava a
+     idade gestacional e a DPP um dia para a frente pela gestação inteira. */
+  const [usDate, setUsDate] = useState(ymdLocal());
   const [usWeeks, setUsWeeks] = useState("");
   const [usDays, setUsDays] = useState("");
   const [babyName, setBabyName] = useState("");
