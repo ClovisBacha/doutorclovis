@@ -470,6 +470,11 @@ function SiteShell() {
      lugar só, em vez de repetida dentro de cada componente. */
   const semChromePublico =
     location.pathname.startsWith("/minha-conta") || location.pathname.startsWith("/painel");
+  /* As telas do próprio app e a de login não ganham "Voltar ao app": lá a
+     volta é o próprio app, ou não faz sentido. */
+  const semVoltaAoApp = ["/minha-conta", "/painel", "/admin", "/auth"].some((p) =>
+    location.pathname.startsWith(p),
+  );
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       <a
@@ -485,6 +490,7 @@ function SiteShell() {
           <SiteHeader />
         </div>
       )}
+      {!semChromePublico && !semVoltaAoApp && <VoltarAoApp />}
       <main id="main-content" className="flex-1 pb-[72px] md:pb-0">
         <Outlet />
       </main>
@@ -629,6 +635,28 @@ function PWAInstallBanner() {
           ✕
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * A volta ao app nas páginas públicas abertas de dentro da casca.
+ *
+ * Dentro do app o cabeçalho e o rodapé do site somem (`.nativo .chrome-publico`),
+ * e com eles qualquer caminho de volta — no iPhone não há botão de voltar do
+ * sistema. `/agendamento` aberta pelo app era um beco sem saída. A barra só
+ * aparece no app (`.voltar-ao-app` é `display: none` fora dele) e leva a
+ * `/auth`, que despacha cada papel para a sua área.
+ */
+function VoltarAoApp() {
+  return (
+    <div className="voltar-ao-app sticky top-0 z-40 items-center border-b border-border/60 bg-background/90 backdrop-blur">
+      <Link
+        to="/auth"
+        className="press flex min-h-11 items-center gap-1 px-4 text-sm font-semibold text-primary"
+      >
+        <span aria-hidden="true">‹</span> Voltar ao app
+      </Link>
     </div>
   );
 }

@@ -173,6 +173,19 @@ export function prepararNativo(): void {
      Como `prepararNativo` roda no escopo do módulo do `router.tsx`, isto
      acontece antes de o React hidratar: nenhum quadro com o menu errado. */
   document.documentElement.classList.add("nativo");
+  /* Sem zoom por pinça nem por duplo toque: dentro do app, a página É a tela,
+     e um app que dá zoom na própria interface é o sinal mais barato de "site
+     embrulhado". O WKWebView respeita `user-scalable=no` (o Safari, desde o
+     iOS 10, ignora — por isso a meta do SITE não o traz), e `styles.css`
+     reforça com `touch-action` em `.nativo`. Letra maior é o Dynamic Type,
+     não o zoom da página. Feito aqui, antes de o React hidratar, e não no
+     `head()` da rota, que é o mesmo para o site. */
+  document
+    .querySelector('meta[name="viewport"]')
+    ?.setAttribute(
+      "content",
+      "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
+    );
   void carregar().then(({ App }) => {
     esconderSplash();
     ligarBotaoVoltar(App);

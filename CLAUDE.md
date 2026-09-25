@@ -17862,3 +17862,29 @@ um app nativo faz e uma página não fazia.
 
 ⚠️ **Não verificado em aparelho:** o `appStateChange` de fato disparando e o
 retrato pintando antes da rede. **Portão:** tsc · lint · 6.624 testes (+17).
+
+## Quatro sinais de site embrulhado que a casca perdeu (set/2026)
+
+Quarto lote da avaliação do app iOS, em cima do terceiro. Tudo código puro,
+verificável no fonte (`casca-polida.test.ts`); tudo só visível num iPhone.
+
+- **A página não dá zoom dentro do app.** `prepararNativo` põe
+  `maximum-scale=1, user-scalable=no` na meta de viewport antes de hidratar
+  (o WKWebView respeita; o Safari não, e por isso a meta do SITE segue sem
+  isso), e `styles.css` reforça com `touch-action: pan-x pan-y` em `.nativo`.
+  Letra maior é o Dynamic Type, não o zoom da página.
+- **O microfone "em breve" saiu do chat com o médico.** Era um controle na
+  barra principal que só mostrava um toast — placeholder visível reprova na
+  revisão (2.1). O Enviar ficou no lugar, desabilitado sem texto, para o campo
+  não mudar de forma a cada letra. Quando o áudio existir (`gravador.ts` já
+  faz isso no diário e no direct), ele volta funcionando.
+- **Página pública aberta de dentro do app tem volta.** Sem o cabeçalho do
+  site (`.nativo .chrome-publico`), `/agendamento` aberta pelo app era um beco
+  sem saída — no iPhone não há botão de voltar do sistema. A barra
+  "‹ Voltar ao app" só existe na casca (CSS) e leva a `/auth`, que despacha
+  cada papel; não aparece em `/minha-conta`, `/painel`, `/admin` nem `/auth`.
+- **Excluir a conta termina no login**, e não na home pública do site, que
+  dentro do app é uma página sem cabeçalho. E os três textos que mandavam
+  "falar com o suporte pelo site" perderam o "pelo site".
+
+**Portão:** tsc · lint · 6.631 testes (+7).
