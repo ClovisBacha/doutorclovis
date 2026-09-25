@@ -29,6 +29,15 @@ describe("⚠️ a tela offline é alcançável, e tem saída", () => {
     expect(CASCA).toContain("window.location.replace(SERVIDOR)");
   });
 
+  test("⚠️ navegação atropelada COM rede volta para a tela anterior, não para o login", () => {
+    /* O Capacitor carrega a casca em QUALQUER falha de navegação, inclusive a
+       cancelada por outra (-999). Com histórico atrás, voltar devolve a tela
+       em que ela estava; só sem histórico é queda de rede de verdade. */
+    expect(CASCA).toContain("window.history.length > 1");
+    expect(CASCA).toContain("window.history.back()");
+    expect(CASCA).toContain("navigator.onLine && window.history.length > 1");
+  });
+
   test("⚠️ e volta para a MESMA porta da casca — a página é estática e não lê a config", () => {
     const daConfig = CONFIG.match(/url:\s*"([^"]+)"/)?.[1];
     const daCasca = CASCA.match(/var SERVIDOR = "([^"]+)"/)?.[1];

@@ -144,13 +144,32 @@
     -->
     <button id="tentar" type="button">Tentar de novo</button>
     <p class="nota">Assim que houver sinal, o app volta sozinho.</p>
+    <!--
+      ⚠️ O CAPACITOR CARREGA ESTA PÁGINA EM QUALQUER FALHA DE NAVEGAÇÃO — não só
+      sem rede. Uma navegação atropelada por outra (código -999, "cancelled")
+      também cai aqui, COM rede, e a paciente veria "Sem conexão" no meio de um
+      app funcionando. Nesse caso a página anterior ainda está no histórico do
+      WebView (a que falhou nunca chegou a existir): voltar é o que devolve a
+      tela em que ela estava, com o link profundo intacto. Sem histórico (abertura
+      fria), é falta de rede mesmo, e a saída é recarregar o servidor.
+    -->
     <script>
       var SERVIDOR = "https://www.obstetrica.com.br/auth";
       function tentarDeNovo() {
+        if (window.history.length > 1) {
+          window.history.back();
+          return;
+        }
         window.location.replace(SERVIDOR);
       }
       document.getElementById("tentar").addEventListener("click", tentarDeNovo);
       window.addEventListener("online", tentarDeNovo);
+      /* Chegou aqui com rede e com uma página atrás: foi atropelo, não queda.
+         Volta sozinha, sem nem desenhar a mensagem de "sem conexão". */
+      if (navigator.onLine && window.history.length > 1) {
+        document.body.style.visibility = "hidden";
+        window.history.back();
+      }
     </script>
   </body>
 </html>
