@@ -9,7 +9,6 @@ import { readFileSync } from "node:fs";
 import { semComentarios } from "@/lib/sem-comentarios";
 import {
   PREFIXO_RETRATO_DA_HOME,
-  apagarRetratoDaHome,
   chaveDoRetrato,
   gravarRetratoDaHome,
   lerRetratoDaHome,
@@ -23,9 +22,6 @@ function armazemFalso() {
     getItem: (k: string) => m.get(k) ?? null,
     setItem: (k: string, v: string) => {
       m.set(k, v);
-    },
-    removeItem: (k: string) => {
-      m.delete(k);
     },
     tamanho: () => m.size,
   };
@@ -87,14 +83,6 @@ describe("gravar e ler", () => {
     expect(lerRetratoDaHome("", s)).toBeNull();
     expect(lerRetratoDaHome("ana", null)).toBeNull();
   });
-
-  test("apagar tira, e não estoura sem storage", () => {
-    const s = armazemFalso();
-    gravarRetratoDaHome("ana", ANA, s);
-    apagarRetratoDaHome("ana", s);
-    expect(lerRetratoDaHome("ana", s)).toBeNull();
-    expect(() => apagarRetratoDaHome("ana", null)).not.toThrow();
-  });
 });
 
 describe("⚠️ e a home usa o retrato nos três pontos certos", () => {
@@ -112,14 +100,24 @@ describe("⚠️ e a home usa o retrato nos três pontos certos", () => {
     expect(CONTA).toContain("podePintarDoRetrato(retrato, marcaDeMedicoNaSessao)");
   });
 
-  test("grava só no ponto em que libera cedo", () => {
+  test("⚠️ regrava sempre que o perfil muda, com a régua de papel", () => {
+    /* Gravado só na abertura, ele envelhecia no minuto em que ela ligava o
+       Modo Cuidado: a abertura seguinte pintava bebê e semana para quem
+       acabou de perder a gestação. */
     expect(CONTA).toMatch(
-      /if \(liberarCedo\) \{\s*setLoading\(false\);\s*gravarRetratoDaHome\(u\.user\.id, data\);/,
+      /if \(!userId \|\| !profile \|\| isDoctor \|\| isAdmin \|\| podeSerMedico\) return;\s*gravarRetratoDaHome\(userId, profile as unknown as PerfilRetratado\);/,
+    );
+    expect(CONTA).not.toContain("gravarRetratoDaHome(u.user.id, data)");
+  });
+
+  test("⚠️ pintou do retrato e o servidor não confirmou a sessão: vira leitura instável", () => {
+    expect(CONTA).toMatch(
+      /if \(!u\.user\) \{\s*if \(pintouDoRetrato\) setPerfilInstavel\(true\);\s*return;/,
     );
   });
 
-  test("some no signOut, junto com a jornada local", () => {
+  test("some na saída e na exclusão da conta, pela vassoura de rastros-locais", () => {
     const saida = CONTA.slice(CONTA.indexOf("async function signOut()"));
-    expect(saida.slice(0, 1200)).toContain("PREFIXO_RETRATO_DA_HOME");
+    expect(saida.slice(0, 900)).toContain("limparRastrosLocaisDaConta()");
   });
 });

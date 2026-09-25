@@ -228,34 +228,53 @@ function ligarBotaoVoltar(App?: AppPlugin): void {
  * A volta do segundo plano.
  *
  * Num app nativo a página não "carrega de novo" quando ela volta: fica dias
- * viva. Duas coisas dependiam de a página recarregar, e por isso não
- * aconteciam:
+ * viva. O token de push só era renovado quando o cartão de avisos montava; um
+ * token trocado pelo sistema ficava velho até ela abrir aquela tela. Aqui ele é
+ * renovado na volta — COM CALMA: `inscreverPushNativo` faz `register()` e uma
+ * escrita no servidor, e dez trocas de app numa sessão de contrações não podem
+ * virar dez registros iguais na frente dos dados que as telas estão relendo.
+ * No máximo uma vez a cada `INTERVALO_DE_RENOVACAO_MS`, lembrado no aparelho.
  *
- *  1. **A sessão do Supabase.** O cliente renova o token por TIMER, e o iOS
- *     congela timers em segundo plano. Depois de uma noite fechado, a
- *     primeira chamada voltava com token vencido. `stopAutoRefresh` ao sair e
- *     `startAutoRefresh` ao voltar é o par que a documentação do Supabase
- *     manda ligar ao `appStateChange` em Capacitor — o `start` renova na
- *     hora se já venceu.
- *  2. **O token de push.** `renovarAvisosSeJaAutorizado` só rodava quando o
- *     cartão de avisos montava; um token trocado pelo sistema ficava velho
- *     até ela abrir aquela tela.
+ * ⚠️ A SESSÃO DO SUPABASE NÃO ENTRA AQUI, de propósito. O supabase-js já ouve
+ * `visibilitychange` (para o relógio de renovação ao esconder, recupera e
+ * renova ao voltar), e o WKWebView dispara esse evento na volta do segundo
+ * plano. Ligar `stopAutoRefresh`/`startAutoRefresh` ao `appStateChange` seria
+ * uma segunda mão no mesmo relógio — e um comentário atribuindo token vencido a
+ * um gancho que a biblioteca já tem esconderia a causa real, se ela existir.
  *
- * Os dados das abas NÃO entram aqui: o WKWebView dispara `visibilitychange`
- * na volta, e é isso que as telas já escutam. Tudo por `import()` dinâmico,
- * como o resto deste arquivo: o navegador não paga por código da casca.
+ * Os dados das abas também não entram: `visibilitychange` é o que elas escutam.
+ * Tudo por `import()` dinâmico, como o resto deste arquivo.
  */
+export const INTERVALO_DE_RENOVACAO_MS = 12 * 60 * 60 * 1000;
+const CHAVE_DA_RENOVACAO = "dc-avisos-renovados-em";
+
+/** A regra pura: passou o intervalo desde a última renovação (ou nunca houve)? */
+export function deveRenovarAvisos(ultimaEm: number | null, agora: number): boolean {
+  if (ultimaEm === null || !Number.isFinite(ultimaEm)) return true;
+  return agora - ultimaEm >= INTERVALO_DE_RENOVACAO_MS;
+}
+
+function renovarAvisosComCalma(): void {
+  let ultima: number | null = null;
+  try {
+    const cru = localStorage.getItem(CHAVE_DA_RENOVACAO);
+    ultima = cru === null ? null : Number(cru);
+  } catch {
+    /* sem armazenamento: renova, é barato uma vez */
+  }
+  if (!deveRenovarAvisos(ultima, Date.now())) return;
+  try {
+    localStorage.setItem(CHAVE_DA_RENOVACAO, String(Date.now()));
+  } catch {
+    /* idem */
+  }
+  void import("@/lib/avisos").then((m) => m.renovarAvisosSeJaAutorizado()).catch(() => {});
+}
+
 function ligarVoltaDoSegundoPlano(App?: AppPlugin): void {
   if (!App) return;
   void App.addListener("appStateChange", ({ isActive }) => {
-    void import("@/integrations/supabase/client")
-      .then(({ supabase }) =>
-        isActive ? supabase.auth.startAutoRefresh() : supabase.auth.stopAutoRefresh(),
-      )
-      .catch(() => {});
-    if (isActive) {
-      void import("@/lib/avisos").then((m) => m.renovarAvisosSeJaAutorizado()).catch(() => {});
-    }
+    if (isActive) renovarAvisosComCalma();
   }).catch(() => {});
 }
 

@@ -27,6 +27,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { limparRastrosLocaisDaConta } from "@/lib/rastros-locais";
 import { excluirMinhaConta, PALAVRA_DE_CONFIRMACAO } from "@/lib/conta.functions";
 import { useVoltar } from "@/lib/use-voltar";
 import { useTravarRolagemDeFundo } from "@/lib/use-travar-rolagem";
@@ -64,6 +65,9 @@ export function ExcluirConta({ ehMedico = false }: { ehMedico?: boolean }) {
            uma sessão apontando para um usuário apagado deixa o app em estados
            que ninguém previu. */
         await supabase.auth.signOut();
+        /* E o aparelho não guarda nada dela: jornada local e retrato da home
+           saem junto, como no signOut da conta. */
+        limparRastrosLocaisDaConta();
         /* Para o LOGIN, e não para a home pública do site: dentro do app a home
            do site é uma página sem cabeçalho nem volta, e no site a tela de
            entrada é o lugar honesto para quem acabou de apagar a conta. */
