@@ -17798,3 +17798,39 @@ Conferido depois de apagar: `tsc` limpo, e nenhum export de `gestacao.ts` ficou
 **Medido ao fim:** portão verde (**6.581 testes**, +13) · **224 bancadas, agora
 com a conferência de parâmetro ligada, 0 com problema** · 19 roteiros de
 interação · 5 mutantes da régua em vermelho + a contraprova de ponta a ponta.
+
+## O primeiro lote do app iOS: cinco correções que não precisavam de Mac (set/2026)
+
+Saíram de uma avaliação do app inteiro contra o que um app iOS bem feito faz
+(casca nativa, UX, desempenho e pendências), feita em sessão à parte. Este lote
+é só o que era código puro e sem decisão de produto; o resto está na lista
+entregue ao dono.
+
+1. **A data do ultrassom no ritual de boas-vindas nascia com o dia SEGUINTE das
+   21h à meia-noite** (`toISOString().split("T")[0]`). Quem aceitava a data
+   pré-preenchida à noite gravava `reference_date` de amanhã, e a idade
+   gestacional e a DPP ficavam um dia à frente pela gestação inteira. Agora é
+   `ymdLocal()`, e `data-civil.test.ts` proíbe a forma errada em todo
+   componente e rota autenticada da paciente.
+2. **O cronômetro de contrações dizia "o bebê estiver se mexendo menos" no Modo
+   Cuidado.** Ele fica de pé no luto de propósito, mas não recebia `careMode`.
+   A régua virou `bandeirasDoParto(careMode)`: as três bandeiras do corpo dela
+   ficam, a do bebê sai, e nada entra no lugar (sinal clínico novo é do médico).
+3. **Os toasts caíam sobre a barra e o botão do bebê nos iPhones com Face ID**:
+   o deslocamento era 96 px fixos. Agora é `calc(var(--safe-bottom) + 120px)`.
+4. **O céu pedia GPS ao montar a home** — na casca, a primeira caixa de diálogo
+   do app era a de localização, com o texto do SOS. Agora só lê ao montar se o
+   sistema já disse sim ou se ela já autorizou pelo cartão neste aparelho
+   (`localizacao-do-ceu.ts`); o cartão "Ativar localização" entrega a
+   coordenada por evento e o céu troca no lugar, sem `location.reload()`.
+5. **`/auth` fazia duas idas ao servidor em SÉRIE e mostrava o formulário de
+   login enquanto isso** — em toda abertura da casca. As duas vão em
+   `Promise.all`, a ordem de despacho virou `destinoDaSessao` (função pura, com
+   o porquê de cada degrau), e a página mostra "Entrando…" em vez do
+   formulário. E `/auth` entrou na mesma regra de borda (`isr`) da conta: era a
+   única porta do app instalado fora dela. ⚠️ A parte do `isr` só está
+   verificada por precedente (a regra de `/minha-conta`), não em produção.
+
+⚠️ **O que continua não verificado em aparelho:** o diálogo de permissão de
+localização e o toast acima da barra. **Portão:** tsc · lint · 6.607 testes
+(+26) · bancadas.

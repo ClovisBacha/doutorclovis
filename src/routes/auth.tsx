@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getMyDoctor } from "@/lib/doctors.functions";
 import { checkIsAdmin } from "@/lib/admin.functions";
+import { destinoDaSessao } from "@/lib/destino-da-sessao";
 import { AppleButton, GoogleButton, OrDivider } from "@/components/google-button";
 
 export const Route = createFileRoute("/auth")({
@@ -91,68 +92,48 @@ function AuthPage() {
   const [msg, setMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
   const [showResend, setShowResend] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
+  /** Sessão viva a caminho do destino: o formulário não aparece. */
+  const [verificando, setVerificando] = useState(false);
 
   useEffect(() => {
     // Nunca redireciona durante o fluxo de redefinição de senha.
     if (isRecoveryLink) return;
+    let cancelado = false;
     supabase.auth.getSession().then(async ({ data }) => {
-      if (!data.session) return;
-      /* ADMIN PRIMEIRO, antes de qualquer outra pergunta.
-
-         O dono da plataforma caía no app da GESTANTE — 18 mil linhas de jornada
-         de gravidez — e o console dele, com faturamento, médicos e cupons, só
-         era alcançável digitando /admin na barra de endereço. Nenhum link
-         levava lá.
-
-         A ordem importa e não é detalhe: o e-mail do dono também está em
-         ADMIN_EMAILS como "equipe do consultório", então a pergunta "é médico?"
-         respondia sim e o mandava para o painel do consultório. Perguntar
-         "é dono?" primeiro é o que separa as duas identidades. */
+      if (!data.session || cancelado) return;
+      /* Sessão viva: a página vira "entrando", e o formulário não pisca. É o
+         caso de TODA abertura da casca nativa, que entra por aqui. */
+      setVerificando(true);
       try {
-        const adm = await checkIsAdmin({ data: { accessToken: data.session.access_token } });
-        if (adm.isAdmin) {
-          navigate({ to: "/admin" });
-          return;
-        }
+        const accessToken = data.session.access_token;
+        /* As duas perguntas ao servidor são independentes — em paralelo, e cada
+         uma falha sozinha (sem rede, o fluxo segue como paciente). A ordem de
+         decisão — dono, médico, cadastro começado, paciente — mora em
+         `destinoDaSessao`, com o porquê de cada degrau. */
+        const [adm, me, intencao] = await Promise.all([
+          checkIsAdmin({ data: { accessToken } }).catch(() => null),
+          getMyDoctor({ data: { accessToken } }).catch(() => null),
+          import("@/lib/intencao-medico"),
+        ]);
+        if (cancelado) return;
+        navigate({
+          to: destinoDaSessao({
+            isAdmin: adm?.isAdmin === true,
+            temPerfilMedico: me?.ok === true && !!me.doctor,
+            querSerMedico: intencao.querSerMedico(),
+          }),
+        });
       } catch {
-        /* sem rede: segue o fluxo normal */
+        /* ⚠️ A ESPERA TEM SAÍDA. O `import()` do pedaço pode falhar (deploy no
+           meio, rede caída) e o `navigate` também; sem isto, `verificando`
+           ficava verdadeiro para sempre e a tela era um "Entrando…" sem
+           formulário e sem volta. O formulário voltar é o pior caso aceitável. */
+        if (!cancelado) setVerificando(false);
       }
-
-      // Conta com perfil de médico ATIVO vai para o painel;
-      // as demais, para o app da paciente.
-      try {
-        const me = await getMyDoctor({ data: { accessToken: data.session.access_token } });
-        /* Basta TER perfil de médico — ativo ou não.
-           
-           Com `?.active` aqui, um médico com a conta inativa era mandado para o
-           app da gestante, batia no bloqueio "esta área é da gestante", clicava
-           em "ir para o meu painel" e recebia "área restrita": um ciclo fechado
-           sem nenhuma tela utilizável. Agora ele chega ao painel, que mostra o
-           perfil e a assinatura — que é justamente o que ele precisa mexer. */
-        if (me.ok && me.doctor) {
-          navigate({ to: "/painel" });
-          return;
-        }
-      } catch {
-        /* sem rede/perfil: segue como paciente */
-      }
-      /* Antes de despachar para o app da gestante: esta pessoa estava tentando
-         se cadastrar como médico?
-
-         Este redirecionamento era a porta pela qual o médico caía no app da
-         paciente. Ele roda no MOUNT, com a sessão que já existe — então acontece
-         antes de a pessoa poder tocar em "Sou médico(a)", e o botão de papel
-         (que o handler de login respeita) nunca entrava em jogo. Resultado: quem
-         voltava do link de confirmação de e-mail, ou reabria o site com sessão
-         viva, ia para "configure sua data de gestação" com o cadastro
-         profissional pela metade. */
-      const { querSerMedico } = await import("@/lib/intencao-medico");
-      if (querSerMedico()) {
-        navigate({ to: "/medicos/cadastro" });
-        return;
-      }
-      navigate({ to: "/minha-conta" });
     });
+    return () => {
+      cancelado = true;
+    };
   }, [navigate, isRecoveryLink]);
 
   // Catch PASSWORD_RECOVERY event from the magic link in the reset email
@@ -333,6 +314,10 @@ function AuthPage() {
         : mode === "forgot"
           ? "Redefinir senha"
           : "Nova senha";
+
+  /* Sessão viva a caminho do destino: nada de formulário — só uma linha, o
+     tempo de o servidor responder. */
+  if (verificando) return <Entrando />;
 
   return (
     <section
@@ -787,6 +772,23 @@ function AuthPage() {
       >
         ← Voltar ao início
       </Link>
+    </section>
+  );
+}
+
+/** A espera de quem já está logada e só passa por aqui para ser despachada. */
+function Entrando() {
+  return (
+    <section
+      className="mx-auto flex min-h-[60svh] max-w-md flex-col items-center justify-center px-5 py-16 text-center"
+      aria-busy="true"
+      aria-live="polite"
+    >
+      <span
+        className="h-8 w-8 animate-spin rounded-full border-2 border-primary/30 border-t-primary"
+        aria-hidden="true"
+      />
+      <p className="mt-4 text-sm text-muted-foreground">Entrando…</p>
     </section>
   );
 }

@@ -92,8 +92,12 @@ describe("a casca guardada continua sendo a mesma para todas", () => {
   });
 
   test("a regra da borda está no build, e é por publicação", () => {
-    expect(CONFIG).toContain('routeRules: { "/minha-conta"');
-    expect(CONFIG).toMatch(/isr:\s*\{\s*expiration:\s*false\s*\}/);
+    expect(CONFIG).toMatch(/"\/minha-conta":\s*\{\s*isr:\s*\{\s*expiration:\s*false\s*\}\s*\}/);
+    /* ⚠️ E `/auth` TAMBÉM: é por ela que a casca nativa entra
+       (`capacitor.config.ts`), e ela é tão fixa quanto a conta — a sessão é
+       lida no telefone e o despacho por papel vem depois. Guardar só a conta
+       deixava a única porta do app instalado fora da borda. */
+    expect(CONFIG).toMatch(/"\/auth":\s*\{\s*isr:\s*\{\s*expiration:\s*false\s*\}\s*\}/);
     /* Só a casca do app. O site é renderizado no servidor (é o que os
        buscadores leem) e o painel do médico não entra nesta conta. */
     expect(CONFIG).not.toContain('"/painel"');
