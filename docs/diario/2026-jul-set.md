@@ -17558,6 +17558,32 @@ entregue ao dono.
 localização e o toast acima da barra. **Portão:** tsc · lint · 6.607 testes
 (+26) · bancadas.
 
+## A casca iOS nos arquivos de texto: tela offline alcançável, retrato, iPhone, claro (set/2026)
+
+Segundo lote da avaliação do app iOS — só o que compila sem Mac e o CI de macOS
+confere. Nada disto foi visto num iPhone; o que dá para provar em texto está em
+`casca-ios.test.ts`.
+
+- **`server.errorPath: "index.html"`.** A tela offline com o 192 existia e era
+  INALCANÇÁVEL: sem `errorPath`, o que aparecia sem rede depois da splash era a
+  página de erro do WebKit. Ela ganhou o botão "Tentar de novo" e volta sozinha
+  no evento `online`; a URL de volta é a mesma `server.url`, e o teste cobra que
+  as duas não divirjam (a página é estática e não lê a config).
+- **Info.plist:** só retrato; `UIUserInterfaceStyle = Light` (sem tema escuro,
+  o teclado e as folhas do sistema vinham escuros sobre página clara);
+  `ITSAppUsesNonExemptEncryption = false`; região e idioma `pt-BR`; `arm64` no
+  lugar do `armv7` obsoleto; `LSApplicationQueriesSchemes` com `whatsapp` para
+  o SOS; e a frase da localização passou a falar dos DOIS usos — o céu da home
+  e o SOS — porque era só do SOS enquanto o app pedia a permissão para o clima.
+- **Projeto:** `TARGETED_DEVICE_FAMILY = 1`. O iPad estava declarado sem
+  layout (a barra de baixo some acima de 768 px), e a revisão testa no iPad
+  quando ele está declarado.
+- **Fora, de propósito:** `audio` em `UIBackgroundModes` para os sons de
+  dormir. Sem uma sessão de áudio de reprodução ativa a chave não faz nada, e
+  ativá-la no lançamento faria TODO som do app ignorar a chave de silêncio.
+  O caminho certo é um plugin pequeno que ative a sessão só quando os sons
+  tocam — fica para um lote com aparelho na mão.
+
 ## A volta ao app: retrato da home, sessão que renova, e os Termos com caminho (set/2026)
 
 Terceiro lote da avaliação do app iOS, em cima do primeiro. Três coisas que

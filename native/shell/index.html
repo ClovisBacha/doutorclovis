@@ -82,6 +82,22 @@
         font-size: 0.75rem;
         color: rgba(244, 240, 248, 0.45);
       }
+      button {
+        width: 100%;
+        max-width: 20rem;
+        padding: 0.9rem 1rem;
+        border: 0;
+        border-radius: 999px;
+        background: #f4f0f8;
+        color: #241a33;
+        font: inherit;
+        font-weight: 600;
+        font-size: 0.95rem;
+        -webkit-tap-highlight-color: transparent;
+      }
+      button:active {
+        opacity: 0.7;
+      }
     </style>
   </head>
   <body>
@@ -119,6 +135,41 @@
     <p class="nota">
       Se for com o seu obstetra, ligue direto para ele — o app não precisa estar aberto.
     </p>
-    <p class="nota">Assim que houver sinal, feche e abra o app.</p>
+    <!--
+      ⚠️ ELA VOLTA SOZINHA, E TEM BOTÃO. "Feche e abra o app" era a única saída,
+      e a paciente no elevador não sabe que a rede voltou. O botão recarrega o
+      site; o evento `online` faz o mesmo sem toque. A URL é a MESMA de
+      `capacitor.config.ts` (`server.url`) — `casca-ios.test.ts` cobra que as
+      duas não divirjam, porque esta página é estática e não lê a config.
+    -->
+    <button id="tentar" type="button">Tentar de novo</button>
+    <p class="nota">Assim que houver sinal, o app volta sozinho.</p>
+    <!--
+      ⚠️ O CAPACITOR CARREGA ESTA PÁGINA EM QUALQUER FALHA DE NAVEGAÇÃO — não só
+      sem rede. Uma navegação atropelada por outra (código -999, "cancelled")
+      também cai aqui, COM rede, e a paciente veria "Sem conexão" no meio de um
+      app funcionando. Nesse caso a página anterior ainda está no histórico do
+      WebView (a que falhou nunca chegou a existir): voltar é o que devolve a
+      tela em que ela estava, com o link profundo intacto. Sem histórico (abertura
+      fria), é falta de rede mesmo, e a saída é recarregar o servidor.
+    -->
+    <script>
+      var SERVIDOR = "https://www.obstetrica.com.br/auth";
+      function tentarDeNovo() {
+        if (window.history.length > 1) {
+          window.history.back();
+          return;
+        }
+        window.location.replace(SERVIDOR);
+      }
+      document.getElementById("tentar").addEventListener("click", tentarDeNovo);
+      window.addEventListener("online", tentarDeNovo);
+      /* Chegou aqui com rede e com uma página atrás: foi atropelo, não queda.
+         Volta sozinha, sem nem desenhar a mensagem de "sem conexão". */
+      if (navigator.onLine && window.history.length > 1) {
+        document.body.style.visibility = "hidden";
+        window.history.back();
+      }
+    </script>
   </body>
 </html>

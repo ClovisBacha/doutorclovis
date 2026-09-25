@@ -621,9 +621,9 @@ describe("⚠️ a casca offline não pode nomear o médico errado", () => {
      consultório FUNDADOR rotulado só "Consultório", oferecido a paciente de
      qualquer médico da plataforma — exatamente o que `emergency-sheet.tsx`
      gastou uma decisão inteira para não fazer.
-     ⚠️ Hoje a tela é INALCANÇÁVEL (não há `server.errorPath` no
-     `capacitor.config.ts`), e é isso que torna este conserto barato: quem
-     ligar o `errorPath` amanhã não liga junto um vazamento. */
+     ⚠️ Ela ficou INALCANÇÁVEL até set/2026 (não havia `server.errorPath` no
+     `capacitor.config.ts`); agora está ligada, e este conserto é o que
+     garantiu que ligá-la não ligasse junto um vazamento. */
   const CASCA = readFileSync("native/shell/index.html", "utf8").replace(/<!--[\s\S]*?-->/g, "");
   const MEDICO = readFileSync("src/lib/doctor.config.ts", "utf8");
 
