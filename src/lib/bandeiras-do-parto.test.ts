@@ -44,6 +44,10 @@ describe("⚠️ e a tela usa a régua, não uma frase cravada", () => {
   });
 
   test("e RECEBE o estado da conta — sem a prop, a régua seria código morto", () => {
-    expect(CONTA).toMatch(/<ContracoesTab[^>]*careMode=\{careMode\}/);
+    /* ⚠️ Só o LUTO, nunca `careMode` (que inclui a leitura instável): a rede
+       oscilando não pode tirar um aviso de segurança de quem está grávida. */
+    expect(CONTA).toMatch(/<ContracoesTab[^>]*careMode=\{luto\}/);
+    expect(CONTA).toMatch(/<RegistrosHub[\s\S]{0,400}luto=\{lutoDoPerfil\}/);
+    expect(CONTA).not.toMatch(/<ContracoesTab[^>]*careMode=\{careMode\}/);
   });
 });

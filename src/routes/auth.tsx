@@ -104,24 +104,32 @@ function AuthPage() {
       /* Sessão viva: a página vira "entrando", e o formulário não pisca. É o
          caso de TODA abertura da casca nativa, que entra por aqui. */
       setVerificando(true);
-      const accessToken = data.session.access_token;
-      /* As duas perguntas ao servidor são independentes — em paralelo, e cada
+      try {
+        const accessToken = data.session.access_token;
+        /* As duas perguntas ao servidor são independentes — em paralelo, e cada
          uma falha sozinha (sem rede, o fluxo segue como paciente). A ordem de
          decisão — dono, médico, cadastro começado, paciente — mora em
          `destinoDaSessao`, com o porquê de cada degrau. */
-      const [adm, me, intencao] = await Promise.all([
-        checkIsAdmin({ data: { accessToken } }).catch(() => null),
-        getMyDoctor({ data: { accessToken } }).catch(() => null),
-        import("@/lib/intencao-medico"),
-      ]);
-      if (cancelado) return;
-      navigate({
-        to: destinoDaSessao({
-          isAdmin: adm?.isAdmin === true,
-          temPerfilMedico: me?.ok === true && !!me.doctor,
-          querSerMedico: intencao.querSerMedico(),
-        }),
-      });
+        const [adm, me, intencao] = await Promise.all([
+          checkIsAdmin({ data: { accessToken } }).catch(() => null),
+          getMyDoctor({ data: { accessToken } }).catch(() => null),
+          import("@/lib/intencao-medico"),
+        ]);
+        if (cancelado) return;
+        navigate({
+          to: destinoDaSessao({
+            isAdmin: adm?.isAdmin === true,
+            temPerfilMedico: me?.ok === true && !!me.doctor,
+            querSerMedico: intencao.querSerMedico(),
+          }),
+        });
+      } catch {
+        /* ⚠️ A ESPERA TEM SAÍDA. O `import()` do pedaço pode falhar (deploy no
+           meio, rede caída) e o `navigate` também; sem isto, `verificando`
+           ficava verdadeiro para sempre e a tela era um "Entrando…" sem
+           formulário e sem volta. O formulário voltar é o pior caso aceitável. */
+        if (!cancelado) setVerificando(false);
+      }
     });
     return () => {
       cancelado = true;

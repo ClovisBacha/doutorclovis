@@ -129,4 +129,8 @@ describe("⚠️ e a home obedece à régua", () => {
     expect(CONTA).toContain("marcarLocalizacaoAutorizada(");
     expect(CONTA).not.toContain("ajustes do navegador");
   });
+
+  test("⚠️ o cartão é a única porta, então vale também para quem tem cidade no cadastro", () => {
+    expect(CONTA).toContain('origemLocal.tipo === "cadastro"');
+  });
 });

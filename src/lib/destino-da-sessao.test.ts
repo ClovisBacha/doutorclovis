@@ -51,4 +51,8 @@ describe("⚠️ e /auth pergunta as duas coisas ao servidor de uma vez", () => 
     expect(AUTH).toContain("setVerificando(true)");
     expect(AUTH).toMatch(/if \(verificando\) return/);
   });
+
+  test("⚠️ e a espera tem saída: falhou o pedaço ou a rede, o formulário volta", () => {
+    expect(AUTH).toMatch(/catch \{[\s\S]{0,400}setVerificando\(false\)/);
+  });
 });
