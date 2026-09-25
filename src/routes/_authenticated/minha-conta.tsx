@@ -45,11 +45,12 @@ import drPortrait from "@/assets/dr-clovis-portrait.jpg";
 import { ymdLocal } from "@/lib/utils";
 import { anunciarLocalizacao, marcarLocalizacaoAutorizada } from "@/lib/localizacao-do-ceu";
 import {
-  PREFIXO_RETRATO_DA_HOME,
   gravarRetratoDaHome,
   lerRetratoDaHome,
   podePintarDoRetrato,
+  type PerfilRetratado,
 } from "@/lib/retrato-da-home";
+import { limparRastrosLocaisDaConta } from "@/lib/rastros-locais";
 import { getMyDoctor } from "@/lib/doctors.functions";
 import { minhasConsultas, type ConsultaDaPaciente } from "@/lib/clinical.functions";
 import {
@@ -1317,6 +1318,16 @@ function MinhaContaPage() {
   useEffect(() => {
     carimbarModoCuidado(careMode);
   }, [careMode]);
+  /* ⚠️ O RETRATO ACOMPANHA O PERFIL. Gravado só na abertura, ele envelhecia no
+     mesmo minuto em que ela ligava o Modo Cuidado (o estado local muda, a
+     linha guardada não): a abertura seguinte pintava bebê e semana para quem
+     acabou de perder a gestação, até a rede responder. Toda mudança de
+     `profile` regrava, com a mesma régua de papel (médico e admin nunca
+     gravam; a âncora gestacional é exigida pela própria função). */
+  useEffect(() => {
+    if (!userId || !profile || isDoctor || isAdmin || podeSerMedico) return;
+    gravarRetratoDaHome(userId, profile as unknown as PerfilRetratado);
+  }, [userId, profile, isDoctor, isAdmin, podeSerMedico]);
   async function toggleCareMode(on: boolean) {
     const { data: s } = await supabase.auth.getSession();
     if (!s.session?.access_token) return;
@@ -1584,10 +1595,12 @@ function MinhaContaPage() {
       const marcaDeMedicoNaSessao =
         (s.session?.user?.user_metadata as { role?: string } | null | undefined)?.role === "doctor";
       const retrato = idDaSessao ? lerRetratoDaHome(idDaSessao) : null;
+      let pintouDoRetrato = false;
       if (retrato && idDaSessao && podePintarDoRetrato(retrato, marcaDeMedicoNaSessao)) {
         setProfile(retrato as Profile);
         setUserId(idDaSessao);
         setLoading(false);
+        pintouDoRetrato = true;
       }
       /* ⚠️ `Promise.resolve(...)` de propósito: o construtor de consulta do
          PostgREST é PREGUIÇOSO — só dispara a requisição quando alguém chama
@@ -1604,7 +1617,14 @@ function MinhaContaPage() {
           )
         : null;
       const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return;
+      if (!u.user) {
+        /* ⚠️ Pintou do retrato e o servidor NÃO confirmou a sessão (revogada,
+           conta apagada noutro aparelho, ou sem rede): a home guardada não
+           pode ficar de pé como se fosse verdade. `perfilInstavel` é o estado
+           honesto que o resto do app já conhece — o mesmo da leitura falhada. */
+        if (pintouDoRetrato) setPerfilInstavel(true);
+        return;
+      }
 
       /* ─── ⚠️ "ELA APARECEU" — sem isto, a aba das Amigas mente por omissão ──
          `last_seen_at` é o que vira "há 2h" na lista de amigas. Se ninguém
@@ -1679,10 +1699,7 @@ function MinhaContaPage() {
       if (marcaDeMedico) setPodeSerMedico(true);
       const ancora = !!(data?.lmp_date || data?.due_date || data?.reference_date);
       const liberarCedo = ancora && !marcaDeMedico;
-      if (liberarCedo) {
-        setLoading(false);
-        gravarRetratoDaHome(u.user.id, data);
-      }
+      if (liberarCedo) setLoading(false);
       const papel = await papelEmVoo;
 
       // Para quem NÃO foi liberada acima, o papel vem ANTES de liberar o
@@ -1834,22 +1851,7 @@ function MinhaContaPage() {
     // Limpa a jornada local (dc-path-*) e o marcador de sync: num aparelho
     // compartilhado, a próxima conta NÃO pode ver nem re-subir os dados de
     // saúde da conta anterior (vazamento entre contas).
-    try {
-      for (let i = localStorage.length - 1; i >= 0; i--) {
-        const k = localStorage.key(i);
-        if (
-          k &&
-          (k.startsWith("dc-path-") ||
-            k === "dc-journey-synced-at" ||
-            /* O retrato da home é o perfil dela: some com a sessão. */
-            k.startsWith(PREFIXO_RETRATO_DA_HOME))
-        ) {
-          localStorage.removeItem(k);
-        }
-      }
-    } catch {
-      /* modo privado/quota: sem cache local a limpar */
-    }
+    limparRastrosLocaisDaConta();
     navigate({ to: "/" });
   }
 

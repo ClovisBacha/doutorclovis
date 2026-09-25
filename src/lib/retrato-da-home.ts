@@ -17,8 +17,9 @@
  *
  * ⚠️ **A chave leva o `uid`, e o `id` da linha é conferido na leitura.** O
  * aparelho é compartilhado (num consultório é o caso comum), e o perfil de uma
- * conta não pode aparecer na home de outra nem por um quadro. E o `signOut`
- * apaga TODOS os retratos do aparelho, junto com a jornada local.
+ * conta não pode aparecer na home de outra nem por um quadro. E a vassoura de
+ * `rastros-locais.ts` tira TODOS os retratos do aparelho na saída e na exclusão
+ * da conta, junto com a jornada local.
  *
  * ⚠️ **NÃO é `dc-path-`.** Esse prefixo viaja no blob de `journey_state`.
  */
@@ -27,7 +28,7 @@ const VERSAO = 1;
 
 export type PerfilRetratado = Record<string, unknown> & { id?: unknown };
 
-type Armazem = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+type Armazem = Pick<Storage, "getItem" | "setItem">;
 
 function armazem(): Armazem | null {
   try {
@@ -91,13 +92,5 @@ export function gravarRetratoDaHome(
   } catch {
     /* cota estourada ou storage bloqueado: o retrato é conveniência, e a home
        continua esperando a rede como sempre esperou */
-  }
-}
-
-export function apagarRetratoDaHome(uid: string, storage: Armazem | null = armazem()): void {
-  try {
-    storage?.removeItem(chaveDoRetrato(uid));
-  } catch {
-    /* idem */
   }
 }
