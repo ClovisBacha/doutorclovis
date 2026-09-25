@@ -17644,3 +17644,71 @@ Quinto lote da avaliação do app iOS — este não toca produto.
   symlink, TODOS os roteiros caem com o mesmo erro: é o cache do Vite
   (`node_modules/.vite`) apontando para a outra árvore, não defeito das
   telas — rode a partir do clone dono do `node_modules`.
+
+## A revisão dos cinco lotes antes de mesclar: nove achados, todos meus (set/2026)
+
+Antes de mesclar os lotes 1 a 5 do app iOS, uma passada de revisão no diff
+inteiro da pilha. Nove achados, nenhum de terceiros — todos em código que os
+próprios lotes escreveram. Cada um entrou no lote que o criou, com teste.
+
+**Lote 1 (correções sem Mac):**
+
+- **A bandeira do bebê continuava nas contrações de quem está em luto.**
+  `ContracoesTab` já recebia `careMode` e `bandeirasDoParto(careMode)` já
+  tirava a bandeira; mas `RegistrosHub`, que monta a aba, não repassava nada.
+  A prop `luto` agora desce de `lutoDoPerfil` até a aba, e o teste amarra os
+  dois pontos de passagem — não só a função pura.
+- **O cartão de localização do céu não aparecia para quem tem a cidade do
+  cadastro como origem** (`tipo === "cadastro"`): a condição olhava só
+  "aprox" e "padrao". Era exatamente o caso de quem nunca deu GPS.
+- **Em `/auth`, se `destinoDaSessao` ou `navigate` lançasse, `verificando`
+  ficava preso em `true`** e a tela "Entrando" nunca saía. O efeito ganhou
+  `try/catch` que devolve o formulário.
+
+**Lote 2 (casca):**
+
+- **A página offline da casca era carregada em QUALQUER falha de navegação,
+  não só sem rede.** O `WebViewDelegationHandler` do Capacitor carrega o
+  `errorPath` em `didFailProvisionalNavigation` inteiro — inclusive o
+  `NSURLErrorCancelled` (-999) de uma navegação atropelada pela seguinte, com
+  rede de sobra. E o botão "tentar de novo" fazia `location.replace(SERVIDOR)`:
+  perdia a tela em que ela estava. Agora, com rede e histórico, a página
+  volta sozinha (`history.back()`, invisível); sem histórico, recarrega o
+  servidor. ⚠️ Uma página de erro tem de saber que pode ter sido chamada sem
+  erro nenhum.
+
+**Lote 3 (volta ao app):**
+
+- **O retrato da home era gravado só na abertura, e envelhecia no minuto em
+  que ela ligava o Modo Cuidado**: o estado local mudava, a linha guardada
+  não, e a abertura seguinte pintava bebê e semana para quem acabou de perder
+  a gestação — até a rede responder. Um `useEffect` regrava a cada mudança de
+  `profile`, com a mesma régua de papel (médico e admin nunca gravam).
+  ⚠️ Um cache de perfil que não acompanha o perfil é um cache que mente na
+  hora mais sensível.
+- **Pintou do retrato e o servidor NÃO confirmou a sessão** (revogada, conta
+  apagada noutro aparelho, sem rede): o código fazia `return` e deixava a home
+  guardada de pé como se fosse verdade. Vira `perfilInstavel`, o estado
+  honesto que o app já tem para a leitura que falhou.
+- **A limpeza dos rastros locais passava só no `signOut`.** A exclusão da
+  conta também sai da sessão — e deixava no aparelho a jornada local
+  (`dc-path-*`, que ainda seria RE-SUBIDA pela próxima conta) e o retrato da
+  home. A vassoura virou `limparRastrosLocaisDaConta()` em
+  `src/lib/rastros-locais.ts`, chamada nos dois lugares; `apagarRetratoDaHome`,
+  que ninguém chamava, saiu.
+- **A volta do segundo plano ligava `stopAutoRefresh`/`startAutoRefresh` do
+  Supabase ao `appStateChange`.** O supabase-js já faz isso sozinho no
+  `visibilitychange`, que o WKWebView dispara na volta: era uma segunda mão no
+  mesmo relógio, e o comentário atribuía "token vencido" a um gancho que a
+  biblioteca já tinha. Saiu. Se houver token vencido na volta, a causa é
+  outra e agora não está escondida.
+- **A renovação do token de push rodava a cada volta, sem freio.**
+  `inscreverPushNativo` faz `register()` e uma escrita no servidor; dez trocas
+  de app numa sessão de contrações virariam dez registros iguais na frente
+  dos dados que as telas estão relendo. Agora no máximo uma vez a cada 12 h
+  (`deveRenovarAvisos`, lembrado em `dc-avisos-renovados-em`).
+
+**A mescla:** os lotes 1, 3, 4 e 5 são uma pilha (cada um nasce do anterior);
+o 2 é independente. Cada correção entrou no seu lote, os de cima receberam o
+de baixo por merge, e as PRs foram para a branch padrão por squash, na ordem
+da pilha, depois de o portão e o CI passarem em cada cabeça.
