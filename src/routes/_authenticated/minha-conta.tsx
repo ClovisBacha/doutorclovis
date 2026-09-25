@@ -1038,7 +1038,15 @@ function MinhaContaPage() {
       });
     }
 
-    if (origemLocal && (origemLocal.tipo === "aprox" || origemLocal.tipo === "padrao")) {
+    /* `cadastro` entra: desde que o GPS deixou de ser pedido ao montar, o cartão
+       é a ÚNICA porta para a localização exata — e quem tem cidade no cadastro
+       ficaria sem porta nenhuma. Ele some assim que a origem vira `gps`. */
+    if (
+      origemLocal &&
+      (origemLocal.tipo === "aprox" ||
+        origemLocal.tipo === "padrao" ||
+        origemLocal.tipo === "cadastro")
+    ) {
       derivadas.push({
         /* O id carrega a CIDADE: quando o app passa a errar outra cidade, é
            um aviso novo e a bolinha volta — que é o comportamento certo, já
@@ -2933,6 +2941,7 @@ function MinhaContaPage() {
                     profile={profile}
                     gest={gest}
                     careMode={careMode}
+                    luto={lutoDoPerfil}
                     onNavigate={goToTab}
                     aoVoltarDeFora={voltarDaBarra}
                     initialSub={consultasSub}
@@ -3324,6 +3333,7 @@ function RegistrosHub({
   profile,
   gest,
   careMode = false,
+  luto = false,
   onNavigate,
   aoVoltarDeFora,
   initialSub = null,
@@ -3331,6 +3341,14 @@ function RegistrosHub({
   profile: Profile | null;
   gest: Gest;
   careMode?: boolean;
+  /**
+   * ⚠️ SÓ O LUTO DE VERDADE — nunca a instabilidade de leitura. `careMode`
+   * é `perfilInstavel || luto`, e serve para o app se calar sobre o bebê
+   * quando não sabe; a caixa vermelha do cronômetro é aviso de SEGURANÇA,
+   * e a rede oscilando não pode tirar "o bebê se mexendo menos" de quem
+   * está grávida.
+   */
+  luto?: boolean;
   onNavigate?: (t: Tab) => void;
   /**
    * ⚠️ **A SETA DE DENTRO, QUANDO ELA VEIO DE FORA — e este era o defeito que
@@ -3427,7 +3445,7 @@ function RegistrosHub({
           />
         )}
         {sub === "contracoes" && (
-          <ContracoesTab weeks={gest?.weeks ?? null} onNavigate={onNavigate} careMode={careMode} />
+          <ContracoesTab weeks={gest?.weeks ?? null} onNavigate={onNavigate} careMode={luto} />
         )}
         {sub === "timeline" && <TimelineTab profile={profile} gest={gest} />}
       </Fade>
