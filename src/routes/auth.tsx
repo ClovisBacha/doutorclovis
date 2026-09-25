@@ -747,6 +747,24 @@ function AuthPage() {
               </button>
             )}
 
+            {mode === "signup" && (
+              /* ⚠️ Os Termos existiam (`/termos`) e nenhum link chegava neles; o
+                 cadastro não pedia aceite. Conteúdo de usuária (a Comunidade)
+                 exige termos aceitos — e é aqui, antes de criar a conta, que
+                 ela concorda. Abrem fora da tela para não perder o formulário. */
+              <p className="text-center text-[13px] leading-relaxed text-muted-foreground">
+                Ao criar a conta, você concorda com os{" "}
+                <a href="/termos" target="_blank" rel="noopener" className="underline">
+                  Termos de uso
+                </a>{" "}
+                e com a{" "}
+                <a href="/privacidade" target="_blank" rel="noopener" className="underline">
+                  Política de privacidade
+                </a>
+                .
+              </p>
+            )}
+
             <button
               type="submit"
               disabled={loading}
