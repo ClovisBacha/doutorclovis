@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { inicialDoMedico } from "@/lib/nome-do-medico";
 import {
   searchDoctors,
   aiSearchDoctors,
@@ -366,10 +367,7 @@ function EncontrarMedicoPage() {
                     />
                   ) : (
                     <span className="flex size-14 shrink-0 items-center justify-center rounded-full bg-primary/10 font-serif text-lg text-primary ring-2 ring-primary/15">
-                      {(d.display_name ?? "")
-                        .replace(/^(Dr|Dra)\.?\s*/i, "")
-                        .charAt(0)
-                        .toUpperCase() || "?"}
+                      {inicialDoMedico(d.display_name)}
                     </span>
                   )}
                   <div className="min-w-0 flex-1">

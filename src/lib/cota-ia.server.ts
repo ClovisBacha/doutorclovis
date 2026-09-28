@@ -96,11 +96,23 @@ export function inicioDoCiclo(agora = new Date()): Date {
  * (`app`) e o de nutrição (`nutricao`). A cota conta exatamente o que esse
  * portão consegue parar — nada mais.
  *
- * A nutrição entrou nesta lista quando entrou no ciclo do cérebro. Ela é a
- * mesma coisa que o chat principal do ponto de vista do que importa aqui: IA
- * respondendo à paciente DELE, com as orientações DELE, sobre um assunto
- * clínico. Deixá-la de fora seria uma segunda porta de entrada que não custa
- * franquia nenhuma — e ninguém teria escolhido isso de propósito.
+ * ⚠️ **A NUTRIÇÃO SAIU DESTA LISTA (set/2026), e a razão é de PRODUTO, não de
+ * engenharia.** Ela entrou aqui quando entrou no ciclo do cérebro, com o
+ * argumento — correto na época — de que era "IA respondendo à paciente DELE
+ * com as orientações DELE". O que mudou foi quem paga: a nutricionista virou
+ * item do **Premium da paciente**, e o dono disse isso com todas as letras —
+ * "as mensagens do médico são pagas pelo médico; no plano premium somente
+ * essa da nutricionista deveria ser paga pela paciente".
+ *
+ * Manter nos dois lugares cobraria a MESMA conversa duas vezes: a franquia do
+ * médico e a assinatura dela. Quem limita a nutrição agora é
+ * `nutricao-premium.ts`, com teto diário próprio e portão de assinatura.
+ *
+ * ⚠️ **O cérebro continua sendo o dele, e continua degradando com a cota
+ * dele.** Sair da CONTAGEM não é sair do portão: com a franquia estourada, a
+ * nutricionista segue respondendo com informação consolidada, sem a voz do
+ * médico — exatamente o que já acontecia. O que ela não faz mais é consumir
+ * uma unidade que ele paga.
  *
  * ─── POR QUE ERA UMA LISTA DE EXCLUSÕES, E POR QUE ISSO ERRAVA ──────────────
  *
@@ -121,7 +133,7 @@ export function inicioDoCiclo(agora = new Date()): Date {
  * O consumo — o que custa dinheiro — continua medindo TODOS os canais. São
  * perguntas diferentes: "quanto isto gasta" e "quanto do plano dele já foi".
  */
-export const CANAIS_DA_COTA = ["app", "nutricao"] as const;
+export const CANAIS_DA_COTA = ["app"] as const;
 
 export function aplicarRecorteDaCota<T>(q: T): T {
   const query = q as unknown as { in: (c: string, v: readonly string[]) => unknown };

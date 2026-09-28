@@ -299,7 +299,7 @@ export function SessaoDoCasal({ aoSair }: { aoSair: () => void }) {
             <li>· a pressão da mão na base das costas</li>
             <li>· uma palavra combinada, que vale depois</li>
           </ul>
-          <p className="mt-6 text-[12px] leading-relaxed text-white/40">
+          <p className="mt-6 text-xs leading-relaxed text-white/40">
             Chame quem vai te acompanhar antes de começar. Dá para fazer sentada no chão, na cama ou
             numa cadeira.
           </p>
@@ -315,7 +315,7 @@ export function SessaoDoCasal({ aoSair }: { aoSair: () => void }) {
       {comecou && !acabou && (
         <div className="flex flex-1 flex-col items-center justify-center px-7 text-center">
           <span
-            className={`rounded-full border px-4 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.14em] ${COR[bloco.alvo].chip}`}
+            className={`rounded-full border px-4 py-1.5 text-xs font-extrabold uppercase tracking-[0.14em] ${COR[bloco.alvo].chip}`}
           >
             {ROTULO_DO_ALVO[bloco.alvo]}
           </span>
@@ -328,7 +328,7 @@ export function SessaoDoCasal({ aoSair }: { aoSair: () => void }) {
           >
             {bloco.texto}
           </p>
-          {pausado && <p className="mt-6 text-[12px] text-white/45">Pausado</p>}
+          {pausado && <p className="mt-6 text-xs text-white/45">Pausado</p>}
         </div>
       )}
 

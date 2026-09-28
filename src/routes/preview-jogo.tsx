@@ -49,7 +49,14 @@ export const Route = createFileRoute("/preview-jogo")({
     feitos: Math.max(0, Math.min(6, Number(q.feitos ?? 1))),
     /* `?premium=1` só para fotografar a tela liberada. Fora disso a bancada
        mostra o que uma visitante sem assinatura veria. */
-    premium: q.premium === "1" || q.premium === true,
+    /* ⚠️ `String(...)` E `=== true`, NUNCA `=== "1"` sozinho: o router
+       JSON-parseia a query, então `?x=1` chega como o NÚMERO 1 e a comparação
+       estrita com a string falha em SILÊNCIO — a bancada abre no estado
+       PADRÃO e a URL volta reescrita como `?x=false`. Medido: era assim aqui,
+       e a varredura de bancadas não tem como ver (ela lê o console, e uma
+       tela que desenha o estado errado não registra erro nenhum).
+       (`=== true` fica porque `String(true)` é `"true"`, não `"1"`.) */
+    premium: q.premium === true || String(q.premium ?? "") === "1",
     /* `?presente=100` abre o aviso de "alguém te mandou Sementinhas".
        Ele só nasce de uma linha real do ledger, então sem isto conferir o
        desenho exigiria um médico logado presenteando uma paciente logada —

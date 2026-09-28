@@ -233,3 +233,36 @@ describe("6. o conteúdo do bloco não forja a moldura do bloco", () => {
     expect(core.indexOf("return parts.join")).toBeGreaterThan(rodape);
   });
 });
+
+describe("7. ⚠️ o app não recomenda o peixe que ele mesmo manda limitar", () => {
+  /**
+   * A frase da semana 32–36 dizia "sardinha, ATUM e outros peixes … duas vezes
+   * por semana", e o cartão de vitamina B6 da aba listava atum — enquanto o
+   * banco do cérebro manda "evite … atum em excesso" e a lista de evitar do
+   * prompt fala em "peixes com mercúrio". Duas peças respondendo à mesma
+   * pergunta ("que peixe eu como?") e nunca comparadas — e o custo aqui não é
+   * de coerência: é o app recomendando duas vezes por semana justamente o
+   * peixe cujo consumo ele limita noutra tela.
+   */
+  const semana = semComentarios("src/lib/nutricao-da-semana.ts");
+  const aba = semComentarios("src/components/nutricao-tab.tsx");
+  const cerebroPack = semComentarios("src/lib/brain-starter-pack.ts");
+
+  test("o banco do cérebro continua mandando limitar o atum", () => {
+    expect(cerebroPack).toMatch(/atum em excesso/);
+  });
+
+  test("⚠️ e nenhum texto para a paciente o RECOMENDA", () => {
+    for (const fonte of [semana, aba]) {
+      expect(fonte).not.toMatch(/\batum\b/i);
+    }
+  });
+
+  test("a recomendação continua existindo — com os peixes que as duas pontas aceitam", () => {
+    /* Tirar o peixe inteiro seria trocar uma contradição por uma omissão: o
+       DHA da sardinha e do salmão é o assunto da semana 32–36. */
+    expect(semana).toMatch(/sardinha/i);
+    expect(semana).toMatch(/salmão/i);
+    expect(semana).toMatch(/baixo mercúrio/i);
+  });
+});

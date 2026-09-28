@@ -1,0 +1,1202 @@
+/**
+ * OS COMENTÁRIOS — servidor.
+ *
+ * A régua (o que passa, o que é recusado e por quê) mora em `comentarios.ts`,
+ * pura e testada. Aqui ela vira lei.
+ *
+ * ⚠️ **A TRIAGEM RODA NO SERVIDOR, e a da tela não conta.** Um corpo montado à
+ * mão pula qualquer verificação de tela — e o que está em jogo é conduta
+ * clínica publicada embaixo do nome de um consultório.
+ */
+
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import {
+  COMENTARIOS_POR_DIA,
+  LIMITE_DO_COMENTARIO,
+  limparPalavrasOcultas,
+  podeApagarComentario,
+  raizDoComentario,
+  recadoDoComentario,
+  temPalavraOculta,
+  triarComentario,
+  verDoComentario,
+} from "./comentarios";
+
+export type ComentarioNaTela = {
+  id: string;
+  autorId: string;
+  autorNome: string;
+  autorAvatar: string | null;
+  texto: string;
+  criadoEm: string;
+  /** Posso apagar este? Ver `podeApagarComentario`. */
+  possoApagar: boolean;
+  /** `null` = é raiz. Aponta SEMPRE para uma raiz — ver `raizDoComentario`. */
+  respondeA?: string | null;
+  curtidas?: number;
+  euCurti?: boolean;
+  /**
+   * Está escondido dos outros, e por quê.
+   *
+   * ⚠️ **A pessoa restringida NUNCA recebe isto no comentário dela** — ela vê o
+   * próprio comentário como sempre, e é esse silêncio que separa restringir de
+   * bloquear. Ver `verDoComentario`.
+   */
+  oculto?: "restrito" | "palavra" | null;
+  /**
+   * Chega RECOLHIDO: a linha existe, o texto não. Só para a dona do post — ela
+   * abre no toque se quiser conferir. Ver `verDoComentario`.
+   */
+  recolhido?: boolean;
+  /** Instante em que a dona do post fixou este. `null` = não fixado. */
+  fixadoEm?: string | null;
+  /**
+   * ⚠️ Posso fixar ESTE? Vem do SERVIDOR, com a MESMA régua que `fixarComentario`
+   * aplica — uma segunda decisão na tela ofereceria "Fixar" numa resposta e o
+   * servidor recusaria depois do toque.
+   */
+  possoFixar?: boolean;
+  /** É meu? É ele que decide quem vê a lista de quem curtiu — e quem edita. */
+  souOAutor?: boolean;
+  /** Instante da última edição. `null` = nunca editado. */
+  editadoEm?: string | null;
+};
+
+async function pacienteDaSessao(accessToken: string): Promise<string | null> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data } = await (supabaseAdmin as any).auth.getUser(accessToken);
+  return data?.user?.id ?? null;
+}
+
+/**
+ * O post, se eu puder vê-lo.
+ *
+ * ⚠️ **COMENTAR EXIGE A MESMA VISIBILIDADE QUE LER.** Sem esta conferência, um
+ * `postId` forjado deixaria comentar num post da camada `amigas` de alguém que
+ * ela não conhece — e o comentário apareceria para todas as amigas daquela
+ * pessoa, com o nome dela junto.
+ */
+async function postQueEuVejo(sb: any, postId: string, eu: string) {
+  const { contextoDe } = await import("./rede-social.functions");
+  const { podeVerPost, QUEM_COMENTA_PADRAO } = await import("./rede-social");
+  const { foraDaRede } = await import("./rede-social.functions");
+  const ctx = await contextoDe(sb, eu);
+
+  /**
+   * ⚠️ **RECUO PARA BANCO SEM `comentarios_abertos`.**
+   *
+   * A coluna nasce num `APLICAR_` que o dono roda à mão, e o deploy chega
+   * SEMPRE antes. Sem este recuo o select falha com `42703`, `postQueEuVejo`
+   * devolve `null` e a tela responde "indisponivel" — a mesma imagem de um post
+   * apagado, sobre um post que está lá.
+   *
+   * Ausente vale ABERTO, que é o padrão da coluna: o pior caso é ela poder
+   * comentar num post que a dona teria fechado se o banco soubesse guardar essa
+   * decisão — e a dona pode apagar. O inverso (tudo fechado) desligaria o
+   * recurso inteiro sem ninguém entender por quê.
+   */
+  const comQuemComenta = await sb
+    .from("rede_posts")
+    .select("id, autor_id, visibilidade, comentarios_abertos, arquivado_em, quem_comenta")
+    .eq("id", postId)
+    .maybeSingle();
+  let data = comQuemComenta.data;
+  if (comQuemComenta.error) {
+    /* ⚠️ Degrau NOVO, no topo: `quem_comenta` nasce no `APLICAR_DEZ_DA_REDE`.
+       Sem ela, todo post aceita comentário de quem o vê — o estado de antes do
+       recurso, e o único seguro: fechar por não saber emudeceria conversas que
+       já existem. */
+    console.warn("[rede] sem quem_comenta — rode APLICAR_DEZ_DA_REDE.sql");
+    const cheia = await sb
+      .from("rede_posts")
+      .select("id, autor_id, visibilidade, comentarios_abertos, arquivado_em")
+      .eq("id", postId)
+      .maybeSingle();
+    data = cheia.data ? { ...cheia.data, quem_comenta: QUEM_COMENTA_PADRAO } : null;
+    if (cheia.error) {
+      console.warn("[rede] sem comentarios_abertos — rode APLICAR_CONVERSA_E_COMENTARIOS.sql");
+      const velho = await sb
+        .from("rede_posts")
+        .select("id, autor_id, visibilidade, arquivado_em")
+        .eq("id", postId)
+        .maybeSingle();
+      if (velho.error) return null;
+      data = velho.data
+        ? { ...velho.data, comentarios_abertos: true, quem_comenta: QUEM_COMENTA_PADRAO }
+        : null;
+    }
+  }
+  if (!data || data.arquivado_em) return null;
+
+  /* ⚠️ **DEGRAU, e ele é obrigatório aqui.** Sem `rede_pausada_em` o `42703`
+     cai em `erroAutor` e a função RECUSA — ou seja, COMENTAR pararia de
+     funcionar para todo mundo por causa de uma coluna que ainda não existe
+     naquele banco. O recuo lê sem ela e trata como "não pausada", que é o que
+     um banco sem a coluna significa. */
+  const lerAutor = (colunas: string) =>
+    sb.from("patient_profiles").select(colunas).eq("id", data.autor_id).maybeSingle();
+  /* ⚠️ **`rede_suspensa_em` FALTAVA, e a suspensão vazava por aqui.**
+     `foraDaRede` cruza TRÊS razões — luto, pausa e suspensão pela moderação —,
+     e este `select` nunca pedia a terceira: mesmo num banco COM a coluna, o
+     campo chegava `undefined` e o post de uma autora suspensa continuava
+     comentável. É um dos vinte e seis pontos de decisão que o comentário da
+     `foraDaRede` avisa que não podem ficar de fora — e ele ficou.
+     ⚠️ **UM DEGRAU POR SQL, do mais novo para o mais antigo.** Um recuo que só
+     soubesse tirar a primeira coluna quebraria de novo assim que a segunda
+     faltasse num banco que rodou meio SQL — a mesma lição de
+     `marcarConsultaNoDia` e de `postsCrus`. */
+  const DEGRAUS_DO_AUTOR = [
+    "id, care_mode, perfil_publico, rede_pausada_em, rede_suspensa_em",
+    "id, care_mode, perfil_publico, rede_pausada_em",
+    "id, care_mode, perfil_publico",
+  ];
+  let autor: {
+    care_mode?: boolean | null;
+    perfil_publico?: boolean | null;
+    rede_pausada_em?: string | null;
+    rede_suspensa_em?: string | null;
+  } | null = null;
+  let erroAutor: unknown = null;
+  for (const colunas of DEGRAUS_DO_AUTOR) {
+    ({ data: autor, error: erroAutor } = await lerAutor(colunas));
+    if (!erroAutor) break;
+  }
+  /* ⚠️ Falha de leitura do AUTOR recusa. Sem saber se ele está em Modo Cuidado
+     ou se o perfil é público, publicar o comentário seria decidir visibilidade
+     no escuro — e o lado seguro aqui é não deixar comentar. */
+  if (erroAutor || !autor) return null;
+
+  /* ⚠️ **A MESMA `podeVerPost` DO FEED, nunca uma régua própria.** Comentar
+     exige a mesma visibilidade que ler: sem esta conferência, um `postId`
+     forjado deixaria comentar num post da camada `amigas` de alguém que ela não
+     conhece — e o comentário apareceria para todas as amigas daquela pessoa,
+     com o nome dela junto. */
+  const vejo = podeVerPost({
+    post: { autorId: data.autor_id, visibilidade: data.visibilidade },
+    euId: eu,
+    autor: { emCuidado: foraDaRede(autor), publico: !!autor.perfil_publico },
+    bloqueado: ctx.bloqueio.has(data.autor_id),
+    sigoAtivo: ctx.sigo.has(data.autor_id),
+    somosAmigas: ctx.amigas.has(data.autor_id),
+  });
+  if (!vejo) return null;
+  return data;
+}
+
+export const comentariosDoPost = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        postId: z.string().uuid(),
+        /* ⚠️ **A ORDEM VEM DA TELA, e o padrão é o TEMPO.** Sem o `.catch`, um
+           valor estranho no corpo do pedido derrubaria os comentários inteiros
+           — uma lista que some por causa de um parâmetro de ordenação. */
+        ordem: z.enum(["recentes", "relevantes"]).catch("recentes").optional(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const post = await postQueEuVejo(sb, data.postId, eu);
+    if (!post) return { ok: false as const, motivo: "indisponivel" as const };
+
+    /* ⚠️ **RECUO DE COLUNA, como toda leitura desta aba.** `responde_a` nasce
+       num `APLICAR_` que o dono roda à mão, e o deploy chega SEMPRE antes: sem
+       o recuo, o `42703` derrubaria os comentários INTEIROS de um recurso que
+       já funcionava — a paciente abriria um post e veria "não deu para
+       carregar" por causa de uma coluna que ela nem sabe que existe. */
+    const lerComentarios = (colunas: string) =>
+      sb
+        .from("rede_comentarios")
+        .select(colunas)
+        .eq("post_id", data.postId)
+        .is("apagado_em", null)
+        .order("criado_em", { ascending: true })
+        .limit(200);
+    /* ⚠️ **UM DEGRAU POR SQL, e nunca um salto ao mínimo.** `fixado_em` nasce
+       no `APLICAR_DEZ_DA_REDE` e `responde_a` no `APLICAR_COMENTARIOS_E_LIMITES`
+       — são dois arquivos, e existe um banco real que rodou o segundo e não o
+       primeiro. Um recuo de dois passos apagaria as RESPOSTAS por causa de uma
+       coluna de fixar: a conversa em árvore, que já funciona, viraria uma lista
+       plana em silêncio. */
+    let { data: linhas, error } = await lerComentarios(
+      "id, autor_id, texto, criado_em, responde_a, fixado_em, editado_em",
+    );
+    if (error) {
+      ({ data: linhas, error } = await lerComentarios(
+        "id, autor_id, texto, criado_em, responde_a, fixado_em",
+      ));
+      console.warn("[comentarios] sem editado_em — rode APLICAR_MAIS_DEZ_DA_REDE.sql");
+    }
+    if (error) {
+      ({ data: linhas, error } = await lerComentarios(
+        "id, autor_id, texto, criado_em, responde_a",
+      ));
+      console.warn("[comentarios] sem fixado_em — rode APLICAR_DEZ_DA_REDE.sql");
+    }
+    if (error) {
+      ({ data: linhas, error } = await lerComentarios("id, autor_id, texto, criado_em"));
+      console.warn("[comentarios] sem responde_a — rode APLICAR_COMENTARIOS_E_LIMITES.sql");
+    }
+    if (error) return { ok: false as const, motivo: "banco" as const };
+
+    const linhasArr = (linhas ?? []) as any[];
+    const autores = [...new Set(linhasArr.map((c) => c.autor_id))];
+    const { contextoDe } = await import("./rede-social.functions");
+    const { apertarQuemComenta, podeComentar, quemComentaDe } = await import("./rede-social");
+    const { podeFixarComentario } = await import("./comentarios");
+    const ctx = await contextoDe(sb, eu);
+
+    const { data: perfis } = await sb
+      .from("patient_profiles")
+      .select("id, display_name, avatar_url")
+      .in("id", autores.length ? autores : ["00000000-0000-0000-0000-000000000000"]);
+
+    /* ─── AS TRÊS LEITURAS NOVAS, TODAS EM PARALELO ────────────────────────
+       ⚠️ Uma consulta por comentário faria um post com 80 comentários custar
+       240 idas ao banco. São três consultas fixas, independentes do tamanho. */
+    const ids = linhasArr.map((c) => c.id);
+    const vazio = ["00000000-0000-0000-0000-000000000000"];
+    const [curtidas, minhasCurtidas, restritos, minhasPalavras] = await Promise.all([
+      /* Quantas curtidas cada comentário tem. */
+      sb
+        .from("rede_comentario_curtidas")
+        .select("comentario_id")
+        .in("comentario_id", ids.length ? ids : vazio),
+      /* Quais EU curti. */
+      sb
+        .from("rede_comentario_curtidas")
+        .select("comentario_id")
+        .eq("quem_id", eu)
+        .in("comentario_id", ids.length ? ids : vazio),
+      /* Quem a DONA do post restringe, e quem EU restrinjo — nas duas direções
+         que `verDoComentario` precisa. */
+      sb
+        .from("rede_restricoes")
+        .select("quem_id, restrito_id")
+        .in("quem_id", [eu, post.autor_id])
+        .in("restrito_id", autores.length ? autores : vazio),
+      /* A MINHA lista de palavras escondidas. */
+      sb.from("patient_profiles").select("palavras_ocultas").eq("id", eu).maybeSingle(),
+    ]);
+
+    const contaCurtidas = new Map<string, number>();
+    for (const r of (curtidas.data ?? []) as any[])
+      contaCurtidas.set(r.comentario_id, (contaCurtidas.get(r.comentario_id) ?? 0) + 1);
+    const euCurti = new Set(((minhasCurtidas.data ?? []) as any[]).map((r) => r.comentario_id));
+
+    /* ⚠️ **FALHA FECHADA seria errado AQUI, e é a exceção que precisa ser dita.**
+       No bloqueio, falhar fechado significa esconder — e esconder é o lado
+       seguro. Na restrição, "fechado" esconderia comentários de gente que
+       ninguém restringiu, e a dona do post veria a conversa dela encolher sem
+       nenhum motivo visível. O lado seguro aqui é NÃO esconder: o pior caso é
+       um comentário restringido aparecendo por uma falha de rede, contra
+       metade da conversa sumindo. */
+    const euRestrinjo = new Set<string>();
+    const donaRestringe = new Set<string>();
+    for (const r of (restritos.data ?? []) as any[]) {
+      if (r.quem_id === eu) euRestrinjo.add(r.restrito_id);
+      if (r.quem_id === post.autor_id) donaRestringe.add(r.restrito_id);
+    }
+
+    const palavras = ((minhasPalavras.data as any)?.palavras_ocultas ?? []) as string[];
+    const porId = new Map(((perfis ?? []) as any[]).map((p) => [p.id, p]));
+    const { renovarUrlsAssinadas, VALIDADE_AVATAR_SEG } = await import("@/lib/imagens.server");
+
+    /**
+     * ⚠️ **A URL É INDEXADA PELO AUTOR, e não pela POSIÇÃO — e o defeito que
+     * isto conserta trocava a foto de uma paciente pela de outra.**
+     *
+     * A lista era montada sobre `linhasArr` (todos os comentários) e lida com o
+     * índice do `.map()` — que roda DEPOIS do `.filter()` do bloqueio. Um único
+     * comentário removido desloca todos os índices seguintes em um: o avatar de
+     * quem ela bloqueou aparecia no comentário da pessoa de baixo.
+     *
+     * Numa base em que as pessoas se conhecem da vida real, isso não é um
+     * enfeite trocado — é a foto de alguém sobre a fala de outra.
+     *
+     * ⚠️ **E ficou pior com o filtro novo:** `verDoComentario` também remove
+     * linhas (restrição, palavra escondida), então o deslocamento passou a
+     * acontecer em mais caminhos. Por autor, nenhum filtro pode desalinhar.
+     */
+    const autoresUnicos = [...new Set(linhasArr.map((c) => c.autor_id as string))];
+    const urlsPorAutor = new Map<string, string | null>();
+    {
+      const assinadas = await renovarUrlsAssinadas(
+        autoresUnicos.map((id) => porId.get(id)?.avatar_url ?? null),
+        VALIDADE_AVATAR_SEG,
+      );
+      autoresUnicos.forEach((id, n) => urlsPorAutor.set(id, assinadas[n] ?? null));
+    }
+
+    const comentarios: ComentarioNaTela[] = linhasArr
+      /* ⚠️ BLOQUEIO SOME DO COMENTÁRIO, como some do feed: quem ela bloqueou não
+         pode continuar aparecendo embaixo das fotos que ela abre. */
+      .filter((c) => !ctx.bloqueio.has(c.autor_id))
+      .map((c) => {
+        /* ⚠️ **A RÉGUA ÚNICA decide o que aparece — a tela só desenha.** Uma
+           segunda versão desta decisão no componente divergiria no primeiro
+           conserto, e a divergência apareceria como comentário restringido
+           vazando para terceiros. */
+        const visao = verDoComentario({
+          euId: eu,
+          autorDoComentario: c.autor_id,
+          donaDoPost: post.autor_id,
+          restringiOAutor: euRestrinjo.has(c.autor_id),
+          donaRestringeOAutor: donaRestringe.has(c.autor_id),
+          batePalavraMinha: palavras.length ? temPalavraOculta(c.texto ?? "", palavras) : false,
+        });
+        if (!visao.mostra && !visao.revelavel) return null;
+        return {
+          id: c.id,
+          autorId: c.autor_id,
+          autorNome: ((porId.get(c.autor_id)?.display_name ?? "") as string).trim() || "Alguém",
+          autorAvatar: urlsPorAutor.get(c.autor_id) ?? null,
+          texto: c.texto,
+          criadoEm: c.criado_em,
+          possoApagar: podeApagarComentario({
+            euId: eu,
+            autorDoComentario: c.autor_id,
+            donaDoPost: post.autor_id,
+          }),
+          respondeA: (c.responde_a ?? null) as string | null,
+          curtidas: contaCurtidas.get(c.id) ?? 0,
+          euCurti: euCurti.has(c.id),
+          oculto: visao.marca,
+          recolhido: visao.revelavel,
+          fixadoEm: (c.fixado_em ?? null) as string | null,
+          possoFixar: podeFixarComentario({
+            euId: eu,
+            donaDoPost: post.autor_id,
+            ehRaiz: !c.responde_a,
+            oculto: visao.marca,
+          }),
+          souOAutor: c.autor_id === eu,
+          editadoEm: (c.editado_em ?? null) as string | null,
+        };
+      })
+      .filter(Boolean) as ComentarioNaTela[];
+
+    /* ⚠️ **A ORDEM SAI DO SERVIDOR, e não da tela.** Ordenar no componente
+       faria a lista pular de lugar depois da primeira pintura — e a régua tem
+       de ser a mesma que decide quem PODE fixar, senão um `fixado_em` gravado
+       numa resposta por uma versão anterior a arrancaria da conversa. */
+    const { ordenarComentarios, ORDEM_PADRAO } = await import("./comentarios");
+
+    return {
+      ok: true as const,
+      comentarios: ordenarComentarios(comentarios, data.ordem ?? ORDEM_PADRAO),
+      abertos: post.comentarios_abertos !== false,
+      souADona: post.autor_id === eu,
+      /**
+       * ⚠️ **EU POSSO COMENTAR NESTE POST?**
+       *
+       * Vem do SERVIDOR, com a MESMA régua que o `comentar` usa — uma segunda
+       * decisão na tela ofereceria o campo e o servidor recusaria depois de ela
+       * ter escrito. É o defeito que "Responder" com os comentários fechados já
+       * teve aqui.
+       */
+      possoComentar: podeComentar({
+        euId: eu,
+        autorId: post.autor_id,
+        quemComenta: apertarQuemComenta({
+          visibilidade: post.visibilidade as any,
+          quemComenta: quemComentaDe((post as any).quem_comenta),
+        }),
+        sigoAtivo: ctx.sigo.has(post.autor_id),
+        somosAmigas: ctx.amigas.has(post.autor_id),
+      }),
+      quemComenta: apertarQuemComenta({
+        visibilidade: post.visibilidade as any,
+        quemComenta: quemComentaDe((post as any).quem_comenta),
+      }),
+    };
+  });
+
+export const comentar = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        postId: z.string().uuid(),
+        texto: z.string().min(1).max(LIMITE_DO_COMENTARIO),
+        /** A raiz da conversa. Ver `raizDoComentario`. */
+        respondeA: z.string().uuid().optional(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+    const texto = data.texto.trim();
+    if (!texto) return { ok: false as const, motivo: "vazio" as const };
+
+    /**
+     * ⚠️ **A TRIAGEM VEM ANTES DE QUALQUER ESCRITA.** É a trava que manteve os
+     * comentários fora do produto por meses; rodá-la depois do `insert` seria o
+     * mesmo que não tê-la.
+     */
+    const desfecho = triarComentario(texto);
+    if (desfecho !== "publicavel") {
+      await (
+        await import("./triagem-barrada.server")
+      ).anotarBarrada(eu, "comentario", desfecho, texto);
+      return { ok: false as const, motivo: desfecho, recado: recadoDoComentario(desfecho) };
+    }
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const post = await postQueEuVejo(sb, data.postId, eu);
+    if (!post) return { ok: false as const, motivo: "indisponivel" as const };
+    /* ⚠️ A dona pode ter FECHADO os comentários daquele post. */
+    if (post.comentarios_abertos === false) {
+      return { ok: false as const, motivo: "fechados" as const };
+    }
+
+    /**
+     * ⚠️ **E QUEM PODE COMENTAR — a camada que faltava.**
+     *
+     * `podeVerPost` já rodou dentro de `postQueEuVejo`: quem chega aqui VÊ a
+     * publicação. Esta régua recorta DENTRO de quem vê, que é exatamente o que o
+     * app não tinha: até agora era tudo ou nada (fechar para todo mundo).
+     *
+     * ⚠️ **A camada é APERTADA contra a visibilidade antes de decidir.** Um post
+     * `amigas` gravado com `quem_comenta: todos` (versão antiga do app, ou corpo
+     * montado à mão) não pode virar uma porta mais larga que a própria
+     * publicação.
+     */
+    {
+      const { contextoDe } = await import("./rede-social.functions");
+      const { apertarQuemComenta, podeComentar, quemComentaDe } = await import("./rede-social");
+      const ctx = await contextoDe(sb, eu);
+      const permitido = podeComentar({
+        euId: eu,
+        autorId: post.autor_id,
+        quemComenta: apertarQuemComenta({
+          visibilidade: post.visibilidade as any,
+          quemComenta: quemComentaDe((post as any).quem_comenta),
+        }),
+        sigoAtivo: ctx.sigo.has(post.autor_id),
+        somosAmigas: ctx.amigas.has(post.autor_id),
+      });
+      if (!permitido) return { ok: false as const, motivo: "so_convidadas" as const };
+    }
+
+    const ontem = new Date(Date.now() - 86400_000).toISOString();
+    const { count, error: erroConta } = await sb
+      .from("rede_comentarios")
+      .select("id", { count: "exact", head: true })
+      .eq("autor_id", eu)
+      .gte("criado_em", ontem);
+    if (erroConta) return { ok: false as const, motivo: "banco" as const };
+    if ((count ?? 0) >= COMENTARIOS_POR_DIA)
+      return { ok: false as const, motivo: "muitos" as const };
+
+    /**
+     * ⚠️ **A TRAVA DO NÍVEL ÚNICO É DAQUI, e não da tela.**
+     *
+     * A coluna aceita qualquer uuid. Um pedido montado à mão apontaria para uma
+     * RESPOSTA, criando o segundo nível — e a tela, que só sabe desenhar raiz e
+     * filha, deixaria essa resposta órfã: gravada, cobrada no contador, e
+     * invisível para todo mundo. `raizDoComentario` a puxa de volta para a
+     * conversa certa.
+     *
+     * ⚠️ **E o alvo tem de ser do MESMO post.** Sem esta conferência, responder
+     * a um comentário de outro post gravaria uma resposta que aparece numa
+     * conversa onde ela não faz sentido nenhum — e o texto dela vazaria para
+     * quem vê aquele outro post.
+     */
+    let respondeA: string | null = null;
+    if (data.respondeA) {
+      const COLUNAS_DO_ALVO = "id, post_id, responde_a, apagado_em";
+      let { data: alvo, error: erroAlvo } = await sb
+        .from("rede_comentarios")
+        /* ⚠️ **DEGRAU DE RECUO, como toda leitura desta aba.** `responde_a` nasce
+           no `APLICAR_COMENTARIOS_E_LIMITES` que o dono roda à mão: num banco
+           sem a coluna, este `select` devolve `42703` e a função responde
+           "banco" — comentar PARARIA para todo mundo por causa de um recurso
+           novo. O ramo de baixo trata o alvo como raiz, que é o que ele é num
+           banco sem árvore. */
+        .select(COLUNAS_DO_ALVO)
+        .eq("id", data.respondeA)
+        .maybeSingle();
+      if (erroAlvo) {
+        ({ data: alvo, error: erroAlvo } = await sb
+          .from("rede_comentarios")
+          .select("id, post_id, apagado_em")
+          .eq("id", data.respondeA)
+          .maybeSingle());
+        if (alvo) alvo.responde_a = null;
+      }
+      /* Falha de leitura NÃO vira comentário raiz em silêncio: ela responderia a
+         alguém e o texto apareceria solto no fim da lista, sem contexto. */
+      if (erroAlvo) return { ok: false as const, motivo: "banco" as const };
+      if (!alvo || alvo.post_id !== data.postId || alvo.apagado_em) {
+        return { ok: false as const, motivo: "alvo_invalido" as const };
+      }
+      const raizIgnorada = raizDoComentario({ id: alvo.id, respondeA: alvo.responde_a ?? null });
+      respondeA = raizIgnorada ? alvo.id : alvo.id;
+    }
+
+    /* ⚠️ **RECUO DE COLUNA no INSERT.** Sem ele, comentar pararia de funcionar
+       para TODO MUNDO num banco que ainda não rodou o SQL — um recurso novo
+       derrubando o que já existia. */
+    let { error } = await sb
+      .from("rede_comentarios")
+      .insert({ post_id: data.postId, autor_id: eu, texto, responde_a: respondeA });
+    if (error) {
+      /* ⚠️ Sem a coluna, uma RESPOSTA viraria comentário solto no fim da lista.
+         Melhor recusar e dizer, do que gravar no lugar errado. */
+      if (respondeA) return { ok: false as const, motivo: "sem_suporte" as const };
+      ({ error } = await sb
+        .from("rede_comentarios")
+        .insert({ post_id: data.postId, autor_id: eu, texto }));
+    }
+    if (error) return { ok: false as const, motivo: "banco" as const };
+
+    /**
+     * ⚠️ **O AVISO VAI PARA A CAIXA ♡, E NÃO POR PUSH — e a diferença é regra
+     * deste app.**
+     *
+     * O push aqui é o MESMO canal por onde chega o aviso de emergência: quem
+     * desliga as notificações por causa de um comentário de madrugada desliga
+     * o resto junto. A régua que já vale para as reações vale para o
+     * comentário: ele não pede ação dela, é afeto sobre uma foto.
+     *
+     * ⚠️ **E VAI DEPOIS DO `insert`, nunca antes.** Avisar de um comentário que
+     * não gravou é pior que não avisar.
+     *
+     * ⚠️ O `catch` engole de propósito: o comentário JÁ existe, e derrubar a
+     * resposta por causa do aviso diria "não deu" sobre algo que deu.
+     */
+    /* ⚠️ A menção dentro do COMENTÁRIO também avisa — e passa pela mesma
+       configuração de cada mencionada. Um `@` que só funcionasse na legenda
+       seria metade do recurso, e a metade que falta é a mais usada. */
+    try {
+      const { avisarMencionadas } = await import("./mencoes.functions");
+      await avisarMencionadas(sb, { texto, quemId: eu, postId: data.postId });
+    } catch {
+      /* O comentário está publicado. */
+    }
+
+    if (post.autor_id !== eu) {
+      try {
+        const { registrarAtividade } = await import("./rede-social.functions");
+        await registrarAtividade(sb, {
+          donoId: post.autor_id,
+          quemId: eu,
+          especie: "comentou",
+          postId: data.postId,
+        });
+      } catch {
+        /* O comentário está publicado; o aviso é o acessório. */
+      }
+    }
+    return { ok: true as const };
+  });
+
+/**
+ * APAGAR UM COMENTÁRIO.
+ *
+ * ⚠️ **MARCA, e não `delete`** — a mesma decisão do post. E o portão é a régua
+ * pura: a autora apaga o seu, a dona do post apaga qualquer um. O `id` vem do
+ * cliente, então quem confere é aqui.
+ */
+export const apagarComentario = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), id: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const { data: c, error: erroLer } = await sb
+      .from("rede_comentarios")
+      .select("id, autor_id, post_id")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (erroLer) return { ok: false as const, motivo: "banco" as const };
+    if (!c) return { ok: false as const, motivo: "nao_existe" as const };
+
+    const { data: post, error: erroPost } = await sb
+      .from("rede_posts")
+      .select("autor_id")
+      .eq("id", c.post_id)
+      .maybeSingle();
+    if (erroPost) return { ok: false as const, motivo: "banco" as const };
+
+    if (
+      !podeApagarComentario({
+        euId: eu,
+        autorDoComentario: c.autor_id,
+        donaDoPost: post?.autor_id ?? "",
+      })
+    ) {
+      return { ok: false as const, motivo: "nao_e_seu" as const };
+    }
+
+    const { error } = await sb
+      .from("rede_comentarios")
+      .update({ apagado_em: new Date().toISOString() })
+      .eq("id", data.id);
+    if (error) return { ok: false as const, motivo: "banco" as const };
+    return { ok: true as const };
+  });
+
+/**
+ * FECHAR OU ABRIR OS COMENTÁRIOS DE UM POST.
+ *
+ * ⚠️ É a saída que transforma "não quero opinião nisto" numa escolha, em vez de
+ * num apagar constante — e o post sobre uma perda é exatamente onde ela precisa
+ * dela.
+ */
+export const fecharComentarios = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        postId: z.string().uuid(),
+        abertos: z.boolean(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await (supabaseAdmin as any)
+      .from("rede_posts")
+      .update({ comentarios_abertos: data.abertos })
+      .eq("id", data.postId)
+      /* ⚠️ Só a DONA fecha. O `postId` vem do cliente. */
+      .eq("autor_id", eu);
+    if (error) return { ok: false as const, motivo: "banco" as const };
+    return { ok: true as const };
+  });
+
+/**
+ * DENUNCIAR UM COMENTÁRIO — e ele precisa CHEGAR na fila.
+ *
+ * ⚠️ **ESTA FUNÇÃO PROMETIA E NÃO CUMPRIA, e o doc dela dizia "a mesma fila do
+ * resto da rede".** Ela gravava `rede_comentarios.denunciado_em` — uma coluna
+ * que NENHUMA consulta do repositório lia — enquanto a tela respondia
+ * "Denunciado. A gente vai olhar." Ninguém ia olhar.
+ *
+ * É palavra por palavra o defeito que o post e o perfil já pagaram aqui
+ * ("`denunciado_em` era gravada e NENHUMA consulta a lia"), consertado num
+ * caminho e deixado de pé no outro — e no canal que mais importa: o comentário
+ * é onde mora o conselho clínico de leiga, que é a razão inteira de esta aba
+ * quase não ter comentários.
+ *
+ * Agora ele entra em `rede_denuncias`, que é o que `denunciasAbertas` lê.
+ *
+ * ⚠️ **O MOTIVO É CATÁLOGO FECHADO**, como nas outras três portas: é ele que
+ * ordena a fila, e campo livre numa denúncia de app de gestação é onde alguém
+ * escreve a informação clínica de outra pessoa.
+ *
+ * ⚠️ **O TRECHO É CONGELADO**: ela pode editar ou apagar o comentário depois, e
+ * sem a cópia a linha da administração apontaria para um texto que já não
+ * existe.
+ *
+ * ⚠️ **A visibilidade do post é conferida ANTES** — a mesma régua da leitura.
+ * Sem ela, um uuid sorteado que respondesse `ok` confirmaria a existência de um
+ * comentário num post que quem pergunta não pode ver.
+ */
+export const denunciarComentario = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        id: z.string().uuid(),
+        motivo: z.string().min(1).max(60),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const { motivoConhecido } = await import("@/lib/denuncias");
+    if (!motivoConhecido(data.motivo)) return { ok: false as const, motivo: "motivo" as const };
+
+    const { data: c } = await sb
+      .from("rede_comentarios")
+      .select("id, post_id, autor_id, texto")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (!c) return { ok: false as const, motivo: "indisponivel" as const };
+
+    /* ⚠️ Denunciar o PRÓPRIO comentário abriria um jeito barato de encher a
+       fila do administrador. */
+    if ((c as { autor_id: string }).autor_id === eu) {
+      return { ok: false as const, motivo: "indisponivel" as const };
+    }
+
+    if (!(await postQueEuVejo(sb, (c as { post_id: string }).post_id, eu))) {
+      return { ok: false as const, motivo: "indisponivel" as const };
+    }
+
+    const { error } = await sb.from("rede_denuncias").insert({
+      alvo: "comentario",
+      alvo_id: (c as { id: string }).id,
+      denunciada_id: (c as { autor_id: string }).autor_id,
+      quem_id: eu,
+      motivo: data.motivo,
+      trecho: ((c as { texto: string | null }).texto ?? "(sem texto)").slice(0, 400),
+    });
+    /* Duplicata é SUCESSO REPETIDO: ela tocou duas vezes, e dizer "erro" a faria
+       tentar de novo. */
+    if (error && (error as { code?: string }).code !== "23505") {
+      console.error("[rede] denúncia de comentário não gravou", error);
+      return { ok: false as const, motivo: "banco" as const };
+    }
+
+    /* ⚠️ **O CARIMBO EM `rede_comentarios.denunciado_em` SAIU.** Nada no
+       repositório o lia — era exatamente a coluna morta que dava ao recurso a
+       aparência de funcionar. A denúncia agora vive em `rede_denuncias`, que a
+       fila lê, e a repetição é barrada pelo índice único de lá
+       (alvo, alvo_id, quem_id), não por um carimbo sem leitor. */
+
+    /* ⚠️ Resposta pelada, sem confirmar nada sobre o comentário nem sobre quem
+       escreveu — a mesma decisão da denúncia da caixinha. */
+    return { ok: true as const };
+  });
+
+/**
+ * CURTIR UM COMENTÁRIO — o coração.
+ *
+ * ⚠️ **É COMO A AUTORA AGRADECE DEZ COMENTÁRIOS sem escrever dez respostas.**
+ * Sem ele, ou ela responde a todos ou ignora todos; e no segundo caso a
+ * comunidade esfria, porque quem comentou não recebe sinal nenhum de que foi
+ * lida.
+ *
+ * ⚠️ **A VISIBILIDADE DO POST É CONFERIDA ANTES**, e não é formalidade: sem
+ * ela, qualquer paciente autenticada curtiria — e portanto CONFIRMARIA a
+ * existência de — um comentário num post que ela não pode ver. O id do
+ * comentário viaja em toda leitura; adivinhar não é preciso.
+ *
+ * ⚠️ **`23505` É SUCESSO REPETIDO, nunca erro.** Dois toques rápidos chegam
+ * antes de a tela repintar; devolver erro faria ela tocar de novo achando que
+ * não pegou.
+ */
+export const curtirComentario = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        comentarioId: z.string().uuid(),
+        curtir: z.boolean(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const { data: c, error: erroC } = await sb
+      .from("rede_comentarios")
+      .select("id, post_id, apagado_em")
+      .eq("id", data.comentarioId)
+      .maybeSingle();
+    if (erroC) return { ok: false as const, motivo: "banco" as const };
+    if (!c || c.apagado_em) return { ok: false as const, motivo: "indisponivel" as const };
+
+    /* A régua de visibilidade do POST, a mesma de sempre. */
+    const post = await postQueEuVejo(sb, c.post_id, eu);
+    if (!post) return { ok: false as const, motivo: "indisponivel" as const };
+
+    if (!data.curtir) {
+      const { error } = await sb
+        .from("rede_comentario_curtidas")
+        .delete()
+        .eq("comentario_id", data.comentarioId)
+        .eq("quem_id", eu);
+      if (error) return { ok: false as const, motivo: "sem_suporte" as const };
+      return { ok: true as const };
+    }
+
+    const { error } = await sb
+      .from("rede_comentario_curtidas")
+      .insert({ comentario_id: data.comentarioId, quem_id: eu });
+    /* `23505` = a chave primária já tinha a linha. Sucesso repetido. */
+    if (error && (error as any).code !== "23505") {
+      return { ok: false as const, motivo: "sem_suporte" as const };
+    }
+    return { ok: true as const };
+  });
+
+/**
+ * RESTRINGIR — o meio-termo entre nada e bloquear.
+ *
+ * ⚠️ **EXISTE POR UM MOTIVO SOCIAL CONCRETO:** bloquear a cunhada tem custo —
+ * ela descobre, e vira briga de família. Numa comunidade onde as pessoas se
+ * conhecem da vida real, esse custo é o que faz a paciente não usar o bloqueio
+ * e continuar recebendo o que a machuca.
+ *
+ * ⚠️ **É MUDO, e o silêncio é o recurso inteiro.** Ninguém é avisado, a tabela
+ * não tem policy de leitura, e o comentário da pessoa restringida aparece para
+ * ELA exatamente como antes. Ver `verDoComentario`.
+ *
+ * ⚠️ **NÃO É O BLOQUEIO COM OUTRO NOME.** Ela continua seguindo, continua vendo
+ * os posts, continua podendo escrever. O que muda é quem LÊ o que ela escreve.
+ */
+export const restringir = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        alvoId: z.string().uuid(),
+        restringir: z.boolean(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+    /* Restringir a si mesma esconderia os próprios comentários da própria tela.
+       O CHECK do banco também recusa; aqui a recusa é mais barata e mais clara. */
+    if (eu === data.alvoId) return { ok: false as const, motivo: "eu_mesma" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    if (!data.restringir) {
+      const { error } = await sb
+        .from("rede_restricoes")
+        .delete()
+        .eq("quem_id", eu)
+        .eq("restrito_id", data.alvoId);
+      if (error) return { ok: false as const, motivo: "sem_suporte" as const };
+      return { ok: true as const };
+    }
+
+    const { error } = await sb
+      .from("rede_restricoes")
+      .insert({ quem_id: eu, restrito_id: data.alvoId });
+    if (error && (error as any).code !== "23505") {
+      return { ok: false as const, motivo: "sem_suporte" as const };
+    }
+    return { ok: true as const };
+  });
+
+/**
+ * Quem EU restrinjo — para a tela do perfil saber o estado do botão.
+ *
+ * ⚠️ **SÓ A MINHA LISTA, NUNCA A DELA.** Saber quem te restringiu é exatamente
+ * o que transformaria o gesto privado numa briga — a mesma razão pela qual o
+ * bloqueio e o silenciar são mudos.
+ */
+export const minhasRestricoes = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: linhas, error } = await (supabaseAdmin as any)
+      .from("rede_restricoes")
+      .select("restrito_id")
+      .eq("quem_id", eu);
+    /* Sem a tabela, a lista é vazia e o botão nasce em "Restringir" — o estado
+       de quem não restringiu ninguém, que é o certo. */
+    if (error) return { ok: true as const, ids: [] as string[] };
+    return { ok: true as const, ids: ((linhas ?? []) as any[]).map((r) => r.restrito_id) };
+  });
+
+/**
+ * AS PALAVRAS QUE ELA NÃO QUER VER.
+ *
+ * ⚠️ **A LISTA É DELA, e o app NÃO sugere palavras.** Numa gestação de alto
+ * risco não existe lista universal: para uma é "perdi", para outra é o nome de
+ * um hospital, para outra é "aborto". Sugerir seria o app escrevendo na tela
+ * dela justamente as palavras que ela está tentando não ler.
+ */
+export const salvarPalavrasOcultas = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        palavras: z.array(z.string().max(200)).max(300),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+    /* ⚠️ A limpeza é da RÉGUA, e roda no servidor — a tela pode ter mandado
+       qualquer coisa, e o teto existe para a lista não virar um parágrafo. */
+    const palavras = limparPalavrasOcultas(data.palavras);
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await (supabaseAdmin as any)
+      .from("patient_profiles")
+      .update({ palavras_ocultas: palavras })
+      .eq("id", eu);
+    if (error) return { ok: false as const, motivo: "sem_suporte" as const };
+    return { ok: true as const, palavras };
+  });
+
+/**
+ * A lista dela, para a tela abrir com o que já está salvo.
+ *
+ * ⚠️ Recuo próprio: sem a coluna, devolve lista vazia em vez de erro — o
+ * ajuste aparece desligado, que é o estado de quem nunca o usou.
+ */
+export const minhasPalavrasOcultas = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: p, error } = await (supabaseAdmin as any)
+      .from("patient_profiles")
+      .select("palavras_ocultas")
+      .eq("id", eu)
+      .maybeSingle();
+    if (error) return { ok: true as const, palavras: [] as string[] };
+    return { ok: true as const, palavras: (p?.palavras_ocultas ?? []) as string[] };
+  });
+
+/**
+ * FIXAR UM COMENTÁRIO — a curadoria da conversa, e ela é da dona do POST.
+ *
+ * ⚠️ **QUEM FIXA É A DONA DO POST, nunca a autora do comentário.** Fixar é pôr
+ * uma frase no topo da conversa DELA; se a autora do comentário pudesse fixar o
+ * próprio, qualquer pessoa poria a própria opinião acima de todas as outras
+ * embaixo da foto de outra — que é o oposto exato de curadoria.
+ *
+ * ⚠️ **E UM SÓ.** Fixar o segundo desafixa o primeiro, no mesmo pedido: uma
+ * recusa ("desafixe o outro antes") faria a dona do post ter de descobrir qual
+ * é o outro, numa lista de oitenta comentários.
+ */
+export const fixarComentario = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        comentarioId: z.string().uuid(),
+        fixar: z.boolean(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    /* ⚠️ O comentário é lido COM a coluna `responde_a`: é ela que diz se isto é
+       raiz, e a régua recusa fixar resposta. Sem ela (banco atrás), tratamos
+       como raiz — é o que ele era antes de a árvore existir. */
+    const lerAlvo = (colunas: string) =>
+      sb.from("rede_comentarios").select(colunas).eq("id", data.comentarioId).maybeSingle();
+    let { data: c, error: erroC } = await lerAlvo("id, post_id, autor_id, apagado_em, responde_a");
+    if (erroC) {
+      ({ data: c, error: erroC } = await lerAlvo("id, post_id, autor_id, apagado_em"));
+    }
+    if (erroC) return { ok: false as const, motivo: "banco" as const };
+    if (!c || (c as any).apagado_em) return { ok: false as const, motivo: "indisponivel" as const };
+
+    /* ⚠️ **O PORTÃO DE DONO vem antes de qualquer escrita**, e é o `autor_id` do
+       POST, não o do comentário. */
+    const { data: post } = await sb
+      .from("rede_posts")
+      .select("id, autor_id")
+      .eq("id", (c as any).post_id)
+      .maybeSingle();
+    if (!post || (post as any).autor_id !== eu) {
+      return { ok: false as const, motivo: "indisponivel" as const };
+    }
+
+    const { podeFixarComentario } = await import("./comentarios");
+    if (
+      data.fixar &&
+      !podeFixarComentario({
+        euId: eu,
+        donaDoPost: (post as any).autor_id,
+        ehRaiz: !(c as any).responde_a,
+        oculto: null,
+      })
+    ) {
+      return { ok: false as const, motivo: "so_raiz" as const };
+    }
+
+    if (!data.fixar) {
+      const { error } = await sb
+        .from("rede_comentarios")
+        .update({ fixado_em: null })
+        .eq("id", data.comentarioId);
+      if (error) return { ok: false as const, motivo: "sem_suporte" as const };
+      return { ok: true as const };
+    }
+
+    /* ⚠️ **DESAFIXA O ANTERIOR PRIMEIRO, e a ordem importa.** Ao contrário do
+       bloqueio — onde a ordem existe para o estado intermediário ser o gesto
+       MENOR —, aqui o intermediário ruim é o oposto: se a fixação nova falhar
+       depois de a antiga sair, ela fica sem nenhum fixado, que é reversível com
+       um toque. Fixando primeiro, uma falha na limpeza deixaria DOIS fixados e
+       a tela mostraria dois topos. */
+    const { error: erroLimpa } = await sb
+      .from("rede_comentarios")
+      .update({ fixado_em: null })
+      .eq("post_id", (c as any).post_id)
+      .not("fixado_em", "is", null);
+    if (erroLimpa) return { ok: false as const, motivo: "sem_suporte" as const };
+
+    const { error } = await sb
+      .from("rede_comentarios")
+      .update({ fixado_em: new Date().toISOString() })
+      .eq("id", data.comentarioId);
+    if (error) return { ok: false as const, motivo: "sem_suporte" as const };
+    return { ok: true as const };
+  });
+
+/**
+ * QUEM CURTIU ESTE COMENTÁRIO — e a lista é de quem ESCREVEU o comentário.
+ *
+ * ⚠️ **NÃO é da dona do post.** O `quemReagiuAoPost` é da autora do post porque
+ * as reações são sobre a publicação DELA; aqui as curtidas são sobre a frase de
+ * quem comentou. Dar a lista à dona do post transformaria a conversa embaixo
+ * das fotos dela num painel de auditoria de quem apoia quem — numa base em que
+ * as pacientes se conhecem da vida real, é a informação que mais gera atrito.
+ *
+ * ⚠️ **E o portão vem ANTES da leitura**, como em toda lista desta aba: com ele
+ * depois, um `comentarioId` qualquer devolveria a lista antes da recusa.
+ */
+export const quemCurtiuComentario = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), comentarioId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const { data: c } = await sb
+      .from("rede_comentarios")
+      .select("id, autor_id, apagado_em")
+      .eq("id", data.comentarioId)
+      .maybeSingle();
+    if (!c || (c as any).apagado_em || (c as any).autor_id !== eu) {
+      return { ok: false as const, motivo: "indisponivel" as const };
+    }
+
+    const { data: linhas, error } = await sb
+      .from("rede_comentario_curtidas")
+      .select("quem_id")
+      .eq("comentario_id", data.comentarioId)
+      .limit(200);
+    /* ⚠️ Falha de leitura devolve ERRO, e nunca lista vazia: "ninguém curtiu"
+       sobre um comentário com o número 12 do lado é a tela se contradizendo. */
+    if (error) return { ok: false as const, motivo: "banco" as const };
+
+    const ids = [...new Set(((linhas ?? []) as any[]).map((l) => l.quem_id as string))];
+    if (ids.length === 0) return { ok: true as const, pessoas: [] };
+
+    const { perfisPorId, naFileira, contextoDe } = await import("./rede-social.functions");
+    /* Duas idas independentes, na mesma onda. */
+    const [perfis, ctx] = await Promise.all([perfisPorId(sb, ids), contextoDe(sb, eu)]);
+    /* ⚠️ **QUEM ELA BLOQUEOU NÃO APARECE.** A curtida continua contando — o
+       número é do comentário, não da lista —, mas ver o nome de quem ela
+       bloqueou é exatamente o que bloquear existe para impedir. */
+    const pessoas = ids
+      .filter((id) => !ctx.bloqueio.has(id))
+      .map((id) => perfis.get(id))
+      .filter(Boolean)
+      .map((p: any) => naFileira(p));
+    return { ok: true as const, pessoas };
+  });
+
+/**
+ * EDITAR UM COMENTÁRIO — corrigir sem apagar a conversa.
+ *
+ * ⚠️ **APAGAR E ESCREVER DE NOVO NÃO É A MESMA COISA.** Apagar leva junto as
+ * RESPOSTAS que penduraram nele (elas viram órfãs e entram como raiz), e o
+ * comentário volta ao fim da lista. Quem digitou "12 semanas" no lugar de "21"
+ * embaixo de um post sobre saúde tinha de escolher entre deixar o erro ou
+ * desmontar a conversa.
+ *
+ * ⚠️ **SÓ O TEXTO MUDA.** Nada de trocar o post, o alvo da resposta ou o
+ * autor: um `update` largo aqui seria a porta para mover um comentário de uma
+ * publicação para outra.
+ *
+ * ⚠️ **E SÓ QUEM ESCREVEU EDITA** — nem a dona do post. Ela pode APAGAR
+ * (`podeApagarComentario`), que é a decisão dela sobre a própria conversa;
+ * reescrever a frase de outra pessoa é pôr palavras na boca dela.
+ */
+export const editarComentario = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        comentarioId: z.string().uuid(),
+        texto: z.string().min(1).max(LIMITE_DO_COMENTARIO),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const { data: c, error: erroC } = await sb
+      .from("rede_comentarios")
+      .select("id, autor_id, apagado_em")
+      .eq("id", data.comentarioId)
+      .maybeSingle();
+    if (erroC) return { ok: false as const, motivo: "banco" as const };
+    if (!c || (c as any).apagado_em || (c as any).autor_id !== eu) {
+      return { ok: false as const, motivo: "indisponivel" as const };
+    }
+
+    /* ⚠️ **A RÉGUA CLÍNICA RODA DE NOVO, e é o ponto todo desta função.** Sem
+       ela, editar seria a porta dos fundos do `comentar`: publica-se "que
+       lindo" e troca-se depois por "no seu lugar eu não iria ao PS". É o mesmo
+       cuidado que `editarPost` tem com a legenda. */
+    const desfecho = triarComentario(data.texto);
+    if (desfecho !== "publicavel") {
+      await (
+        await import("./triagem-barrada.server")
+      ).anotarBarrada(eu, "comentario", desfecho, data.texto);
+      return {
+        ok: false as const,
+        motivo: "clinico" as const,
+        recado: recadoDoComentario(desfecho),
+      };
+    }
+
+    /* ⚠️ **O SELO DE EDITADO NÃO É ENFEITE.** Quem respondeu respondeu ao texto
+       que estava lá; sem ele, trocar o texto depois faz as respostas parecerem
+       sem sentido — ou faz a autora parecer ter dito uma coisa que ninguém leu.
+       Sem a coluna, a edição VALE e só o selo falta: recusar seria tirar uma
+       correção por causa de um carimbo. */
+    const { error } = await sb
+      .from("rede_comentarios")
+      .update({ texto: data.texto, editado_em: new Date().toISOString() })
+      .eq("id", data.comentarioId)
+      .eq("autor_id", eu);
+    if (error) {
+      const { error: erro2 } = await sb
+        .from("rede_comentarios")
+        .update({ texto: data.texto })
+        .eq("id", data.comentarioId)
+        .eq("autor_id", eu);
+      if (erro2) return { ok: false as const, motivo: "banco" as const };
+      return { ok: true as const, semSelo: true as const };
+    }
+    return { ok: true as const, semSelo: false as const };
+  });

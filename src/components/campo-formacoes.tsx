@@ -47,7 +47,7 @@ export function CampoFormacoes({
   return (
     <div className="rounded-2xl border border-border bg-background/40 p-4">
       <p className={classeLabel}>Formações e títulos</p>
-      <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+      <p className="mt-1 text-xs leading-snug text-muted-foreground">
         Nada aqui é obrigatório — mas é o que a paciente lê para escolher entre dois nomes que ela
         não conhece. Preencha só o que quiser mostrar.
       </p>
@@ -55,7 +55,7 @@ export function CampoFormacoes({
       <div className="mt-3 space-y-3">
         {CATEGORIAS_FORMACAO.filter((c) => abertas.has(c.chave)).map((c) => (
           <div key={c.chave}>
-            <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {c.rotulo}
             </label>
             <input
@@ -70,7 +70,7 @@ export function CampoFormacoes({
 
       {fechadas.length > 0 && (
         <div className="mt-4">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Adicionar mais
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
@@ -100,7 +100,7 @@ export function CampoFormacoes({
           placeholder="Como você acompanha uma gestação, o que a paciente pode esperar de você, o que te trouxe para a obstetrícia. Escreva como falaria numa primeira consulta."
           className={classeInput}
         />
-        <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+        <p className="mt-1 text-xs leading-snug text-muted-foreground">
           Este texto aparece no seu card, abaixo do nome. É a parte que faz a paciente sentir que já
           te conhece um pouco.
         </p>

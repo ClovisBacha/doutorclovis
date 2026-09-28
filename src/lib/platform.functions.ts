@@ -33,6 +33,8 @@ export type PlatformDoctor = {
   plan: string;
   active: boolean;
   verified: boolean;
+  /** A resposta do conselho, quando houve. `null` = nunca conferido. */
+  crm: { em: string; nome: string | null; situacao: string | null } | null;
   created_at: string | null;
   patients: number;
   brainEntries: number;
@@ -148,6 +150,10 @@ export const getPlatformOverview = createServerFn({ method: "POST" })
       created_at: string | null;
       /** Ausente quando a migration ainda não rodou — o retry abaixo cobre. */
       ai_messages_per_cycle?: number | null;
+      /** A conferência no conselho. Ausente no degrau de baixo. */
+      crm_conferido_em?: string | null;
+      crm_conferido_nome?: string | null;
+      crm_conferido_situacao?: string | null;
     };
     /* ─── A COLUNA NOVA ENTRA COM RETRY, NUNCA DIRETO ────────────────────────
        `ai_messages_per_cycle` é o que transforma o plano `mensagens` num preço:
@@ -158,7 +164,20 @@ export const getPlatformOverview = createServerFn({ method: "POST" })
        sem rede faria a lista de médicos sumir por completo do painel da
        plataforma enquanto a migration estivesse pendente, que é exatamente o
        estado que o CLAUDE.md avisa ser o normal em produção. */
-    const colunas = "id,display_name,plan,plan_expires_at,active,verified,created_at";
+    /* ⚠️ **A CONFERÊNCIA NO CFM ERA GRAVADA E LIDA POR NINGUÉM.**
+       `conferirMeuCrm` consulta o conselho e grava `crm_conferido_em`,
+       `crm_conferido_nome` e `crm_conferido_situacao` — e nenhum `select` do
+       repositório pedia as três. Enquanto isso, o selo "verificado" que ORDENA
+       a busca de médicos (`doctors.functions.ts`) é um booleano que alguém
+       aperta à mão. A plataforma pagava a consulta ao conselho e mostrava como
+       verificado quem ninguém verificou.
+       ⚠️ **E ele continua sendo apertado à mão, de propósito.** Casar
+       `verified` com a resposta do CFM é decisão do dono, não minha: situação
+       regular no conselho não é a mesma coisa que aprovado nesta plataforma. O
+       que muda aqui é que a conferência deixa de ser invisível. */
+    const colunas =
+      "id,display_name,plan,plan_expires_at,active,verified,created_at," +
+      "crm_conferido_em,crm_conferido_nome,crm_conferido_situacao";
     const docRows = await safe<DocRow[]>(async () => {
       const { colunaAusente } = await import("./postgrest");
       const comQtd = await sb
@@ -173,7 +192,18 @@ export const getPlatformOverview = createServerFn({ method: "POST" })
         .select(colunas)
         .order("created_at", { ascending: false })
         .limit(MAX_ROWS);
-      return (semQtd.data ?? []) as DocRow[];
+      if (!semQtd.error) return (semQtd.data ?? []) as DocRow[];
+      if (!colunaAusente(semQtd.error)) throw semQtd.error;
+      /* ⚠️ **UM DEGRAU POR SQL.** As três colunas do CRM nascem em
+         `APLICAR_MEDICO.sql`; num banco que ainda não o rodou, pedi-las
+         derrubaria a LISTA DE MÉDICOS INTEIRA do painel da plataforma por
+         causa de um campo informativo. */
+      const semCrm = await sb
+        .from("doctors")
+        .select("id,display_name,plan,plan_expires_at,active,verified,created_at")
+        .order("created_at", { ascending: false })
+        .limit(MAX_ROWS);
+      return (semCrm.data ?? []) as DocRow[];
     }, []);
 
     // Contagens auxiliares por médico (pacientes vinculadas e entradas de cérebro)
@@ -214,6 +244,13 @@ export const getPlatformOverview = createServerFn({ method: "POST" })
       plan: d.plan || "trial",
       active: d.active ?? true,
       verified: d.verified ?? false,
+      crm: d.crm_conferido_em
+        ? {
+            em: d.crm_conferido_em,
+            nome: d.crm_conferido_nome ?? null,
+            situacao: d.crm_conferido_situacao ?? null,
+          }
+        : null,
       created_at: d.created_at,
       patients: patientsByDoctor.get(d.id) ?? 0,
       brainEntries: brainByDoctor.get(d.id) ?? 0,

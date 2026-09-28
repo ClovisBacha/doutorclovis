@@ -76,7 +76,7 @@ jobs:
       - run: bun run lint
 
   bancadas:
-    name: Bancadas — abre as telas e lê o console
+    name: Bancadas — abre as telas, toca nos controles e lê o console
     runs-on: ubuntu-latest
     # ⚠️ ESTE JOB EXISTE POR UM DEFEITO CONCRETO: um `getServerSnapshot`
     # devolvendo `[]` novo a cada leitura pôs a barra de navegação em laço
@@ -96,8 +96,33 @@ jobs:
 
       # O Chromium do Playwright, e só ele — os outros dois navegadores
       # dobrariam o tempo do job sem pegar nada a mais.
+      #
+      # ⚠️ E A LISTA DA GOOGLE SAI ANTES. `--with-deps` roda `apt-get update`
+      # com TODAS as fontes do runner, e a do Chrome (`dl.google.com`) serve
+      # de vez em quando um índice cujo hash não bate: "Hash Sum mismatch", e o
+      # `apt` inteiro sai com 100. Este job reprovou duas vezes seguidas — o
+      # push e o `rerun` — sem que uma linha do nosso código tivesse mudado, e
+      # a mensagem ("Failed to install browsers") não diz que a causa é um
+      # espelho de terceiro. **Job que reprova por motivo alheio ao código é
+      # job que se aprende a ignorar**, e no dia em que o vermelho for de
+      # verdade ele é ignorado junto.
+      # Nada aqui usa o Chrome da Google: o navegador é o Chromium do
+      # Playwright, baixado do CDN dele.
+      # ⚠️ POR CONTEÚDO, e nunca pelo nome do arquivo: a primeira tentativa
+      # apagou `google-chrome*.list` e o job caiu igual — o runner declara a
+      # fonte noutro arquivo (o formato `deb822` usa `.sources`). Apagar pelo
+      # nome é adivinhar; procurar o HOST é medir. E o passo CONFERE que não
+      # sobrou nenhuma, senão ele "passaria" sem ter feito nada — falha aberta
+      # num passo cujo trabalho inteiro é remover uma coisa.
+      - name: Tira as fontes apt da Google (não são usadas aqui)
+        run: |
+          for f in $(sudo grep -rl 'dl\.google\.com' /etc/apt/sources.list.d /etc/apt/sources.list 2>/dev/null); do
+            echo "removendo $f"; sudo rm -f "$f"
+          done
+          if sudo grep -rq 'dl\.google\.com' /etc/apt/sources.list.d /etc/apt/sources.list 2>/dev/null; then
+            echo "ainda há fonte apt apontando para dl.google.com"; exit 1
+          fi
       - run: bunx playwright install --with-deps chromium
-
       # ⚠️ O servidor de DESENVOLVIMENTO, e não o build: o build gera
       # `.vercel/output` (Build Output API), que o `vite preview` não serve —
       # medido. E o dev serve as rotas de bancada do mesmo jeito.
@@ -143,6 +168,18 @@ jobs:
             echo "o servidor não respondeu em 120s"; cat /tmp/dev.log; exit 1; }
 
       - run: bun run varrer:bancadas
+
+      # ⚠️ **A VARREDURA DE INTERAÇÃO PEGA O QUE A DE CARGA NÃO PEGA.**
+      #
+      # A de cima abre a tela e lê o console; esta TOCA nos controles. Foi ela
+      # que achou a barrinha do story misturando o atalho `animation` com o
+      # longhand `animationPlayState` — o React só avisa na REPINTURA que o
+      # toque provoca, e o defeito era real: numa repintura o atalho reescrevia
+      # o play-state e a barra voltava a correr sozinha enquanto o dedo a
+      # segurava.
+      #
+      # Ela roda DEPOIS, no mesmo servidor: subir um segundo dobraria o job.
+      - run: bun run varrer:interacao
 
       # O log do servidor ajuda a diagnosticar quando o job falha — sem ele,
       # "a página não desenhou nada" não diz se foi a tela ou o servidor.

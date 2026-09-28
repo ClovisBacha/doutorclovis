@@ -77,6 +77,35 @@ export function ehNativo(): boolean {
   return ponte()?.isNativePlatform?.() === true;
 }
 
+/**
+ * "ELA JÁ ESTÁ USANDO O APP?" — instalado na Tela de Início OU dentro da casca.
+ *
+ * ⚠️ Ele existe porque `display-mode: standalone` sozinho é FALSO na casca do
+ * Capacitor, e sozinho já custou dois defeitos: o puxar-para-atualizar não
+ * existia no app nativo, e o banner "Instalar o app" aparecia DENTRO dele —
+ * mandando a paciente "tocar em compartilhar ↑" numa tela que não tem barra de
+ * navegador.
+ *
+ * ⚠️ **Ele NÃO deve desligar nada no Safari comum do iPhone.** É lá que
+ * instalar destrava o push, e o push é o canal do aviso de consulta e do
+ * retorno do SOS — esconder o convite ali tiraria da paciente o caminho para
+ * receber emergência.
+ *
+ * ⚠️ **Lê `window`/`navigator`: só vale no cliente.** Quem chama decide num
+ * EFEITO, nunca no render — no servidor ele responde `false`, e decidir no
+ * render trocaria um banner a mais por uma quebra de hidratação.
+ */
+export function ehAppInstalado(): boolean {
+  if (typeof window === "undefined") return false;
+  if (ehNativo()) return true;
+  try {
+    if (window.matchMedia?.("(display-mode: standalone)").matches) return true;
+  } catch {
+    /* navegador sem matchMedia de display-mode */
+  }
+  return (navigator as unknown as { standalone?: boolean }).standalone === true;
+}
+
 /** `"ios"`, `"android"` ou `"web"`. */
 export function plataforma(): string {
   return ponte()?.getPlatform?.() ?? "web";
@@ -144,10 +173,27 @@ export function prepararNativo(): void {
      Como `prepararNativo` roda no escopo do módulo do `router.tsx`, isto
      acontece antes de o React hidratar: nenhum quadro com o menu errado. */
   document.documentElement.classList.add("nativo");
+  /* Sem zoom por pinça nem por duplo toque: dentro do app, a página É a tela,
+     e um app que dá zoom na própria interface é o sinal mais barato de "site
+     embrulhado". O WKWebView respeita `user-scalable=no` (o Safari, desde o
+     iOS 10, ignora — por isso a meta do SITE não o traz), e `styles.css`
+     reforça com `touch-action` em `.nativo`. Letra maior é o Dynamic Type,
+     não o zoom da página. Feito aqui, antes de o React hidratar, e não no
+     `head()` da rota, que é o mesmo para o site. */
+  document
+    .querySelector('meta[name="viewport"]')
+    ?.setAttribute(
+      "content",
+      "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
+    );
   void carregar().then(({ App }) => {
     esconderSplash();
     ligarBotaoVoltar(App);
+    ligarVoltaDoSegundoPlano(App);
   });
+  /* O toque num aviso leva ao lugar do aviso — ver `ligarToqueNoAviso`. Ele é
+     carregado à parte porque o plugin de push é pesado e só existe na casca. */
+  void import("@/lib/push-nativo").then((m) => m.ligarToqueNoAviso()).catch(() => {});
 }
 
 /**
@@ -175,6 +221,60 @@ function ligarBotaoVoltar(App?: AppPlugin): void {
       return;
     }
     void App.minimizeApp().catch(() => {});
+  }).catch(() => {});
+}
+
+/**
+ * A volta do segundo plano.
+ *
+ * Num app nativo a página não "carrega de novo" quando ela volta: fica dias
+ * viva. O token de push só era renovado quando o cartão de avisos montava; um
+ * token trocado pelo sistema ficava velho até ela abrir aquela tela. Aqui ele é
+ * renovado na volta — COM CALMA: `inscreverPushNativo` faz `register()` e uma
+ * escrita no servidor, e dez trocas de app numa sessão de contrações não podem
+ * virar dez registros iguais na frente dos dados que as telas estão relendo.
+ * No máximo uma vez a cada `INTERVALO_DE_RENOVACAO_MS`, lembrado no aparelho.
+ *
+ * ⚠️ A SESSÃO DO SUPABASE NÃO ENTRA AQUI, de propósito. O supabase-js já ouve
+ * `visibilitychange` (para o relógio de renovação ao esconder, recupera e
+ * renova ao voltar), e o WKWebView dispara esse evento na volta do segundo
+ * plano. Ligar `stopAutoRefresh`/`startAutoRefresh` ao `appStateChange` seria
+ * uma segunda mão no mesmo relógio — e um comentário atribuindo token vencido a
+ * um gancho que a biblioteca já tem esconderia a causa real, se ela existir.
+ *
+ * Os dados das abas também não entram: `visibilitychange` é o que elas escutam.
+ * Tudo por `import()` dinâmico, como o resto deste arquivo.
+ */
+export const INTERVALO_DE_RENOVACAO_MS = 12 * 60 * 60 * 1000;
+const CHAVE_DA_RENOVACAO = "dc-avisos-renovados-em";
+
+/** A regra pura: passou o intervalo desde a última renovação (ou nunca houve)? */
+export function deveRenovarAvisos(ultimaEm: number | null, agora: number): boolean {
+  if (ultimaEm === null || !Number.isFinite(ultimaEm)) return true;
+  return agora - ultimaEm >= INTERVALO_DE_RENOVACAO_MS;
+}
+
+function renovarAvisosComCalma(): void {
+  let ultima: number | null = null;
+  try {
+    const cru = localStorage.getItem(CHAVE_DA_RENOVACAO);
+    ultima = cru === null ? null : Number(cru);
+  } catch {
+    /* sem armazenamento: renova, é barato uma vez */
+  }
+  if (!deveRenovarAvisos(ultima, Date.now())) return;
+  try {
+    localStorage.setItem(CHAVE_DA_RENOVACAO, String(Date.now()));
+  } catch {
+    /* idem */
+  }
+  void import("@/lib/avisos").then((m) => m.renovarAvisosSeJaAutorizado()).catch(() => {});
+}
+
+function ligarVoltaDoSegundoPlano(App?: AppPlugin): void {
+  if (!App) return;
+  void App.addListener("appStateChange", ({ isActive }) => {
+    if (isActive) renovarAvisosComCalma();
   }).catch(() => {});
 }
 
@@ -340,6 +440,38 @@ export function tocarPadrao(padrao: number[]): void {
   } catch {
     /* sem haptics */
   }
+}
+
+/**
+ * O RETORNO TÁTIL DE UM DESFECHO — "deu certo" e "não deu".
+ *
+ * ⚠️ Ele existe porque o SOS era o único gesto de CONSEQUÊNCIA do app
+ * inteiramente mudo ao dedo, e o canal que sobrava não é confiável: no iPhone
+ * no SILENCIOSO o alarme de Web Audio simplesmente não toca (o WebKit trata
+ * isso como o bug 237322 — Web Audio É silenciado pelo botão físico). Numa
+ * emergência, a paciente apertava o botão vermelho e não recebia sinal nenhum
+ * de que alguma coisa tinha acontecido.
+ *
+ * ⚠️ **NÃO é `tocarPadrao` com outro nome.** No iOS o `Haptics.notification`
+ * é um padrão do SISTEMA, com a assinatura tátil que o iPhone usa para
+ * "concluído" e "falhou" — a paciente já a conhece de todo outro app. Uma
+ * agenda de impactos nossa soaria como uma vibração qualquer.
+ *
+ * ⚠️ **Nunca lança e nunca espera.** Ele é chamado no caminho do socorro; um
+ * `await` aqui atrasaria o envio, e uma exceção o derrubaria.
+ */
+export function hapticoDeAviso(tipo: "sucesso" | "erro"): void {
+  const haptics = carregados.Haptics;
+  if (ehNativo() && haptics?.notification) {
+    void haptics
+      .notification({ type: (tipo === "sucesso" ? "SUCCESS" : "ERROR") as never })
+      ?.catch(() => {});
+    return;
+  }
+  /* Fora da casca: dois pulsos curtos para o sucesso, três longos para o erro.
+     ⚠️ O erro DESCE e repete, como o som — é o que a deixa distinguir os dois
+     sem olhar para a tela, que é a situação inteira do SOS. */
+  tocarPadrao(tipo === "sucesso" ? [18, 60, 18] : [45, 90, 45, 90, 45]);
 }
 
 /** Interrompe o que estiver tocando. */

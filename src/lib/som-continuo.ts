@@ -48,6 +48,7 @@ export {
   NIVEL_AO_VIVO,
   ROTULO_DO_SOM,
   ofertaveis,
+  familiasDeSom,
   ehSomContinuo,
   montar,
   periodosDe,
