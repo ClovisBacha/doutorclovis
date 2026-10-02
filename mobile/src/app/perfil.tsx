@@ -1,0 +1,321 @@
+import { dueDateFromLmp } from "@/lib/gestacao";
+import { router } from "expo-router";
+import { useState } from "react";
+import { Alert, KeyboardAvoidingView, Platform, Pressable, Switch, Text, View } from "react-native";
+import {
+  Botao,
+  Campo,
+  Carregando,
+  Cartao,
+  Linha,
+  NaoConsegueLer,
+  T,
+  Tela,
+} from "~/componentes/base";
+import { limparRastrosLocais } from "~/lib/armazem";
+import { ehBancada } from "~/lib/bancada";
+import { deYmd, mascaraDeData, paraYmd, RECADO_DA_DATA, recusaDaDum } from "~/lib/datas";
+import { gravarPerfil } from "~/lib/gravar-perfil";
+import { abrir, PRIVACIDADE, TERMOS } from "~/lib/links";
+import { useSessao } from "~/lib/sessao";
+import { excluirMinhaConta, ligarModoCuidado, PALAVRA_DE_CONFIRMACAO } from "~/servidor/conta";
+import { supabase } from "~/servidor/supabase";
+import { ALVO_MINIMO, cor, fonte } from "~/tema";
+
+const texto = (v: unknown) => (typeof v === "string" ? v : "");
+
+/**
+ * O Perfil: os dados que abastecem a home e o SOS, o Modo Cuidado, os
+ * documentos, sair e excluir a conta (exigência da Apple: excluir DENTRO do
+ * app, sem passar por e-mail).
+ */
+export default function Perfil() {
+  const { perfil, estadoDoPerfil, recarregarPerfil } = useSessao();
+  if (estadoDoPerfil === "carregando") {
+    return (
+      <Tela>
+        <Carregando />
+      </Tela>
+    );
+  }
+  if (estadoDoPerfil === "falhou") {
+    return (
+      <Tela>
+        <NaoConsegueLer
+          sossego="Seus dados estão guardados."
+          aoTentar={() => void recarregarPerfil()}
+        />
+      </Tela>
+    );
+  }
+  /* A chave remonta o formulário quando o perfil chega, para os campos
+     nascerem preenchidos. */
+  return <FormularioDoPerfil key={perfil?.id ?? "novo"} />;
+}
+
+function FormularioDoPerfil() {
+  const { sessao, perfil, recarregarPerfil } = useSessao();
+  const [nome, setNome] = useState(texto(perfil?.display_name));
+  const [bebe, setBebe] = useState(texto(perfil?.baby_name));
+  const [dum, setDum] = useState(perfil?.lmp_date ? deYmd(perfil.lmp_date) : "");
+  const [contato, setContato] = useState(texto(perfil?.emergency_contact));
+  const [telefone, setTelefone] = useState(texto(perfil?.emergency_phone));
+  const [emailContato, setEmailContato] = useState(texto(perfil?.emergency_email));
+  const [sangue, setSangue] = useState(texto(perfil?.blood_type));
+  const [alergias, setAlergias] = useState(texto(perfil?.allergies));
+  const [remedios, setRemedios] = useState(texto(perfil?.medications));
+  const [recado, setRecado] = useState<{ texto: string; erro: boolean } | null>(null);
+  const [salvando, setSalvando] = useState(false);
+  const [cuidado, setCuidado] = useState(perfil?.care_mode === true);
+  const [trocandoCuidado, setTrocandoCuidado] = useState(false);
+  const [excluindo, setExcluindo] = useState<"fechado" | "aberto" | "enviando">("fechado");
+  const [palavra, setPalavra] = useState("");
+  const [erroExcluir, setErroExcluir] = useState<string | null>(null);
+
+  async function salvar() {
+    setRecado(null);
+    const uid = sessao?.user.id;
+    if (!uid || ehBancada()) return setRecado({ texto: "Na bancada nada é gravado.", erro: false });
+    const campos: Record<string, unknown> = {
+      display_name: nome.trim() || null,
+      baby_name: bebe.trim() || null,
+      emergency_contact: contato.trim() || null,
+      emergency_phone: telefone.trim() || null,
+      emergency_email: emailContato.trim() || null,
+      blood_type: sangue.trim() || null,
+      allergies: alergias.trim() || null,
+      medications: remedios.trim() || null,
+    };
+    if (dum.trim() && !perfil?.birth_date) {
+      const ymd = paraYmd(dum);
+      const r = recusaDaDum(ymd);
+      if (r || !ymd) return setRecado({ texto: RECADO_DA_DATA[r ?? "formato"], erro: true });
+      if (ymd !== perfil?.lmp_date) {
+        campos.lmp_date = ymd;
+        campos.due_date = dueDateFromLmp(ymd);
+      }
+    }
+    setSalvando(true);
+    const r = await gravarPerfil(uid, campos);
+    setSalvando(false);
+    if (!r.ok)
+      return setRecado({
+        texto: "Não conseguimos salvar. Confira a internet e tente de novo.",
+        erro: true,
+      });
+    await recarregarPerfil();
+    setRecado({
+      texto: r.ignoradas.length
+        ? "Salvo. Alguns campos ainda não são aceitos pelo servidor e ficaram de fora."
+        : "Salvo.",
+      erro: false,
+    });
+  }
+
+  async function trocarCuidado(on: boolean) {
+    if (ehBancada()) return setCuidado(on);
+    setTrocandoCuidado(true);
+    try {
+      const r = await ligarModoCuidado({ on });
+      if (r.ok) {
+        setCuidado(r.careMode);
+        await recarregarPerfil();
+      } else {
+        setRecado({
+          texto: "Não conseguimos mudar o Modo Cuidado agora. Tente de novo.",
+          erro: true,
+        });
+      }
+    } catch {
+      setRecado({ texto: "Sem conexão. O Modo Cuidado não foi alterado.", erro: true });
+    } finally {
+      setTrocandoCuidado(false);
+    }
+  }
+
+  function pedirCuidado(on: boolean) {
+    if (!on) return void trocarCuidado(false);
+    const msg =
+      "O app para de mostrar o bebê, a semana e as contagens. O SOS e o acolhimento continuam. Você pode desligar quando quiser.";
+    if (Platform.OS === "web") return void trocarCuidado(true);
+    Alert.alert("Ligar o Modo Cuidado?", msg, [
+      { text: "Agora não", style: "cancel" },
+      { text: "Ligar", onPress: () => void trocarCuidado(true) },
+    ]);
+  }
+
+  async function sair() {
+    await limparRastrosLocais();
+    await supabase.auth.signOut().catch(() => {});
+    router.replace("/entrar");
+  }
+
+  async function excluir() {
+    setErroExcluir(null);
+    if (palavra.trim().toUpperCase() !== PALAVRA_DE_CONFIRMACAO) {
+      return setErroExcluir(`Digite ${PALAVRA_DE_CONFIRMACAO} para confirmar.`);
+    }
+    if (ehBancada()) return setErroExcluir("Na bancada nada é apagado.");
+    setExcluindo("enviando");
+    try {
+      const r = await excluirMinhaConta({ confirmacao: PALAVRA_DE_CONFIRMACAO });
+      if (r.ok) {
+        await limparRastrosLocais();
+        await supabase.auth.signOut().catch(() => {});
+        router.replace("/entrar");
+        return;
+      }
+      setErroExcluir(
+        r.motivo === "sessao"
+          ? "Sua sessão expirou. Entre de novo e repita."
+          : r.motivo === "medico"
+            ? "Esta é uma conta de médico — a exclusão passa pelo suporte."
+            : "Não conseguimos excluir agora. Nada foi apagado; tente de novo.",
+      );
+    } catch {
+      setErroExcluir("Sem conexão. Nada foi apagado; tente de novo com internet.");
+    }
+    setExcluindo("aberto");
+  }
+
+  return (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
+      <Tela bordas={["top", "bottom"]}>
+        <Linha estilo={{ justifyContent: "space-between" }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Voltar"
+            onPress={() => (router.canGoBack() ? router.back() : router.replace("/inicio"))}
+            style={{ minWidth: ALVO_MINIMO, minHeight: ALVO_MINIMO, justifyContent: "center" }}
+          >
+            <Text style={{ fontSize: 17, color: cor.primariaEscura, fontFamily: fonte.forte }}>
+              ‹ Voltar
+            </Text>
+          </Pressable>
+          <T tipo="subtitulo">Perfil</T>
+          <View style={{ minWidth: ALVO_MINIMO }} />
+        </Linha>
+
+        <Cartao>
+          <T tipo="subtitulo">Você e o bebê</T>
+          <Campo rotulo="Seu nome" value={nome} onChangeText={setNome} />
+          <Campo rotulo="Nome do bebê" value={bebe} onChangeText={setBebe} />
+          {perfil?.birth_date ? (
+            <T tipo="apagado">Bebê nascido em {deYmd(perfil.birth_date)}.</T>
+          ) : (
+            <Campo
+              rotulo="Primeiro dia da última menstruação"
+              value={dum}
+              onChangeText={(t) => setDum(mascaraDeData(t))}
+              placeholder="dd/mm/aaaa"
+              keyboardType="number-pad"
+              maxLength={10}
+            />
+          )}
+        </Cartao>
+
+        <Cartao>
+          <T tipo="subtitulo">Para o SOS</T>
+          <T tipo="apagado" estilo={{ fontSize: 14 }}>
+            Fica guardado no celular e aparece na tela do SOS, mesmo sem internet.
+          </T>
+          <Campo rotulo="Contato de emergência" value={contato} onChangeText={setContato} />
+          <Campo
+            rotulo="Telefone do contato"
+            value={telefone}
+            onChangeText={setTelefone}
+            keyboardType="phone-pad"
+          />
+          <Campo
+            rotulo="E-mail do contato (opcional)"
+            value={emailContato}
+            onChangeText={setEmailContato}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+          <Campo
+            rotulo="Tipo sanguíneo"
+            value={sangue}
+            onChangeText={setSangue}
+            placeholder="Ex.: O+"
+            autoCapitalize="characters"
+          />
+          <Campo rotulo="Alergias" value={alergias} onChangeText={setAlergias} />
+          <Campo rotulo="Medicações em uso" value={remedios} onChangeText={setRemedios} />
+        </Cartao>
+
+        {recado ? (
+          <T tipo="corpo" cor={recado.erro ? cor.urgente : cor.ok}>
+            {recado.texto}
+          </T>
+        ) : null}
+        <Botao rotulo="Salvar" aoTocar={() => void salvar()} carregando={salvando} />
+
+        <Cartao>
+          <Linha estilo={{ justifyContent: "space-between" }}>
+            <View style={{ flex: 1, gap: 2 }}>
+              <T tipo="rotulo">Modo Cuidado</T>
+              <T tipo="apagado" estilo={{ fontSize: 14 }}>
+                Para quando a gestação não seguiu. O app para de falar do bebê; o SOS continua.
+              </T>
+            </View>
+            <Switch
+              accessibilityLabel="Modo Cuidado"
+              value={cuidado}
+              disabled={trocandoCuidado}
+              onValueChange={pedirCuidado}
+              trackColor={{ true: cor.primaria, false: cor.borda }}
+            />
+          </Linha>
+        </Cartao>
+
+        <Cartao>
+          <Botao rotulo="Termos de uso" tipo="texto" aoTocar={() => abrir(TERMOS)} />
+          <Botao rotulo="Política de privacidade" tipo="texto" aoTocar={() => abrir(PRIVACIDADE)} />
+          <Botao rotulo="Sair da conta" tipo="secundario" aoTocar={() => void sair()} />
+        </Cartao>
+
+        <Cartao>
+          {excluindo === "fechado" ? (
+            <Botao
+              rotulo="Excluir minha conta"
+              tipo="texto"
+              aoTocar={() => setExcluindo("aberto")}
+            />
+          ) : (
+            <>
+              <T tipo="subtitulo" cor={cor.urgente}>
+                Excluir a conta
+              </T>
+              <T tipo="corpo">
+                Apaga para sempre o seu perfil, a jornada, os registros de saúde, as publicações e
+                as conversas. Não dá para desfazer.
+              </T>
+              <Campo
+                rotulo={`Digite ${PALAVRA_DE_CONFIRMACAO} para confirmar`}
+                value={palavra}
+                onChangeText={setPalavra}
+                autoCapitalize="characters"
+              />
+              {erroExcluir ? (
+                <T tipo="corpo" cor={cor.urgente}>
+                  {erroExcluir}
+                </T>
+              ) : null}
+              <Botao
+                rotulo="Excluir para sempre"
+                tipo="perigo"
+                carregando={excluindo === "enviando"}
+                aoTocar={() => void excluir()}
+              />
+              <Botao rotulo="Cancelar" tipo="texto" aoTocar={() => setExcluindo("fechado")} />
+            </>
+          )}
+        </Cartao>
+      </Tela>
+    </KeyboardAvoidingView>
+  );
+}

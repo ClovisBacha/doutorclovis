@@ -9,6 +9,9 @@ import {
   type ReactNode,
 } from "react";
 import { ehBancada, perfilDaBancada } from "~/lib/bancada";
+import { gestacaoDoPerfil } from "~/lib/gestacao";
+import { kitDoPerfil } from "~/lib/kit-sos";
+import { guardarKitDoSos } from "~/lib/kit-sos-armazem";
 import { supabase } from "~/servidor/supabase";
 
 /**
@@ -104,8 +107,11 @@ export function ProvedorDeSessao({ children }: { children: ReactNode }) {
       setEstado("falhou");
       return;
     }
-    setPerfil((data as Perfil | null) ?? null);
-    setEstado(data ? "pronto" : "sem-perfil");
+    const p = (data as Perfil | null) ?? null;
+    setPerfil(p);
+    setEstado(p ? "pronto" : "sem-perfil");
+    /* O kit do SOS acompanha o perfil, para o socorro funcionar sem rede. */
+    if (p) void guardarKitDoSos(kitDoPerfil(p, situacaoParaSocorro(p)));
   }, [uid]);
 
   useEffect(() => {
@@ -124,6 +130,14 @@ export function ProvedorDeSessao({ children }: { children: ReactNode }) {
     [sessao, carregandoSessao, perfil, estadoDoPerfil, recarregarPerfil],
   );
   return <Contexto.Provider value={valor}>{children}</Contexto.Provider>;
+}
+
+/** A linha "situação" da ficha de emergência. No luto, nunca "gestante". */
+export function situacaoParaSocorro(p: Perfil): string | null {
+  if (p.care_mode) return "Paciente obstétrica";
+  if (p.birth_date) return "Puérpera (teve bebê recentemente)";
+  const g = gestacaoDoPerfil(p);
+  return g ? `Gestante de ${g.weeks} semanas e ${g.days} dias` : "Gestante";
 }
 
 export function useSessao(): Valor {
