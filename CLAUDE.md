@@ -374,6 +374,11 @@ commit` numa árvore que o contêiner restaurou de instantâneo antigo: o hook
 
 - Site e app da paciente em produção na Vercel; a casca nativa compila no CI e
   nunca foi assinada nem rodou num iPhone (sem Team, sem entitlements).
+- **App React Native em `mobile/` (out/2026)**: Expo 57 + expo-router, o mesmo
+  Supabase e as mesmas funções de servidor (por HTTP, `src/servidor/ponte.ts`),
+  regras puras importadas de `../src/lib`. Foco em gestantes, sem médico na
+  v1. Portão próprio: `bash mobile/scripts/verificar.sh` (e o job "App React
+  Native" da CI). Nunca rodou num iPhone. Ver `docs/diario/2026-out.md`.
 - Avaliação completa do app contra o padrão de um app iOS bem feito feita em
   23/09 (35 itens, com esforço): o que reprova na loja, o que denuncia site
   embrulhado, e o que falta de recurso. Lotes 1 a 4 saíram como PRs
@@ -392,4 +397,5 @@ O histórico de cada decisão, medição e defeito (jul a set/2026, ~17.800
 linhas) está em `docs/diario/2026-jul-set.md`. Foi movido para cá em 24/09/2026
 sem uma linha editada: dentro do `CLAUDE.md` ele entrava inteiro em toda sessão
 e consumia o contexto antes de o trabalho começar. Sessões novas registram no
-diário, não aqui; este arquivo guarda só o que vale sempre e o estado atual.
+diário (a partir de out/2026, em `docs/diario/2026-out.md`), não aqui; este
+arquivo guarda só o que vale sempre e o estado atual.
