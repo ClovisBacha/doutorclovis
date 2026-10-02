@@ -18,7 +18,11 @@ export default tseslint.config(
      arte) reprovou o portão com 36 erros de formatação em arquivos que nunca
      serão commitados — e o que estava vermelho era `bun run verificar` sobre
      um código de produção inteiro e correto. */
-  { ignores: ["dist", ".output", ".vinxi", ".vercel", "*-tmp.mjs", "scratchpad/**"] },
+  /* `mobile/**` é o app React Native (Expo): outro projeto, com tsconfig,
+     dependências e regras de lint próprios (React Native não tem DOM, e as
+     globais do navegador que este config declara não existem lá). Ele tem
+     portão próprio (`mobile/scripts/verificar.sh`), e a CI roda os dois. */
+  { ignores: ["dist", ".output", ".vinxi", ".vercel", "*-tmp.mjs", "scratchpad/**", "mobile/**"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
