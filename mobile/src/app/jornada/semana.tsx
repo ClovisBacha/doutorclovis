@@ -4,6 +4,7 @@ import { Text, View } from "react-native";
 import { babyForWeek, fruitEmojiForWeek } from "@/lib/gestacao";
 import { Botao, Cartao, Carregando, T, Tela } from "~/componentes/base";
 import { corJornada } from "~/componentes/jornada/cores";
+import { Descolar } from "~/componentes/jornada/efeitos";
 import {
   BarraDoTopo,
   BotaoRedondo,
@@ -180,9 +181,12 @@ export default function Semana() {
           gap: espaco.md,
         }}
       >
-        <Text style={{ fontSize: 36, opacity: figurinha ? 1 : 0.35 }}>
-          {fruitEmojiForWeek(semana)}
-        </Text>
+        {/* Conquistada, a figurinha descola do álbum (gira em 3D e assenta). */}
+        <Descolar ativo={figurinha}>
+          <Text style={{ fontSize: 44, opacity: figurinha ? 1 : 0.35 }}>
+            {fruitEmojiForWeek(semana)}
+          </Text>
+        </Descolar>
         <View style={{ flex: 1 }}>
           <T tipo="rotulo">
             {figurinha ? "Figurinha da semana conquistada!" : "Figurinha da semana"}

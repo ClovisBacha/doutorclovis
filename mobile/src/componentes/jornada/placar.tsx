@@ -1,9 +1,11 @@
-import { Flame, Sprout, Trophy } from "lucide-react-native";
-import { useState, type ReactNode } from "react";
+import { Flame, ShieldCheck, Sprout, Trophy } from "lucide-react-native";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
 import { T, toque } from "~/componentes/base";
 import { corJornada } from "~/componentes/jornada/cores";
+import { ChamaViva, Faiscas, Odometro } from "~/componentes/jornada/efeitos";
 import { Folha } from "~/componentes/jornada/pecas";
+import { BolhaViva } from "~/componentes/movimento";
 import { Pulso } from "~/componentes/movimento";
 import { explicacaoDaChama } from "~/lib/jornada/trilha";
 import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
@@ -36,6 +38,14 @@ export function Placar({
 }) {
   const [aberta, setAberta] = useState<null | "sementes" | "chama" | "trofeus">(null);
   const fmt = (n: number | null) => (carregando ? "…" : n == null ? "—" : String(n));
+  /* Faíscas quando o saldo SOBE (não ao carregar pela primeira vez). */
+  const saldoAntes = useRef<number | null>(null);
+  const [subiu, setSubiu] = useState(0);
+  useEffect(() => {
+    if (saldo != null && saldoAntes.current != null && saldo > saldoAntes.current)
+      setSubiu((n) => n + 1);
+    if (saldo != null) saldoAntes.current = saldo;
+  }, [saldo]);
   return (
     <>
       <View style={{ flexDirection: "row", gap: espaco.sm }}>
@@ -43,6 +53,7 @@ export function Placar({
           rotulo={`Sementinhas: ${fmt(saldo)}`}
           icone={<Sprout size={20} color={corJornada.sementinha} strokeWidth={2.4} />}
           valor={fmt(saldo)}
+          faiscas={subiu}
           fundo={corJornada.sementinhaFundo}
           corValor={corJornada.sementinha}
           aoTocar={() => setAberta("sementes")}
@@ -51,12 +62,31 @@ export function Placar({
           <Pilar
             rotulo={`Chama: ${chama} ${chama === 1 ? "dia seguido" : "dias seguidos"}`}
             icone={
-              <Flame
-                size={20}
-                color={chama > 0 ? corJornada.chama : cor.textoApagado}
-                fill={chama > 0 ? "#fdba74" : "transparent"}
-                strokeWidth={2.4}
-              />
+              <View>
+                <ChamaViva acesa={chama > 0} dias={chama}>
+                  <Flame
+                    size={20}
+                    color={chama > 0 ? corJornada.chama : cor.textoApagado}
+                    fill={chama > 0 ? "#fdba74" : "transparent"}
+                    strokeWidth={2.4}
+                  />
+                </ChamaViva>
+                {/* O escudinho: há perdão guardado — um dia em branco não apaga a chama. */}
+                {chama > 0 && perdoes > 0 ? (
+                  <View
+                    style={{
+                      position: "absolute",
+                      left: -8,
+                      bottom: -6,
+                      backgroundColor: cor.cartao,
+                      borderRadius: 8,
+                      padding: 1,
+                    }}
+                  >
+                    <ShieldCheck size={12} color={corJornada.chama} strokeWidth={2.6} />
+                  </View>
+                ) : null}
+              </View>
             }
             valor={String(chama)}
             fundo={chama > 0 ? corJornada.chamaFundo : cor.apagado}
@@ -75,6 +105,11 @@ export function Placar({
       </View>
 
       <Folha aberta={aberta === "chama"} aoFechar={() => setAberta(null)} titulo="🔥 A sua chama">
+        {chama > 0 ? (
+          <View style={{ alignItems: "center" }}>
+            <BolhaViva humor="chama" tamanho={120} />
+          </View>
+        ) : null}
         {explicacaoDaChama(chama, perdoes).map((l, i) => (
           <T key={i} tipo={i === 0 ? "rotulo" : "corpo"}>
             {l}
@@ -131,6 +166,7 @@ function Pilar({
   fundo,
   corValor,
   aoTocar,
+  faiscas,
 }: {
   rotulo: string;
   icone: ReactNode;
@@ -138,6 +174,8 @@ function Pilar({
   fundo: string;
   corValor: string;
   aoTocar: () => void;
+  /** Muda quando o valor SOBE: estoura faíscas em volta do pilar. */
+  faiscas?: number;
 }) {
   return (
     <Pressable
@@ -164,17 +202,18 @@ function Pilar({
       {icone}
       {/* O número que mudou (ganhou sementinhas, a chama subiu) dá um pulo. */}
       <Pulso chave={valor}>
-        <Text
-          style={{
+        {/* Rola até o valor novo como um odômetro. */}
+        <Odometro
+          valor={valor}
+          estilo={{
             fontFamily: fonte.titulo,
             fontSize: 18,
             color: corValor,
             fontVariant: ["tabular-nums"],
           }}
-        >
-          {valor}
-        </Text>
+        />
       </Pulso>
+      <Faiscas disparo={faiscas ?? null} cor={corValor} raio={34} />
     </Pressable>
   );
 }

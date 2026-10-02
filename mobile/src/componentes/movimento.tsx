@@ -64,6 +64,11 @@ const VIDEOS = {
   exercicio: require("../../assets/animacoes/bolha-exercicio.mp4"),
   apaixonado: require("../../assets/animacoes/bolha-apaixonado.mp4"),
   orgulhosa: require("../../assets/animacoes/bolha-orgulhosa.mp4"),
+  /* Da gamificação: a festa das cinco estrelas (estrelas em órbita), o
+     presente do dia (a caixa que abre e brotam sementinhas) e a chama. */
+  estrelas: require("../../assets/animacoes/bolha-estrelas.mp4"),
+  presente: require("../../assets/animacoes/bolha-presente.mp4"),
+  chama: require("../../assets/animacoes/bolha-chama.mp4"),
 } as const;
 
 const ARTES = {
@@ -74,6 +79,10 @@ const ARTES = {
   exercicio: require("../../../src/assets/bolha/exercicio.webp"),
   apaixonado: require("../../../src/assets/bolha/apaixonado.webp"),
   orgulhosa: require("../../../src/assets/bolha/orgulhosa.webp"),
+  /* O primeiro quadro de cada vídeo novo é a arte de onde ele nasceu. */
+  estrelas: require("../../../src/assets/bolha/comemorando.webp"),
+  presente: require("../../../src/assets/bolha/feliz.webp"),
+  chama: require("../../../src/assets/bolha/orgulhosa.webp"),
 } as const;
 
 export type HumorDaBolha = keyof typeof VIDEOS;

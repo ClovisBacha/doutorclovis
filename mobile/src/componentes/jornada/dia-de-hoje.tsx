@@ -1,9 +1,12 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { Check, ChevronRight, Lock } from "lucide-react-native";
-import { useState, type ComponentType, type ReactNode } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Image } from "expo-image";
+import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { Animated, Easing, Pressable, Text, View } from "react-native";
 import { T, toque } from "~/componentes/base";
 import { corJornada } from "~/componentes/jornada/cores";
+import { Halo, Pulinho, useBalanco } from "~/componentes/jornada/efeitos";
+import { useMovimentoReduzido } from "~/componentes/movimento";
 import { Estrelas, Folha } from "~/componentes/jornada/pecas";
 import { diaCurto, dataDoDia, diaNaSemana, quandoAbre, temaDoDia } from "~/lib/jornada/dia";
 import { flagsDoDia, type Blob } from "~/lib/jornada/momentos";
@@ -210,17 +213,24 @@ export function TrilhaDaSemana({
   return (
     <View style={{ gap: espaco.sm }}>
       <View
-        style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }}
+        style={{
+          flexDirection: "row",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          /* Espaço para a bolha que saltita em cima do dia de hoje. */
+          paddingTop: 26,
+        }}
       >
         {/* As linhas ficam numa camada ATRÁS dos nós: desenhadas dentro de cada
             nó, a do seguinte passava por cima do anterior. */}
+        {/* A linha se desenha da esquerda para a direita ao abrir a aba. */}
         {dias.slice(1).map((D, i) => (
-          <View
+          <LinhaQueSeDesenha
             key={`l${D}`}
-            pointerEvents="none"
-            style={{
+            atraso={i * 90}
+            estilo={{
               position: "absolute",
-              top: 22,
+              top: 48,
               left: `${((i + 0.5) / dias.length) * 100}%`,
               width: `${100 / dias.length}%`,
               height: 3,
@@ -233,6 +243,16 @@ export function TrilhaDaSemana({
           const data = dataDoDia(D, hojeD, hoje);
           return (
             <View key={D} style={{ flex: 1, alignItems: "center", gap: 4 }}>
+              {no.tipo === "hoje" ? (
+                /* A bolha saltita em cima do dia de hoje: "você está aqui". */
+                <Pulinho estilo={{ position: "absolute", top: -28, zIndex: 2 }}>
+                  <Image
+                    source={BOLHA_PEQUENA}
+                    style={{ width: 28, height: 28 }}
+                    contentFit="contain"
+                  />
+                </Pulinho>
+              ) : null}
               <No
                 D={D}
                 no={no}
@@ -369,6 +389,8 @@ function No({
 }) {
   const hoje = no.tipo === "hoje";
   const tam = hoje ? 46 : 40;
+  /* O dia trancado balança o cadeado antes de explicar quando abre. */
+  const { estilo: balanco, balancar } = useBalanco();
   const fechado = no.tipo !== "futuro" && no.fechado;
   const parcial = no.tipo !== "futuro" && !no.fechado && no.momentos > 0;
   const fundo =
@@ -387,6 +409,7 @@ function No({
       accessibilityLabel={rotulo}
       onPress={() => {
         toque();
+        if (no.tipo === "futuro") balancar();
         aoTocar();
       }}
       hitSlop={4}
@@ -398,17 +421,21 @@ function No({
         opacity: pressed ? 0.7 : 1,
       })}
     >
-      <View
-        style={{
-          width: tam,
-          height: tam,
-          borderRadius: tam / 2,
-          backgroundColor: fundo,
-          borderWidth: hoje ? 3 : fechado ? 0 : 2,
-          borderColor: hoje ? corJornada.roxo : parcial ? corJornada.roxoClaro : cor.borda,
-          alignItems: "center",
-          justifyContent: "center",
-        }}
+      {hoje ? <Halo cor={corJornada.roxoClaro} tamanho={tam} /> : null}
+      <Animated.View
+        style={[
+          balanco,
+          {
+            width: tam,
+            height: tam,
+            borderRadius: tam / 2,
+            backgroundColor: fundo,
+            borderWidth: hoje ? 3 : fechado ? 0 : 2,
+            borderColor: hoje ? corJornada.roxo : parcial ? corJornada.roxoClaro : cor.borda,
+            alignItems: "center",
+            justifyContent: "center",
+          },
+        ]}
       >
         {no.tipo === "futuro" ? (
           <Lock size={16} color={cor.textoApagado} />
@@ -425,7 +452,33 @@ function No({
             {no.momentos > 0 ? `${no.momentos}/5` : diaNaSemana(D)}
           </Text>
         )}
-      </View>
+      </Animated.View>
     </Pressable>
+  );
+}
+
+const BOLHA_PEQUENA = require("../../../../src/assets/bolha/feliz.webp");
+
+function LinhaQueSeDesenha({ atraso, estilo }: { atraso: number; estilo: object }) {
+  const reduzido = useMovimentoReduzido();
+  const v = useRef(new Animated.Value(reduzido ? 1 : 0)).current;
+  useEffect(() => {
+    if (reduzido) {
+      v.setValue(1);
+      return;
+    }
+    Animated.timing(v, {
+      toValue: 1,
+      duration: 380,
+      delay: 150 + atraso,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [atraso, reduzido, v]);
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[estilo, { transformOrigin: "left", transform: [{ scaleX: v }] }]}
+    />
   );
 }

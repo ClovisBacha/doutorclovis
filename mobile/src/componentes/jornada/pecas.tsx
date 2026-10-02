@@ -16,6 +16,7 @@ import Svg, { Path } from "react-native-svg";
 import { toque } from "~/componentes/base";
 import { BolhaViva, type HumorDaBolha } from "~/componentes/movimento";
 import { BotaoVoltar, PilulaSos } from "~/componentes/cabecalho";
+import { Estouro } from "~/componentes/jornada/efeitos";
 import { CORES_DO_CONFETE, corJornada } from "~/componentes/jornada/cores";
 import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
 
@@ -96,8 +97,11 @@ export function Estrelas({
       accessibilityLabel={`${feitos} de ${total} estrelas`}
       style={{ flexDirection: "row", gap: 2 }}
     >
+      {/* Cada estrela que acende estoura (infla + faíscas) — em qualquer tela. */}
       {Array.from({ length: total }, (_, i) => (
-        <Estrela key={i} acesa={i < feitos} tamanho={tamanho} />
+        <Estouro key={i} ativo={i < feitos}>
+          <Estrela acesa={i < feitos} tamanho={tamanho} />
+        </Estouro>
       ))}
     </View>
   );
@@ -350,14 +354,7 @@ export function BarraDoTopo({
             overflow: "hidden",
           }}
         >
-          <View
-            style={{
-              width: `${Math.round(Math.min(1, Math.max(0, progresso)) * 100)}%`,
-              height: "100%",
-              borderRadius: 6,
-              backgroundColor: corJornada.roxoMedio,
-            }}
-          />
+          <BarraQueEnche fracao={Math.min(1, Math.max(0, progresso))} />
         </View>
       ) : (
         <Text
@@ -415,5 +412,28 @@ export function Ficha({
         {rotulo}
       </Text>
     </Pressable>
+  );
+}
+
+/** O preenchimento da barra de progresso: anda com mola até a fração nova. */
+function BarraQueEnche({ fracao }: { fracao: number }) {
+  const v = useRef(new Animated.Value(fracao)).current;
+  useEffect(() => {
+    Animated.spring(v, {
+      toValue: fracao,
+      useNativeDriver: false,
+      speed: 14,
+      bounciness: 6,
+    }).start();
+  }, [fracao, v]);
+  return (
+    <Animated.View
+      style={{
+        width: v.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] }),
+        height: "100%",
+        borderRadius: 6,
+        backgroundColor: corJornada.roxoMedio,
+      }}
+    />
   );
 }

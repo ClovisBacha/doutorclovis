@@ -5,7 +5,6 @@ import {
   CalendarDays,
   ChevronRight,
   Footprints,
-  Gift,
   Heart,
   PenLine,
   Sparkles,
@@ -18,6 +17,8 @@ import { carregarQuizDoDia, temQuizNoDia, type DailyQuiz } from "@/lib/daily-qui
 import { gestChallenge, posChallenge } from "@/lib/daily-challenges";
 import { Botao, Cartao, Carregando, NaoConsegueLer, T, Tela, toque } from "~/componentes/base";
 import { rota } from "~/componentes/jornada/bancada";
+import { SementesSubindo } from "~/componentes/jornada/efeitos";
+import { BolhaViva } from "~/componentes/movimento";
 import { corJornada } from "~/componentes/jornada/cores";
 import { CartaoDoDia, TrilhaDaSemana, type ItemDoDia } from "~/componentes/jornada/dia-de-hoje";
 import {
@@ -707,7 +708,8 @@ function AvisoDePresente({
   return (
     <Cartao fundo={corJornada.sementinhaFundo}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.md }}>
-        <Gift size={28} color={corJornada.sementinha} />
+        {/* A bolha abre a caixa e brotam sementinhas. */}
+        <BolhaViva humor="presente" tamanho={88} />
         <View style={{ flex: 1 }}>
           <T tipo="rotulo" cor={corJornada.sementinha}>
             Você ganhou {quantidade} sementinhas 🌱
@@ -716,6 +718,7 @@ function AvisoDePresente({
         </View>
       </View>
       <Botao rotulo="Que bom!" tipo="secundario" aoTocar={aoFechar} />
+      <SementesSubindo quantidade={quantidade} disparo={quantidade} />
     </Cartao>
   );
 }

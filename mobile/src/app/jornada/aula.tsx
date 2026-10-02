@@ -1,7 +1,7 @@
 import * as Haptics from "expo-haptics";
 import { Check, X } from "lucide-react-native";
-import { useEffect, useState } from "react";
-import { Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Animated, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { gestChallenge } from "@/lib/daily-challenges";
 import { carregarQuizDoDia, isMultiQuestion, type DailyQuiz } from "@/lib/daily-quizzes";
@@ -9,6 +9,7 @@ import { Botao, Cartao, Carregando, NaoConsegueLer, T, Tela, toque } from "~/com
 import { corJornada } from "~/componentes/jornada/cores";
 import { concluirMomento, FimDoMomento, type Desfecho } from "~/componentes/jornada/fim";
 import { pagarAula } from "~/componentes/jornada/economia";
+import { useBalanco, useQuique } from "~/componentes/jornada/efeitos";
 import { BarraDoTopo, BolhaFalando, voltarParaJornada } from "~/componentes/jornada/pecas";
 import { useAtividade } from "~/componentes/jornada/usarJornada";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
@@ -408,59 +409,79 @@ function Opcao({
     },
     errada: { borda: cor.urgente, fundo: cor.urgenteFundo, selo: cor.urgente, letra: cor.branco },
   }[estado];
+  /* A opção reage ao veredito: a certa quica, a errada balança de leve — sem
+     vermelho gritando, só o "não" do corpo. */
+  const { estilo: estiloQuique, quicar } = useQuique();
+  const { estilo: estiloBalanco, balancar } = useBalanco();
+  const antes = useRef(estado);
+  useEffect(() => {
+    if (antes.current === estado) return;
+    antes.current = estado;
+    if (estado === "certa") quicar();
+    else if (estado === "errada") balancar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estado]);
   return (
-    <Pressable
-      accessibilityRole={multi ? "checkbox" : "radio"}
-      accessibilityState={{
-        checked: estado === "escolhida" || estado === "certa" || estado === "errada",
-        disabled: travada,
-      }}
-      accessibilityLabel={`${texto}${estado === "certa" || estado === "faltou" ? ", resposta certa" : estado === "errada" ? ", resposta errada" : ""}`}
-      disabled={travada}
-      onPress={() => {
-        toque();
-        aoTocar();
-      }}
-      style={({ pressed }) => ({
-        flexDirection: "row",
-        alignItems: "center",
-        gap: espaco.md,
-        minHeight: ALVO_MINIMO + 12,
-        paddingVertical: espaco.md,
-        paddingHorizontal: espaco.md,
-        borderRadius: raio.md,
-        borderWidth: 2,
-        borderStyle: estado === "faltou" ? "dashed" : "solid",
-        borderColor: visual.borda,
-        backgroundColor: visual.fundo,
-        opacity: pressed ? 0.8 : 1,
-      })}
-    >
-      <View
-        style={{
-          width: 32,
-          height: 32,
-          borderRadius: multi ? 8 : 16,
-          backgroundColor: visual.selo,
-          alignItems: "center",
-          justifyContent: "center",
+    <Animated.View style={[estiloQuique, estiloBalanco]}>
+      <Pressable
+        accessibilityRole={multi ? "checkbox" : "radio"}
+        accessibilityState={{
+          checked: estado === "escolhida" || estado === "certa" || estado === "errada",
+          disabled: travada,
         }}
+        accessibilityLabel={`${texto}${estado === "certa" || estado === "faltou" ? ", resposta certa" : estado === "errada" ? ", resposta errada" : ""}`}
+        disabled={travada}
+        onPress={() => {
+          toque();
+          aoTocar();
+        }}
+        style={({ pressed }) => ({
+          flexDirection: "row",
+          alignItems: "center",
+          gap: espaco.md,
+          minHeight: ALVO_MINIMO + 12,
+          paddingVertical: espaco.md,
+          paddingHorizontal: espaco.md,
+          borderRadius: raio.md,
+          borderWidth: 2,
+          borderStyle: estado === "faltou" ? "dashed" : "solid",
+          borderColor: visual.borda,
+          backgroundColor: visual.fundo,
+          opacity: pressed ? 0.8 : 1,
+        })}
       >
-        {estado === "certa" || estado === "faltou" ? (
-          <Check size={18} color={visual.letra} strokeWidth={3} />
-        ) : estado === "errada" ? (
-          <X size={18} color={visual.letra} strokeWidth={3} />
-        ) : (
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 15, color: visual.letra }}>
-            {letra}
-          </Text>
-        )}
-      </View>
-      <Text
-        style={{ flex: 1, fontFamily: fonte.media, fontSize: 16, lineHeight: 22, color: cor.texto }}
-      >
-        {texto}
-      </Text>
-    </Pressable>
+        <View
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: multi ? 8 : 16,
+            backgroundColor: visual.selo,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {estado === "certa" || estado === "faltou" ? (
+            <Check size={18} color={visual.letra} strokeWidth={3} />
+          ) : estado === "errada" ? (
+            <X size={18} color={visual.letra} strokeWidth={3} />
+          ) : (
+            <Text style={{ fontFamily: fonte.titulo, fontSize: 15, color: visual.letra }}>
+              {letra}
+            </Text>
+          )}
+        </View>
+        <Text
+          style={{
+            flex: 1,
+            fontFamily: fonte.media,
+            fontSize: 16,
+            lineHeight: 22,
+            color: cor.texto,
+          }}
+        >
+          {texto}
+        </Text>
+      </Pressable>
+    </Animated.View>
   );
 }

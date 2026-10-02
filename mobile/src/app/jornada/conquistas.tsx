@@ -1,8 +1,8 @@
 import * as Haptics from "expo-haptics";
 import { useFocusEffect } from "expo-router";
 import { Check, Lock } from "lucide-react-native";
-import { useCallback, useMemo, useState } from "react";
-import { Platform, Pressable, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Animated, Platform, Pressable, Text, View } from "react-native";
 import { Botao, Cartao, Carregando, NaoConsegueLer, T, Tela, toque } from "~/componentes/base";
 import { corDaRaridade, corJornada } from "~/componentes/jornada/cores";
 import { lerConquistas, resgatar, type LeituraDasConquistas } from "~/componentes/jornada/economia";
@@ -13,7 +13,8 @@ import {
   Pulsando,
   voltarParaJornada,
 } from "~/componentes/jornada/pecas";
-import { Inclinacao3D } from "~/componentes/movimento";
+import { Inclinacao3D, useMovimentoReduzido } from "~/componentes/movimento";
+import { Faiscas, SementesSubindo, useVirada } from "~/componentes/jornada/efeitos";
 import { useDiaDaJornada } from "~/componentes/jornada/usarJornada";
 import {
   montarGrade,
@@ -277,139 +278,197 @@ function CartaoDeConquista({
 }) {
   const r = corDaRaridade[c.def.raridade];
   const bloqueada = c.estado === "bloqueada";
+  /* Resgatou: o cartão dá uma volta inteira em 3D, estoura e as sementinhas
+     sobem dele. */
+  const { estilo: virada, virar } = useVirada();
+  const estadoAntes = useRef(c.estado);
+  const [festejo, setFestejo] = useState(0);
+  useEffect(() => {
+    const resgatou = estadoAntes.current === "resgatar" && c.estado === "resgatada";
+    estadoAntes.current = c.estado;
+    if (!resgatou) return;
+    virar();
+    setFestejo((n) => n + 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [c.estado]);
   /* Conquistada ganha profundidade e brilho que corre com o celular (as
      trancadas ficam chapadas: é o contraste que dá vontade de ganhar). */
   const cartao = (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${c.def.title}, ${r.rotulo.toLowerCase()}, ${
-        bloqueada ? "bloqueada" : c.estado === "resgatar" ? "pronta para resgatar" : "conquistada"
-      }`}
-      onPress={() => {
-        toque();
-        aoAbrir();
-      }}
-      style={({ pressed }) => ({
-        width: bloqueada ? "31.5%" : "100%",
-        minHeight: 150,
-        borderRadius: raio.md,
-        borderWidth: bloqueada ? 1.5 : 2.5,
-        borderColor: bloqueada ? cor.borda : r.anel,
-        backgroundColor: bloqueada ? cor.apagado : r.fundo,
-        padding: espaco.sm,
-        alignItems: "center",
-        gap: 4,
-        opacity: pressed ? 0.8 : 1,
-      })}
-    >
-      <View style={{ height: 44, alignItems: "center", justifyContent: "center" }}>
-        <Text style={{ fontSize: 32, opacity: bloqueada ? 0.3 : 1 }}>{c.def.emoji}</Text>
-        {bloqueada ? (
-          <View
-            style={{
-              position: "absolute",
-              right: -8,
-              bottom: 0,
-              backgroundColor: cor.cartao,
-              borderRadius: 10,
-              padding: 2,
-            }}
-          >
-            <Lock size={14} color={cor.textoApagado} />
-          </View>
-        ) : null}
-      </View>
-      <Text
-        numberOfLines={2}
-        style={{
-          fontFamily: fonte.forte,
-          fontSize: 13,
-          lineHeight: 17,
-          textAlign: "center",
-          color: bloqueada ? cor.textoApagado : cor.texto,
-          minHeight: 34,
+    <Animated.View style={virada}>
+      {c.estado === "resgatar" ? <AnelDaRaridade cor={r.anel} raio={raio.md} /> : null}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${c.def.title}, ${r.rotulo.toLowerCase()}, ${
+          bloqueada ? "bloqueada" : c.estado === "resgatar" ? "pronta para resgatar" : "conquistada"
+        }`}
+        onPress={() => {
+          toque();
+          aoAbrir();
         }}
+        style={({ pressed }) => ({
+          width: "100%",
+          minHeight: 150,
+          borderRadius: raio.md,
+          borderWidth: bloqueada ? 1.5 : 2.5,
+          borderColor: bloqueada ? cor.borda : r.anel,
+          backgroundColor: bloqueada ? cor.apagado : r.fundo,
+          padding: espaco.sm,
+          alignItems: "center",
+          gap: 4,
+          opacity: pressed ? 0.8 : 1,
+        })}
       >
-        {c.def.title}
-      </Text>
-      <View style={{ flex: 1, justifyContent: "flex-end", alignSelf: "stretch" }}>
-        {c.estado === "resgatar" ? (
-          <Pulsando>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Resgatar ${c.sementinhas} sementinhas`}
-              disabled={resgatando}
-              onPress={() => {
-                toque(false);
-                aoResgatar();
-              }}
+        <View style={{ height: 44, alignItems: "center", justifyContent: "center" }}>
+          <Text style={{ fontSize: 32, opacity: bloqueada ? 0.3 : 1 }}>{c.def.emoji}</Text>
+          {bloqueada ? (
+            <View
               style={{
-                minHeight: 44,
-                paddingVertical: 4,
-                borderRadius: raio.md,
-                backgroundColor: corJornada.roxo,
-                alignItems: "center",
-                justifyContent: "center",
-                paddingHorizontal: 4,
-                opacity: resgatando ? 0.6 : 1,
+                position: "absolute",
+                right: -8,
+                bottom: 0,
+                backgroundColor: cor.cartao,
+                borderRadius: 10,
+                padding: 2,
               }}
             >
-              {resgatando ? (
-                <Text style={{ fontFamily: fonte.titulo, fontSize: 13, color: cor.branco }}>…</Text>
-              ) : (
-                <>
-                  <Text
-                    style={{
-                      fontFamily: fonte.forte,
-                      fontSize: 13,
-                      lineHeight: 16,
-                      color: cor.jogoFundo,
-                    }}
-                  >
-                    Resgatar
+              <Lock size={14} color={cor.textoApagado} />
+            </View>
+          ) : null}
+        </View>
+        <Text
+          numberOfLines={2}
+          style={{
+            fontFamily: fonte.forte,
+            fontSize: 13,
+            lineHeight: 17,
+            textAlign: "center",
+            color: bloqueada ? cor.textoApagado : cor.texto,
+            minHeight: 34,
+          }}
+        >
+          {c.def.title}
+        </Text>
+        <View style={{ flex: 1, justifyContent: "flex-end", alignSelf: "stretch" }}>
+          {c.estado === "resgatar" ? (
+            <Pulsando>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Resgatar ${c.sementinhas} sementinhas`}
+                disabled={resgatando}
+                onPress={() => {
+                  toque(false);
+                  aoResgatar();
+                }}
+                style={{
+                  minHeight: 44,
+                  paddingVertical: 4,
+                  borderRadius: raio.md,
+                  backgroundColor: corJornada.roxo,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  paddingHorizontal: 4,
+                  opacity: resgatando ? 0.6 : 1,
+                }}
+              >
+                {resgatando ? (
+                  <Text style={{ fontFamily: fonte.titulo, fontSize: 13, color: cor.branco }}>
+                    …
                   </Text>
-                  <Text
-                    style={{
-                      fontFamily: fonte.titulo,
-                      fontSize: 13,
-                      lineHeight: 16,
-                      color: cor.branco,
-                    }}
-                  >
-                    +{c.sementinhas} 🌱
-                  </Text>
-                </>
-              )}
-            </Pressable>
-          </Pulsando>
-        ) : c.estado === "resgatada" || c.estado === "desbloqueada" ? (
-          <View
-            style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 3 }}
-          >
-            <Check size={13} color={r.texto} strokeWidth={3} />
-            <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: r.texto }}>
-              {dataCurta(c.quando) ?? ""}
+                ) : (
+                  <>
+                    <Text
+                      style={{
+                        fontFamily: fonte.forte,
+                        fontSize: 13,
+                        lineHeight: 16,
+                        color: cor.jogoFundo,
+                      }}
+                    >
+                      Resgatar
+                    </Text>
+                    <Text
+                      style={{
+                        fontFamily: fonte.titulo,
+                        fontSize: 13,
+                        lineHeight: 16,
+                        color: cor.branco,
+                      }}
+                    >
+                      +{c.sementinhas} 🌱
+                    </Text>
+                  </>
+                )}
+              </Pressable>
+            </Pulsando>
+          ) : c.estado === "resgatada" || c.estado === "desbloqueada" ? (
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 3,
+              }}
+            >
+              <Check size={13} color={r.texto} strokeWidth={3} />
+              <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: r.texto }}>
+                {dataCurta(c.quando) ?? ""}
+              </Text>
+            </View>
+          ) : (
+            <Text
+              style={{
+                fontFamily: fonte.media,
+                fontSize: 13,
+                color: cor.textoApagado,
+                textAlign: "center",
+              }}
+            >
+              +{c.sementinhas} 🌱
             </Text>
-          </View>
-        ) : (
-          <Text
-            style={{
-              fontFamily: fonte.media,
-              fontSize: 13,
-              color: cor.textoApagado,
-              textAlign: "center",
-            }}
-          >
-            +{c.sementinhas} 🌱
-          </Text>
-        )}
-      </View>
-    </Pressable>
+          )}
+        </View>
+      </Pressable>
+      <Faiscas disparo={festejo} cor={r.anel} raio={60} pecas={12} />
+      <SementesSubindo quantidade={c.sementinhas} disparo={festejo} />
+    </Animated.View>
   );
-  if (bloqueada) return cartao;
+  if (bloqueada) return <View style={{ width: "31.5%" }}>{cartao}</View>;
   return (
     <Inclinacao3D estilo={{ width: "31.5%" }} raio={raio.md}>
       {cartao}
     </Inclinacao3D>
+  );
+}
+
+/** O anel que respira em volta da conquista pronta para resgatar, na cor da raridade. */
+function AnelDaRaridade({ cor: corDoAnel, raio: r }: { cor: string; raio: number }) {
+  const reduzido = useMovimentoReduzido();
+  const v = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (reduzido) return;
+    const laco = Animated.loop(
+      Animated.sequence([
+        Animated.timing(v, { toValue: 1, duration: 1100, useNativeDriver: true }),
+        Animated.timing(v, { toValue: 0, duration: 1100, useNativeDriver: true }),
+      ]),
+    );
+    laco.start();
+    return () => laco.stop();
+  }, [reduzido, v]);
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        top: -5,
+        left: -5,
+        right: -5,
+        bottom: -5,
+        borderRadius: r + 5,
+        borderWidth: 3,
+        borderColor: corDoAnel,
+        opacity: reduzido ? 0.5 : v.interpolate({ inputRange: [0, 1], outputRange: [0.15, 0.7] }),
+      }}
+    />
   );
 }
