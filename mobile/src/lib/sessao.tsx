@@ -12,6 +12,7 @@ import { ehBancada, perfilDaBancada } from "~/lib/bancada";
 import { gestacaoDoPerfil } from "~/lib/gestacao";
 import { kitDoPerfil } from "~/lib/kit-sos";
 import { guardarKitDoSos } from "~/lib/kit-sos-armazem";
+import { lerMedicoLocal } from "~/lib/medico-local";
 import { supabase } from "~/servidor/supabase";
 
 /**
@@ -39,6 +40,9 @@ export type Perfil = {
   phone?: string | null;
   avatar_url?: string | null;
   food_preferences?: string | null;
+  medico_nome?: string | null;
+  medico_celular?: string | null;
+  medico_email?: string | null;
   quiz_premium?: boolean | null;
   [coluna: string]: unknown;
 };
@@ -111,7 +115,10 @@ export function ProvedorDeSessao({ children }: { children: ReactNode }) {
     setPerfil(p);
     setEstado(p ? "pronto" : "sem-perfil");
     /* O kit do SOS acompanha o perfil, para o socorro funcionar sem rede. */
-    if (p) void guardarKitDoSos(kitDoPerfil(p, situacaoParaSocorro(p)));
+    if (p) {
+      const medico = await lerMedicoLocal();
+      void guardarKitDoSos(kitDoPerfil(p, situacaoParaSocorro(p), new Date(), medico));
+    }
   }, [uid]);
 
   useEffect(() => {

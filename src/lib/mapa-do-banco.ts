@@ -546,6 +546,15 @@ export const MAPA_DO_BANCO: readonly ArquivoDoBanco[] = [
     ],
   },
   {
+    arquivo: "APLICAR_MEDICO_DA_GESTANTE.sql",
+    alvos: [
+      {
+        tabela: "patient_profiles",
+        colunas: ["medico_celular", "medico_email", "medico_nome"],
+      },
+    ],
+  },
+  {
     arquivo: "APLICAR_MEMORIA_DA_NUTRICAO.sql",
     alvos: [
       {

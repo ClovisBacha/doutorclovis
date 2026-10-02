@@ -3,6 +3,7 @@
 //
 //   bun run export:web            # gera dist-web/
 //   node scripts/fotografar.mjs <pasta-de-saida> /rota?bancada=1 /outra?bancada=1&x=y ...
+//   ALTURA=2000 node scripts/fotografar.mjs …   # telas que rolam, por inteiro
 //
 // Sai com código 1 se alguma tela der erro de JavaScript, erro de console ou
 // abrir em branco. ⚠️ A área segura é ZERO no Chromium: o que fica atrás da
@@ -39,7 +40,7 @@ const exe = existsSync("/opt/pw-browsers/chromium") ? "/opt/pw-browsers/chromium
 const navegador = await chromium.launch({ executablePath: exe });
 let falhas = 0;
 for (const rota of rotas) {
-  const pagina = await navegador.newPage({ viewport: { width: 393, height: 852 }, deviceScaleFactor: 2 });
+  const pagina = await navegador.newPage({ viewport: { width: 393, height: Number(process.env.ALTURA ?? 852) }, deviceScaleFactor: 2 });
   const problemas = [];
   pagina.on("pageerror", (e) => problemas.push(`JS: ${e.message}`));
   pagina.on("console", (m) => {

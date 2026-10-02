@@ -10,8 +10,11 @@ import {
   mensagemDeSocorro,
   telefoneInternacional,
   type KitDoSos,
+  type MedicoLocal,
 } from "~/lib/kit-sos";
 import { lerKitDoSos } from "~/lib/kit-sos-armazem";
+import { lerMedicoLocal } from "~/lib/medico-local";
+import { ehBancada } from "~/lib/bancada";
 import { abrir, ligar } from "~/lib/links";
 import { localizacaoParaSocorro, type Ponto } from "~/lib/localizacao";
 import { situacaoParaSocorro, useSessao } from "~/lib/sessao";
@@ -32,22 +35,36 @@ type Aviso =
 export default function Sos() {
   const { sessao, perfil } = useSessao();
   const [kitGuardado, setKitGuardado] = useState<KitDoSos | null>(null);
+  const [medicoLocal, setMedicoLocal] = useState<MedicoLocal | null>(null);
   const [aviso, setAviso] = useState<Aviso>({ fase: "parado" });
+  /* A localização começa a ser buscada AO ABRIR: assim o WhatsApp e o SMS já
+     saem com o mapa, sem ela esperar o GPS depois de tocar. */
+  const [pontoCedo, setPontoCedo] = useState<Ponto | null>(null);
 
   useEffect(() => {
     void lerKitDoSos().then(setKitGuardado);
+    void lerMedicoLocal().then(setMedicoLocal);
+    if (!ehBancada()) void localizacaoParaSocorro().then(setPontoCedo);
   }, []);
 
   // O perfil vivo vence o guardado; sem rede, o guardado é o que existe.
-  const kit = perfil ? kitDoPerfil(perfil, situacaoParaSocorro(perfil)) : kitGuardado;
+  const kit = perfil
+    ? kitDoPerfil(perfil, situacaoParaSocorro(perfil), new Date(), medicoLocal)
+    : kitGuardado;
   const telefoneContato = telefoneInternacional(kit?.contatoTelefone ?? null);
-  const ponto = aviso.fase === "feito" ? aviso.ponto : null;
+  const celularMedico = telefoneInternacional(kit?.medicoCelular ?? null);
+  const emailMedico = kit?.medicoEmail ?? null;
+  const temMedico = !!(celularMedico || emailMedico);
+  const quemAvisar = [kit?.contatoNome, temMedico ? (kit?.medicoNome ?? "o seu médico") : null]
+    .filter(Boolean)
+    .join(" e ");
+  const ponto = (aviso.fase === "feito" ? aviso.ponto : null) ?? pontoCedo;
   const mensagem = mensagemDeSocorro(kit, ponto?.latitude ?? null, ponto?.longitude ?? null);
 
   async function avisarContato() {
     toque(false);
     setAviso({ fase: "enviando" });
-    const p = await localizacaoParaSocorro();
+    const p = pontoCedo ?? (await localizacaoParaSocorro());
     let canais: CanaisAviso | null = null;
     let servidorFalhou = !sessao;
     if (sessao) {
@@ -66,15 +83,22 @@ export default function Sos() {
     setAviso({ fase: "feito", ponto: p, canais, servidorFalhou });
   }
 
-  async function mandarSms() {
-    if (!telefoneContato) return;
+  async function mandarSms(numero: string | null) {
+    if (!numero) return;
     const disponivel = Platform.OS !== "web" && (await SMS.isAvailableAsync().catch(() => false));
     if (disponivel) {
-      await SMS.sendSMSAsync([`+${telefoneContato}`], mensagem).catch(() => {});
+      await SMS.sendSMSAsync([`+${numero}`], mensagem).catch(() => {});
       return;
     }
     const sep = Platform.OS === "ios" ? "&" : "?";
-    abrir(`sms:+${telefoneContato}${sep}body=${encodeURIComponent(mensagem)}`);
+    abrir(`sms:+${numero}${sep}body=${encodeURIComponent(mensagem)}`);
+  }
+
+  function mandarEmail(para: string) {
+    const assunto = `SOS — ${kit?.nome ?? "uma paciente"} precisa de ajuda agora`;
+    abrir(
+      `mailto:${para}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(mensagem)}`,
+    );
   }
 
   const destinos = aviso.fase === "feito" ? (aviso.canais?.destinos ?? []) : [];
@@ -125,14 +149,14 @@ export default function Sos() {
       </Pressable>
 
       <Cartao>
-        <T tipo="subtitulo">
-          {kit?.contatoNome ? `Avisar ${kit.contatoNome}` : "Avisar o seu contato"}
-        </T>
-        {kit?.contatoTelefone || kit?.contatoNome ? (
+        <T tipo="subtitulo">{quemAvisar ? `Avisar ${quemAvisar}` : "Avisar quem você cadastrou"}</T>
+        {kit?.contatoTelefone || kit?.contatoNome || temMedico ? (
           <>
             {aviso.fase === "parado" ? (
               <>
-                <T tipo="apagado">Mandamos a sua localização para quem você cadastrou.</T>
+                <T tipo="apagado">
+                  Mandamos a sua localização e a sua ficha para quem você cadastrou.
+                </T>
                 <Botao rotulo="Avisar agora" tipo="perigo" aoTocar={() => void avisarContato()} />
               </>
             ) : null}
@@ -164,12 +188,15 @@ export default function Sos() {
             ) : null}
             {telefoneContato ? (
               <>
+                <T tipo="apagado" estilo={{ fontSize: 14 }}>
+                  Ou fale direto com {kit?.contatoNome ?? "o seu contato"}:
+                </T>
                 <Linha>
                   <Botao
                     rotulo="SMS"
                     tipo="secundario"
                     estilo={{ flex: 1 }}
-                    aoTocar={() => void mandarSms()}
+                    aoTocar={() => void mandarSms(telefoneContato)}
                   />
                   <Botao
                     rotulo="WhatsApp"
@@ -191,6 +218,63 @@ export default function Sos() {
         ) : (
           <>
             <T tipo="apagado">Você ainda não cadastrou um contato de emergência.</T>
+            {sessao ? (
+              <Botao
+                rotulo="Cadastrar no Perfil"
+                tipo="secundario"
+                aoTocar={() => router.push("/perfil")}
+              />
+            ) : null}
+          </>
+        )}
+      </Cartao>
+
+      <Cartao>
+        <T tipo="subtitulo">
+          {kit?.medicoNome ? `Falar com ${kit.medicoNome}` : "O seu médico ou médica"}
+        </T>
+        {temMedico ? (
+          <>
+            <T tipo="apagado">A mensagem leva a sua localização e o que está na ficha abaixo.</T>
+            {celularMedico ? (
+              <>
+                <Linha>
+                  <Botao
+                    rotulo="WhatsApp"
+                    tipo="secundario"
+                    estilo={{ flex: 1 }}
+                    aoTocar={() =>
+                      abrir(`https://wa.me/${celularMedico}?text=${encodeURIComponent(mensagem)}`)
+                    }
+                  />
+                  <Botao
+                    rotulo="SMS"
+                    tipo="secundario"
+                    estilo={{ flex: 1 }}
+                    aoTocar={() => void mandarSms(celularMedico)}
+                  />
+                </Linha>
+                <Botao
+                  rotulo={`Ligar para ${kit?.medicoNome ?? "o médico"}`}
+                  tipo="secundario"
+                  aoTocar={() => ligar(`+${celularMedico}`)}
+                />
+              </>
+            ) : null}
+            {emailMedico ? (
+              <Botao
+                rotulo="Mandar e-mail"
+                tipo="secundario"
+                aoTocar={() => mandarEmail(emailMedico)}
+              />
+            ) : null}
+          </>
+        ) : (
+          <>
+            <T tipo="apagado">
+              Cadastre o celular e o e-mail de quem acompanha a sua gestação para avisar em um
+              toque.
+            </T>
             {sessao ? (
               <Botao
                 rotulo="Cadastrar no Perfil"

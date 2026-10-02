@@ -7,6 +7,8 @@ import { BOLHA } from "~/componentes/artes";
 import { Botao, Campo, Cartao, Linha, T, Tela, toque } from "~/componentes/base";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { gravarPerfil } from "~/lib/gravar-perfil";
+import { guardarMedicoLocal } from "~/lib/medico-local";
+import { celularE164, emailValido } from "@/lib/medico-da-gestante";
 import {
   mascaraDeData,
   paraYmd,
@@ -18,7 +20,7 @@ import { useSessao } from "~/lib/sessao";
 import { ALVO_MINIMO, cor, espaco, raio } from "~/tema";
 
 type Modo = "dum" | "us" | "nasceu";
-const PASSOS = 4;
+const PASSOS = 5;
 
 /**
  * O ritual de boas-vindas: o mínimo para o app acompanhar a gestação, em
@@ -41,6 +43,9 @@ export default function Ritual() {
   const [bebe, setBebe] = useState(perfil?.baby_name ?? "");
   const [contato, setContato] = useState(perfil?.emergency_contact ?? "");
   const [telefone, setTelefone] = useState(perfil?.emergency_phone ?? "");
+  const [medicoNome, setMedicoNome] = useState(perfil?.medico_nome ?? "");
+  const [medicoCelular, setMedicoCelular] = useState(perfil?.medico_celular ?? "");
+  const [medicoEmail, setMedicoEmail] = useState(perfil?.medico_email ?? "");
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
 
@@ -70,6 +75,11 @@ export default function Ritual() {
       const e = conferirData();
       if (e) return setErro(e);
     }
+    if (passo === 4) {
+      if (medicoCelular.trim() && !celularE164(medicoCelular))
+        return setErro("Confira o celular: DDD e número.");
+      if (medicoEmail.trim() && !emailValido(medicoEmail)) return setErro("Confira o e-mail.");
+    }
     if (passo < PASSOS - 1) setPasso(passo + 1);
     else void salvar();
   }
@@ -85,6 +95,17 @@ export default function Ritual() {
     if (bebe.trim()) payload.baby_name = bebe.trim();
     if (contato.trim()) payload.emergency_contact = contato.trim();
     if (telefone.trim()) payload.emergency_phone = telefone.trim();
+    if (medicoNome.trim()) payload.medico_nome = medicoNome.trim();
+    if (medicoCelular.trim()) payload.medico_celular = medicoCelular.trim();
+    if (medicoEmail.trim()) payload.medico_email = medicoEmail.trim();
+    /* O médico também vai para o aparelho: o SOS sem rede e o banco que
+       ainda não tem as colunas (APLICAR_MEDICO_DA_GESTANTE.sql). */
+    if (medicoCelular.trim() || medicoEmail.trim())
+      await guardarMedicoLocal({
+        nome: medicoNome.trim() || null,
+        celular: medicoCelular.trim() || null,
+        email: medicoEmail.trim() || null,
+      });
     if (modo === "dum" && ymd) {
       payload.lmp_date = ymd;
       payload.due_date = dueDateFromLmp(ymd);
@@ -265,6 +286,38 @@ export default function Ritual() {
           </>
         ) : null}
 
+        {passo === 4 ? (
+          <>
+            <T tipo="titulo" centro>
+              Quem acompanha a sua gestação?
+            </T>
+            <T tipo="apagado" centro>
+              No SOS, o app manda o e-mail de emergência para o seu médico ou médica e deixa a
+              mensagem pronta no WhatsApp, com a sua localização.
+            </T>
+            <Campo
+              rotulo="Nome do médico ou médica"
+              value={medicoNome}
+              onChangeText={setMedicoNome}
+              autoCapitalize="words"
+            />
+            <Campo
+              rotulo="Celular (WhatsApp)"
+              value={medicoCelular}
+              onChangeText={setMedicoCelular}
+              keyboardType="phone-pad"
+              placeholder="(31) 99999-0000"
+            />
+            <Campo
+              rotulo="E-mail"
+              value={medicoEmail}
+              onChangeText={setMedicoEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+          </>
+        ) : null}
+
         {erro ? (
           <T tipo="apagado" cor={cor.urgente}>
             {erro}
@@ -275,7 +328,7 @@ export default function Ritual() {
           aoTocar={avancar}
           carregando={salvando}
         />
-        {passo === 2 || passo === 3 ? (
+        {passo >= 2 ? (
           <Botao
             rotulo="Pular por agora"
             tipo="texto"

@@ -15,6 +15,10 @@ export type KitDoSos = {
   alergias: string | null;
   medicacoes: string | null;
   situacao: string | null;
+  /** O médico que ela cadastrou (medico_* no perfil, ou o guardado no aparelho). */
+  medicoNome?: string | null;
+  medicoCelular?: string | null;
+  medicoEmail?: string | null;
   atualizadoEm: string;
 };
 
@@ -26,7 +30,13 @@ type PerfilParaKit = {
   blood_type?: string | null;
   allergies?: string | null;
   medications?: string | null;
+  medico_nome?: string | null;
+  medico_celular?: string | null;
+  medico_email?: string | null;
 };
+
+/** O médico guardado no aparelho — vale enquanto o banco não tem as colunas. */
+export type MedicoLocal = { nome: string | null; celular: string | null; email: string | null };
 
 const limpo = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
 
@@ -34,7 +44,11 @@ export function kitDoPerfil(
   perfil: PerfilParaKit,
   situacao: string | null,
   agora = new Date(),
+  medicoLocal: MedicoLocal | null = null,
 ): KitDoSos {
+  /* O banco vence quando tem; o aparelho cobre o banco que ainda não tem as
+     colunas (APLICAR_MEDICO_DA_GESTANTE.sql chega depois do código). */
+  const doBanco = !!(limpo(perfil.medico_celular) || limpo(perfil.medico_email));
   return {
     nome: limpo(perfil.display_name) ?? limpo(perfil.full_name),
     contatoNome: limpo(perfil.emergency_contact),
@@ -43,6 +57,9 @@ export function kitDoPerfil(
     alergias: limpo(perfil.allergies),
     medicacoes: limpo(perfil.medications),
     situacao,
+    medicoNome: doBanco ? limpo(perfil.medico_nome) : limpo(medicoLocal?.nome),
+    medicoCelular: doBanco ? limpo(perfil.medico_celular) : limpo(medicoLocal?.celular),
+    medicoEmail: doBanco ? limpo(perfil.medico_email) : limpo(medicoLocal?.email),
     atualizadoEm: agora.toISOString(),
   };
 }

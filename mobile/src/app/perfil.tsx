@@ -1,6 +1,6 @@
 import { dueDateFromLmp } from "@/lib/gestacao";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, KeyboardAvoidingView, Platform, Pressable, Switch, Text, View } from "react-native";
 import {
   Botao,
@@ -16,6 +16,8 @@ import { limparRastrosLocais } from "~/lib/armazem";
 import { ehBancada } from "~/lib/bancada";
 import { deYmd, mascaraDeData, paraYmd, RECADO_DA_DATA, recusaDaDum } from "~/lib/datas";
 import { gravarPerfil } from "~/lib/gravar-perfil";
+import { guardarMedicoLocal, lerMedicoLocal } from "~/lib/medico-local";
+import { celularE164, emailValido } from "@/lib/medico-da-gestante";
 import { CartaoDaPermissaoDeIA } from "~/lib/ia/PermissaoDeIA";
 import { abrir, PRIVACIDADE, TERMOS } from "~/lib/links";
 import { useSessao } from "~/lib/sessao";
@@ -65,6 +67,20 @@ function FormularioDoPerfil() {
   const [sangue, setSangue] = useState(texto(perfil?.blood_type));
   const [alergias, setAlergias] = useState(texto(perfil?.allergies));
   const [remedios, setRemedios] = useState(texto(perfil?.medications));
+  const [medicoNome, setMedicoNome] = useState(texto(perfil?.medico_nome));
+  const [medicoCelular, setMedicoCelular] = useState(texto(perfil?.medico_celular));
+  const [medicoEmail, setMedicoEmail] = useState(texto(perfil?.medico_email));
+
+  /* Enquanto o banco não tem as colunas do médico, o que vale é o guardado
+     no aparelho: preenche os campos que vieram vazios do perfil. */
+  useEffect(() => {
+    void lerMedicoLocal().then((m) => {
+      if (!m || perfil?.medico_celular || perfil?.medico_email) return;
+      setMedicoNome((v) => v || (m.nome ?? ""));
+      setMedicoCelular((v) => v || (m.celular ?? ""));
+      setMedicoEmail((v) => v || (m.email ?? ""));
+    });
+  }, [perfil?.medico_celular, perfil?.medico_email]);
   const [recado, setRecado] = useState<{ texto: string; erro: boolean } | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [cuidado, setCuidado] = useState(perfil?.care_mode === true);
@@ -86,7 +102,16 @@ function FormularioDoPerfil() {
       blood_type: sangue.trim() || null,
       allergies: alergias.trim() || null,
       medications: remedios.trim() || null,
+      medico_nome: medicoNome.trim() || null,
+      medico_celular: medicoCelular.trim() || null,
+      medico_email: medicoEmail.trim() || null,
     };
+    if (medicoCelular.trim() && !celularE164(medicoCelular)) {
+      return setRecado({ texto: "Confira o celular do médico: DDD e número.", erro: true });
+    }
+    if (medicoEmail.trim() && !emailValido(medicoEmail)) {
+      return setRecado({ texto: "Confira o e-mail do médico.", erro: true });
+    }
     if (dum.trim() && !perfil?.birth_date) {
       const ymd = paraYmd(dum);
       const r = recusaDaDum(ymd);
@@ -97,6 +122,13 @@ function FormularioDoPerfil() {
       }
     }
     setSalvando(true);
+    /* O médico vai também para o aparelho: o SOS precisa dele sem rede e
+       antes de o banco aceitar as colunas. */
+    await guardarMedicoLocal({
+      nome: medicoNome.trim() || null,
+      celular: medicoCelular.trim() || null,
+      email: medicoEmail.trim() || null,
+    });
     const r = await gravarPerfil(uid, campos);
     setSalvando(false);
     if (!r.ok)
@@ -106,7 +138,7 @@ function FormularioDoPerfil() {
       });
     await recarregarPerfil();
     setRecado({
-      texto: r.ignoradas.length
+      texto: r.ignoradas.some((c) => !c.startsWith("medico_"))
         ? "Salvo. Alguns campos ainda não são aceitos pelo servidor e ficaram de fora."
         : "Salvo.",
       erro: false,
@@ -246,6 +278,34 @@ function FormularioDoPerfil() {
           />
           <Campo rotulo="Alergias" value={alergias} onChangeText={setAlergias} />
           <Campo rotulo="Medicações em uso" value={remedios} onChangeText={setRemedios} />
+        </Cartao>
+
+        <Cartao>
+          <T tipo="subtitulo">Quem acompanha a sua gestação</T>
+          <T tipo="apagado" estilo={{ fontSize: 14 }}>
+            No SOS, o app manda para essa pessoa o e-mail de emergência e oferece a mensagem pronta
+            no WhatsApp, com a sua localização e a sua ficha.
+          </T>
+          <Campo
+            rotulo="Nome do médico ou médica"
+            value={medicoNome}
+            onChangeText={setMedicoNome}
+            autoCapitalize="words"
+          />
+          <Campo
+            rotulo="Celular (WhatsApp)"
+            value={medicoCelular}
+            onChangeText={setMedicoCelular}
+            keyboardType="phone-pad"
+            placeholder="(31) 99999-0000"
+          />
+          <Campo
+            rotulo="E-mail"
+            value={medicoEmail}
+            onChangeText={setMedicoEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
         </Cartao>
 
         {recado ? (

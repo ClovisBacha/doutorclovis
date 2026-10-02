@@ -28,3 +28,21 @@ describe("o kit do SOS", () => {
     expect(mensagemDeSocorro(null, null, null)).not.toContain("maps");
   });
 });
+
+describe("o médico no kit", () => {
+  test("o banco vence; sem as colunas, vale o guardado no aparelho", () => {
+    const local = { nome: "Dra. Ana", celular: "31988887777", email: null };
+    const doBanco = kitDoPerfil(
+      { medico_nome: "Dr. Clóvis", medico_celular: "31999990000" },
+      null,
+      new Date(),
+      local,
+    );
+    expect(doBanco.medicoNome).toBe("Dr. Clóvis");
+    expect(doBanco.medicoCelular).toBe("31999990000");
+    const semColunas = kitDoPerfil({ display_name: "Marina" }, null, new Date(), local);
+    expect(semColunas.medicoNome).toBe("Dra. Ana");
+    expect(semColunas.medicoCelular).toBe("31988887777");
+    expect(kitDoPerfil({}, null).medicoNome).toBeNull();
+  });
+});

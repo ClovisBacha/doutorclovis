@@ -8,6 +8,7 @@ export type CanaisAviso = {
   sms: boolean;
   destinos: { nome: string; via: string }[];
   faltou: string | null;
+  medicoContato?: boolean;
 };
 
 export const dispararEmergencia = funcaoDoServidor<
