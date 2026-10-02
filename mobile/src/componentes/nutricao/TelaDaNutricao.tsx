@@ -1,11 +1,12 @@
 import { passoDaDigitacao, avisoQuePodeAparecer } from "@/lib/chat-stream";
 import { tituloDaFoto, type AssuntoDaFoto } from "@/lib/foto-da-nutricao";
 import { type MotivoDoBloqueio } from "@/lib/nutricao-premium";
+import { BotaoVoltar, PilulaSos } from "~/componentes/cabecalho";
 import { recadoDaAmostraNoApp, recadoDoBloqueioNoApp } from "~/lib/nutricao/recados-no-app";
 import { pedeSocorro } from "@/lib/socorro-na-nutricao";
 import * as ImagePicker from "expo-image-picker";
 import { Redirect, router } from "expo-router";
-import { ArrowUp, Camera, ChevronLeft, Phone, ScanText, ShieldCheck, X } from "lucide-react-native";
+import { ArrowUp, Camera, Phone, ScanText, ShieldCheck, X } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   AccessibilityInfo,
@@ -654,22 +655,7 @@ function Cabecalho({
         gap: espaco.xs,
       }}
     >
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Voltar"
-        onPress={() => {
-          toque();
-          aoVoltar();
-        }}
-        style={{
-          width: ALVO_MINIMO,
-          height: ALVO_MINIMO,
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <ChevronLeft size={28} color={cor.texto} />
-      </Pressable>
+      <BotaoVoltar aoTocar={aoVoltar} />
       <View style={{ flex: 1 }}>
         <T tipo="subtitulo">Nutrição</T>
         <T tipo="apagado" estilo={{ fontSize: 13, lineHeight: 17 }}>
@@ -686,19 +672,16 @@ function Cabecalho({
           }}
           style={({ pressed }) => ({
             minHeight: ALVO_MINIMO,
-            flexDirection: "row",
+            minWidth: ALVO_MINIMO,
             alignItems: "center",
-            gap: 4,
-            paddingHorizontal: espaco.sm,
+            justifyContent: "center",
             opacity: pressed ? 0.6 : 1,
           })}
         >
-          <ShieldCheck size={18} color={cor.nutricao} />
-          <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: cor.nutricao }}>
-            Permissão de IA
-          </Text>
+          <ShieldCheck size={22} color={cor.nutricao} />
         </Pressable>
       ) : null}
+      <PilulaSos />
     </View>
   );
 }

@@ -222,7 +222,12 @@ export default function Chutes() {
     void buscar();
   }
 
-  if (estadoDoPerfil === "carregando") return <Carregando />;
+  if (estadoDoPerfil === "carregando")
+    return (
+      <Tela>
+        <Carregando />
+      </Tela>
+    );
   if (cuidado || perfil?.birth_date) return <Redirect href="/saude" />;
 
   const minutos = emCurso ? (agora - new Date(emCurso.startedAt).getTime()) / 60000 : 0;

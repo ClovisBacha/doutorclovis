@@ -357,6 +357,7 @@ export function Inclinacao3D({
   estilo,
   raio = 24,
   brilho = true,
+  estiloDeFora,
 }: {
   children: ReactNode;
   aoTocar?: () => void;
@@ -364,6 +365,8 @@ export function Inclinacao3D({
   estilo?: StyleProp<ViewStyle>;
   raio?: number;
   brilho?: boolean;
+  /** Layout no pai (flexBasis, largura numa grade): vai no invólucro tocável. */
+  estiloDeFora?: StyleProp<ViewStyle>;
 }) {
   const reduzido = useMovimentoReduzido();
   const rx = useRef(new Animated.Value(0)).current;
@@ -461,9 +464,10 @@ export function Inclinacao3D({
       ) : null}
     </Animated.View>
   );
-  if (!aoTocar) return corpo;
+  if (!aoTocar) return estiloDeFora ? <View style={estiloDeFora}>{corpo}</View> : corpo;
   return (
     <Pressable
+      style={estiloDeFora}
       accessibilityRole="button"
       accessibilityLabel={rotuloAcessivel}
       onPressIn={aoPressionar}

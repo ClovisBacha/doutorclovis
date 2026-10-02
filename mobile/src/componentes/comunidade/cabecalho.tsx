@@ -1,14 +1,12 @@
-import { router } from "expo-router";
-import { ChevronLeft } from "lucide-react-native";
 import type { ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
 import { toque } from "~/componentes/base";
+import { BotaoVoltar, PilulaSos, voltarOu } from "~/componentes/cabecalho";
 import { ALVO_MINIMO, cor, espaco, fonte } from "~/tema";
 
 /** Volta; sem histórico (link aberto direto), cai no feed. */
 export function voltar() {
-  if (router.canGoBack()) router.back();
-  else router.replace("/comunidade");
+  voltarOu("/comunidade");
 }
 
 /** A barra de cima das telas empilhadas da Comunidade: voltar, título, ação. */
@@ -18,33 +16,32 @@ export function Cabecalho({ titulo, direita }: { titulo: string; direita?: React
       style={{
         flexDirection: "row",
         alignItems: "center",
-        paddingHorizontal: espaco.xs,
+        paddingHorizontal: espaco.lg,
+        gap: espaco.sm,
         minHeight: ALVO_MINIMO + 8,
         borderBottomWidth: 1,
         borderBottomColor: cor.borda,
         backgroundColor: cor.fundo,
       }}
     >
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Voltar"
-        onPress={() => {
-          toque();
-          voltar();
-        }}
-        hitSlop={6}
-        style={{ width: ALVO_MINIMO, height: ALVO_MINIMO, alignItems: "center", justifyContent: "center" }}
-      >
-        <ChevronLeft size={28} color={cor.texto} />
-      </Pressable>
+      <BotaoVoltar voltarPara="/comunidade" />
       <Text
         accessibilityRole="header"
         numberOfLines={1}
-        style={{ flex: 1, fontFamily: fonte.titulo, fontSize: 18, color: cor.texto, textAlign: "center" }}
+        style={{
+          flex: 1,
+          fontFamily: fonte.titulo,
+          fontSize: 18,
+          color: cor.texto,
+          textAlign: "center",
+        }}
       >
         {titulo}
       </Text>
-      <View style={{ minWidth: ALVO_MINIMO, alignItems: "flex-end" }}>{direita}</View>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.xs }}>
+        {direita}
+        <PilulaSos />
+      </View>
     </View>
   );
 }
@@ -96,7 +93,9 @@ export function BotaoIcone({
             borderColor: cor.fundo,
           }}
         >
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 13, lineHeight: 16, color: cor.branco }}>
+          <Text
+            style={{ fontFamily: fonte.titulo, fontSize: 13, lineHeight: 16, color: cor.branco }}
+          >
             {selo > 9 ? "9+" : selo}
           </Text>
         </View>

@@ -16,15 +16,7 @@ import { Pressable, Text, View } from "react-native";
 import { babyForWeek, fruitEmojiForWeek } from "@/lib/gestacao";
 import { carregarQuizDoDia, temQuizNoDia, type DailyQuiz } from "@/lib/daily-quizzes";
 import { gestChallenge, posChallenge } from "@/lib/daily-challenges";
-import {
-  Botao,
-  Cartao,
-  Carregando,
-  NaoConsegueLer,
-  T,
-  Tela,
-  toque,
-} from "~/componentes/base";
+import { Botao, Cartao, Carregando, NaoConsegueLer, T, Tela, toque } from "~/componentes/base";
 import { rota } from "~/componentes/jornada/bancada";
 import { corJornada } from "~/componentes/jornada/cores";
 import { CartaoDoDia, TrilhaDaSemana, type ItemDoDia } from "~/componentes/jornada/dia-de-hoje";
@@ -102,7 +94,10 @@ const ir = (caminho: string) => router.push(rota(caminho) as never);
    Carteira, conquistas e reconciliação — o que a aba lê ao ganhar foco
    ══════════════════════════════════════════════════════════════════════════ */
 
-type EstadoDaCarteira = { estado: "carregando" } | { estado: "falhou" } | { estado: "ok"; dados: CarteiraOk };
+type EstadoDaCarteira =
+  | { estado: "carregando" }
+  | { estado: "falhou" }
+  | { estado: "ok"; dados: CarteiraOk };
 
 function useCarteira(ativa: boolean) {
   const [carteira, setCarteira] = useState<EstadoDaCarteira>({ estado: "carregando" });
@@ -286,7 +281,10 @@ function JornadaDaGestacao({
 
   return (
     <Tela>
-      <Saudacao titulo="Sua jornada" sub={nome ? `Que bom te ver, ${nome}.` : "Um dia de cada vez."} />
+      <Saudacao
+        titulo="Sua jornada"
+        sub={nome ? `Que bom te ver, ${nome}.` : "Um dia de cada vez."}
+      />
       <Placar
         saldo={carteira.estado === "ok" ? carteira.dados.balance : null}
         trofeus={carteira.estado === "ok" ? carteira.dados.trofeus : null}
@@ -353,7 +351,9 @@ function JornadaDaGestacao({
           })}
         >
           <CalendarDays size={18} color={corJornada.roxo} />
-          <Text style={{ fontFamily: fonte.forte, fontSize: 15, color: corJornada.roxo }}>Ver a semana</Text>
+          <Text style={{ fontFamily: fonte.forte, fontSize: 15, color: corJornada.roxo }}>
+            Ver a semana
+          </Text>
         </Pressable>
       </View>
       <Cartao estilo={{ paddingHorizontal: espaco.sm, paddingVertical: espaco.md }}>
@@ -432,11 +432,18 @@ function JornadaDoPosParto({
         pos
       />
       {carteira.estado === "falhou" ? (
-        <NaoConsegueLer sossego="Os seus momentos de hoje continuam guardados." aoTentar={() => void recarregar()} />
+        <NaoConsegueLer
+          sossego="Os seus momentos de hoje continuam guardados."
+          aoTentar={() => void recarregar()}
+        />
       ) : null}
       <CartaoDoDia
         sobre={`Semana ${Math.floor(idadeDias / 7) + 1} de vida`}
-        titulo={idadeDias === 0 ? `🍼 ${quem} nasceu hoje` : `🍼 ${quem} com ${idadeDias} ${idadeDias === 1 ? "dia" : "dias"}`}
+        titulo={
+          idadeDias === 0
+            ? `🍼 ${quem} nasceu hoje`
+            : `🍼 ${quem} com ${idadeDias} ${idadeDias === 1 ? "dia" : "dias"}`
+        }
         linha={null}
         feitos={feitos}
         total={itens.length}
@@ -492,7 +499,10 @@ function JornadaDoCuidado({ uid }: { uid: string }) {
   ];
   return (
     <Tela>
-      <Saudacao titulo="Cuidar de você" sub="Um momento por dia, no seu ritmo. Sem placar e sem pressa." />
+      <Saudacao
+        titulo="Cuidar de você"
+        sub="Um momento por dia, no seu ritmo. Sem placar e sem pressa."
+      />
       <CartaoDoDia
         sobre={dataPorExtenso(new Date())}
         titulo="Três cuidados com você"
@@ -522,10 +532,14 @@ function JornadaSemData({ uid }: { uid: string }) {
           Falta saber de quantas semanas você está
         </T>
         <T tipo="apagado">
-          A aula de cada dia, os desafios e a trilha seguem a sua gestação. Assim que o seu perfil tiver a
-          data da última menstruação ou a do ultrassom, a jornada se monta sozinha.
+          A aula de cada dia, os desafios e a trilha seguem a sua gestação. Assim que o seu perfil
+          tiver a data da última menstruação ou a do ultrassom, a jornada se monta sozinha.
         </T>
-        <Botao rotulo="Informar a data" tipo="secundario" aoTocar={() => router.push("/perfil")} />
+        <Botao
+          rotulo="Informar a data"
+          tipo="secundario"
+          aoTocar={() => router.push("/ritual?editar=1")}
+        />
       </Cartao>
       <CartaoDoDia
         sobre={dataPorExtenso(new Date())}
@@ -562,7 +576,20 @@ function JornadaSemData({ uid }: { uid: string }) {
    Peças da aba
    ══════════════════════════════════════════════════════════════════════════ */
 
-const MESES = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+const MESES = [
+  "janeiro",
+  "fevereiro",
+  "março",
+  "abril",
+  "maio",
+  "junho",
+  "julho",
+  "agosto",
+  "setembro",
+  "outubro",
+  "novembro",
+  "dezembro",
+];
 
 function dataPorExtenso(d: Date): string {
   return `${diaLongo(d)}, ${d.getDate()} de ${MESES[d.getMonth()]}`;
@@ -671,7 +698,12 @@ function AvisoDePresente({
   aoFechar: () => void;
 }) {
   const quem =
-    nome?.trim() || (de === "criadora" ? "a equipe da Obstétrica" : de === "amiga" ? "uma amiga" : "o seu médico");
+    nome?.trim() ||
+    (de === "criadora"
+      ? "a equipe da Obstétrica"
+      : de === "amiga"
+        ? "uma amiga"
+        : "a equipe da Obstétrica");
   return (
     <Cartao fundo={corJornada.sementinhaFundo}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.md }}>

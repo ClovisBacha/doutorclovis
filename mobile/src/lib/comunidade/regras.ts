@@ -375,7 +375,7 @@ export function cartoesDoApp(): CartaoDaComunidade[] {
           ...c,
           texto: c.texto.replace(
             /Ele avisa o seu médico e o seu contato de uma vez\.?/,
-            "Ele liga para o 192 e avisa o seu contato de emergência.",
+            "Ele abre o 192 e avisa quem você cadastrou.",
           ),
         }
       : c,

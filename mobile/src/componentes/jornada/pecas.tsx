@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { ChevronLeft, X } from "lucide-react-native";
+import { X } from "lucide-react-native";
 import { useEffect, useRef, type ReactNode } from "react";
 import {
   Animated,
@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import { toque } from "~/componentes/base";
 import { BolhaViva, type HumorDaBolha } from "~/componentes/movimento";
+import { BotaoVoltar, PilulaSos } from "~/componentes/cabecalho";
 import { CORES_DO_CONFETE, corJornada } from "~/componentes/jornada/cores";
 import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
 
@@ -338,13 +339,7 @@ export function BarraDoTopo({
         minHeight: ALVO_MINIMO + 4,
       }}
     >
-      <BotaoRedondo rotulo={fechar ? "Sair" : "Voltar"} aoTocar={aoSair ?? voltarParaJornada}>
-        {fechar ? (
-          <X size={22} color={cor.textoApagado} />
-        ) : (
-          <ChevronLeft size={24} color={cor.textoApagado} />
-        )}
-      </BotaoRedondo>
+      <BotaoVoltar fechar={fechar} aoTocar={aoSair ?? voltarParaJornada} />
       {progresso != null ? (
         <View
           style={{
@@ -372,6 +367,7 @@ export function BarraDoTopo({
           {titulo}
         </Text>
       )}
+      <PilulaSos />
     </View>
   );
 }

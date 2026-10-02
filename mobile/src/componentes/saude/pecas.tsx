@@ -1,10 +1,12 @@
 import type { Gravidade } from "@/lib/sinais-clinicos";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { ChevronLeft, Phone } from "lucide-react-native";
+import { Phone } from "lucide-react-native";
 import type { ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Botao, Cartao, Linha, T, toque } from "~/componentes/base";
+import { BotaoVoltar, PilulaSos } from "~/componentes/cabecalho";
+import { SAMU } from "~/config";
 import { ligar } from "~/lib/links";
 import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
 
@@ -33,28 +35,7 @@ export function Cabecalho({
 }) {
   return (
     <Linha estilo={{ gap: espaco.md, marginBottom: espaco.xs }}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Voltar para Saúde"
-        onPress={() => {
-          toque();
-          voltarParaSaude();
-        }}
-        hitSlop={8}
-        style={({ pressed }) => ({
-          width: ALVO_MINIMO,
-          height: ALVO_MINIMO,
-          borderRadius: raio.pilula,
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: cor.cartao,
-          borderWidth: 1,
-          borderColor: cor.borda,
-          opacity: pressed ? 0.7 : 1,
-        })}
-      >
-        <ChevronLeft size={24} color={cor.texto} />
-      </Pressable>
+      <BotaoVoltar voltarPara="/saude" />
       {arte ? (
         <View
           style={{
@@ -72,17 +53,24 @@ export function Cabecalho({
       <T tipo="titulo" estilo={{ flex: 1, fontSize: 24 }} linhas={2}>
         {titulo}
       </T>
+      <PilulaSos />
     </Linha>
   );
 }
 
 /** O botão do 192 — liga direto, funciona sem internet. */
-export function BotaoLigar192({ grande, rotulo = "Ligar 192" }: { grande?: boolean; rotulo?: string }) {
+export function BotaoLigar192({
+  grande,
+  rotulo = "Ligar 192",
+}: {
+  grande?: boolean;
+  rotulo?: string;
+}) {
   return (
     <Botao
       rotulo={rotulo}
       tipo="perigo"
-      aoTocar={() => ligar("192")}
+      aoTocar={() => ligar(SAMU)}
       icone={<Phone size={grande ? 22 : 18} color={cor.branco} />}
       estilo={grande ? { minHeight: 60 } : undefined}
     />

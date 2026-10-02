@@ -1,7 +1,7 @@
 import { dueDateFromLmp } from "@/lib/gestacao";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, KeyboardAvoidingView, Platform, Pressable, Switch, Text, View } from "react-native";
+import { Alert, KeyboardAvoidingView, Platform, Switch, View } from "react-native";
 import {
   Botao,
   Campo,
@@ -14,16 +14,17 @@ import {
 } from "~/componentes/base";
 import { limparRastrosLocais } from "~/lib/armazem";
 import { ehBancada } from "~/lib/bancada";
-import { deYmd, mascaraDeData, paraYmd, RECADO_DA_DATA, recusaDaDum } from "~/lib/datas";
+import { deYmd, paraYmd, RECADO_DA_DATA, recusaDaDum } from "~/lib/datas";
 import { gravarPerfil } from "~/lib/gravar-perfil";
 import { guardarMedicoLocal, lerMedicoLocal } from "~/lib/medico-local";
 import { celularE164, emailValido } from "@/lib/medico-da-gestante";
 import { CartaoDaPermissaoDeIA } from "~/lib/ia/PermissaoDeIA";
 import { abrir, PRIVACIDADE, TERMOS } from "~/lib/links";
+import { CabecalhoDaPilha } from "~/componentes/cabecalho";
 import { useSessao } from "~/lib/sessao";
 import { excluirMinhaConta, ligarModoCuidado, PALAVRA_DE_CONFIRMACAO } from "~/servidor/conta";
 import { supabase } from "~/servidor/supabase";
-import { ALVO_MINIMO, cor, fonte } from "~/tema";
+import { cor } from "~/tema";
 
 const texto = (v: unknown) => (typeof v === "string" ? v : "");
 
@@ -57,10 +58,10 @@ export default function Perfil() {
 }
 
 function FormularioDoPerfil() {
-  const { sessao, perfil, recarregarPerfil } = useSessao();
+  const { sessao, perfil, recarregarPerfil, cuidado: cuidadoDaSessao } = useSessao();
   const [nome, setNome] = useState(texto(perfil?.display_name));
   const [bebe, setBebe] = useState(texto(perfil?.baby_name));
-  const [dum, setDum] = useState(perfil?.lmp_date ? deYmd(perfil.lmp_date) : "");
+  const [dum] = useState(perfil?.lmp_date ? deYmd(perfil.lmp_date) : "");
   const [contato, setContato] = useState(texto(perfil?.emergency_contact));
   const [telefone, setTelefone] = useState(texto(perfil?.emergency_phone));
   const [emailContato, setEmailContato] = useState(texto(perfil?.emergency_email));
@@ -217,37 +218,35 @@ function FormularioDoPerfil() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <Tela bordas={["top", "bottom"]}>
-        <Linha estilo={{ justifyContent: "space-between" }}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Voltar"
-            onPress={() => (router.canGoBack() ? router.back() : router.replace("/inicio"))}
-            style={{ minWidth: ALVO_MINIMO, minHeight: ALVO_MINIMO, justifyContent: "center" }}
-          >
-            <Text style={{ fontSize: 17, color: cor.primariaEscura, fontFamily: fonte.forte }}>
-              ‹ Voltar
-            </Text>
-          </Pressable>
-          <T tipo="subtitulo">Perfil</T>
-          <View style={{ minWidth: ALVO_MINIMO }} />
-        </Linha>
+        <CabecalhoDaPilha titulo="Perfil" voltarPara="/inicio" />
 
         <Cartao>
-          <T tipo="subtitulo">Você e o bebê</T>
+          <T tipo="subtitulo">{cuidadoDaSessao ? "Você" : "Você e o bebê"}</T>
           <Campo rotulo="Seu nome" value={nome} onChangeText={setNome} />
-          <Campo rotulo="Nome do bebê" value={bebe} onChangeText={setBebe} />
-          {perfil?.birth_date ? (
-            <T tipo="apagado">Bebê nascido em {deYmd(perfil.birth_date)}.</T>
-          ) : (
-            <Campo
-              rotulo="Primeiro dia da última menstruação"
-              value={dum}
-              onChangeText={(t) => setDum(mascaraDeData(t))}
-              placeholder="dd/mm/aaaa"
-              keyboardType="number-pad"
-              maxLength={10}
-            />
-          )}
+          {/* No Modo Cuidado o Perfil também para de falar do bebê. */}
+          {!cuidadoDaSessao ? (
+            <>
+              <Campo rotulo="Nome do bebê" value={bebe} onChangeText={setBebe} />
+              <T tipo="apagado" estilo={{ fontSize: 14 }}>
+                {perfil?.birth_date
+                  ? `Bebê nascido em ${deYmd(perfil.birth_date)}.`
+                  : perfil?.reference_date
+                    ? `Gestação contada pelo ultrassom de ${deYmd(perfil.reference_date)}.`
+                    : perfil?.lmp_date
+                      ? `Gestação contada pela última menstruação (${deYmd(perfil.lmp_date)}).`
+                      : "Ainda sem a data da gestação."}
+              </T>
+              <Botao
+                rotulo={
+                  perfil?.birth_date
+                    ? "Corrigir a data"
+                    : "Corrigir a data ou contar que o bebê nasceu"
+                }
+                tipo="secundario"
+                aoTocar={() => router.push("/ritual?editar=1")}
+              />
+            </>
+          ) : null}
         </Cartao>
 
         <Cartao>

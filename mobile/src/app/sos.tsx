@@ -1,5 +1,6 @@
 import * as SMS from "expo-sms";
 import { router } from "expo-router";
+import { X } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
 import { Botao, Cartao, Linha, T, Tela, toque } from "~/componentes/base";
@@ -120,7 +121,7 @@ export default function Sos() {
             justifyContent: "center",
           }}
         >
-          <Text style={{ fontSize: 26, color: cor.urgente, fontFamily: fonte.forte }}>✕</Text>
+          <X size={28} color={cor.urgente} />
         </Pressable>
       </Linha>
 

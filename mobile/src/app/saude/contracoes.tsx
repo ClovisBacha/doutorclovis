@@ -10,6 +10,7 @@ import { Cabecalho, CartaoDeSocorro, Confirmacao, Escolha } from "~/componentes/
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { gestacaoDoPerfil } from "~/lib/gestacao";
 import { ligar } from "~/lib/links";
+import { SAMU } from "~/config";
 import { gravarFila, lerFila } from "~/lib/saude/armazem-de-filas";
 import { contracoesDeExemplo } from "~/lib/saude/bancada";
 import { isoNormal } from "~/lib/saude/chutes";
@@ -310,7 +311,7 @@ export default function Contracoes() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Ligar 192: ${b}`}
-              onPress={() => ligar("192")}
+              onPress={() => ligar(SAMU)}
               style={({ pressed }) => ({
                 minHeight: ALVO_MINIMO,
                 paddingHorizontal: espaco.md,

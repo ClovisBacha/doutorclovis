@@ -4,6 +4,7 @@ import { Pressable, Text, View } from "react-native";
 import { T, toque } from "~/componentes/base";
 import { corJornada } from "~/componentes/jornada/cores";
 import { Folha } from "~/componentes/jornada/pecas";
+import { Pulso } from "~/componentes/movimento";
 import { explicacaoDaChama } from "~/lib/jornada/trilha";
 import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
 
@@ -81,9 +82,16 @@ export function Placar({
         ))}
       </Folha>
 
-      <Folha aberta={aberta === "sementes"} aoFechar={() => setAberta(null)} titulo="🌱 Sementinhas">
+      <Folha
+        aberta={aberta === "sementes"}
+        aoFechar={() => setAberta(null)}
+        titulo="🌱 Sementinhas"
+      >
         {pos ? (
-          <T>No pós-parto, os momentos do dia são só seus: eles acendem a chama, sem somar sementinhas. As conquistas continuam rendendo quando você as resgata.</T>
+          <T>
+            No pós-parto, os momentos do dia são só seus: eles acendem a chama, sem somar
+            sementinhas. As conquistas continuam rendendo quando você as resgata.
+          </T>
         ) : (
           <>
             <T>Você ganha sementinhas cuidando de você e aprendendo, todo dia:</T>
@@ -100,7 +108,10 @@ export function Placar({
       </Folha>
 
       <Folha aberta={aberta === "trofeus"} aoFechar={() => setAberta(null)} titulo="🏆 Troféus">
-        <T>Cada dia em que você fecha os cinco momentos — a aula e as quatro atividades — vira um troféu.</T>
+        <T>
+          Cada dia em que você fecha os cinco momentos — a aula e as quatro atividades — vira um
+          troféu.
+        </T>
         <T tipo="apagado">
           {trofeus == null
             ? "Não conseguimos carregar a sua contagem agora."
@@ -151,11 +162,19 @@ function Pilar({
       })}
     >
       {icone}
-      <Text
-        style={{ fontFamily: fonte.titulo, fontSize: 18, color: corValor, fontVariant: ["tabular-nums"] }}
-      >
-        {valor}
-      </Text>
+      {/* O número que mudou (ganhou sementinhas, a chama subiu) dá um pulo. */}
+      <Pulso chave={valor}>
+        <Text
+          style={{
+            fontFamily: fonte.titulo,
+            fontSize: 18,
+            color: corValor,
+            fontVariant: ["tabular-nums"],
+          }}
+        >
+          {valor}
+        </Text>
+      </Pulso>
     </Pressable>
   );
 }
@@ -173,8 +192,12 @@ function LinhaDeGanho({ rotulo, valor }: { rotulo: string; valor: string }) {
         borderRadius: raio.sm,
       }}
     >
-      <Text style={{ flex: 1, fontFamily: fonte.media, fontSize: 15, color: cor.texto }}>{rotulo}</Text>
-      <Text style={{ fontFamily: fonte.forte, fontSize: 15, color: corJornada.sementinha }}>{valor}</Text>
+      <Text style={{ flex: 1, fontFamily: fonte.media, fontSize: 15, color: cor.texto }}>
+        {rotulo}
+      </Text>
+      <Text style={{ fontFamily: fonte.forte, fontSize: 15, color: corJornada.sementinha }}>
+        {valor}
+      </Text>
     </View>
   );
 }

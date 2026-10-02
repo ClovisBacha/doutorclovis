@@ -21,6 +21,7 @@ import { inicioDoDia } from "~/lib/saude/formato";
 import { resumoParaOHub, type RegistroDeSaude } from "~/lib/saude/registros";
 import { ferramentasDaGestacao, NOME_DOS_MOVIMENTOS } from "~/lib/ferramentas";
 import { gestacaoDoPerfil } from "~/lib/gestacao";
+import { Entrada, Flutuar, Inclinacao3D } from "~/componentes/movimento";
 import { useSessao } from "~/lib/sessao";
 import { supabase } from "~/servidor/supabase";
 import { ALVO_MINIMO, cor, espaco, fonte, raio, sombra } from "~/tema";
@@ -164,8 +165,8 @@ export default function HubDaSaude() {
       <T tipo="titulo">Saúde</T>
       <BlocoDoSintoma />
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: espaco.md }}>
-        {blocos.map((b) => (
-          <BlocoDaGrade key={b.chave} bloco={b} />
+        {blocos.map((b, i) => (
+          <BlocoDaGrade key={b.chave} bloco={b} ordem={i} />
         ))}
       </View>
     </Tela>
@@ -182,30 +183,35 @@ type Bloco = {
   rota: string;
 };
 
-function BlocoDaGrade({ bloco }: { bloco: Bloco }) {
+function BlocoDaGrade({ bloco, ordem }: { bloco: Bloco; ordem: number }) {
+  /* Cada bloco é um objeto com profundidade: entra em cascata, inclina com o
+     celular e afunda na direção do dedo; a peça 3D flutua no seu ritmo. */
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${bloco.rotulo}: ${bloco.dado}`}
-      onPress={() => {
-        toque();
-        router.push(bloco.rota as never);
-      }}
-      style={({ pressed }) => [
+    <Inclinacao3D
+      aoTocar={() => router.push(bloco.rota as never)}
+      rotuloAcessivel={`${bloco.rotulo}: ${bloco.dado}`}
+      raio={raio.lg}
+      estiloDeFora={{ flexBasis: "46%", flexGrow: 1 }}
+      estilo={[
         {
-          flexBasis: "46%",
-          flexGrow: 1,
           minHeight: 176,
           backgroundColor: bloco.fundo,
           borderRadius: raio.lg,
           padding: espaco.lg,
           justifyContent: "space-between",
-          opacity: pressed ? 0.8 : 1,
         },
         sombra,
       ]}
     >
-      <Image source={ARTES[bloco.arte]} style={{ width: 76, height: 76 }} contentFit="contain" />
+      <Entrada atraso={120 + ordem * 70}>
+        <Flutuar periodo={2800 + ordem * 450} amplitude={4}>
+          <Image
+            source={ARTES[bloco.arte]}
+            style={{ width: 76, height: 76 }}
+            contentFit="contain"
+          />
+        </Flutuar>
+      </Entrada>
       <View style={{ gap: 2 }}>
         <Text style={{ fontFamily: fonte.titulo, fontSize: 19, color: bloco.tinta }}>
           {bloco.rotulo}
@@ -217,7 +223,7 @@ function BlocoDaGrade({ bloco }: { bloco: Bloco }) {
           {bloco.dado}
         </Text>
       </View>
-    </Pressable>
+    </Inclinacao3D>
   );
 }
 

@@ -12,13 +12,15 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import { ChevronLeft, ChevronRight } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
-import { BEBE, BOLHA } from "~/componentes/artes";
+import { Pressable, ScrollView, Text } from "react-native";
+import { BEBE } from "~/componentes/artes";
 import { Botao, Cartao, Linha, Pilula, T, Tela, toque } from "~/componentes/base";
 import { parametroDaBancada } from "~/lib/bancada";
 import { gestacaoDoPerfil } from "~/lib/gestacao";
 import { semGeneroDoBebe } from "~/lib/nutricao/frase-do-topo";
-import { Entrada, Flutuar, Inclinacao3D } from "~/componentes/movimento";
+import { BolhaViva, Entrada, Flutuar, Inclinacao3D } from "~/componentes/movimento";
+import { CabecalhoDaPilha } from "~/componentes/cabecalho";
+import { Medida } from "~/componentes/medida";
 import { useSessao } from "~/lib/sessao";
 import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
 
@@ -54,11 +56,7 @@ export default function Bebe() {
   if (cuidado) {
     return (
       <Tela bordas={["top", "bottom"]}>
-        <Image
-          source={BOLHA.feliz}
-          style={{ width: 96, height: 96, alignSelf: "center" }}
-          contentFit="contain"
-        />
+        <BolhaViva humor="feliz" tamanho={96} />
         <T tipo="subtitulo" centro>
           Este espaço está guardado
         </T>
@@ -92,22 +90,10 @@ export default function Bebe() {
 
   return (
     <Tela bordas={["top", "bottom"]}>
-      <Linha estilo={{ justifyContent: "space-between" }}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Voltar"
-          onPress={() => (router.canGoBack() ? router.back() : router.replace("/inicio"))}
-          style={{ minWidth: ALVO_MINIMO, minHeight: ALVO_MINIMO, justifyContent: "center" }}
-        >
-          <Text style={{ fontSize: 17, color: cor.primariaEscura, fontFamily: fonte.forte }}>
-            ‹ Voltar
-          </Text>
-        </Pressable>
-        <T tipo="subtitulo">
-          {perfil?.baby_name ? `${perfil.baby_name}, semana a semana` : "Semana a semana"}
-        </T>
-        <View style={{ minWidth: ALVO_MINIMO }} />
-      </Linha>
+      <CabecalhoDaPilha
+        titulo={perfil?.baby_name ? `${perfil.baby_name}, semana a semana` : "Semana a semana"}
+        voltarPara="/inicio"
+      />
 
       <ScrollView
         ref={faixa}
@@ -246,26 +232,5 @@ function Seta({
     >
       <Icone size={24} color={cor.primariaEscura} />
     </Pressable>
-  );
-}
-
-function Medida({ titulo, valor }: { titulo: string; valor: string }) {
-  return (
-    <View
-      style={{
-        flex: 1,
-        backgroundColor: cor.cartao,
-        borderRadius: raio.md,
-        padding: espaco.sm,
-        gap: 2,
-      }}
-    >
-      <T tipo="apagado" estilo={{ fontSize: 13 }}>
-        {titulo}
-      </T>
-      <T tipo="rotulo" linhas={2} estilo={{ fontSize: 14 }}>
-        {valor}
-      </T>
-    </View>
   );
 }

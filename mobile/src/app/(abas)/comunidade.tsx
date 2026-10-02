@@ -2,7 +2,15 @@ import { deveVerOnboarding } from "@/lib/onboarding-da-comunidade";
 import { router, useFocusEffect } from "expo-router";
 import { Heart, ImagePlus, Search } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Botao, Cartao, Carregando, NaoConsegueLer, T, toque } from "~/componentes/base";
 import { useAcoesDosPosts } from "~/componentes/comunidade/acoes";
@@ -56,7 +64,11 @@ export default function Comunidade() {
   const [maisCarregando, setMaisCarregando] = useState(false);
   const [atualizando, setAtualizando] = useState(false);
   const [novas, setNovas] = useState(0);
-  const [eu, setEu] = useState<{ perfil: PerfilNaTela; pausada: boolean; suspensa: boolean } | null>(null);
+  const [eu, setEu] = useState<{
+    perfil: PerfilNaTela;
+    pausada: boolean;
+    suspensa: boolean;
+  } | null>(null);
   const [boasVindas, setBoasVindas] = useState(false);
   const [agora, setAgora] = useState(() => Date.now());
   const aviso = useAviso();
@@ -172,7 +184,10 @@ export default function Comunidade() {
     setAtualizando(false);
   }, [carregar, carregarCabecalho]);
 
-  const abrirComentarios = useCallback((p: PostNaTela) => router.push(`/comunidade/post/${p.id}`), []);
+  const abrirComentarios = useCallback(
+    (p: PostNaTela) => router.push(`/comunidade/post/${p.id}`),
+    [],
+  );
   const { acoes, elementos } = useAcoesDosPosts({
     mudar: setPosts,
     aviso: aviso.mostrar,
@@ -210,18 +225,37 @@ export default function Comunidade() {
           paddingTop: espaco.sm,
         }}
       >
-        <Text accessibilityRole="header" style={{ flex: 1, fontFamily: fonte.titulo, fontSize: 28, color: cor.texto, letterSpacing: -0.4 }}>
+        <Text
+          accessibilityRole="header"
+          style={{
+            flex: 1,
+            fontFamily: fonte.titulo,
+            fontSize: 28,
+            color: cor.texto,
+            letterSpacing: -0.4,
+          }}
+        >
           Comunidade
         </Text>
-        <BotaoIcone rotulo="Atividade" selo={novas} aoTocar={() => router.push("/comunidade/atividade")}>
-          <Heart size={25} color={cor.texto} strokeWidth={1.9} />
-        </BotaoIcone>
-        <BotaoIcone rotulo="Buscar pessoas" aoTocar={() => router.push("/comunidade/busca")}>
-          <Search size={24} color={cor.texto} strokeWidth={1.9} />
-        </BotaoIcone>
-        <BotaoIcone rotulo="Meu perfil" aoTocar={() => router.push("/comunidade/eu")}>
-          <Avatar id={uid ?? "eu"} nome={meuNome} url={meuAvatar} tamanho={32} />
-        </BotaoIcone>
+        {/* No Modo Cuidado o feed some, e as portas para posts e perfis de
+            outras gestantes somem junto. */}
+        {!cuidado ? (
+          <>
+            <BotaoIcone
+              rotulo="Atividade"
+              selo={novas}
+              aoTocar={() => router.push("/comunidade/atividade")}
+            >
+              <Heart size={25} color={cor.texto} strokeWidth={1.9} />
+            </BotaoIcone>
+            <BotaoIcone rotulo="Buscar pessoas" aoTocar={() => router.push("/comunidade/busca")}>
+              <Search size={24} color={cor.texto} strokeWidth={1.9} />
+            </BotaoIcone>
+            <BotaoIcone rotulo="Meu perfil" aoTocar={() => router.push("/comunidade/eu")}>
+              <Avatar id={uid ?? "eu"} nome={meuNome} url={meuAvatar} tamanho={32} />
+            </BotaoIcone>
+          </>
+        ) : null}
       </View>
 
       {eu?.suspensa ? (
@@ -242,7 +276,9 @@ export default function Comunidade() {
         </Cartao>
       ) : null}
 
-      {boasVindas && !cuidado ? <BoasVindas cartoes={cartoesDoApp()} aoTerminar={terminarBoasVindas} /> : null}
+      {boasVindas && !cuidado ? (
+        <BoasVindas cartoes={cartoesDoApp()} aoTerminar={terminarBoasVindas} />
+      ) : null}
 
       {!cuidado ? (
         <Pressable
@@ -290,7 +326,8 @@ export default function Comunidade() {
   );
 
   const corpoVazio = () => {
-    if (estado === "carregando" || estadoDoPerfil === "carregando") return <Carregando texto="Carregando o feed…" />;
+    if (estado === "carregando" || estadoDoPerfil === "carregando")
+      return <Carregando texto="Carregando o feed…" />;
     if (cuidado) {
       return (
         <Cartao fundo={cor.rosaMarca} estilo={{ marginHorizontal: espaco.lg }}>
@@ -325,7 +362,11 @@ export default function Comunidade() {
           Aqui aparecem as publicações de quem você segue. Encontre alguém pela busca ou conte como
           você está hoje.
         </T>
-        <Botao rotulo="Buscar pessoas" tipo="secundario" aoTocar={() => router.push("/comunidade/busca")} />
+        <Botao
+          rotulo="Buscar pessoas"
+          tipo="secundario"
+          aoTocar={() => router.push("/comunidade/busca")}
+        />
       </Cartao>
     );
   };
@@ -369,7 +410,11 @@ export default function Comunidade() {
         onEndReached={() => void carregarMais()}
         onEndReachedThreshold={0.6}
         refreshControl={
-          <RefreshControl refreshing={atualizando} onRefresh={() => void atualizar()} tintColor={cor.primaria} />
+          <RefreshControl
+            refreshing={atualizando}
+            onRefresh={() => void atualizar()}
+            tintColor={cor.primaria}
+          />
         }
         contentContainerStyle={{ paddingBottom: espaco.lg }}
       />
@@ -394,14 +439,25 @@ function PessoasSugeridas({
       <T tipo="rotulo" estilo={{ marginHorizontal: espaco.lg }}>
         Pessoas para seguir
       </T>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: espaco.lg, gap: espaco.md }}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: espaco.lg, gap: espaco.md }}
+      >
         {pessoas.map((p) => {
           const v = p.id in vinculos ? vinculos[p.id] : p.sigo;
           return (
             <View
               key={p.id}
               style={[
-                { width: 150, backgroundColor: cor.cartao, borderRadius: raio.lg, padding: espaco.md, alignItems: "center", gap: 6 },
+                {
+                  width: 150,
+                  backgroundColor: cor.cartao,
+                  borderRadius: raio.lg,
+                  padding: espaco.md,
+                  alignItems: "center",
+                  gap: 6,
+                },
                 sombra,
               ]}
             >
@@ -412,10 +468,23 @@ function PessoasSugeridas({
                 style={{ alignItems: "center", gap: 6, minHeight: ALVO_MINIMO }}
               >
                 <Avatar id={p.id} nome={p.nome} url={p.avatarUrl} tamanho={60} />
-                <Text numberOfLines={1} style={{ fontFamily: fonte.forte, fontSize: 15, color: cor.texto }}>
+                <Text
+                  numberOfLines={1}
+                  style={{ fontFamily: fonte.forte, fontSize: 15, color: cor.texto }}
+                >
                   {p.nome}
                 </Text>
-                <Text numberOfLines={2} style={{ fontFamily: fonte.normal, fontSize: 13, lineHeight: 17, color: cor.textoApagado, textAlign: "center", minHeight: 34 }}>
+                <Text
+                  numberOfLines={2}
+                  style={{
+                    fontFamily: fonte.normal,
+                    fontSize: 13,
+                    lineHeight: 17,
+                    color: cor.textoApagado,
+                    textAlign: "center",
+                    minHeight: 34,
+                  }}
+                >
                   {p.bio ?? " "}
                 </Text>
               </Pressable>
@@ -423,7 +492,11 @@ function PessoasSugeridas({
                 rotulo={rotuloDoBotaoSeguir(v)}
                 tipo={v ? "secundario" : "primario"}
                 desabilitado={!!v}
-                estilo={{ alignSelf: "stretch", paddingHorizontal: espaco.sm, minHeight: ALVO_MINIMO }}
+                estilo={{
+                  alignSelf: "stretch",
+                  paddingHorizontal: espaco.sm,
+                  minHeight: ALVO_MINIMO,
+                }}
                 aoTocar={() => {
                   void api.seguir(p.id).then((r) => {
                     if (!r.ok) return aviso(mensagemDoErro(r.motivo, r.recado, "perfil"), true);

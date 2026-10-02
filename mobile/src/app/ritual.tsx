@@ -1,5 +1,5 @@
 import { dueDateFromLmp } from "@/lib/gestacao";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, View } from "react-native";
 import { BolhaViva } from "~/componentes/movimento";
@@ -9,6 +9,7 @@ import { gravarPerfil } from "~/lib/gravar-perfil";
 import { guardarMedicoLocal } from "~/lib/medico-local";
 import { celularE164, emailValido } from "@/lib/medico-da-gestante";
 import {
+  deYmd,
   mascaraDeData,
   paraYmd,
   RECADO_DA_DATA,
@@ -28,17 +29,33 @@ const PASSOS = 5;
  */
 export default function Ritual() {
   const { sessao, perfil, recarregarPerfil } = useSessao();
-  const inicial = Number(parametroDaBancada("passo") ?? 0);
+  /* `?editar=1`: aberto do Perfil (ou da Jornada) para corrigir a data —
+     começa no passo da data, já preenchido, e ao salvar volta de onde veio. */
+  const editar = useLocalSearchParams<{ editar?: string }>().editar === "1";
+  const inicial = editar ? 1 : Number(parametroDaBancada("passo") ?? 0);
   const [passo, setPasso] = useState(
     Number.isFinite(inicial) ? Math.min(Math.max(inicial, 0), PASSOS - 1) : 0,
   );
   const [nome, setNome] = useState(
     perfil?.display_name ?? (sessao?.user.user_metadata?.display_name as string | undefined) ?? "",
   );
-  const [modo, setModo] = useState<Modo>("dum");
-  const [data, setData] = useState("");
-  const [semanasUs, setSemanasUs] = useState("");
-  const [diasUs, setDiasUs] = useState("");
+  const modoInicial: Modo = perfil?.birth_date ? "nasceu" : perfil?.reference_date ? "us" : "dum";
+  const [modo, setModo] = useState<Modo>(modoInicial);
+  const [data, setData] = useState(
+    deYmd(
+      modoInicial === "nasceu"
+        ? perfil?.birth_date
+        : modoInicial === "us"
+          ? perfil?.reference_date
+          : perfil?.lmp_date,
+    ),
+  );
+  const [semanasUs, setSemanasUs] = useState(
+    perfil?.reference_weeks != null ? String(perfil.reference_weeks) : "",
+  );
+  const [diasUs, setDiasUs] = useState(
+    perfil?.reference_days != null ? String(perfil.reference_days) : "",
+  );
   const [bebe, setBebe] = useState(perfil?.baby_name ?? "");
   const [contato, setContato] = useState(perfil?.emergency_contact ?? "");
   const [telefone, setTelefone] = useState(perfil?.emergency_phone ?? "");
@@ -115,6 +132,17 @@ export default function Ritual() {
     } else if (modo === "nasceu" && ymd) {
       payload.birth_date = ymd;
     }
+    /* Corrigindo: a âncora antiga não pode continuar vencendo. Quem volta de
+       "nasceu" para a gestação perde o birth_date; quem troca o ultrassom pela
+       DUM perde a referência (o cálculo prefere o ultrassom). */
+    if (editar && ymd) {
+      if (modo !== "nasceu") payload.birth_date = null;
+      if (modo === "dum") {
+        payload.reference_date = null;
+        payload.reference_weeks = null;
+        payload.reference_days = null;
+      }
+    }
     const r = await gravarPerfil(uid, payload);
     setSalvando(false);
     if (!r.ok) {
@@ -124,7 +152,8 @@ export default function Ritual() {
       return;
     }
     await recarregarPerfil();
-    router.replace("/inicio");
+    if (editar && router.canGoBack()) router.back();
+    else router.replace("/inicio");
   }
 
   return (

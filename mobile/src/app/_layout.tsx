@@ -5,12 +5,12 @@ import {
   Nunito_800ExtraBold,
   useFonts,
 } from "@expo-google-fonts/nunito";
-import { Stack } from "expo-router";
+import { router, Stack, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { ProvedorDeSessao } from "~/lib/sessao";
+import { ProvedorDeSessao, useSessao } from "~/lib/sessao";
 import { cor } from "~/tema";
 
 void SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -33,6 +33,7 @@ export default function Raiz() {
   return (
     <SafeAreaProvider>
       <ProvedorDeSessao>
+        <GuardaDaSessao />
         <StatusBar style="dark" />
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: cor.fundo } }}>
           <Stack.Screen
@@ -43,4 +44,24 @@ export default function Raiz() {
       </ProvedorDeSessao>
     </SafeAreaProvider>
   );
+}
+
+/**
+ * Sem sessão, só a entrada, a porta e o SOS ficam abertos. As abas já se
+ * guardavam sozinhas; as telas empilhadas (bebê, perfil, jornada/*, saude/*,
+ * comunidade/*, nutrição) abriam vazias — e quebradas — sem login. O SOS fica
+ * fora de propósito: ele funciona sem conta e sem rede.
+ */
+const ABERTAS = new Set(["(entrada)", "sos"]);
+
+function GuardaDaSessao() {
+  const { sessao, carregandoSessao } = useSessao();
+  const segmentos = useSegments();
+  const primeiro = segmentos[0] as string | undefined;
+  useEffect(() => {
+    if (carregandoSessao || sessao) return;
+    if (!primeiro || ABERTAS.has(primeiro)) return;
+    router.replace("/entrar");
+  }, [carregandoSessao, sessao, primeiro]);
+  return null;
 }

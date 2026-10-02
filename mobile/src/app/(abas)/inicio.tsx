@@ -38,6 +38,7 @@ import {
 import { ligar } from "~/lib/links";
 import { semGeneroDoBebe } from "~/lib/nutricao/frase-do-topo";
 import { BolhaViva, Entrada, Flutuar, Inclinacao3D } from "~/componentes/movimento";
+import { Medida } from "~/componentes/medida";
 import { useSessao } from "~/lib/sessao";
 import { ALVO_MINIMO, cor, espaco, raio } from "~/tema";
 
@@ -339,27 +340,6 @@ function CartaoDaSemana({
         </Linha>
       </Cartao>
     </Inclinacao3D>
-  );
-}
-
-function Medida({ titulo, valor }: { titulo: string; valor: string }) {
-  return (
-    <View
-      style={{
-        flex: 1,
-        backgroundColor: cor.cartao,
-        borderRadius: raio.md,
-        padding: espaco.sm,
-        gap: 2,
-      }}
-    >
-      <T tipo="apagado" estilo={{ fontSize: 13 }}>
-        {titulo}
-      </T>
-      <T tipo="rotulo" linhas={2} estilo={{ fontSize: 14 }}>
-        {valor}
-      </T>
-    </View>
   );
 }
 
