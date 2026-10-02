@@ -525,6 +525,7 @@ function JornadaSemData({ uid }: { uid: string }) {
           A aula de cada dia, os desafios e a trilha seguem a sua gestação. Assim que o seu perfil tiver a
           data da última menstruação ou a do ultrassom, a jornada se monta sozinha.
         </T>
+        <Botao rotulo="Informar a data" tipo="secundario" aoTocar={() => router.push("/perfil")} />
       </Cartao>
       <CartaoDoDia
         sobre={dataPorExtenso(new Date())}
