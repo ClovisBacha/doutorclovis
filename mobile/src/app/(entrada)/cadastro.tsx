@@ -82,7 +82,7 @@ export default function Cadastro() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <Tela bordas={["top", "bottom"]}>
-        <CabecalhoDaMarca subtitulo="Crie sua conta grátis." />
+        <CabecalhoDaMarca subtitulo="Crie sua conta." />
         <View style={{ gap: espaco.md, marginTop: espaco.md }}>
           <Campo
             rotulo="Seu nome"

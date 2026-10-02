@@ -82,14 +82,27 @@ export default function Mexer() {
     if (e === "fim") {
       setSintoma("lombar");
       setEtapa("fim");
-      setDesfecho({ ganhou: at.cuidado ? null : 5, fechou: false, bonus: null, semPagamento: at.cuidado });
+      setDesfecho({
+        ganhou: at.cuidado ? null : 5,
+        fechou: false,
+        bonus: null,
+        semPagamento: at.cuidado,
+      });
     }
   }, [at.pronto, at.cuidado, aplicouBancada]);
 
   async function terminar() {
     setEtapa("fim");
     if (!at.uid) return;
-    setDesfecho(await concluirMomento({ uid: at.uid, D: at.D, momento: "movement", cuidado: at.cuidado, pos: at.pos }));
+    setDesfecho(
+      await concluirMomento({
+        uid: at.uid,
+        D: at.D,
+        momento: "movement",
+        cuidado: at.cuidado,
+        pos: at.pos,
+      }),
+    );
   }
 
   if (!at.pronto) {
@@ -100,14 +113,21 @@ export default function Mexer() {
     );
   }
 
-  if (etapa === "sessao") return <Sessao seq={seq} aoTerminar={() => void terminar()} aoSair={() => setEtapa("escolha")} />;
+  if (etapa === "sessao")
+    return (
+      <Sessao seq={seq} aoTerminar={() => void terminar()} aoSair={() => setEtapa("escolha")} />
+    );
 
   if (etapa === "fim") {
     return (
       <Tela bordas={["top", "bottom"]}>
         <FimDoMomento
           titulo="Corpo em movimento!"
-          fala={at.cuidado ? "Obrigada por cuidar do seu corpo hoje." : "Mexer um pouco todo dia alivia o corpo e ajuda o sono."}
+          fala={
+            at.cuidado
+              ? "Obrigada por cuidar do seu corpo hoje."
+              : "Mexer um pouco todo dia alivia o corpo e ajuda o sono."
+          }
           desfecho={desfecho}
           D={at.D}
           cuidado={at.cuidado}
@@ -116,10 +136,13 @@ export default function Mexer() {
             sintoma ? (
               <Cartao>
                 <T tipo="rotulo">
-                  E o incômodo de hoje ({SINTOMAS.find((s) => s.chave === sintoma)?.rotulo.toLowerCase()})?
+                  E o incômodo de hoje (
+                  {SINTOMAS.find((s) => s.chave === sintoma)?.rotulo.toLowerCase()})?
                 </T>
                 {avaliou ? (
-                  <T tipo="apagado">Anotado. A próxima sessão começa pelo que funciona melhor para você.</T>
+                  <T tipo="apagado">
+                    Anotado. A próxima sessão começa pelo que funciona melhor para você.
+                  </T>
                 ) : (
                   <View style={{ flexDirection: "row", flexWrap: "wrap", gap: espaco.sm }}>
                     {(["Melhorou", "Igual", "Piorou"] as const).map((d) => (
@@ -136,7 +159,8 @@ export default function Mexer() {
                 )}
                 {avaliou === "Piorou" ? (
                   <T tipo="apagado">
-                    Se a dor continuar forte ou vier com algum sinal de alerta, procure atendimento — o SOS fica sempre aqui embaixo.
+                    Se a dor continuar forte ou vier com algum sinal de alerta, procure atendimento
+                    — o SOS fica sempre aqui embaixo.
                   </T>
                 ) : null}
               </Cartao>
@@ -148,7 +172,9 @@ export default function Mexer() {
   }
 
   if (etapa === "sinais") {
-    const sinais = at.cuidado ? SINAIS_DE_PARADA.filter((s) => !SO_NA_GESTACAO.has(s)) : SINAIS_DE_PARADA;
+    const sinais = at.cuidado
+      ? SINAIS_DE_PARADA.filter((s) => !SO_NA_GESTACAO.has(s))
+      : SINAIS_DE_PARADA;
     return (
       <Tela bordas={["top", "bottom"]}>
         <BarraDoTopo titulo="Antes de começar" aoSair={() => setEtapa("escolha")} />
@@ -161,16 +187,31 @@ export default function Mexer() {
           </View>
           <View style={{ gap: 6, marginTop: 4 }}>
             {sinais.map((s) => (
-              <View key={s} style={{ flexDirection: "row", gap: espaco.sm, alignItems: "flex-start" }}>
-                <Text style={{ fontFamily: fonte.titulo, fontSize: 16, color: cor.atencao }}>•</Text>
+              <View
+                key={s}
+                style={{ flexDirection: "row", gap: espaco.sm, alignItems: "flex-start" }}
+              >
+                <Text style={{ fontFamily: fonte.titulo, fontSize: 16, color: cor.atencao }}>
+                  •
+                </Text>
                 <T estilo={{ flex: 1 }}>{s}</T>
               </View>
             ))}
           </View>
-          <T tipo="apagado">Nesses casos, procure atendimento. E se algo assim aparecer no meio, pare na hora.</T>
+          <T tipo="apagado">
+            Nesses casos, procure atendimento. E se algo assim aparecer no meio, pare na hora.
+          </T>
         </Cartao>
-        <Botao rotulo="Estou com um desses — abrir o SOS" tipo="perigo" aoTocar={() => router.push("/sos")} />
-        <Botao rotulo="Estou bem, começar" corFundo={corJornada.roxo} aoTocar={() => setEtapa("sessao")} />
+        <Botao
+          rotulo="Estou com um desses — abrir o SOS"
+          tipo="perigo"
+          aoTocar={() => router.push("/sos")}
+        />
+        <Botao
+          rotulo="Estou bem, começar"
+          corFundo={corJornada.roxo}
+          aoTocar={() => setEtapa("sessao")}
+        />
       </Tela>
     );
   }
@@ -209,18 +250,40 @@ export default function Mexer() {
       </View>
       <Cartao>
         <T tipo="rotulo">
-          Sua sessão: {seq.length} {seq.length === 1 ? "movimento" : "movimentos"} · {minutosAproximados(total)}
+          Sua sessão: {seq.length} {seq.length === 1 ? "movimento" : "movimentos"} ·{" "}
+          {minutosAproximados(total)}
         </T>
         {seq.map((m, i) => (
-          <View key={m.id} style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm, minHeight: 32 }}>
-            <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: corJornada.roxoClaro, width: 18 }}>{i + 1}</Text>
+          <View
+            key={m.id}
+            style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm, minHeight: 32 }}
+          >
+            <Text
+              style={{
+                fontFamily: fonte.forte,
+                fontSize: 14,
+                color: corJornada.roxoClaro,
+                width: 18,
+              }}
+            >
+              {i + 1}
+            </Text>
             <Text style={{ fontSize: 20 }}>{m.emoji}</Text>
-            <Text style={{ flex: 1, fontFamily: fonte.media, fontSize: 15, color: cor.texto }}>{m.name}</Text>
-            <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: cor.textoApagado }}>{m.secs}s</Text>
+            <Text style={{ flex: 1, fontFamily: fonte.media, fontSize: 15, color: cor.texto }}>
+              {m.name}
+            </Text>
+            <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: cor.textoApagado }}>
+              {m.secs}s
+            </Text>
           </View>
         ))}
       </Cartao>
-      <Botao rotulo="Continuar" corFundo={corJornada.roxo} aoTocar={() => setEtapa("sinais")} desabilitado={!seq.length} />
+      <Botao
+        rotulo="Continuar"
+        corFundo={corJornada.roxo}
+        aoTocar={() => setEtapa("sinais")}
+        desabilitado={!seq.length}
+      />
     </Tela>
   );
 }
@@ -235,7 +298,14 @@ function Anel({ fracao, tamanho = 120 }: { fracao: number; tamanho?: number }) {
   const c = 2 * Math.PI * r;
   return (
     <Svg width={tamanho} height={tamanho}>
-      <Circle cx={tamanho / 2} cy={tamanho / 2} r={r} stroke={corJornada.estrelaApagada} strokeWidth={10} fill="none" />
+      <Circle
+        cx={tamanho / 2}
+        cy={tamanho / 2}
+        r={r}
+        stroke={corJornada.estrelaApagada}
+        strokeWidth={10}
+        fill="none"
+      />
       <Circle
         cx={tamanho / 2}
         cy={tamanho / 2}
@@ -252,7 +322,15 @@ function Anel({ fracao, tamanho = 120 }: { fracao: number; tamanho?: number }) {
   );
 }
 
-function Sessao({ seq, aoTerminar, aoSair }: { seq: Movimento[]; aoTerminar: () => void; aoSair: () => void }) {
+function Sessao({
+  seq,
+  aoTerminar,
+  aoSair,
+}: {
+  seq: Movimento[];
+  aoTerminar: () => void;
+  aoSair: () => void;
+}) {
   const { trechos, total } = useMemo(() => linhaDoTempo(seq), [seq]);
   const [t, setT] = useState(0);
   const [pausada, setPausada] = useState(false);
@@ -277,11 +355,13 @@ function Sessao({ seq, aoTerminar, aoSair }: { seq: Movimento[]; aoTerminar: () 
   useEffect(() => {
     if (pos.tipo === "movimento" && pos.trecho.indice !== ultimoIndice.current) {
       ultimoIndice.current = pos.trecho.indice;
-      if (Platform.OS !== "web") void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      if (Platform.OS !== "web")
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     }
     if (pos.tipo === "fim" && !terminou.current) {
       terminou.current = true;
-      if (Platform.OS !== "web") void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      if (Platform.OS !== "web")
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       aoTerminar();
     }
   }, [pos, aoTerminar]);
@@ -292,8 +372,18 @@ function Sessao({ seq, aoTerminar, aoSair }: { seq: Movimento[]; aoTerminar: () 
     setT(alvo);
   }
 
-  const m = pos.tipo === "movimento" ? pos.trecho.movimento : pos.tipo === "troca" ? pos.proximo.movimento : null;
-  const indice = pos.tipo === "movimento" ? pos.trecho.indice : pos.tipo === "troca" ? pos.proximo.indice : seq.length - 1;
+  const m =
+    pos.tipo === "movimento"
+      ? pos.trecho.movimento
+      : pos.tipo === "troca"
+        ? pos.proximo.movimento
+        : null;
+  const indice =
+    pos.tipo === "movimento"
+      ? pos.trecho.indice
+      : pos.tipo === "troca"
+        ? pos.proximo.indice
+        : seq.length - 1;
 
   return (
     <SafeAreaView edges={["top", "bottom"]} style={{ flex: 1, backgroundColor: cor.fundo }}>
@@ -304,21 +394,35 @@ function Sessao({ seq, aoTerminar, aoSair }: { seq: Movimento[]; aoTerminar: () 
       <ScrollView contentContainerStyle={{ padding: espaco.lg, gap: espaco.md }}>
         {m ? (
           <>
-            <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: corJornada.roxo, letterSpacing: 0.4 }}>
+            <Text
+              style={{
+                fontFamily: fonte.forte,
+                fontSize: 14,
+                color: corJornada.roxo,
+                letterSpacing: 0.4,
+              }}
+            >
               {pos.tipo === "troca" ? "PREPARE-SE · " : ""}MOVIMENTO {indice + 1} DE {seq.length}
             </Text>
             <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.lg }}>
-              <View style={{ width: 120, height: 120, alignItems: "center", justifyContent: "center" }}>
+              <View
+                style={{ width: 120, height: 120, alignItems: "center", justifyContent: "center" }}
+              >
                 <Anel
                   fracao={
-                    pos.tipo === "movimento"
-                      ? 1 - pos.restante / pos.trecho.movimento.secs
-                      : 0
+                    pos.tipo === "movimento" ? 1 - pos.restante / pos.trecho.movimento.secs : 0
                   }
                 />
                 <View style={{ position: "absolute", alignItems: "center" }}>
                   <Text style={{ fontSize: 30 }}>{m.emoji}</Text>
-                  <Text style={{ fontFamily: fonte.titulo, fontSize: 20, color: corJornada.roxoEscuro, fontVariant: ["tabular-nums"] }}>
+                  <Text
+                    style={{
+                      fontFamily: fonte.titulo,
+                      fontSize: 20,
+                      color: corJornada.roxoEscuro,
+                      fontVariant: ["tabular-nums"],
+                    }}
+                  >
                     {pos.tipo === "movimento" || pos.tipo === "troca" ? `${pos.restante}s` : ""}
                   </Text>
                 </View>
@@ -333,7 +437,10 @@ function Sessao({ seq, aoTerminar, aoSair }: { seq: Movimento[]; aoTerminar: () 
             <Cartao>
               <T tipo="rotulo">Passo a passo</T>
               {m.passos.map((p, i) => (
-                <View key={i} style={{ flexDirection: "row", gap: espaco.sm, alignItems: "flex-start" }}>
+                <View
+                  key={i}
+                  style={{ flexDirection: "row", gap: espaco.sm, alignItems: "flex-start" }}
+                >
                   <View
                     style={{
                       width: 24,
@@ -345,7 +452,9 @@ function Sessao({ seq, aoTerminar, aoSair }: { seq: Movimento[]; aoTerminar: () 
                       marginTop: 1,
                     }}
                   >
-                    <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: corJornada.roxo }}>{i + 1}</Text>
+                    <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: corJornada.roxo }}>
+                      {i + 1}
+                    </Text>
                   </View>
                   <T estilo={{ flex: 1 }}>{p}</T>
                 </View>
@@ -353,7 +462,7 @@ function Sessao({ seq, aoTerminar, aoSair }: { seq: Movimento[]; aoTerminar: () 
             </Cartao>
             <View style={{ flexDirection: "row", gap: espaco.sm }}>
               <Cartao estilo={{ flex: 1 }} fundo={corJornada.feitoFundo}>
-                <T tipo="rotulo" cor="#15803d">
+                <T tipo="rotulo" cor={cor.sementinha}>
                   O que sentir
                 </T>
                 <T tipo="apagado">{m.sentir}</T>
@@ -381,12 +490,27 @@ function Sessao({ seq, aoTerminar, aoSair }: { seq: Movimento[]; aoTerminar: () 
           borderTopColor: cor.borda,
         }}
       >
-        <Text style={{ fontFamily: fonte.forte, fontSize: 16, color: cor.textoApagado, fontVariant: ["tabular-nums"] }}>
+        <Text
+          style={{
+            fontFamily: fonte.forte,
+            fontSize: 16,
+            color: cor.textoApagado,
+            fontVariant: ["tabular-nums"],
+          }}
+        >
           faltam {relogio(total - t)}
         </Text>
         <View style={{ flexDirection: "row", gap: espaco.md }}>
-          <BotaoRedondo rotulo={pausada ? "Continuar" : "Pausar"} aoTocar={() => setPausada((p) => !p)} fundo={corJornada.roxoFundo}>
-            {pausada ? <Play size={20} color={corJornada.roxo} /> : <Pause size={20} color={corJornada.roxo} />}
+          <BotaoRedondo
+            rotulo={pausada ? "Continuar" : "Pausar"}
+            aoTocar={() => setPausada((p) => !p)}
+            fundo={corJornada.roxoFundo}
+          >
+            {pausada ? (
+              <Play size={20} color={corJornada.roxo} />
+            ) : (
+              <Pause size={20} color={corJornada.roxo} />
+            )}
           </BotaoRedondo>
           <BotaoRedondo rotulo="Pular para o próximo" aoTocar={pular} fundo={corJornada.roxoFundo}>
             <SkipForward size={20} color={corJornada.roxo} />

@@ -4,7 +4,12 @@ import { Text, View } from "react-native";
 import { babyForWeek, fruitEmojiForWeek } from "@/lib/gestacao";
 import { Botao, Cartao, Carregando, T, Tela } from "~/componentes/base";
 import { corJornada } from "~/componentes/jornada/cores";
-import { BarraDoTopo, BotaoRedondo, Estrelas, voltarParaJornada } from "~/componentes/jornada/pecas";
+import {
+  BarraDoTopo,
+  BotaoRedondo,
+  Estrelas,
+  voltarParaJornada,
+} from "~/componentes/jornada/pecas";
 import { useJornada } from "~/componentes/jornada/usarJornada";
 import {
   D_MINIMO,
@@ -46,7 +51,9 @@ export default function Semana() {
     return (
       <Tela bordas={["top", "bottom"]}>
         <BarraDoTopo titulo="A semana" />
-        <T>A trilha das semanas acompanha a gestação. Os seus momentos de hoje continuam na jornada.</T>
+        <T>
+          A trilha das semanas acompanha a gestação. Os seus momentos de hoje continuam na jornada.
+        </T>
         <Botao rotulo="Voltar" aoTocar={voltarParaJornada} corFundo={corJornada.roxo} />
       </Tela>
     );
@@ -101,7 +108,9 @@ export default function Semana() {
               key={D}
               accessible
               accessibilityLabel={`Dia ${diaNaSemana(D)}, ${tema.rotulo}, ${
-                no.tipo === "futuro" ? `abre ${quandoAbre(D, hojeD, hoje)}` : `${no.momentos} de 5 momentos`
+                no.tipo === "futuro"
+                  ? `abre ${quandoAbre(D, hojeD, hoje)}`
+                  : `${no.momentos} de 5 momentos`
               }`}
               style={{
                 flexDirection: "row",
@@ -112,11 +121,17 @@ export default function Semana() {
                 minHeight: 64,
                 backgroundColor: ehHoje ? corJornada.roxoNevoa : "transparent",
                 borderBottomWidth: i === dias.length - 1 ? 0 : 1,
-                borderBottomColor: "#f3ece8",
+                borderBottomColor: cor.divisor,
               }}
             >
               <View style={{ width: 44, alignItems: "center" }}>
-                <Text style={{ fontFamily: fonte.titulo, fontSize: 18, color: ehHoje ? corJornada.roxo : cor.texto }}>
+                <Text
+                  style={{
+                    fontFamily: fonte.titulo,
+                    fontSize: 18,
+                    color: ehHoje ? corJornada.roxo : cor.texto,
+                  }}
+                >
                   {String(data.getDate()).padStart(2, "0")}
                 </Text>
                 <Text style={{ fontFamily: fonte.media, fontSize: 13, color: cor.textoApagado }}>
@@ -124,7 +139,13 @@ export default function Semana() {
                 </Text>
               </View>
               <View style={{ flex: 1, gap: 2 }}>
-                <Text style={{ fontFamily: fonte.forte, fontSize: 15, color: no.tipo === "futuro" ? cor.textoApagado : cor.texto }}>
+                <Text
+                  style={{
+                    fontFamily: fonte.forte,
+                    fontSize: 15,
+                    color: no.tipo === "futuro" ? cor.textoApagado : cor.texto,
+                  }}
+                >
                   {tema.emoji} {tema.rotulo}
                 </Text>
                 <Text style={{ fontFamily: fonte.normal, fontSize: 13, color: cor.textoApagado }}>
@@ -159,7 +180,9 @@ export default function Semana() {
           gap: espaco.md,
         }}
       >
-        <Text style={{ fontSize: 36, opacity: figurinha ? 1 : 0.35 }}>{fruitEmojiForWeek(semana)}</Text>
+        <Text style={{ fontSize: 36, opacity: figurinha ? 1 : 0.35 }}>
+          {fruitEmojiForWeek(semana)}
+        </Text>
         <View style={{ flex: 1 }}>
           <T tipo="rotulo">
             {figurinha ? "Figurinha da semana conquistada!" : "Figurinha da semana"}

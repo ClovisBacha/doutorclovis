@@ -22,9 +22,10 @@ import {
 } from "lucide-react-native";
 import type { ComponentType } from "react";
 import { Pressable, View } from "react-native";
-import { BEBE, BOLHA } from "~/componentes/artes";
+import { BEBE } from "~/componentes/artes";
 import { Cartao, Linha, NaoConsegueLer, Pilula, T, Tela, toque } from "~/componentes/base";
 import { CVV } from "~/config";
+import { ferramentasDaGestacao, NOME_DOS_MOVIMENTOS } from "~/lib/ferramentas";
 import { gestacaoDoPerfil, primeiroNome } from "~/lib/gestacao";
 import {
   dataCurta,
@@ -35,6 +36,8 @@ import {
   rotuloDaIdade,
 } from "~/lib/inicio";
 import { ligar } from "~/lib/links";
+import { semGeneroDoBebe } from "~/lib/nutricao/frase-do-topo";
+import { BolhaViva, Entrada, Flutuar, Inclinacao3D } from "~/componentes/movimento";
 import { useSessao } from "~/lib/sessao";
 import { ALVO_MINIMO, cor, espaco, raio } from "~/tema";
 
@@ -50,6 +53,11 @@ export default function Inicio() {
   const agora = new Date();
   const nome = primeiroNome(perfil?.display_name ?? perfil?.full_name);
   const gest = gestacaoDoPerfil(perfil, agora);
+  const ferramentas = ferramentasDaGestacao({
+    semanas: gest?.weeks ?? null,
+    cuidado,
+    nasceu: !!perfil?.birth_date,
+  });
   const nascido = perfil?.birth_date ? idadeDoBebe(perfil.birth_date, agora) : null;
   const frase = fraseDoDia({
     dia: diaLocalDe(agora),
@@ -101,7 +109,7 @@ export default function Inicio() {
 
       {frase ? (
         <Linha estilo={{ alignItems: "flex-end", gap: espaco.md }}>
-          <Image source={BOLHA.feliz} style={{ width: 64, height: 64 }} contentFit="contain" />
+          <BolhaViva humor="feliz" tamanho={64} />
           <View
             style={{
               flex: 1,
@@ -118,54 +126,64 @@ export default function Inicio() {
         </Linha>
       ) : null}
 
-      {cuidado ? (
-        <CartaoDeAcolhimento />
-      ) : nascido ? (
-        <Cartao fundo={cor.rosaMarca}>
-          <T tipo="apagado">{perfil?.baby_name ? perfil.baby_name : "Seu bebê"} tem</T>
-          <T tipo="titulo">{nascido}</T>
-          <T>Cada dia conta uma história nova. Cuide de você também.</T>
-        </Cartao>
-      ) : gest ? (
-        <CartaoDaSemana
-          semanas={gest.weeks}
-          dias={gest.days}
-          totalDias={gest.totalDays}
-          nomeDoBebe={perfil?.baby_name ?? null}
-        />
-      ) : (
-        <Cartao>
-          <T tipo="subtitulo">Falta a data da sua gestação</T>
-          <T tipo="apagado">
-            Com a data da última menstruação ou do ultrassom, o app acompanha a sua semana.
-          </T>
-          <Pressable
-            onPress={() => router.push("/ritual")}
-            style={{ minHeight: ALVO_MINIMO, justifyContent: "center" }}
-          >
-            <T tipo="rotulo" cor={cor.primariaEscura}>
-              Informar agora
+      <Entrada atraso={80}>
+        {cuidado ? (
+          <CartaoDeAcolhimento />
+        ) : nascido ? (
+          <Cartao fundo={cor.rosaMarca}>
+            <T tipo="apagado">{perfil?.baby_name ? perfil.baby_name : "Seu bebê"} tem</T>
+            <T tipo="titulo">{nascido}</T>
+            <T>Cada dia conta uma história nova. Cuide de você também.</T>
+          </Cartao>
+        ) : gest ? (
+          <CartaoDaSemana
+            semanas={gest.weeks}
+            dias={gest.days}
+            totalDias={gest.totalDays}
+            nomeDoBebe={perfil?.baby_name ?? null}
+          />
+        ) : (
+          <Cartao>
+            <T tipo="subtitulo">Falta a data da sua gestação</T>
+            <T tipo="apagado">
+              Com a data da última menstruação ou do ultrassom, o app acompanha a sua semana.
             </T>
-          </Pressable>
-        </Cartao>
-      )}
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                toque();
+                router.push("/ritual");
+              }}
+              style={{ minHeight: ALVO_MINIMO, justifyContent: "center" }}
+            >
+              <T tipo="rotulo" cor={cor.primariaEscura}>
+                Informar agora
+              </T>
+            </Pressable>
+          </Cartao>
+        )}
+      </Entrada>
 
       <T tipo="subtitulo" estilo={{ marginTop: espaco.sm }}>
         Para hoje
       </T>
       <Atalho
+        ordem={1}
         Icone={Sparkles}
         titulo="Sua jornada do dia"
         texto={
           cuidado
-            ? "Uma respiração e um momento de gratidão."
-            : "A aula de hoje, quatro momentos e as suas sementinhas."
+            ? "Respirar, mexer devagar e escrever — no seu tempo."
+            : nascido
+              ? "O desafio do dia, uma respiração e um momento de gratidão."
+              : "A aula de hoje, cinco momentos e as suas sementinhas."
         }
         corIcone={cor.jogo}
         fundoIcone={cor.jogoFundo}
         aoTocar={() => router.push("/jornada")}
       />
       <Atalho
+        ordem={2}
         Icone={Activity}
         titulo="Registrar pressão, peso ou glicemia"
         texto="O app avisa se algum número pedir atenção."
@@ -173,18 +191,20 @@ export default function Inicio() {
         fundoIcone={cor.saudeFundo}
         aoTocar={() => router.push("/saude/registros")}
       />
-      {!cuidado && gest && gest.weeks >= 26 ? (
+      {ferramentas.movimentos && gest ? (
         <Atalho
+          ordem={3}
           Icone={HeartHandshake}
-          titulo="Contar os movimentos"
+          titulo={NOME_DOS_MOVIMENTOS}
           texto="Dez movimentos, no seu tempo."
           corIcone={cor.chutes}
           fundoIcone={cor.chutesFundo}
           aoTocar={() => router.push("/saude/chutes")}
         />
       ) : null}
-      {gest && gest.weeks >= 20 ? (
+      {ferramentas.contracoes && gest ? (
         <Atalho
+          ordem={4}
           Icone={Timer}
           titulo="Cronometrar contrações"
           texto="Duração e intervalo, com os sinais para procurar atendimento."
@@ -194,6 +214,7 @@ export default function Inicio() {
         />
       ) : null}
       <Atalho
+        ordem={5}
         Icone={Apple}
         titulo="Perguntar à nutricionista"
         texto="Pode comer? O que fazer com o que tem em casa?"
@@ -203,6 +224,7 @@ export default function Inicio() {
       />
       {!cuidado ? (
         <Atalho
+          ordem={6}
           Icone={MessageCircleHeart}
           titulo="Comunidade"
           texto="Gestantes na mesma fase que você."
@@ -242,73 +264,81 @@ function CartaoDaSemana({
   const reta = retaFinalMensagem(semanas);
   const arte = BEBE[semanaDaArte(semanas)];
   return (
-    <Cartao
-      fundo={cor.rosaMarca}
-      estilo={{ gap: espaco.md }}
+    <Inclinacao3D
       aoTocar={() => router.push("/bebe")}
       rotuloAcessivel="Ver o bebê semana a semana"
+      raio={raio.lg}
     >
-      <Linha estilo={{ justifyContent: "space-between", alignItems: "flex-start" }}>
-        <View style={{ flex: 1, gap: 4 }}>
-          <Pilula texto={`${tri}º trimestre`} fundo={cor.cartao} />
-          <T tipo="titulo" estilo={{ fontSize: 28 }}>
-            {rotuloDaIdade(semanas, dias)}
-          </T>
-          <T tipo="apagado">
-            {nomeDoBebe ? `${nomeDoBebe} está crescendo` : "O bebê está crescendo"}
-          </T>
-        </View>
-        <Image
-          source={arte}
-          style={{ width: 120, height: 120 }}
-          contentFit="contain"
-          accessibilityLabel="Ilustração do bebê nesta fase"
-        />
-      </Linha>
-      <Linha estilo={{ gap: espaco.md }}>
-        <Medida titulo="Tamanho" valor={bebe.size} />
-        <Medida titulo="Peso" valor={bebe.weight} />
-        <Medida titulo="Como" valor={`${fruitEmojiForWeek(semanas)} ${bebe.fruit}`} />
-      </Linha>
-      <T>{bebe.desc}</T>
-      <View>
-        <View
-          style={{
-            height: 10,
-            backgroundColor: cor.cartao,
-            borderRadius: raio.pilula,
-            overflow: "hidden",
-          }}
-        >
+      <Cartao fundo={cor.rosaMarca} estilo={{ gap: espaco.md }}>
+        <Linha estilo={{ justifyContent: "space-between", alignItems: "flex-start" }}>
+          <View style={{ flex: 1, gap: 4 }}>
+            <Pilula texto={`${tri}º trimestre`} fundo={cor.cartao} />
+            <T tipo="titulo" estilo={{ fontSize: 28 }}>
+              {rotuloDaIdade(semanas, dias)}
+            </T>
+            <T tipo="apagado">
+              {nomeDoBebe ? `${nomeDoBebe} está crescendo` : "O bebê está crescendo"}
+            </T>
+          </View>
+          <Flutuar>
+            <Image
+              source={arte}
+              style={{ width: 120, height: 120 }}
+              contentFit="contain"
+              accessibilityLabel="Ilustração do bebê nesta fase"
+            />
+          </Flutuar>
+        </Linha>
+        <Linha estilo={{ gap: espaco.md }}>
+          <Medida titulo="Tamanho" valor={bebe.size} />
+          <Medida titulo="Peso" valor={bebe.weight} />
+          <Medida titulo="Como" valor={`${fruitEmojiForWeek(semanas)} ${bebe.fruit}`} />
+        </Linha>
+        <T>{semGeneroDoBebe(bebe.desc)}</T>
+        <View>
           <View
             style={{
-              width: `${Math.round(fracaoDaGestacao(totalDias) * 100)}%`,
               height: 10,
-              backgroundColor: cor.primaria,
+              backgroundColor: cor.cartao,
+              borderRadius: raio.pilula,
+              overflow: "hidden",
             }}
-          />
+          >
+            <View
+              style={{
+                width: `${Math.round(fracaoDaGestacao(totalDias) * 100)}%`,
+                height: 10,
+                backgroundColor: cor.primaria,
+              }}
+            />
+          </View>
+          <T tipo="apagado" estilo={{ marginTop: 6, fontSize: 13 }}>
+            {faltam > 0
+              ? `Data provável: ${dataCurta(dataProvavel(totalDias))} · faltam ${faltam} ${faltam === 1 ? "dia" : "dias"}`
+              : `Data provável: ${dataCurta(dataProvavel(totalDias))}`}
+          </T>
         </View>
-        <T tipo="apagado" estilo={{ marginTop: 6, fontSize: 13 }}>
-          {faltam > 0
-            ? `Data provável: ${dataCurta(dataProvavel(totalDias))} · faltam ${faltam} ${faltam === 1 ? "dia" : "dias"}`
-            : `Data provável: ${dataCurta(dataProvavel(totalDias))}`}
-        </T>
-      </View>
-      {reta ? (
-        <View
-          style={{ backgroundColor: cor.cartao, borderRadius: raio.md, padding: espaco.md, gap: 4 }}
-        >
-          <T tipo="rotulo">{reta.titulo}</T>
-          <T tipo="apagado">{reta.corpo}</T>
-        </View>
-      ) : null}
-      <Linha estilo={{ justifyContent: "flex-end", gap: 2 }}>
-        <T tipo="rotulo" cor={cor.primariaEscura} estilo={{ fontSize: 14 }}>
-          Ver semana a semana
-        </T>
-        <ChevronRight size={18} color={cor.primariaEscura} />
-      </Linha>
-    </Cartao>
+        {reta ? (
+          <View
+            style={{
+              backgroundColor: cor.cartao,
+              borderRadius: raio.md,
+              padding: espaco.md,
+              gap: 4,
+            }}
+          >
+            <T tipo="rotulo">{reta.titulo}</T>
+            <T tipo="apagado">{reta.corpo}</T>
+          </View>
+        ) : null}
+        <Linha estilo={{ justifyContent: "flex-end", gap: 2 }}>
+          <T tipo="rotulo" cor={cor.primariaEscura} estilo={{ fontSize: 14 }}>
+            Ver semana a semana
+          </T>
+          <ChevronRight size={18} color={cor.primariaEscura} />
+        </Linha>
+      </Cartao>
+    </Inclinacao3D>
   );
 }
 
@@ -362,6 +392,7 @@ function CartaoDeAcolhimento() {
 }
 
 function Atalho({
+  ordem = 0,
   Icone,
   titulo,
   texto,
@@ -369,6 +400,8 @@ function Atalho({
   fundoIcone,
   aoTocar,
 }: {
+  /** A posição na lista: os atalhos entram em cascata, 60 ms um do outro. */
+  ordem?: number;
   Icone: ComponentType<{ size?: number; color?: string }>;
   titulo: string;
   texto: string;
@@ -377,35 +410,37 @@ function Atalho({
   aoTocar: () => void;
 }) {
   return (
-    <Cartao
-      aoTocar={aoTocar}
-      rotuloAcessivel={titulo}
-      estilo={{
-        flexDirection: "row",
-        alignItems: "center",
-        gap: espaco.md,
-        paddingVertical: espaco.md,
-      }}
-    >
-      <View
-        style={{
-          width: 44,
-          height: 44,
-          borderRadius: raio.md,
-          backgroundColor: fundoIcone,
+    <Entrada atraso={200 + ordem * 60}>
+      <Cartao
+        aoTocar={aoTocar}
+        rotuloAcessivel={titulo}
+        estilo={{
+          flexDirection: "row",
           alignItems: "center",
-          justifyContent: "center",
+          gap: espaco.md,
+          paddingVertical: espaco.md,
         }}
       >
-        <Icone size={22} color={corIcone} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <T tipo="rotulo">{titulo}</T>
-        <T tipo="apagado" estilo={{ fontSize: 14 }}>
-          {texto}
-        </T>
-      </View>
-      <ChevronRight size={20} color={cor.textoApagado} />
-    </Cartao>
+        <View
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: raio.md,
+            backgroundColor: fundoIcone,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Icone size={22} color={corIcone} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <T tipo="rotulo">{titulo}</T>
+          <T tipo="apagado" estilo={{ fontSize: 14 }}>
+            {texto}
+          </T>
+        </View>
+        <ChevronRight size={20} color={cor.textoApagado} />
+      </Cartao>
+    </Entrada>
   );
 }

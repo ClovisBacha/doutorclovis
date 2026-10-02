@@ -1,4 +1,3 @@
-import { Image } from "expo-image";
 import { router } from "expo-router";
 import { ChevronLeft, X } from "lucide-react-native";
 import { useEffect, useRef, type ReactNode } from "react";
@@ -15,33 +14,19 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import { toque } from "~/componentes/base";
+import { BolhaViva, type HumorDaBolha } from "~/componentes/movimento";
 import { CORES_DO_CONFETE, corJornada } from "~/componentes/jornada/cores";
 import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
 
 /* ── A bolha, porta-voz do app ─────────────────────────────────────────── */
 
-const BOLHAS = {
-  estudiosa: require("../../../../src/assets/bolha/estudiosa.webp"),
-  exercicio: require("../../../../src/assets/bolha/exercicio.webp"),
-  feliz: require("../../../../src/assets/bolha/feliz.webp"),
-  apaixonado: require("../../../../src/assets/bolha/apaixonado.webp"),
-  comemorando: require("../../../../src/assets/bolha/comemorando.webp"),
-  dormindo: require("../../../../src/assets/bolha/dormindo.webp"),
-  orgulhosa: require("../../../../src/assets/bolha/orgulhosa.webp"),
-} as const;
-
-export type Humor = keyof typeof BOLHAS;
+export type Humor = HumorDaBolha;
 
 export function Bolha({ humor, tamanho = 132 }: { humor: Humor; tamanho?: number }) {
-  return (
-    <Image
-      source={BOLHAS[humor]}
-      style={{ width: tamanho, height: tamanho }}
-      contentFit="contain"
-      accessibilityIgnoresInvertColors
-      accessible={false}
-    />
-  );
+  /* A bolha viva: o vídeo curto em laço de cada humor (movimento.tsx). A arte
+     parada continua sendo o primeiro quadro e o que aparece com
+     "reduzir movimento" ou na web. */
+  return <BolhaViva humor={humor} tamanho={tamanho} />;
 }
 
 /** A bolha com um balão de fala ao lado. */
@@ -119,7 +104,6 @@ export function Estrelas({
 
 /* ── Confete (Animated puro) ───────────────────────────────────────────── */
 
-
 export function Confete({ pecas = 36, altura = 800 }: { pecas?: number; altura?: number }) {
   const itens = useRef(
     Array.from({ length: pecas }, (_, i) => ({
@@ -168,7 +152,10 @@ export function Confete({ pecas = 36, altura = 800 }: { pecas?: number; altura?:
               { translateY: p.v.interpolate({ inputRange: [0, 1], outputRange: [0, altura] }) },
               { translateX: p.v.interpolate({ inputRange: [0, 1], outputRange: [0, p.deriva] }) },
               {
-                rotate: p.v.interpolate({ inputRange: [0, 1], outputRange: ["0deg", `${p.gira}deg`] }),
+                rotate: p.v.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ["0deg", `${p.gira}deg`],
+                }),
               },
             ],
           }}
@@ -194,8 +181,18 @@ export function Pulsando({
     if (!ativo) return;
     const laco = Animated.loop(
       Animated.sequence([
-        Animated.timing(v, { toValue: 1, duration: 700, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-        Animated.timing(v, { toValue: 0, duration: 700, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(v, {
+          toValue: 1,
+          duration: 700,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(v, {
+          toValue: 0,
+          duration: 700,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
       ]),
     );
     laco.start();
@@ -205,7 +202,9 @@ export function Pulsando({
     <Animated.View
       style={[
         estilo,
-        ativo && { transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] }) }] },
+        ativo && {
+          transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] }) }],
+        },
       ]}
     >
       {children}
@@ -234,7 +233,14 @@ export function Folha({
           accessibilityRole="button"
           accessibilityLabel="Fechar"
           onPress={aoFechar}
-          style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0, backgroundColor: "rgba(41,20,19,0.35)" }}
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: 0,
+            bottom: 0,
+            backgroundColor: "rgba(41,20,19,0.35)",
+          }}
         />
         <View
           style={{
@@ -252,7 +258,9 @@ export function Folha({
           </View>
           {titulo ? (
             <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
-              <Text style={{ flex: 1, fontFamily: fonte.titulo, fontSize: 20, color: cor.texto }}>{titulo}</Text>
+              <Text style={{ flex: 1, fontFamily: fonte.titulo, fontSize: 20, color: cor.texto }}>
+                {titulo}
+              </Text>
               <BotaoRedondo rotulo="Fechar" aoTocar={aoFechar}>
                 <X size={20} color={cor.textoApagado} />
               </BotaoRedondo>
@@ -322,12 +330,31 @@ export function BarraDoTopo({
   aoSair?: () => void;
 }) {
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.md, minHeight: ALVO_MINIMO + 4 }}>
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: espaco.md,
+        minHeight: ALVO_MINIMO + 4,
+      }}
+    >
       <BotaoRedondo rotulo={fechar ? "Sair" : "Voltar"} aoTocar={aoSair ?? voltarParaJornada}>
-        {fechar ? <X size={22} color={cor.textoApagado} /> : <ChevronLeft size={24} color={cor.textoApagado} />}
+        {fechar ? (
+          <X size={22} color={cor.textoApagado} />
+        ) : (
+          <ChevronLeft size={24} color={cor.textoApagado} />
+        )}
       </BotaoRedondo>
       {progresso != null ? (
-        <View style={{ flex: 1, height: 12, borderRadius: 6, backgroundColor: corJornada.estrelaApagada, overflow: "hidden" }}>
+        <View
+          style={{
+            flex: 1,
+            height: 12,
+            borderRadius: 6,
+            backgroundColor: corJornada.estrelaApagada,
+            overflow: "hidden",
+          }}
+        >
           <View
             style={{
               width: `${Math.round(Math.min(1, Math.max(0, progresso)) * 100)}%`,
@@ -338,7 +365,10 @@ export function BarraDoTopo({
           />
         </View>
       ) : (
-        <Text numberOfLines={1} style={{ flex: 1, fontFamily: fonte.forte, fontSize: 17, color: cor.texto }}>
+        <Text
+          numberOfLines={1}
+          style={{ flex: 1, fontFamily: fonte.forte, fontSize: 17, color: cor.texto }}
+        >
           {titulo}
         </Text>
       )}
@@ -379,7 +409,13 @@ export function Ficha({
         opacity: pressed ? 0.75 : 1,
       })}
     >
-      <Text style={{ fontFamily: ativa ? fonte.forte : fonte.media, fontSize: 15, color: ativa ? corJornada.roxoEscuro : cor.texto }}>
+      <Text
+        style={{
+          fontFamily: ativa ? fonte.forte : fonte.media,
+          fontSize: 15,
+          color: ativa ? corJornada.roxoEscuro : cor.texto,
+        }}
+      >
         {rotulo}
       </Text>
     </Pressable>

@@ -6,9 +6,22 @@ import { Platform, Pressable, Text, View } from "react-native";
 import { Botao, Cartao, Carregando, NaoConsegueLer, T, Tela, toque } from "~/componentes/base";
 import { corDaRaridade, corJornada } from "~/componentes/jornada/cores";
 import { lerConquistas, resgatar, type LeituraDasConquistas } from "~/componentes/jornada/economia";
-import { BarraDoTopo, Confete, Folha, Pulsando, voltarParaJornada } from "~/componentes/jornada/pecas";
+import {
+  BarraDoTopo,
+  Confete,
+  Folha,
+  Pulsando,
+  voltarParaJornada,
+} from "~/componentes/jornada/pecas";
+import { Inclinacao3D } from "~/componentes/movimento";
 import { useDiaDaJornada } from "~/componentes/jornada/usarJornada";
-import { montarGrade, paraResgatar, placar, prateleiras, type Cartao as CartaoDaGrade } from "~/lib/jornada/conquistas";
+import {
+  montarGrade,
+  paraResgatar,
+  placar,
+  prateleiras,
+  type Cartao as CartaoDaGrade,
+} from "~/lib/jornada/conquistas";
 import { dataCurta } from "~/lib/jornada/dia";
 import { cor, espaco, fonte, raio } from "~/tema";
 
@@ -66,7 +79,8 @@ export default function Conquistas() {
     setAberta(null);
     if (r.granted > 0) {
       setGanho({ chave: c.def.key, valor: r.granted });
-      if (Platform.OS !== "web") void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      if (Platform.OS !== "web")
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     }
   }
 
@@ -82,7 +96,9 @@ export default function Conquistas() {
     return (
       <Tela bordas={["top", "bottom"]}>
         <BarraDoTopo titulo="Conquistas" />
-        <T>As suas conquistas ficam guardadas. Hoje a jornada é sobre cuidar de você, sem placar.</T>
+        <T>
+          As suas conquistas ficam guardadas. Hoje a jornada é sobre cuidar de você, sem placar.
+        </T>
         <Botao rotulo="Voltar" aoTocar={voltarParaJornada} corFundo={corJornada.roxo} />
       </Tela>
     );
@@ -114,7 +130,9 @@ export default function Conquistas() {
                 <T tipo="rotulo" cor={cor.atencao}>
                   Não conseguimos conferir quais você já resgatou
                 </T>
-                <T tipo="apagado">As conquistas aparecem, mas o resgate volta quando a conexão voltar.</T>
+                <T tipo="apagado">
+                  As conquistas aparecem, mas o resgate volta quando a conexão voltar.
+                </T>
                 <Botao rotulo="Tentar de novo" tipo="secundario" aoTocar={() => void carregar()} />
               </Cartao>
             ) : null}
@@ -144,7 +162,9 @@ export default function Conquistas() {
       <Folha aberta={!!aberta} aoFechar={() => setAberta(null)}>
         {aberta ? (
           <View style={{ alignItems: "center", gap: espaco.sm }}>
-            <Text style={{ fontSize: 54, opacity: aberta.estado === "bloqueada" ? 0.35 : 1 }}>{aberta.def.emoji}</Text>
+            <Text style={{ fontSize: 54, opacity: aberta.estado === "bloqueada" ? 0.35 : 1 }}>
+              {aberta.def.emoji}
+            </Text>
             <T tipo="titulo" centro estilo={{ fontSize: 23 }}>
               {aberta.def.title}
             </T>
@@ -188,11 +208,29 @@ function Resumo({ grade, posParto }: { grade: CartaoDaGrade[]; posParto: boolean
   return (
     <Cartao fundo={corJornada.roxoNevoa}>
       <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
-        <Text style={{ fontFamily: fonte.titulo, fontSize: 34, color: corJornada.roxoEscuro }}>{feitas}</Text>
-        <Text style={{ fontFamily: fonte.forte, fontSize: 17, color: cor.textoApagado }}>de {total} conquistas</Text>
+        <Text style={{ fontFamily: fonte.titulo, fontSize: 34, color: corJornada.roxoEscuro }}>
+          {feitas}
+        </Text>
+        <Text style={{ fontFamily: fonte.forte, fontSize: 17, color: cor.textoApagado }}>
+          de {total} conquistas
+        </Text>
       </View>
-      <View style={{ height: 10, borderRadius: 5, backgroundColor: corJornada.estrelaApagada, overflow: "hidden" }}>
-        <View style={{ width: `${Math.round(pct * 100)}%`, height: "100%", backgroundColor: corJornada.roxoMedio, borderRadius: 5 }} />
+      <View
+        style={{
+          height: 10,
+          borderRadius: 5,
+          backgroundColor: corJornada.estrelaApagada,
+          overflow: "hidden",
+        }}
+      >
+        <View
+          style={{
+            width: `${Math.round(pct * 100)}%`,
+            height: "100%",
+            backgroundColor: corJornada.roxoMedio,
+            borderRadius: 5,
+          }}
+        />
       </View>
       <T tipo="apagado">
         {n > 0
@@ -209,7 +247,16 @@ function Resumo({ grade, posParto }: { grade: CartaoDaGrade[]; posParto: boolean
 function SeloDeRaridade({ c }: { c: CartaoDaGrade }) {
   const r = corDaRaridade[c.def.raridade];
   return (
-    <View style={{ backgroundColor: r.fundo, borderColor: r.anel, borderWidth: 1.5, borderRadius: raio.pilula, paddingHorizontal: 10, paddingVertical: 3 }}>
+    <View
+      style={{
+        backgroundColor: r.fundo,
+        borderColor: r.anel,
+        borderWidth: 1.5,
+        borderRadius: raio.pilula,
+        paddingHorizontal: 10,
+        paddingVertical: 3,
+      }}
+    >
       <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: r.texto }}>
         {r.rotulo} · +{c.sementinhas} 🌱
       </Text>
@@ -230,7 +277,9 @@ function CartaoDeConquista({
 }) {
   const r = corDaRaridade[c.def.raridade];
   const bloqueada = c.estado === "bloqueada";
-  return (
+  /* Conquistada ganha profundidade e brilho que corre com o celular (as
+     trancadas ficam chapadas: é o contraste que dá vontade de ganhar). */
+  const cartao = (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${c.def.title}, ${r.rotulo.toLowerCase()}, ${
@@ -241,7 +290,7 @@ function CartaoDeConquista({
         aoAbrir();
       }}
       style={({ pressed }) => ({
-        width: "31.5%",
+        width: bloqueada ? "31.5%" : "100%",
         minHeight: 150,
         borderRadius: raio.md,
         borderWidth: bloqueada ? 1.5 : 2.5,
@@ -256,7 +305,16 @@ function CartaoDeConquista({
       <View style={{ height: 44, alignItems: "center", justifyContent: "center" }}>
         <Text style={{ fontSize: 32, opacity: bloqueada ? 0.3 : 1 }}>{c.def.emoji}</Text>
         {bloqueada ? (
-          <View style={{ position: "absolute", right: -8, bottom: 0, backgroundColor: cor.cartao, borderRadius: 10, padding: 2 }}>
+          <View
+            style={{
+              position: "absolute",
+              right: -8,
+              bottom: 0,
+              backgroundColor: cor.cartao,
+              borderRadius: 10,
+              padding: 2,
+            }}
+          >
             <Lock size={14} color={cor.textoApagado} />
           </View>
         ) : null}
@@ -300,8 +358,24 @@ function CartaoDeConquista({
                 <Text style={{ fontFamily: fonte.titulo, fontSize: 13, color: cor.branco }}>…</Text>
               ) : (
                 <>
-                  <Text style={{ fontFamily: fonte.forte, fontSize: 13, lineHeight: 16, color: "#ede9fe" }}>Resgatar</Text>
-                  <Text style={{ fontFamily: fonte.titulo, fontSize: 13, lineHeight: 16, color: cor.branco }}>
+                  <Text
+                    style={{
+                      fontFamily: fonte.forte,
+                      fontSize: 13,
+                      lineHeight: 16,
+                      color: cor.jogoFundo,
+                    }}
+                  >
+                    Resgatar
+                  </Text>
+                  <Text
+                    style={{
+                      fontFamily: fonte.titulo,
+                      fontSize: 13,
+                      lineHeight: 16,
+                      color: cor.branco,
+                    }}
+                  >
                     +{c.sementinhas} 🌱
                   </Text>
                 </>
@@ -309,16 +383,33 @@ function CartaoDeConquista({
             </Pressable>
           </Pulsando>
         ) : c.estado === "resgatada" || c.estado === "desbloqueada" ? (
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 3 }}>
+          <View
+            style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 3 }}
+          >
             <Check size={13} color={r.texto} strokeWidth={3} />
-            <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: r.texto }}>{dataCurta(c.quando) ?? ""}</Text>
+            <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: r.texto }}>
+              {dataCurta(c.quando) ?? ""}
+            </Text>
           </View>
         ) : (
-          <Text style={{ fontFamily: fonte.media, fontSize: 13, color: cor.textoApagado, textAlign: "center" }}>
+          <Text
+            style={{
+              fontFamily: fonte.media,
+              fontSize: 13,
+              color: cor.textoApagado,
+              textAlign: "center",
+            }}
+          >
             +{c.sementinhas} 🌱
           </Text>
         )}
       </View>
     </Pressable>
+  );
+  if (bloqueada) return cartao;
+  return (
+    <Inclinacao3D estilo={{ width: "31.5%" }} raio={raio.md}>
+      {cartao}
+    </Inclinacao3D>
   );
 }

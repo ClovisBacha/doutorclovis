@@ -1,4 +1,3 @@
-import { RED_SYMPTOMS } from "@/lib/triage";
 import * as SMS from "expo-sms";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
@@ -14,6 +13,7 @@ import {
 } from "~/lib/kit-sos";
 import { lerKitDoSos } from "~/lib/kit-sos-armazem";
 import { lerMedicoLocal } from "~/lib/medico-local";
+import { sinaisDeSocorro } from "~/lib/saude/triagem-local";
 import { ehBancada } from "~/lib/bancada";
 import { abrir, ligar } from "~/lib/links";
 import { localizacaoParaSocorro, type Ponto } from "~/lib/localizacao";
@@ -302,14 +302,16 @@ export default function Sos() {
 
       <Cartao>
         <T tipo="subtitulo">Ligue {SAMU} ou vá à maternidade se tiver</T>
-        {RED_SYMPTOMS.map((s) => (
-          <Linha key={s.id} estilo={{ alignItems: "flex-start" }}>
-            <Text style={{ color: cor.urgente, fontFamily: fonte.forte, fontSize: 16 }}>•</Text>
-            <T tipo="corpo" estilo={{ flex: 1 }}>
-              {s.label}
-            </T>
-          </Linha>
-        ))}
+        {sinaisDeSocorro({ cuidado: perfil?.care_mode === true, nasceu: !!perfil?.birth_date }).map(
+          (s) => (
+            <Linha key={s.id} estilo={{ alignItems: "flex-start" }}>
+              <Text style={{ color: cor.urgente, fontFamily: fonte.forte, fontSize: 16 }}>•</Text>
+              <T tipo="corpo" estilo={{ flex: 1 }}>
+                {s.label}
+              </T>
+            </Linha>
+          ),
+        )}
       </Cartao>
 
       <Linha>

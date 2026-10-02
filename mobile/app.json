@@ -12,7 +12,9 @@
       "bundleIdentifier": "br.com.obstetrica.app",
       "supportsTablet": false,
       "usesAppleSignIn": true,
-      "config": { "usesNonExemptEncryption": false },
+      "config": {
+        "usesNonExemptEncryption": false
+      },
       "infoPlist": {
         "CFBundleDevelopmentRegion": "pt-BR",
         "CFBundleLocalizations": ["pt-BR"],
@@ -73,7 +75,8 @@
           "cameraPermission": "Para você tirar foto da sua barriga, do seu bebê ou do seu ultrassom e publicar na Comunidade ou mostrar o seu prato para a nutricionista.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": false

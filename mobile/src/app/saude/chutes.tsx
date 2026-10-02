@@ -13,7 +13,17 @@ import { sinalMovimentosReduzidos } from "@/lib/sinais-clinicos";
 import { Redirect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import { Botao, Carregando, Cartao, Linha, NaoConsegueLer, Pilula, T, Tela, toque } from "~/componentes/base";
+import {
+  Botao,
+  Carregando,
+  Cartao,
+  Linha,
+  NaoConsegueLer,
+  Pilula,
+  T,
+  Tela,
+  toque,
+} from "~/componentes/base";
 import { GraficoDeLinha } from "~/componentes/saude/grafico";
 import { Cabecalho, CartaoDeSocorro, Escolha } from "~/componentes/saude/pecas";
 import { apagar, gravarJson, lerJson } from "~/lib/armazem";
@@ -75,9 +85,7 @@ export default function Chutes() {
       setEstado("falhou");
       return;
     }
-    setHistorico(
-      (data as Contagem[]).map((k) => ({ ...k, started_at: isoNormal(k.started_at) })),
-    );
+    setHistorico((data as Contagem[]).map((k) => ({ ...k, started_at: isoNormal(k.started_at) })));
     setEstado("pronto");
   }, []);
 
@@ -130,7 +138,13 @@ export default function Chutes() {
       setEmCurso(sessaoEmCursoDeExemplo(t, est));
       if (est === "falhou") setEstado("falhou");
       else {
-        setHistorico(sessoesDeExemplo(t).map((s, i) => ({ ...s, id: `exemplo-${i}`, strength: i === 1 ? 1 : 2 })));
+        setHistorico(
+          sessoesDeExemplo(t).map((s, i) => ({
+            ...s,
+            id: `exemplo-${i}`,
+            strength: i === 1 ? 1 : 2,
+          })),
+        );
         setEstado("pronto");
       }
       return;
@@ -209,7 +223,7 @@ export default function Chutes() {
   }
 
   if (estadoDoPerfil === "carregando") return <Carregando />;
-  if (cuidado) return <Redirect href="/saude" />;
+  if (cuidado || perfil?.birth_date) return <Redirect href="/saude" />;
 
   const minutos = emCurso ? (agora - new Date(emCurso.startedAt).getTime()) / 60000 : 0;
   const alarme = emCurso
@@ -304,7 +318,12 @@ export default function Chutes() {
               accessibilityRole="button"
               accessibilityLabel="Contei um a mais — tirar 1"
               onPress={() => somar(-1)}
-              style={{ minHeight: ALVO_MINIMO, alignItems: "center", justifyContent: "center", marginTop: espaco.lg }}
+              style={{
+                minHeight: ALVO_MINIMO,
+                alignItems: "center",
+                justifyContent: "center",
+                marginTop: espaco.lg,
+              }}
             >
               <Text
                 style={{
@@ -324,8 +343,8 @@ export default function Chutes() {
           {fase ? (
             <>
               <T>
-                Conte quanto tempo o bebê leva para fazer 10 movimentos. Deitada de lado, no começo da
-                noite — para a maioria são uns 20 minutos.
+                Conte quanto tempo o bebê leva para fazer 10 movimentos. Deitada de lado, no começo
+                da noite — para a maioria são uns 20 minutos.
               </T>
               <T tipo="apagado">Valem chutes, socos, rolamentos e cutucadas. Soluços não contam.</T>
               <T tipo="apagado">
@@ -348,7 +367,15 @@ export default function Chutes() {
       )}
 
       {aviso ? (
-        <Cartao fundo={aviso.tom === "aparelho" ? cor.atencaoFundo : aviso.tom === "ok" ? cor.chutesFundo : cor.apagado}>
+        <Cartao
+          fundo={
+            aviso.tom === "aparelho"
+              ? cor.atencaoFundo
+              : aviso.tom === "ok"
+                ? cor.chutesFundo
+                : cor.apagado
+          }
+        >
           <T tipo="rotulo" cor={aviso.tom === "aparelho" ? cor.atencao : cor.texto}>
             {aviso.texto}
           </T>
@@ -396,8 +423,8 @@ export default function Chutes() {
             </T>
           )}
           <T tipo="apagado">
-            Se você sentir o bebê diferente do que costuma, não espere um número: ligue para o 192 ou
-            procure a maternidade.
+            Se você sentir o bebê diferente do que costuma, não espere um número: ligue para o 192
+            ou procure a maternidade.
           </T>
           {serie.length >= 2 ? (
             <View style={{ gap: espaco.xs, marginTop: espaco.sm }}>
@@ -424,7 +451,9 @@ export default function Chutes() {
             const f = nivelDeForca(s.strength ?? null);
             const dur =
               s.ended_at != null
-                ? duracaoFalada((new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()) / 1000)
+                ? duracaoFalada(
+                    (new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()) / 1000,
+                  )
                 : "sem fim";
             return (
               <View
@@ -446,7 +475,9 @@ export default function Chutes() {
                   <T>
                     {s.kick_count} {s.kick_count === 1 ? "movimento" : "movimentos"}
                   </T>
-                  {f?.chip ? <Pilula texto={f.chip} fundo={cor.chutesFundo} corTexto={cor.chutes} /> : null}
+                  {f?.chip ? (
+                    <Pilula texto={f.chip} fundo={cor.chutesFundo} corTexto={cor.chutes} />
+                  ) : null}
                   {ehLocal(s.id) ? (
                     <Pilula texto="no aparelho" fundo={cor.atencaoFundo} corTexto={cor.atencao} />
                   ) : null}

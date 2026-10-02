@@ -1,4 +1,10 @@
-import { ALL_SYMPTOMS, assessLevel, LEVEL_FALLBACK, type RiskLevel } from "@/lib/triage";
+import {
+  ALL_SYMPTOMS,
+  assessLevel,
+  LEVEL_FALLBACK,
+  RED_SYMPTOMS,
+  type RiskLevel,
+} from "@/lib/triage";
 
 /**
  * A TRIAGEM QUE NÃO DEPENDE DE REDE.
@@ -35,4 +41,16 @@ const ORDEM: Record<RiskLevel, number> = { vermelho: 0, amarelo: 1, verde: 2 };
 /** O pior dos dois níveis — a resposta do servidor só pode SUBIR o local. */
 export function piorNivel(a: RiskLevel, b: RiskLevel): RiskLevel {
   return ORDEM[a] <= ORDEM[b] ? a : b;
+}
+
+/**
+ * Os sinais que a tela do SOS lista. Os da GESTAÇÃO (movimentos do bebê,
+ * bolsa rompida, contrações antes de 37 semanas) não valem para quem já teve
+ * o bebê nem para quem está no Modo Cuidado — listar "redução dos movimentos
+ * do bebê" a quem o perdeu é a pior frase possível nesta tela.
+ */
+export function sinaisDeSocorro(o: { cuidado: boolean; nasceu: boolean }) {
+  const daGestacao = new Set(["movimentos", "perda_liquido", "contracoes"]);
+  if (!o.cuidado && !o.nasceu) return RED_SYMPTOMS;
+  return RED_SYMPTOMS.filter((s) => !daGestacao.has(s.id));
 }

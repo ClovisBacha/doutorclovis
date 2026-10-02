@@ -1,6 +1,7 @@
 import { passoDaDigitacao, avisoQuePodeAparecer } from "@/lib/chat-stream";
 import { tituloDaFoto, type AssuntoDaFoto } from "@/lib/foto-da-nutricao";
-import { recadoDaAmostra, recadoDoBloqueio, type MotivoDoBloqueio } from "@/lib/nutricao-premium";
+import { type MotivoDoBloqueio } from "@/lib/nutricao-premium";
+import { recadoDaAmostraNoApp, recadoDoBloqueioNoApp } from "~/lib/nutricao/recados-no-app";
 import { pedeSocorro } from "@/lib/socorro-na-nutricao";
 import * as ImagePicker from "expo-image-picker";
 import { Redirect, router } from "expo-router";
@@ -84,7 +85,14 @@ function inicialDaBancada(): {
   campo: string;
   amostra: number | null;
 } {
-  const vazio = { estado: null, permissao: "permitida" as const, turnos: [], bloqueio: null, campo: "", amostra: null };
+  const vazio = {
+    estado: null,
+    permissao: "permitida" as const,
+    turnos: [],
+    bloqueio: null,
+    campo: "",
+    amostra: null,
+  };
   if (!ehBancada()) return vazio;
   const estado = parametroDaBancada("estado") as EstadoDaBancada;
   /* No Modo Cuidado a memória não é lida, e a conversa de exemplo fala do
@@ -139,7 +147,9 @@ export function TelaDaNutricao() {
   const [semAnimacao, setSemAnimacao] = useState(false);
 
   /* O que ela tentou fazer antes de permitir: feito logo depois do "sim". */
-  const pendente = useRef<{ tipo: "texto"; texto: string } | { tipo: "foto"; assunto: AssuntoDaFoto } | null>(null);
+  const pendente = useRef<
+    { tipo: "texto"; texto: string } | { tipo: "foto"; assunto: AssuntoDaFoto } | null
+  >(null);
   const rolagem = useRef<ScrollView>(null);
   /* Sair da tela cancela o que estiver no ar. Criado no efeito (e não no
      useRef) para que um efeito rodado duas vezes não deixe o sinal já
@@ -164,7 +174,8 @@ export function TelaDaNutricao() {
      de antes da perda pode falar do bebê) e nada na bancada. */
   const memoriaLida = useRef(false);
   useEffect(() => {
-    if (bancada || cuidado || !uid || permissao.estado !== "permitida" || memoriaLida.current) return;
+    if (bancada || cuidado || !uid || permissao.estado !== "permitida" || memoriaLida.current)
+      return;
     memoriaLida.current = true;
     void lerMemoria(uid).then((r) => {
       if (r.tipo === "falhou") setMemoriaFalhou(true);
@@ -188,7 +199,9 @@ export function TelaDaNutricao() {
       setChegando(alvo.current.slice(0, mostrado.current));
     }
     quadro.current =
-      aberto.current || mostrado.current < alvo.current.length ? requestAnimationFrame(desenhar) : null;
+      aberto.current || mostrado.current < alvo.current.length
+        ? requestAnimationFrame(desenhar)
+        : null;
   }, []);
   const comecarDigitacao = () => {
     alvo.current = "";
@@ -206,12 +219,17 @@ export function TelaDaNutricao() {
   const esperarDigitacao = () =>
     new Promise<void>((pronto) => {
       const conferir = () =>
-        semAnimacao || mostrado.current >= alvo.current.length ? pronto() : setTimeout(conferir, 50);
+        semAnimacao || mostrado.current >= alvo.current.length
+          ? pronto()
+          : setTimeout(conferir, 50);
       conferir();
     });
-  useEffect(() => () => {
-    if (quadro.current !== null) cancelAnimationFrame(quadro.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (quadro.current !== null) cancelAnimationFrame(quadro.current);
+    },
+    [],
+  );
 
   /* ─── O ENVIO ────────────────────────────────────────────────────────── */
   async function enviar(bruto?: string) {
@@ -223,7 +241,12 @@ export function TelaDaNutricao() {
       setTurnos((t) => [
         ...t,
         { id: novoId("socorro"), role: "user", texto: msg, especie: "socorro" },
-        { id: novoId("socorro"), role: "assistant", texto: RESPOSTA_DO_SOCORRO_NO_APP, especie: "socorro" },
+        {
+          id: novoId("socorro"),
+          role: "assistant",
+          texto: RESPOSTA_DO_SOCORRO_NO_APP,
+          especie: "socorro",
+        },
       ]);
       setCampo("");
       return;
@@ -254,7 +277,12 @@ export function TelaDaNutricao() {
         setChegando(null);
         setTurnos((t) => [
           ...t,
-          { id: novoId("bancada"), role: "assistant", texto: RESPOSTA_DA_BANCADA, especie: "recado" },
+          {
+            id: novoId("bancada"),
+            role: "assistant",
+            texto: RESPOSTA_DA_BANCADA,
+            especie: "recado",
+          },
         ]);
         setEnviando(false);
       }, 500);
@@ -288,7 +316,10 @@ export function TelaDaNutricao() {
           },
         ]);
         if (!cuidado && uid) {
-          void gravarTroca(uid, msg, { content: r.texto, ...(r.assinatura ? { assinatura: r.assinatura } : {}) });
+          void gravarTroca(uid, msg, {
+            content: r.texto,
+            ...(r.assinatura ? { assinatura: r.assinatura } : {}),
+          });
         }
         return;
       }
@@ -314,7 +345,10 @@ export function TelaDaNutricao() {
           ...t,
           { id: novoId("parcial"), role: "assistant", texto: r.parcial, especie: "recado" },
         ]);
-        setAviso({ tipo: "falha", texto: doServidor ?? "A resposta foi interrompida no meio. Pode perguntar de novo." });
+        setAviso({
+          tipo: "falha",
+          texto: doServidor ?? "A resposta foi interrompida no meio. Pode perguntar de novo.",
+        });
       } else {
         tirarPergunta();
         setCampo(msg);
@@ -361,13 +395,17 @@ export function TelaDaNutricao() {
         if (!p.granted) {
           setAviso({
             tipo: "falha",
-            texto: "O app não tem acesso à câmera. Dá para liberar nos Ajustes do iPhone — ou escolher uma foto da galeria.",
+            texto:
+              "O app não tem acesso à câmera. Dá para liberar nos Ajustes do iPhone — ou escolher uma foto da galeria.",
           });
           return;
         }
         resultado = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 1 });
       } else {
-        resultado = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 1 });
+        resultado = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ["images"],
+          quality: 1,
+        });
       }
     } catch {
       setAviso({ tipo: "falha", texto: recadoDaFoto("preparo") });
@@ -379,9 +417,18 @@ export function TelaDaNutricao() {
     setAviso(null);
     setBloqueio(null);
     const titulo = tituloDaFoto(assunto);
-    const pergunta: Turno = { id: novoId("foto"), role: "user", texto: titulo, especie: "conversa", foto: foto.uri };
+    const pergunta: Turno = {
+      id: novoId("foto"),
+      role: "user",
+      texto: titulo,
+      especie: "conversa",
+      foto: foto.uri,
+    };
     const recado = (texto: string) =>
-      setTurnos((t) => [...t, { id: novoId("recado"), role: "assistant", texto, especie: "recado" }]);
+      setTurnos((t) => [
+        ...t,
+        { id: novoId("recado"), role: "assistant", texto, especie: "recado" },
+      ]);
     setTurnos((t) => [...t, pergunta]);
     setEnviando(true);
     setChegando("");
@@ -406,7 +453,10 @@ export function TelaDaNutricao() {
           },
         ]);
         if (!cuidado && uid) {
-          void gravarTroca(uid, titulo, { content: d.texto, ...(d.assinatura ? { assinatura: d.assinatura } : {}) });
+          void gravarTroca(uid, titulo, {
+            content: d.texto,
+            ...(d.assinatura ? { assinatura: d.assinatura } : {}),
+          });
         }
       } else if (d.tipo === "bloqueio") {
         setTurnos((t) => t.filter((x) => x.id !== pergunta.id));
@@ -489,8 +539,8 @@ export function TelaDaNutricao() {
               {vazia ? (
                 <View style={{ gap: espaco.md }}>
                   <T tipo="apagado">
-                    Pergunte sobre comida: o que pode, o que evitar, o que fazer com o que tem em casa. Ou
-                    mande a foto do prato ou de um rótulo.
+                    Pergunte sobre comida: o que pode, o que evitar, o que fazer com o que tem em
+                    casa. Ou mande a foto do prato ou de um rótulo.
                   </T>
                   <View style={{ gap: espaco.sm }}>
                     {prontas.map((p) => (
@@ -501,8 +551,8 @@ export function TelaDaNutricao() {
               ) : null}
               {memoriaFalhou ? (
                 <T tipo="apagado">
-                  Não consegui trazer a conversa anterior agora — isso é a conexão. Você pode perguntar
-                  normalmente.
+                  Não consegui trazer a conversa anterior agora — isso é a conexão. Você pode
+                  perguntar normalmente.
                 </T>
               ) : null}
               {turnos.map((t) =>
@@ -513,7 +563,10 @@ export function TelaDaNutricao() {
                 ),
               )}
               {chegando !== null ? <BolhaChegando texto={chegando} /> : null}
-              <T tipo="apagado" estilo={{ fontSize: 13, textAlign: "center", marginTop: espaco.sm }}>
+              <T
+                tipo="apagado"
+                estilo={{ fontSize: 13, textAlign: "center", marginTop: espaco.sm }}
+              >
                 Respostas geradas pela IA do Google. Podem errar e não substituem a sua consulta.
               </T>
             </>
@@ -561,7 +614,12 @@ export function TelaDaNutricao() {
       >
         <Pressable
           onPress={() => setVerPermissao(false)}
-          style={{ flex: 1, backgroundColor: "rgba(41,20,19,0.35)", justifyContent: "center", padding: espaco.lg }}
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(41,20,19,0.35)",
+            justifyContent: "center",
+            padding: espaco.lg,
+          }}
         >
           <Pressable onPress={() => {}} style={{ gap: espaco.sm }}>
             <CartaoDaPermissaoDeIA permissao={permissao} aoMudar={() => setVerPermissao(false)} />
@@ -603,7 +661,12 @@ function Cabecalho({
           toque();
           aoVoltar();
         }}
-        style={{ width: ALVO_MINIMO, height: ALVO_MINIMO, alignItems: "center", justifyContent: "center" }}
+        style={{
+          width: ALVO_MINIMO,
+          height: ALVO_MINIMO,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
       >
         <ChevronLeft size={28} color={cor.texto} />
       </Pressable>
@@ -631,7 +694,9 @@ function Cabecalho({
           })}
         >
           <ShieldCheck size={18} color={cor.nutricao} />
-          <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: cor.nutricao }}>Permissão de IA</Text>
+          <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: cor.nutricao }}>
+            Permissão de IA
+          </Text>
         </Pressable>
       ) : null}
     </View>
@@ -674,8 +739,8 @@ function SemPermissao({ aoRever, turnos }: { aoRever: () => void; turnos: Turno[
       <Cartao>
         <T tipo="rotulo">A nutricionista com IA está desligada</T>
         <T tipo="apagado">
-          Nada do que você escreve ou fotografa sai do aparelho para a IA sem a sua permissão. Se mudar de
-          ideia, é só rever.
+          Nada do que você escreve ou fotografa sai do aparelho para a IA sem a sua permissão. Se
+          mudar de ideia, é só rever.
         </T>
         <Botao rotulo="Rever a decisão" corFundo={cor.nutricao} aoTocar={aoRever} />
       </Cartao>
@@ -724,8 +789,8 @@ function Compositor({
   amostra: number | null;
 }) {
   const baixo = useSafeAreaInsets().bottom;
-  const linhaDaAmostra = recadoDaAmostra(amostra);
-  const porta = bloqueio ? recadoDoBloqueio(bloqueio) : null;
+  const linhaDaAmostra = recadoDaAmostraNoApp(amostra);
+  const porta = bloqueio ? recadoDoBloqueioNoApp(bloqueio) : null;
   const vazio = !campo.trim();
   return (
     <View
@@ -740,12 +805,21 @@ function Compositor({
       }}
     >
       {porta ? (
-        <Faixa fundo={cor.nutricaoFundo} titulo={porta.titulo} texto={porta.texto} aoFechar={aoFecharBloqueio} />
+        <Faixa
+          fundo={cor.nutricaoFundo}
+          titulo={porta.titulo}
+          texto={porta.texto}
+          aoFechar={aoFecharBloqueio}
+        />
       ) : null}
       {aviso ? (
         <Faixa fundo={cor.atencaoFundo} texto={aviso.texto} aoFechar={aoFecharAviso}>
           {aviso.tipo === "sessao" ? (
-            <Botao rotulo="Entrar de novo" tipo="secundario" aoTocar={() => router.replace("/entrar")} />
+            <Botao
+              rotulo="Entrar de novo"
+              tipo="secundario"
+              aoTocar={() => router.replace("/entrar")}
+            />
           ) : null}
         </Faixa>
       ) : null}
@@ -755,8 +829,18 @@ function Compositor({
         </T>
       ) : null}
       <View style={{ flexDirection: "row", gap: espaco.sm }}>
-        <BotaoDeFoto rotulo="Foto do prato" icone="prato" desabilitado={enviando} aoTocar={() => aoFoto("prato")} />
-        <BotaoDeFoto rotulo="Rótulo" icone="rotulo" desabilitado={enviando} aoTocar={() => aoFoto("rotulo")} />
+        <BotaoDeFoto
+          rotulo="Foto do prato"
+          icone="prato"
+          desabilitado={enviando}
+          aoTocar={() => aoFoto("prato")}
+        />
+        <BotaoDeFoto
+          rotulo="Rótulo"
+          icone="rotulo"
+          desabilitado={enviando}
+          aoTocar={() => aoFoto("rotulo")}
+        />
       </View>
       <View style={{ flexDirection: "row", alignItems: "flex-end", gap: espaco.sm }}>
         <TextInput
@@ -864,7 +948,9 @@ function Faixa({
   children?: ReactNode;
 }) {
   return (
-    <View style={{ backgroundColor: fundo, borderRadius: raio.md, padding: espaco.md, gap: espaco.sm }}>
+    <View
+      style={{ backgroundColor: fundo, borderRadius: raio.md, padding: espaco.md, gap: espaco.sm }}
+    >
       <View style={{ flexDirection: "row", gap: espaco.sm }}>
         <View style={{ flex: 1, gap: 4 }}>
           {titulo ? <T tipo="rotulo">{titulo}</T> : null}
@@ -876,7 +962,14 @@ function Faixa({
           accessibilityRole="button"
           accessibilityLabel="Fechar aviso"
           onPress={aoFechar}
-          style={{ width: ALVO_MINIMO, height: ALVO_MINIMO, alignItems: "center", justifyContent: "center", marginTop: -10, marginRight: -10 }}
+          style={{
+            width: ALVO_MINIMO,
+            height: ALVO_MINIMO,
+            alignItems: "center",
+            justifyContent: "center",
+            marginTop: -10,
+            marginRight: -10,
+          }}
         >
           <X size={18} color={cor.textoApagado} />
         </Pressable>

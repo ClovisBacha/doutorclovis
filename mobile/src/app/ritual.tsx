@@ -1,9 +1,8 @@
 import { dueDateFromLmp } from "@/lib/gestacao";
-import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, View } from "react-native";
-import { BOLHA } from "~/componentes/artes";
+import { BolhaViva } from "~/componentes/movimento";
 import { Botao, Campo, Cartao, Linha, T, Tela, toque } from "~/componentes/base";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { gravarPerfil } from "~/lib/gravar-perfil";
@@ -148,10 +147,11 @@ export default function Ritual() {
           ))}
         </Linha>
         <View style={{ alignItems: "center", marginTop: espaco.md }}>
-          <Image
-            source={passo === PASSOS - 1 ? BOLHA.comemorando : BOLHA.feliz}
-            style={{ width: 110, height: 110 }}
-            contentFit="contain"
+          {/* A chave troca o vídeo quando o humor muda (o player é por humor). */}
+          <BolhaViva
+            key={passo === PASSOS - 1 ? "comemorando" : "feliz"}
+            humor={passo === PASSOS - 1 ? "comemorando" : "feliz"}
+            tamanho={116}
           />
         </View>
 

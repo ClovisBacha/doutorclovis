@@ -73,7 +73,9 @@ export default function Contracoes() {
       setEstado("falhou");
       return;
     }
-    setHistorico((data as ContracaoDaTela[]).map((c) => ({ ...c, started_at: isoNormal(c.started_at) })));
+    setHistorico(
+      (data as ContracaoDaTela[]).map((c) => ({ ...c, started_at: isoNormal(c.started_at) })),
+    );
     setEstado("pronto");
   }, []);
 
@@ -188,7 +190,10 @@ export default function Contracoes() {
     }
     const antes = historico;
     setHistorico((h) => h.map((c) => (c.id === id ? { ...c, intensity: valor } : c)));
-    const { error } = await supabase.from("contraction_logs").update({ intensity: valor }).eq("id", id);
+    const { error } = await supabase
+      .from("contraction_logs")
+      .update({ intensity: valor })
+      .eq("id", id);
     if (error) {
       setHistorico(antes);
       setErroLinha("Não conseguimos corrigir agora. Tente de novo.");
@@ -206,7 +211,9 @@ export default function Contracoes() {
       const { error } = await supabase.from("contraction_logs").delete().eq("id", id);
       setOcupado(false);
       if (error) {
-        setErroLinha("Não conseguimos apagar agora. A contração continua guardada — tente de novo.");
+        setErroLinha(
+          "Não conseguimos apagar agora. A contração continua guardada — tente de novo.",
+        );
         return;
       }
     }
@@ -246,7 +253,10 @@ export default function Contracoes() {
             <View style={{ alignSelf: "stretch", gap: espaco.sm }}>
               <T tipo="rotulo">Como está a dor?</T>
               <Escolha
-                opcoes={NIVEIS_DE_INTENSIDADE.map((n) => ({ valor: n.valor as number, rotulo: n.rotulo }))}
+                opcoes={NIVEIS_DE_INTENSIDADE.map((n) => ({
+                  valor: n.valor as number,
+                  rotulo: n.rotulo,
+                }))}
                 valor={intensidade}
                 corAtiva={cor.contracoes}
                 rotuloAcessivel="Intensidade da contração"
@@ -272,7 +282,11 @@ export default function Contracoes() {
       </Cartao>
 
       {pedeLigar ? (
-        <CartaoDeSocorro titulo={titulo} texto={analise.detail} grande={analise.status === "urgente"}>
+        <CartaoDeSocorro
+          titulo={titulo}
+          texto={analise.detail}
+          grande={analise.status === "urgente"}
+        >
           <Numeros analise={analise} />
         </CartaoDeSocorro>
       ) : (
@@ -301,14 +315,16 @@ export default function Contracoes() {
                 minHeight: ALVO_MINIMO,
                 paddingHorizontal: espaco.md,
                 borderRadius: raio.pilula,
-                backgroundColor: pressed ? "#991b1b" : cor.urgente,
+                backgroundColor: pressed ? cor.urgentePressionado : cor.urgente,
                 flexDirection: "row",
                 alignItems: "center",
                 gap: 6,
               })}
             >
               <Phone size={16} color={cor.branco} />
-              <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: cor.branco }}>Ligar 192</Text>
+              <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: cor.branco }}>
+                Ligar 192
+              </Text>
             </Pressable>
           </Linha>
         ))}
@@ -367,12 +383,7 @@ export default function Contracoes() {
   );
 }
 
-const COLUNAS = [
-  { width: 56 },
-  { width: 72 },
-  { width: 80 },
-  { flex: 1 },
-] as const;
+const COLUNAS = [{ width: 56 }, { width: 72 }, { width: 80 }, { flex: 1 }] as const;
 
 function Numeros({ analise }: { analise: ReturnType<typeof analyzeContractions> }) {
   const partes = [
@@ -391,7 +402,15 @@ function Numeros({ analise }: { analise: ReturnType<typeof analyzeContractions> 
   );
 }
 
-function BotaoRedondo({ rotulo, aoTocar, cheio }: { rotulo: string; aoTocar: () => void; cheio?: boolean }) {
+function BotaoRedondo({
+  rotulo,
+  aoTocar,
+  cheio,
+}: {
+  rotulo: string;
+  aoTocar: () => void;
+  cheio?: boolean;
+}) {
   return (
     <Pressable
       accessibilityRole="button"
@@ -446,7 +465,12 @@ function LinhaDaContracao({
       : l.intervaloSeg >= 3600
         ? `${Math.floor(l.intervaloSeg / 3600)} h ${String(Math.round((l.intervaloSeg % 3600) / 60)).padStart(2, "0")}`
         : `${Math.max(1, Math.round(l.intervaloSeg / 60))} min`;
-  const texto = { fontFamily: fonte.media, fontSize: 15, color: cor.texto, fontVariant: ["tabular-nums" as const] };
+  const texto = {
+    fontFamily: fonte.media,
+    fontSize: 15,
+    color: cor.texto,
+    fontVariant: ["tabular-nums" as const],
+  };
   return (
     <View
       style={{
@@ -473,7 +497,9 @@ function LinhaDaContracao({
         })}
       >
         <Text style={[COLUNAS[0], texto, { fontFamily: fonte.forte }]}>{l.hora}</Text>
-        <Text style={[COLUNAS[1], texto]}>{l.duracaoSeg != null ? relogio(l.duracaoSeg * 1000) : "sem fim"}</Text>
+        <Text style={[COLUNAS[1], texto]}>
+          {l.duracaoSeg != null ? relogio(l.duracaoSeg * 1000) : "sem fim"}
+        </Text>
         <Text style={[COLUNAS[2], texto]}>{intervalo}</Text>
         <Text style={[COLUNAS[3], texto, { color: cor.contracoes, fontFamily: fonte.forte }]}>
           {l.intensidade ?? "—"}
@@ -483,7 +509,10 @@ function LinhaDaContracao({
         <View style={{ padding: espaco.md, paddingTop: 0, gap: espaco.sm }}>
           <T tipo="rotulo">Corrigir a intensidade</T>
           <Escolha
-            opcoes={NIVEIS_DE_INTENSIDADE.map((n) => ({ valor: n.valor as number, rotulo: n.rotulo }))}
+            opcoes={NIVEIS_DE_INTENSIDADE.map((n) => ({
+              valor: n.valor as number,
+              rotulo: n.rotulo,
+            }))}
             valor={l.valorIntensidade}
             corAtiva={cor.contracoes}
             rotuloAcessivel="Corrigir a intensidade"

@@ -19,6 +19,8 @@ import {
 } from "~/lib/saude/fila";
 import { inicioDoDia } from "~/lib/saude/formato";
 import { resumoParaOHub, type RegistroDeSaude } from "~/lib/saude/registros";
+import { ferramentasDaGestacao, NOME_DOS_MOVIMENTOS } from "~/lib/ferramentas";
+import { gestacaoDoPerfil } from "~/lib/gestacao";
 import { useSessao } from "~/lib/sessao";
 import { supabase } from "~/servidor/supabase";
 import { ALVO_MINIMO, cor, espaco, fonte, raio, sombra } from "~/tema";
@@ -39,7 +41,12 @@ import { ALVO_MINIMO, cor, espaco, fonte, raio, sombra } from "~/tema";
 type Dados = { saude?: string | null; chutes?: number; contracoes?: string | null };
 
 export default function HubDaSaude() {
-  const { sessao, cuidado } = useSessao();
+  const { sessao, cuidado, perfil } = useSessao();
+  const ferramentas = ferramentasDaGestacao({
+    semanas: gestacaoDoPerfil(perfil)?.weeks ?? null,
+    cuidado,
+    nasceu: !!perfil?.birth_date,
+  });
   const uid = sessao?.user.id ?? null;
   const [dados, setDados] = useState<Dados>({});
 
@@ -80,15 +87,20 @@ export default function HubDaSaude() {
     const novo: Dados = {};
     if (!regs.error && regs.data) novo.saude = resumoParaOHub(regs.data as RegistroDeSaude[]);
     if (!kicks.error && kicks.data) {
-      const doServidor = (kicks.data as { started_at: string; ended_at: string | null; kick_count: number }[]).map(
-        (k) => ({ ...k, id: k.started_at, started_at: isoNormal(k.started_at) }),
-      );
+      const doServidor = (
+        kicks.data as { started_at: string; ended_at: string | null; kick_count: number }[]
+      ).map((k) => ({ ...k, id: k.started_at, started_at: isoNormal(k.started_at) }));
       novo.chutes = chutesDeHoje(mesclar(doServidor, filaK), agora);
     }
     if (!contr.error && contr.data) {
-      const doServidor = (contr.data as { id: string; started_at: string; ended_at: string | null; intensity: number | null }[]).map(
-        (c) => ({ ...c, started_at: isoNormal(c.started_at) }),
-      );
+      const doServidor = (
+        contr.data as {
+          id: string;
+          started_at: string;
+          ended_at: string | null;
+          intensity: number | null;
+        }[]
+      ).map((c) => ({ ...c, started_at: isoNormal(c.started_at) }));
       novo.contracoes = resumoDeContracoes(mesclar(doServidor, filaC), agora);
     }
     setDados(novo);
@@ -110,28 +122,32 @@ export default function HubDaSaude() {
       fundo: cor.saudeFundo,
       rota: "/saude/registros",
     },
-    ...(cuidado
+    ...(!ferramentas.movimentos
       ? []
       : [
           {
             chave: "chutes",
-            rotulo: "Chutes",
-            dado: dados.chutes ? `${dados.chutes} · chutes hoje` : "Contar movimentos",
+            rotulo: NOME_DOS_MOVIMENTOS,
+            dado: dados.chutes ? `${dados.chutes} hoje` : "Contar movimentos",
             arte: "chutes" as const,
             tinta: cor.chutes,
             fundo: cor.chutesFundo,
             rota: "/saude/chutes",
           },
         ]),
-    {
-      chave: "contracoes",
-      rotulo: "Contrações",
-      dado: dados.contracoes ?? "Cronometrar",
-      arte: "contracoes",
-      tinta: cor.contracoes,
-      fundo: cor.contracoesFundo,
-      rota: "/saude/contracoes",
-    },
+    ...(!ferramentas.contracoes
+      ? []
+      : [
+          {
+            chave: "contracoes",
+            rotulo: "Contrações",
+            dado: dados.contracoes ?? "Cronometrar",
+            arte: "contracoes" as const,
+            tinta: cor.contracoes,
+            fundo: cor.contracoesFundo,
+            rota: "/saude/contracoes",
+          },
+        ]),
     {
       chave: "nutricao",
       rotulo: "Nutrição",
@@ -226,7 +242,7 @@ function BlocoDoSintoma() {
           paddingHorizontal: espaco.lg,
           paddingVertical: espaco.md,
           borderWidth: 1,
-          borderColor: "#fecaca",
+          borderColor: cor.urgenteBorda,
           opacity: pressed ? 0.8 : 1,
         },
       ]}

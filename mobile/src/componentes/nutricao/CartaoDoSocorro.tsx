@@ -16,7 +16,7 @@ import { cor, espaco } from "~/tema";
  */
 export function CartaoDoSocorro({ texto }: { texto: string }) {
   return (
-    <Cartao fundo={cor.urgenteFundo} estilo={{ borderWidth: 1, borderColor: "#fca5a5" }}>
+    <Cartao fundo={cor.urgenteFundo} estilo={{ borderWidth: 1, borderColor: cor.urgenteBorda }}>
       <T tipo="subtitulo" cor={cor.urgente}>
         {TITULO_DO_SOCORRO}
       </T>

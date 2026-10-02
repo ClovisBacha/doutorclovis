@@ -2,6 +2,7 @@ import * as Haptics from "expo-haptics";
 import type { ReactNode } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Platform,
   Pressable,
   ScrollView,
@@ -15,6 +16,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
+import { useMolaDeToque } from "~/componentes/movimento";
 import { ALVO_MINIMO, cor, espaco, fonte, raio, sombra } from "~/tema";
 
 export function toque(leve = true) {
@@ -122,16 +124,75 @@ export function Cartao({
   ];
   if (!aoTocar) return <View style={base}>{children}</View>;
   return (
+    <CartaoTocavel base={base} aoTocar={aoTocar} rotuloAcessivel={rotuloAcessivel}>
+      {children}
+    </CartaoTocavel>
+  );
+}
+
+/* Layout fica no Pressable de fora (para flex/margens valerem na linha do
+   pai); o visual vai na camada animada de dentro, que afunda com a mola. */
+const CHAVES_DE_LAYOUT = [
+  "flex",
+  "flexGrow",
+  "flexShrink",
+  "flexBasis",
+  "width",
+  "minWidth",
+  "maxWidth",
+  "alignSelf",
+  "margin",
+  "marginTop",
+  "marginBottom",
+  "marginLeft",
+  "marginRight",
+  "marginHorizontal",
+  "marginVertical",
+  "position",
+  "top",
+  "left",
+  "right",
+  "bottom",
+] as const;
+
+function separarLayout(estilo: StyleProp<ViewStyle>): [ViewStyle, ViewStyle] {
+  const plano = { ...(StyleSheet.flatten(estilo) ?? {}) } as Record<string, unknown>;
+  const fora: Record<string, unknown> = {};
+  for (const k of CHAVES_DE_LAYOUT) {
+    if (k in plano) {
+      fora[k] = plano[k];
+      delete plano[k];
+    }
+  }
+  return [fora as ViewStyle, plano as ViewStyle];
+}
+
+function CartaoTocavel({
+  base,
+  aoTocar,
+  rotuloAcessivel,
+  children,
+}: {
+  base: StyleProp<ViewStyle>;
+  aoTocar: () => void;
+  rotuloAcessivel?: string;
+  children: ReactNode;
+}) {
+  const { escala, aoPressionar, aoSoltar } = useMolaDeToque(0.975);
+  const [fora, dentro] = separarLayout(base);
+  return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={rotuloAcessivel}
+      onPressIn={aoPressionar}
+      onPressOut={aoSoltar}
       onPress={() => {
         toque();
         aoTocar();
       }}
-      style={({ pressed }) => [...base, pressed && { opacity: 0.75 }]}
+      style={fora}
     >
-      {children}
+      <Animated.View style={[dentro, { transform: [{ scale: escala }] }]}>{children}</Animated.View>
     </Pressable>
   );
 }
@@ -166,34 +227,43 @@ export function Botao({
   const corTexto =
     tipo === "secundario" ? cor.primariaEscura : tipo === "texto" ? cor.primariaEscura : cor.branco;
   const off = desabilitado || carregando;
+  const { escala, aoPressionar, aoSoltar } = useMolaDeToque(0.96);
+  const [fora, dentro] = separarLayout(estilo);
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={rotulo}
       accessibilityState={{ disabled: !!off, busy: !!carregando }}
       disabled={off}
+      onPressIn={aoPressionar}
+      onPressOut={aoSoltar}
       onPress={() => {
         toque();
         aoTocar();
       }}
-      style={({ pressed }) => [
-        {
-          minHeight: ALVO_MINIMO + 4,
-          borderRadius: raio.pilula,
-          backgroundColor: fundo,
-          paddingHorizontal: espaco.xl,
-          alignItems: "center",
-          justifyContent: "center",
-          flexDirection: "row",
-          gap: espaco.sm,
-          opacity: off ? 0.5 : pressed ? 0.8 : 1,
-        },
-        tipo === "secundario" && { borderWidth: 1, borderColor: cor.borda },
-        estilo,
-      ]}
+      style={fora}
     >
-      {carregando ? <ActivityIndicator color={corTexto} /> : icone}
-      <Text style={{ fontFamily: fonte.forte, fontSize: 16, color: corTexto }}>{rotulo}</Text>
+      <Animated.View
+        style={[
+          {
+            minHeight: ALVO_MINIMO + 4,
+            borderRadius: raio.pilula,
+            backgroundColor: fundo,
+            paddingHorizontal: espaco.xl,
+            alignItems: "center",
+            justifyContent: "center",
+            flexDirection: "row",
+            gap: espaco.sm,
+            opacity: off ? 0.5 : 1,
+          },
+          tipo === "secundario" && { borderWidth: 1, borderColor: cor.borda },
+          dentro,
+          { transform: [{ scale: escala }] },
+        ]}
+      >
+        {carregando ? <ActivityIndicator color={corTexto} /> : icone}
+        <Text style={{ fontFamily: fonte.forte, fontSize: 16, color: corTexto }}>{rotulo}</Text>
+      </Animated.View>
     </Pressable>
   );
 }

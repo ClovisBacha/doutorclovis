@@ -1,5 +1,5 @@
-import { Redirect } from "expo-router";
-import { Carregando, NaoConsegueLer, Tela } from "~/componentes/base";
+import { Redirect, router } from "expo-router";
+import { Botao, Carregando, NaoConsegueLer, Tela } from "~/componentes/base";
 import { useSessao } from "~/lib/sessao";
 
 /** A porta do app: decide para onde cada estado vai, num lugar só. */
@@ -12,9 +12,10 @@ export default function Porta() {
     return (
       <Tela>
         <NaoConsegueLer
-          sossego="Os seus dados continuam guardados. O SOS funciona sem internet pelo botão vermelho."
+          sossego="Os seus dados continuam guardados. O SOS funciona sem internet."
           aoTentar={() => void recarregarPerfil()}
         />
+        <Botao rotulo="Abrir o SOS" tipo="perigo" aoTocar={() => router.push("/sos")} />
       </Tela>
     );
   /* Sem perfil, ou sem nenhuma âncora da gestação (e sem parto), o ritual

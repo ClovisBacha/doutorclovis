@@ -18,6 +18,7 @@ import { Botao, Cartao, Linha, Pilula, T, Tela, toque } from "~/componentes/base
 import { parametroDaBancada } from "~/lib/bancada";
 import { gestacaoDoPerfil } from "~/lib/gestacao";
 import { semGeneroDoBebe } from "~/lib/nutricao/frase-do-topo";
+import { Entrada, Flutuar, Inclinacao3D } from "~/componentes/movimento";
 import { useSessao } from "~/lib/sessao";
 import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
 
@@ -165,29 +166,36 @@ export default function Bebe() {
         })}
       </ScrollView>
 
-      <Cartao fundo={cor.rosaMarca} estilo={{ alignItems: "center", gap: espaco.md }}>
-        <Linha estilo={{ gap: espaco.sm }}>
-          <Pilula texto={`${trimesterForWeek(semana)}º trimestre`} fundo={cor.cartao} />
-          {rotulo ? <Pilula texto={rotulo} fundo={cor.cartao} /> : null}
-        </Linha>
-        <Linha estilo={{ justifyContent: "space-between", alignSelf: "stretch" }}>
-          <Seta direcao={-1} desabilitada={semana <= WEEK_MIN} aoTocar={() => andar(-1)} />
-          <Image
-            source={BEBE[semanaDaArte(semana)]}
-            style={{ width: 170, height: 170 }}
-            contentFit="contain"
-            accessibilityLabel={`Ilustração do bebê na semana ${semana}`}
-          />
-          <Seta direcao={1} desabilitada={semana >= WEEK_MAX} aoTocar={() => andar(1)} />
-        </Linha>
-        <T tipo="titulo">Semana {semana}</T>
-        <Linha estilo={{ gap: espaco.md, alignSelf: "stretch" }}>
-          <Medida titulo="Tamanho" valor={bebe.size} />
-          <Medida titulo="Peso" valor={bebe.weight} />
-          <Medida titulo="Como" valor={`${fruitEmojiForWeek(semana)} ${bebe.fruit}`} />
-        </Linha>
-        <T estilo={{ alignSelf: "stretch" }}>{bebe.desc}</T>
-      </Cartao>
+      <Inclinacao3D raio={raio.lg}>
+        <Cartao fundo={cor.rosaMarca} estilo={{ alignItems: "center", gap: espaco.md }}>
+          <Linha estilo={{ gap: espaco.sm }}>
+            <Pilula texto={`${trimesterForWeek(semana)}º trimestre`} fundo={cor.cartao} />
+            {rotulo ? <Pilula texto={rotulo} fundo={cor.cartao} /> : null}
+          </Linha>
+          <Linha estilo={{ justifyContent: "space-between", alignSelf: "stretch" }}>
+            <Seta direcao={-1} desabilitada={semana <= WEEK_MIN} aoTocar={() => andar(-1)} />
+            {/* A chave reinicia a entrada a cada semana: a arte chega de novo. */}
+            <Entrada key={semana} deslocamento={10}>
+              <Flutuar>
+                <Image
+                  source={BEBE[semanaDaArte(semana)]}
+                  style={{ width: 170, height: 170 }}
+                  contentFit="contain"
+                  accessibilityLabel={`Ilustração do bebê na semana ${semana}`}
+                />
+              </Flutuar>
+            </Entrada>
+            <Seta direcao={1} desabilitada={semana >= WEEK_MAX} aoTocar={() => andar(1)} />
+          </Linha>
+          <T tipo="titulo">Semana {semana}</T>
+          <Linha estilo={{ gap: espaco.md, alignSelf: "stretch" }}>
+            <Medida titulo="Tamanho" valor={bebe.size} />
+            <Medida titulo="Peso" valor={bebe.weight} />
+            <Medida titulo="Como" valor={`${fruitEmojiForWeek(semana)} ${bebe.fruit}`} />
+          </Linha>
+          <T estilo={{ alignSelf: "stretch" }}>{semGeneroDoBebe(bebe.desc)}</T>
+        </Cartao>
+      </Inclinacao3D>
 
       {nutri ? (
         <Cartao fundo={cor.nutricaoFundo}>

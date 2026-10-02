@@ -108,9 +108,33 @@ describe("registros de saúde", () => {
 
   test("o resumo do hub pega o último peso e a última pressão", () => {
     const lista: RegistroDeSaude[] = [
-      { id: "a", log_date: "2026-10-02", weight_kg: null, systolic: 118, diastolic: 76, glucose_mg_dl: null, notes: null },
-      { id: "b", log_date: "2026-10-01", weight_kg: 68.4, systolic: 130, diastolic: 80, glucose_mg_dl: null, notes: null },
-      { id: "c", log_date: "2026-09-20", weight_kg: 66, systolic: null, diastolic: null, glucose_mg_dl: null, notes: null },
+      {
+        id: "a",
+        log_date: "2026-10-02",
+        weight_kg: null,
+        systolic: 118,
+        diastolic: 76,
+        glucose_mg_dl: null,
+        notes: null,
+      },
+      {
+        id: "b",
+        log_date: "2026-10-01",
+        weight_kg: 68.4,
+        systolic: 130,
+        diastolic: 80,
+        glucose_mg_dl: null,
+        notes: null,
+      },
+      {
+        id: "c",
+        log_date: "2026-09-20",
+        weight_kg: 66,
+        systolic: null,
+        diastolic: null,
+        glucose_mg_dl: null,
+        notes: null,
+      },
     ];
     expect(resumoParaOHub(lista)).toBe("68,4 kg · pressão 118/76");
     expect(resumoParaOHub([])).toBeNull();
@@ -175,7 +199,11 @@ const contr = (min: number, fechada = true, tentativas = 0): ContracaoPendente =
 
 describe("fila offline", () => {
   test("as chaves levam o uid e o prefixo dc-", () => {
-    for (const c of [chaveDaFilaDeChutes(UID), chaveDaFilaDeContracoes(UID), chaveDaSessaoDeChutes(UID)]) {
+    for (const c of [
+      chaveDaFilaDeChutes(UID),
+      chaveDaFilaDeContracoes(UID),
+      chaveDaSessaoDeChutes(UID),
+    ]) {
       expect(c.startsWith("dc-")).toBe(true);
       expect(c.endsWith(UID)).toBe(true);
     }
@@ -184,7 +212,11 @@ describe("fila offline", () => {
   });
 
   test("o disco saneia lixo, poda o vencido e ordena", () => {
-    const velha = { ...contr(0), id: "local-1", started_at: new Date(AGORA - 9 * 86400000).toISOString() };
+    const velha = {
+      ...contr(0),
+      id: "local-1",
+      started_at: new Date(AGORA - 9 * 86400000).toISOString(),
+    };
     const bruto = [contr(5), { lixo: true }, contr(20), velha, "x"];
     const f = filaDoBruto(bruto, ehContracaoPendente, AGORA);
     expect(f.length).toBe(2);
@@ -193,9 +225,36 @@ describe("fila offline", () => {
   });
 
   test("sessão de chutes sem fim não entra na fila", () => {
-    expect(ehSessaoPendente({ id: "local-1", started_at: "x", ended_at: null, kick_count: 3, strength: 2, tentativas: 0 })).toBe(false);
-    expect(ehSessaoPendente({ id: "local-1", started_at: "x", ended_at: "y", kick_count: 3, strength: 2, tentativas: 0 })).toBe(true);
-    expect(ehSessaoPendente({ id: "uuid", started_at: "x", ended_at: "y", kick_count: 3, strength: 2, tentativas: 0 })).toBe(false);
+    expect(
+      ehSessaoPendente({
+        id: "local-1",
+        started_at: "x",
+        ended_at: null,
+        kick_count: 3,
+        strength: 2,
+        tentativas: 0,
+      }),
+    ).toBe(false);
+    expect(
+      ehSessaoPendente({
+        id: "local-1",
+        started_at: "x",
+        ended_at: "y",
+        kick_count: 3,
+        strength: 2,
+        tentativas: 0,
+      }),
+    ).toBe(true);
+    expect(
+      ehSessaoPendente({
+        id: "uuid",
+        started_at: "x",
+        ended_at: "y",
+        kick_count: 3,
+        strength: 2,
+        tentativas: 0,
+      }),
+    ).toBe(false);
   });
 
   test("sobe as encerradas e deixa a aberta", async () => {
@@ -338,8 +397,12 @@ describe("contagem de movimentos", () => {
   test("sessão vence em 4 h, e no futuro também", () => {
     const ini = new Date(AGORA - 30 * 60000).toISOString();
     expect(sanearSessao({ startedAt: ini, count: 3 }, AGORA)?.count).toBe(3);
-    expect(sanearSessao({ startedAt: new Date(AGORA - 5 * 3600000).toISOString(), count: 3 }, AGORA)).toBeNull();
-    expect(sanearSessao({ startedAt: new Date(AGORA + 3600000).toISOString(), count: 3 }, AGORA)).toBeNull();
+    expect(
+      sanearSessao({ startedAt: new Date(AGORA - 5 * 3600000).toISOString(), count: 3 }, AGORA),
+    ).toBeNull();
+    expect(
+      sanearSessao({ startedAt: new Date(AGORA + 3600000).toISOString(), count: 3 }, AGORA),
+    ).toBeNull();
     expect(sanearSessao({ count: 3 }, AGORA)).toBeNull();
     expect(sanearSessao(null, AGORA)).toBeNull();
   });
@@ -360,9 +423,15 @@ describe("contagem de movimentos", () => {
   });
 
   test("zero movimentos antes de 2 h descarta; zero em 2 h é dado e sobe", () => {
-    expect(encerrarDescarta({ startedAt: new Date(AGORA - 60000).toISOString(), count: 0 }, AGORA)).toBe(true);
-    expect(encerrarDescarta({ startedAt: new Date(AGORA - 121 * 60000).toISOString(), count: 0 }, AGORA)).toBe(false);
-    expect(encerrarDescarta({ startedAt: new Date(AGORA - 60000).toISOString(), count: 1 }, AGORA)).toBe(false);
+    expect(
+      encerrarDescarta({ startedAt: new Date(AGORA - 60000).toISOString(), count: 0 }, AGORA),
+    ).toBe(true);
+    expect(
+      encerrarDescarta({ startedAt: new Date(AGORA - 121 * 60000).toISOString(), count: 0 }, AGORA),
+    ).toBe(false);
+    expect(
+      encerrarDescarta({ startedAt: new Date(AGORA - 60000).toISOString(), count: 1 }, AGORA),
+    ).toBe(false);
   });
 
   test("chutes de hoje somam só o que começou hoje", () => {
@@ -387,10 +456,14 @@ describe("contagem de movimentos", () => {
     const agora = Date.now();
     const alerta = sessaoEmCursoDeExemplo(agora, "alerta")!;
     const min = (agora - new Date(alerta.startedAt).getTime()) / 60000;
-    expect(sinalMovimentosReduzidos({ semanas: 30, movimentos: alerta.count, minutos: min })?.gravidade).toBe("grave");
+    expect(
+      sinalMovimentosReduzidos({ semanas: 30, movimentos: alerta.count, minutos: min })?.gravidade,
+    ).toBe("grave");
     const contando = sessaoEmCursoDeExemplo(agora, "contando")!;
     const m2 = (agora - new Date(contando.startedAt).getTime()) / 60000;
-    expect(sinalMovimentosReduzidos({ semanas: 30, movimentos: contando.count, minutos: m2 })).toBeNull();
+    expect(
+      sinalMovimentosReduzidos({ semanas: 30, movimentos: contando.count, minutos: m2 }),
+    ).toBeNull();
   });
 });
 
@@ -405,8 +478,18 @@ describe("contrações", () => {
   });
 
   test("a lista mede de início a início, e a mais recente vem primeiro", () => {
-    const a = { id: "a", started_at: new Date(AGORA - 600000).toISOString(), ended_at: new Date(AGORA - 540000).toISOString(), intensity: 2 };
-    const b = { id: "b", started_at: new Date(AGORA - 300000).toISOString(), ended_at: new Date(AGORA - 255000).toISOString(), intensity: 3 };
+    const a = {
+      id: "a",
+      started_at: new Date(AGORA - 600000).toISOString(),
+      ended_at: new Date(AGORA - 540000).toISOString(),
+      intensity: 2,
+    };
+    const b = {
+      id: "b",
+      started_at: new Date(AGORA - 300000).toISOString(),
+      ended_at: new Date(AGORA - 255000).toISOString(),
+      intensity: 3,
+    };
     const linhas = linhasDaLista([a, b]);
     expect(linhas[0].id).toBe("b");
     expect(linhas[0].intervaloSeg).toBe(300);
@@ -456,7 +539,9 @@ describe("triagem local", () => {
   test("no Modo Cuidado sai o sintoma do bebê e o verde não fala de pré-natal", () => {
     expect(sintomasParaMarcar(true).some((s) => s.id === "movimentos")).toBe(false);
     expect(sintomasParaMarcar(false).some((s) => s.id === "movimentos")).toBe(true);
-    expect(orientacaoLocal([], { systolic: null, diastolic: null }, true).message).not.toContain("pré-natal");
+    expect(orientacaoLocal([], { systolic: null, diastolic: null }, true).message).not.toContain(
+      "pré-natal",
+    );
   });
 
   test("o servidor só pode subir o nível", () => {
@@ -474,5 +559,21 @@ describe("formato", () => {
     expect(duracaoFalada(45)).toBe("45 s");
     expect(duracaoFalada(65)).toBe("1 min 05 s");
     expect(duracaoFalada(18 * 60)).toBe("18 min");
+  });
+});
+
+describe("os sinais do SOS", () => {
+  test("na gestação, todos; no Modo Cuidado e depois do parto, sem os da gestação", async () => {
+    const { sinaisDeSocorro } = await import("./triagem-local");
+    const ids = (o: { cuidado: boolean; nasceu: boolean }) => sinaisDeSocorro(o).map((s) => s.id);
+    expect(ids({ cuidado: false, nasceu: false })).toContain("movimentos");
+    for (const o of [
+      { cuidado: true, nasceu: false },
+      { cuidado: false, nasceu: true },
+    ]) {
+      expect(ids(o)).not.toContain("movimentos");
+      expect(ids(o)).not.toContain("contracoes");
+      expect(ids(o)).toContain("sangramento");
+    }
   });
 });

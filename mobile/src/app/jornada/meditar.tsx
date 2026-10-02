@@ -60,7 +60,12 @@ export default function Meditar() {
     if (e === "sessao") setEtapa("sessao");
     if (e === "fim") {
       setEtapa("fim");
-      setDesfecho({ ganhou: at.cuidado || at.pos ? null : 5, fechou: false, bonus: null, semPagamento: at.cuidado || at.pos });
+      setDesfecho({
+        ganhou: at.cuidado || at.pos ? null : 5,
+        fechou: false,
+        bonus: null,
+        semPagamento: at.cuidado || at.pos,
+      });
     }
   }, [at.pronto, at.cuidado, at.pos, aplicouBancada]);
 
@@ -89,11 +94,19 @@ export default function Meditar() {
       const dias = Array.isArray(log.dias) ? log.dias : [];
       gravarChave(CHAVE_LOG_MEDITACAO, {
         dias: dias.includes(hoje) ? dias : [...dias, hoje].slice(-400),
-        minutos: (typeof log.minutos === "number" ? log.minutos : 0) + Math.max(1, Math.round(segundos / 60)),
+        minutos:
+          (typeof log.minutos === "number" ? log.minutos : 0) +
+          Math.max(1, Math.round(segundos / 60)),
         humores: Array.isArray(log.humores) ? log.humores : [],
       });
     }
-    const d = await concluirMomento({ uid: at.uid, D: at.D, momento: "meditation", cuidado: at.cuidado, pos: at.pos });
+    const d = await concluirMomento({
+      uid: at.uid,
+      D: at.D,
+      momento: "meditation",
+      cuidado: at.cuidado,
+      pos: at.pos,
+    });
     setDesfecho(d);
   }
 
@@ -148,7 +161,12 @@ export default function Meditar() {
       <T tipo="rotulo">O que você está precisando?</T>
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: espaco.sm }}>
         {temas.map((t) => (
-          <Ficha key={t.tema} rotulo={`${t.emoji} ${t.precisa}`} ativa={tema === t.tema} aoTocar={() => setTema(t.tema)} />
+          <Ficha
+            key={t.tema}
+            rotulo={`${t.emoji} ${t.precisa}`}
+            ativa={tema === t.tema}
+            aoTocar={() => setTema(t.tema)}
+          />
         ))}
       </View>
       <T tipo="rotulo" estilo={{ marginTop: espaco.sm }}>
@@ -160,10 +178,15 @@ export default function Meditar() {
         ))}
       </View>
       <T tipo="apagado">
-        {relogio(segundosDaSessao(plano.totalCiclos))} · {plano.totalCiclos} respirações. Se puder, fique num lugar
-        tranquilo. A tela fica acesa até o fim.
+        {relogio(segundosDaSessao(plano.totalCiclos))} · {plano.totalCiclos} respirações. Se puder,
+        fique num lugar tranquilo. A tela fica acesa até o fim.
       </T>
-      <Botao rotulo="Começar" corFundo={corJornada.roxo} aoTocar={() => setEtapa("sessao")} estilo={{ marginTop: espaco.sm }} />
+      <Botao
+        rotulo="Começar"
+        corFundo={corJornada.roxo}
+        aoTocar={() => setEtapa("sessao")}
+        estilo={{ marginTop: espaco.sm }}
+      />
     </Tela>
   );
 }
@@ -215,7 +238,8 @@ function Sessao({
     }
     if (faseAnterior.current === inst.fase && t > 0.3) return;
     faseAnterior.current = inst.fase;
-    if (Platform.OS !== "web") void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    if (Platform.OS !== "web")
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     const restante = DURACAO_DA_FASE[inst.fase] * (1 - inst.progresso) * 1000;
     if (inst.fase === "segure") return;
     Animated.timing(escala, {
@@ -248,12 +272,23 @@ function Sessao({
   const podeContar = contaComoFeita(t);
 
   return (
-    <SafeAreaView edges={["top", "bottom"]} style={{ flex: 1, backgroundColor: corJornada.roxoNevoa }}>
+    <SafeAreaView
+      edges={["top", "bottom"]}
+      style={{ flex: 1, backgroundColor: corJornada.roxoNevoa }}
+    >
       {Platform.OS !== "web" ? <MantemAcesa /> : null}
       <View style={{ paddingHorizontal: espaco.lg, paddingTop: espaco.sm }}>
         <BarraDoTopo fechar progresso={t / total} aoSair={aoSairCedo} />
       </View>
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: espaco.xl, paddingHorizontal: espaco.xl }}>
+      <View
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          gap: espaco.xl,
+          paddingHorizontal: espaco.xl,
+        }}
+      >
         <View style={{ width: 270, height: 270, alignItems: "center", justifyContent: "center" }}>
           <View
             style={{
@@ -287,26 +322,65 @@ function Sessao({
               transform: [{ scale: escala }],
             }}
           />
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 30, color: cor.branco }}>{ROTULO_DA_FASE[inst.fase]}</Text>
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 22, color: "#ede9fe", fontVariant: ["tabular-nums"] }}>
+          <Text style={{ fontFamily: fonte.titulo, fontSize: 30, color: cor.branco }}>
+            {ROTULO_DA_FASE[inst.fase]}
+          </Text>
+          <Text
+            style={{
+              fontFamily: fonte.titulo,
+              fontSize: 22,
+              color: cor.jogoFundo,
+              fontVariant: ["tabular-nums"],
+            }}
+          >
             {inst.restante}
           </Text>
         </View>
         <View style={{ minHeight: 96, justifyContent: "center" }}>
           {fala ? (
-            <Text style={{ fontFamily: fonte.media, fontSize: 18, lineHeight: 27, color: corJornada.roxoEscuro, textAlign: "center" }}>
+            <Text
+              style={{
+                fontFamily: fonte.media,
+                fontSize: 18,
+                lineHeight: 27,
+                color: corJornada.roxoEscuro,
+                textAlign: "center",
+              }}
+            >
               {fala}
             </Text>
           ) : null}
         </View>
       </View>
       <View style={{ padding: espaco.lg, gap: espaco.md }}>
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: espaco.lg }}>
-          <Text style={{ fontFamily: fonte.forte, fontSize: 16, color: cor.textoApagado, fontVariant: ["tabular-nums"] }}>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: espaco.lg,
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: fonte.forte,
+              fontSize: 16,
+              color: cor.textoApagado,
+              fontVariant: ["tabular-nums"],
+            }}
+          >
             faltam {relogio(total - t)}
           </Text>
-          <BotaoRedondo rotulo={pausada ? "Continuar" : "Pausar"} aoTocar={() => setPausada((p) => !p)} fundo={cor.cartao}>
-            {pausada ? <Play size={20} color={corJornada.roxo} /> : <Pause size={20} color={corJornada.roxo} />}
+          <BotaoRedondo
+            rotulo={pausada ? "Continuar" : "Pausar"}
+            aoTocar={() => setPausada((p) => !p)}
+            fundo={cor.cartao}
+          >
+            {pausada ? (
+              <Play size={20} color={corJornada.roxo} />
+            ) : (
+              <Pause size={20} color={corJornada.roxo} />
+            )}
           </BotaoRedondo>
         </View>
         <Botao

@@ -48,7 +48,9 @@ export function CartaoDoDia({
   mostrarEstrelas?: boolean;
 }) {
   return (
-    <View style={[{ borderRadius: raio.lg, backgroundColor: cor.cartao, overflow: "hidden" }, sombra]}>
+    <View
+      style={[{ borderRadius: raio.lg, backgroundColor: cor.cartao, overflow: "hidden" }, sombra]}
+    >
       <LinearGradient
         colors={[corJornada.roxoEscuro, corJornada.roxo, corJornada.roxoMedio]}
         start={{ x: 0, y: 0 }}
@@ -64,14 +66,25 @@ export function CartaoDoDia({
               paddingVertical: 3,
             }}
           >
-            <Text style={{ fontFamily: fonte.titulo, fontSize: 13, color: cor.branco, letterSpacing: 0.6 }}>
+            <Text
+              style={{
+                fontFamily: fonte.titulo,
+                fontSize: 13,
+                color: cor.branco,
+                letterSpacing: 0.6,
+              }}
+            >
               HOJE
             </Text>
           </View>
-          <Text style={{ flex: 1, fontFamily: fonte.forte, fontSize: 15, color: "#ede9fe" }}>{sobre}</Text>
+          <Text style={{ flex: 1, fontFamily: fonte.forte, fontSize: 15, color: cor.jogoFundo }}>
+            {sobre}
+          </Text>
           {mostrarEstrelas ? <Estrelas feitos={feitos} total={total} tamanho={17} /> : null}
         </View>
-        <Text style={{ fontFamily: fonte.titulo, fontSize: 24, color: cor.branco, letterSpacing: -0.3 }}>
+        <Text
+          style={{ fontFamily: fonte.titulo, fontSize: 24, color: cor.branco, letterSpacing: -0.3 }}
+        >
           {titulo}
         </Text>
         {linha ? (
@@ -107,7 +120,9 @@ function LinhaDoMomento({ item, ultimo }: { item: ItemDoDia; ultimo: boolean }) 
       accessibilityRole="button"
       accessibilityLabel={`${item.titulo}. ${item.sub}`}
       accessibilityState={{ checked: item.feito }}
-      accessibilityHint={item.feito ? "Já feito hoje" : item.marcaPorToque ? "Toque quando tiver feito" : undefined}
+      accessibilityHint={
+        item.feito ? "Já feito hoje" : item.marcaPorToque ? "Toque quando tiver feito" : undefined
+      }
       onPress={() => {
         toque();
         item.aoTocar();
@@ -121,7 +136,7 @@ function LinhaDoMomento({ item, ultimo }: { item: ItemDoDia; ultimo: boolean }) 
         minHeight: ALVO_MINIMO + 16,
         backgroundColor: pressed ? corJornada.roxoNevoa : "transparent",
         borderBottomWidth: ultimo ? 0 : 1,
-        borderBottomColor: "#f3ece8",
+        borderBottomColor: cor.divisor,
       })}
     >
       <View
@@ -141,10 +156,17 @@ function LinhaDoMomento({ item, ultimo }: { item: ItemDoDia; ultimo: boolean }) 
         )}
       </View>
       <View style={{ flex: 1, gap: 2 }}>
-        <Text style={{ fontFamily: fonte.forte, fontSize: 16, color: cor.texto }}>{item.titulo}</Text>
+        <Text style={{ fontFamily: fonte.forte, fontSize: 16, color: cor.texto }}>
+          {item.titulo}
+        </Text>
         <Text
           numberOfLines={item.linhasDoSub ?? 1}
-          style={{ fontFamily: fonte.normal, fontSize: 14, lineHeight: 19, color: cor.textoApagado }}
+          style={{
+            fontFamily: fonte.normal,
+            fontSize: 14,
+            lineHeight: 19,
+            color: cor.textoApagado,
+          }}
         >
           {item.sub}
         </Text>
@@ -155,7 +177,13 @@ function LinhaDoMomento({ item, ultimo }: { item: ItemDoDia; ultimo: boolean }) 
         </Text>
       ) : item.marcaPorToque ? (
         <View
-          style={{ width: 28, height: 28, borderRadius: 14, borderWidth: 2.5, borderColor: corJornada.roxoClaro }}
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 14,
+            borderWidth: 2.5,
+            borderColor: corJornada.roxoClaro,
+          }}
         />
       ) : (
         <ChevronRight size={22} color={corJornada.roxoClaro} />
@@ -181,7 +209,9 @@ export function TrilhaDaSemana({
   const noAberto = folha != null ? estadoDoNo(blob, folha, hojeD) : null;
   return (
     <View style={{ gap: espaco.sm }}>
-      <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }}>
+      <View
+        style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }}
+      >
         {/* As linhas ficam numa camada ATRÁS dos nós: desenhadas dentro de cada
             nó, a do seguinte passava por cima do anterior. */}
         {dias.slice(1).map((D, i) => (
@@ -236,8 +266,8 @@ export function TrilhaDaSemana({
           noAberto.tipo === "futuro" ? (
             <View style={{ gap: espaco.sm }}>
               <T>
-                Este dia abre {quandoAbre(folha, hojeD, hoje)}. A jornada anda um dia de cada vez, junto
-                com a sua gestação.
+                Este dia abre {quandoAbre(folha, hojeD, hoje)}. A jornada anda um dia de cada vez,
+                junto com a sua gestação.
               </T>
               <T tipo="apagado">
                 Tema: {temaDoDia(folha).emoji} {temaDoDia(folha).rotulo}
@@ -258,7 +288,10 @@ function diaLongoAcessivel(d: Date): string {
 
 function tituloDaFolha(D: number, hojeD: number, hoje: Date): string {
   const d = dataDoDia(D, hojeD, hoje);
-  const quando = D === hojeD ? "Hoje" : `${diaCurto(d)}, ${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+  const quando =
+    D === hojeD
+      ? "Hoje"
+      : `${diaCurto(d)}, ${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
   return `${quando} · dia ${diaNaSemana(D)}`;
 }
 
@@ -285,7 +318,10 @@ export function ResumoDoDia({ blob, D, hoje }: { blob: Blob; D: number; hoje: bo
       </View>
       <View style={{ gap: 4 }}>
         {itens.map(([rotulo, ok]) => (
-          <View key={rotulo} style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm, minHeight: 30 }}>
+          <View
+            key={rotulo}
+            style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm, minHeight: 30 }}
+          >
             <View
               style={{
                 width: 22,
@@ -298,7 +334,13 @@ export function ResumoDoDia({ blob, D, hoje }: { blob: Blob; D: number; hoje: bo
             >
               {ok ? <Check size={14} color={cor.branco} strokeWidth={3} /> : null}
             </View>
-            <Text style={{ fontFamily: fonte.media, fontSize: 15, color: ok ? cor.texto : cor.textoApagado }}>
+            <Text
+              style={{
+                fontFamily: fonte.media,
+                fontSize: 15,
+                color: ok ? cor.texto : cor.textoApagado,
+              }}
+            >
               {rotulo}
             </Text>
           </View>

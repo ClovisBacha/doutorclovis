@@ -68,7 +68,14 @@ export default function Aula() {
     const qs = quiz.questions;
     if (etapa === "pergunta") setE(comecarPerguntas(INICIO_DA_AULA));
     if (etapa === "verificada" && qs.length > 1) {
-      let x = verificar(escolher(comecarPerguntas(INICIO_DA_AULA), qs[0], Array.isArray(qs[0].a) ? qs[0].a[0] : qs[0].a), qs[0]);
+      let x = verificar(
+        escolher(
+          comecarPerguntas(INICIO_DA_AULA),
+          qs[0],
+          Array.isArray(qs[0].a) ? qs[0].a[0] : qs[0].a,
+        ),
+        qs[0],
+      );
       x = continuar(x, qs.length);
       const q = qs[1];
       const errada = q.o.findIndex((_, i) => !(Array.isArray(q.a) ? q.a : [q.a]).includes(i));
@@ -79,19 +86,35 @@ export default function Aula() {
     }
     if (etapa === "fim") {
       setE({ ...INICIO_DA_AULA, etapa: "fim", acertos: Math.max(0, qs.length - 1) });
-      setDesfecho({ ganhou: sementesDaAula(Math.max(0, qs.length - 1)), fechou: false, bonus: null, semPagamento: false });
+      setDesfecho({
+        ganhou: sementesDaAula(Math.max(0, qs.length - 1)),
+        fechou: false,
+        bonus: null,
+        semPagamento: false,
+      });
     }
   }, [quiz, bancadaAplicada]);
 
   /* O fim da aula: marca e paga uma vez só. */
   useEffect(() => {
-    if (e.etapa !== "fim" || desfecho || !at.uid || (ehBancada() && parametroDaBancada("etapa") === "fim")) return;
+    if (
+      e.etapa !== "fim" ||
+      desfecho ||
+      !at.uid ||
+      (ehBancada() && parametroDaBancada("etapa") === "fim")
+    )
+      return;
     let vivo = true;
-    void concluirMomento({ uid: at.uid, D, momento: "aula", cuidado: at.cuidado, pos: at.pos, acertos: e.acertos }).then(
-      (d) => {
-        if (vivo) setDesfecho(d);
-      },
-    );
+    void concluirMomento({
+      uid: at.uid,
+      D,
+      momento: "aula",
+      cuidado: at.cuidado,
+      pos: at.pos,
+      acertos: e.acertos,
+    }).then((d) => {
+      if (vivo) setDesfecho(d);
+    });
     return () => {
       vivo = false;
     };
@@ -111,8 +134,15 @@ export default function Aula() {
     return (
       <Tela bordas={["top", "bottom"]}>
         <BarraDoTopo titulo="Aula" />
-        <T>A aula do dia acompanha as semanas da gestação. Os outros momentos da jornada continuam aqui para você.</T>
-        <Botao rotulo="Voltar para a jornada" aoTocar={voltarParaJornada} corFundo={corJornada.roxo} />
+        <T>
+          A aula do dia acompanha as semanas da gestação. Os outros momentos da jornada continuam
+          aqui para você.
+        </T>
+        <Botao
+          rotulo="Voltar para a jornada"
+          aoTocar={voltarParaJornada}
+          corFundo={corJornada.roxo}
+        />
       </Tela>
     );
   }
@@ -121,9 +151,16 @@ export default function Aula() {
     return (
       <Tela bordas={["top", "bottom"]}>
         <BarraDoTopo titulo="Aula de hoje" />
-        <BolhaFalando humor="estudiosa" fala="A aula de hoje já está feita. Amanhã tem outra esperando por você!" />
+        <BolhaFalando
+          humor="estudiosa"
+          fala="A aula de hoje já está feita. Amanhã tem outra esperando por você!"
+        />
         {quiz && quiz !== "carregando" ? <Licao quiz={quiz} /> : null}
-        <Botao rotulo="Voltar para a jornada" aoTocar={voltarParaJornada} corFundo={corJornada.roxo} />
+        <Botao
+          rotulo="Voltar para a jornada"
+          aoTocar={voltarParaJornada}
+          corFundo={corJornada.roxo}
+        />
       </Tela>
     );
   }
@@ -148,9 +185,7 @@ export default function Aula() {
         />
         {desafio ? (
           <Cartao>
-            <T tipo="rotulo">
-              Desafio do dia {desafio.emoji}
-            </T>
+            <T tipo="rotulo">Desafio do dia {desafio.emoji}</T>
             <T>{desafio.label}</T>
             <Botao
               rotulo="Fiz o desafio"
@@ -191,7 +226,10 @@ export default function Aula() {
     return (
       <Tela bordas={["top", "bottom"]}>
         <BarraDoTopo fechar progresso={0} />
-        <BolhaFalando humor="estudiosa" fala={`Leia a lição com calma. Depois vêm ${total} perguntas, com uma tentativa em cada.`} />
+        <BolhaFalando
+          humor="estudiosa"
+          fala={`Leia a lição com calma. Depois vêm ${total} perguntas, com uma tentativa em cada.`}
+        />
         <Licao quiz={quiz} />
         <Botao
           rotulo={`Vamos às perguntas (${total})`}
@@ -209,8 +247,17 @@ export default function Aula() {
       <View style={{ paddingHorizontal: espaco.lg, paddingTop: espaco.sm }}>
         <BarraDoTopo fechar progresso={(e.indice + (e.verificada ? 1 : 0)) / total} />
       </View>
-      <ScrollView contentContainerStyle={{ padding: espaco.lg, gap: espaco.md, paddingBottom: espaco.xl }}>
-        <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: corJornada.roxo, letterSpacing: 0.4 }}>
+      <ScrollView
+        contentContainerStyle={{ padding: espaco.lg, gap: espaco.md, paddingBottom: espaco.xl }}
+      >
+        <Text
+          style={{
+            fontFamily: fonte.forte,
+            fontSize: 14,
+            color: corJornada.roxo,
+            letterSpacing: 0.4,
+          }}
+        >
           PERGUNTA {e.indice + 1} DE {total}
           {multi ? " · MARQUE TODAS AS CERTAS" : ""}
         </Text>
@@ -237,7 +284,11 @@ export default function Aula() {
           gap: espaco.md,
           borderTopWidth: 1,
           borderTopColor: e.verificada ? "transparent" : cor.borda,
-          backgroundColor: !e.verificada ? cor.fundo : e.acertou ? corJornada.feitoFundo : cor.urgenteFundo,
+          backgroundColor: !e.verificada
+            ? cor.fundo
+            : e.acertou
+              ? corJornada.feitoFundo
+              : cor.urgenteFundo,
         }}
       >
         {e.verificada ? (
@@ -248,8 +299,12 @@ export default function Aula() {
               ) : (
                 <X size={24} color={cor.urgente} strokeWidth={3} />
               )}
-              <T tipo="subtitulo" cor={e.acertou ? "#15803d" : cor.urgente}>
-                {e.acertou ? "Isso mesmo!" : multi ? "Quase! Olhe as marcadas em verde" : "Não foi dessa vez"}
+              <T tipo="subtitulo" cor={e.acertou ? cor.sementinha : cor.urgente}>
+                {e.acertou
+                  ? "Isso mesmo!"
+                  : multi
+                    ? "Quase! Olhe as marcadas em verde"
+                    : "Não foi dessa vez"}
               </T>
             </View>
             <T tipo="corpo" cor={cor.texto}>
@@ -272,7 +327,9 @@ export default function Aula() {
               const x = verificar(e, q);
               if (Platform.OS !== "web") {
                 void Haptics.notificationAsync(
-                  x.acertou ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning,
+                  x.acertou
+                    ? Haptics.NotificationFeedbackType.Success
+                    : Haptics.NotificationFeedbackType.Warning,
                 ).catch(() => {});
               }
               setE(x);
@@ -289,7 +346,14 @@ function Licao({ quiz }: { quiz: DailyQuiz }) {
   return (
     <>
       <Cartao>
-        <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: corJornada.roxo, letterSpacing: 0.4 }}>
+        <Text
+          style={{
+            fontFamily: fonte.forte,
+            fontSize: 13,
+            color: corJornada.roxo,
+            letterSpacing: 0.4,
+          }}
+        >
           📖 A LIÇÃO DE HOJE
         </Text>
         {titulo ? <T tipo="subtitulo">{titulo}</T> : null}
@@ -324,9 +388,24 @@ function Opcao({
 }) {
   const visual = {
     neutra: { borda: cor.borda, fundo: cor.cartao, selo: cor.apagado, letra: cor.textoApagado },
-    escolhida: { borda: corJornada.roxo, fundo: corJornada.roxoFundo, selo: corJornada.roxo, letra: cor.branco },
-    certa: { borda: corJornada.feito, fundo: corJornada.feitoFundo, selo: corJornada.feito, letra: cor.branco },
-    faltou: { borda: corJornada.feito, fundo: cor.cartao, selo: corJornada.feitoFundo, letra: corJornada.feito },
+    escolhida: {
+      borda: corJornada.roxo,
+      fundo: corJornada.roxoFundo,
+      selo: corJornada.roxo,
+      letra: cor.branco,
+    },
+    certa: {
+      borda: corJornada.feito,
+      fundo: corJornada.feitoFundo,
+      selo: corJornada.feito,
+      letra: cor.branco,
+    },
+    faltou: {
+      borda: corJornada.feito,
+      fundo: cor.cartao,
+      selo: corJornada.feitoFundo,
+      letra: corJornada.feito,
+    },
     errada: { borda: cor.urgente, fundo: cor.urgenteFundo, selo: cor.urgente, letra: cor.branco },
   }[estado];
   return (
@@ -372,10 +451,16 @@ function Opcao({
         ) : estado === "errada" ? (
           <X size={18} color={visual.letra} strokeWidth={3} />
         ) : (
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 15, color: visual.letra }}>{letra}</Text>
+          <Text style={{ fontFamily: fonte.titulo, fontSize: 15, color: visual.letra }}>
+            {letra}
+          </Text>
         )}
       </View>
-      <Text style={{ flex: 1, fontFamily: fonte.media, fontSize: 16, lineHeight: 22, color: cor.texto }}>{texto}</Text>
+      <Text
+        style={{ flex: 1, fontFamily: fonte.media, fontSize: 16, lineHeight: 22, color: cor.texto }}
+      >
+        {texto}
+      </Text>
     </Pressable>
   );
 }

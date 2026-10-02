@@ -15,6 +15,7 @@ export const cor = {
   destaque: "#ffe2de",
   textoDestaque: "#581b1d",
   borda: "#ede0db",
+  divisor: "#f3ece8",
   branco: "#ffffff",
   // Famílias (mesmas do site): a cor diz de que assunto é a tela.
   chutes: "#0369a1",
@@ -31,6 +32,8 @@ export const cor = {
   // Gravidade clínica — só para o que a régua de sinais-clinicos devolve.
   urgente: "#b91c1c",
   urgenteFundo: "#fee2e2",
+  urgenteBorda: "#fecaca",
+  urgentePressionado: "#991b1b",
   atencao: "#b45309",
   atencaoFundo: "#fef3c7",
   ok: "#047857",
