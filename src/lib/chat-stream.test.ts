@@ -36,6 +36,25 @@ describe("ler a linha do fluxo", () => {
     });
   });
 
+  test("a ASSINATURA do servidor — dentro do `finish`, que é onde a SDK a cola", () => {
+    expect(
+      lerLinhaDoStream('data: {"type":"finish","messageMetadata":{"assinatura":"abc"}}'),
+    ).toEqual({ tipo: "assinatura", assinatura: "abc" });
+  });
+
+  test("e num `message-metadata` avulso também", () => {
+    expect(
+      lerLinhaDoStream('data: {"type":"message-metadata","messageMetadata":{"assinatura":"xyz"}}'),
+    ).toEqual({ tipo: "assinatura", assinatura: "xyz" });
+  });
+
+  test("`finish` sem assinatura é nada — e assinatura que não é string também", () => {
+    expect(lerLinhaDoStream('data: {"type":"finish"}')).toEqual({ tipo: "nada" });
+    expect(lerLinhaDoStream('data: {"type":"finish","messageMetadata":{"assinatura":7}}')).toEqual({
+      tipo: "nada",
+    });
+  });
+
   test("aceita o campo `error` além do `errorText`", () => {
     expect(lerLinhaDoStream('data: {"type":"error","error":"falhou"}')).toEqual({
       tipo: "erro",

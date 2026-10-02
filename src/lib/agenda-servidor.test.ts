@@ -49,7 +49,21 @@ describe("1. marcarConsultaNoDia — o choque é de FAIXA", () => {
   });
 
   test("lê o dia inteiro, com a duração de cada linha", () => {
-    expect(fn).toContain('.select("id, patient_name, confirmed_time, duration_minutes")');
+    /* ⚠️ **Cobra a GARANTIA, não a grafia — e esta asserção JÁ REPROVOU um
+       conserto.** Ela travava a chamada `.select("…")` literal e ficou
+       vermelha no dia em que a leitura ganhou um DEGRAU (`lerODia(colunas)`)
+       e passou a RECUSAR quando falha, que é estritamente mais forte: antes,
+       erro de leitura devolvia lista vazia e a consulta era marcada por cima
+       de outra. O que importa é que as quatro colunas sejam pedidas. */
+    expect(fn).toContain("id, patient_name, confirmed_time, duration_minutes");
+  });
+
+  test("⚠️ e RECUSA quando não consegue ler o dia", () => {
+    /* O índice único do banco pega só o INSTANTE exato; a sobreposição
+       (10:00–10:30 vs 10:15) passa por ele. A única coisa entre duas pacientes
+       na mesma sala é esta leitura. */
+    expect(fn).toMatch(/doDia === null/);
+    expect(fn).not.toMatch(/\(doDia \?\? \[\]\)/);
   });
 
   test("a duração do médico entra na linha gravada", () => {

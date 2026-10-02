@@ -1,4 +1,6 @@
 import { useId, useMemo, useState } from "react";
+import { diaCurto } from "@/lib/hora-do-registro";
+
 import type { Serie } from "@/lib/clinical.functions";
 
 /**
@@ -46,8 +48,48 @@ import type { Serie } from "@/lib/clinical.functions";
  * erraria quando o médico usa o interruptor manual em vez do tema do sistema.
  * A variante `dark:` já existe no projeto (`&:is(.dark *)`).
  */
-const TOKENS_DE_COR =
-  "[--serie-a:#4F46E5] [--serie-b:#0891B2] dark:[--serie-a:#6366F1] dark:[--serie-b:#0E9AB8]";
+const PALETAS = {
+  /** O prontuário: peso, pressão e glicemia. Índigo + ciano. */
+  clinica:
+    "[--serie-a:#4F46E5] [--serie-b:#0891B2] dark:[--serie-a:#6366F1] dark:[--serie-b:#0E9AB8]",
+  /**
+   * O contador de movimentos, na tela da PACIENTE.
+   *
+   * ⚠️ A aba inteira é azul-céu (`glass-sky`, `bg-sky-700`, os chips
+   * `bg-sky-100`) e o gráfico entrava nela com a linha ÍNDIGO do prontuário —
+   * dois azuis de famílias diferentes a três centímetros um do outro. "Cor de
+   * linha é identidade" continua valendo; o que estava errado é que a
+   * identidade desenhada não era a da tela.
+   *
+   * ⚠️ `--serie-a` é `sky-700`, o MESMO tom do botão de iniciar sessão logo
+   * acima — não um azul parecido, o mesmo.
+   *
+   * ⚠️ E `--serie-b` existe porque o CONTRATO do componente é de até duas
+   * séries, não porque haja uma segunda hoje (`serieDeChutes` devolve uma só).
+   * Deixá-la herdando o ciano da paleta clínica seria embarcar um par
+   * sky↔ciano que REPROVA na separação para daltonismo — o dia em que alguém
+   * acrescentasse a segunda série, ela nasceria indistinguível da primeira.
+   * O rosa aqui NÃO é o `--primary` do app (aquele é um terracota de croma
+   * baixo, oklch 0.57 0.1 22): é um rosa saturado, escolhido por passar.
+   */
+  chutes:
+    "[--serie-a:#0369A1] [--serie-b:#BE185D] dark:[--serie-a:#0D9BD8] dark:[--serie-b:#D9628F]",
+} as const;
+
+/**
+ * ⚠️ **CATÁLOGO FECHADO, e não um hex por prop.** Cada par passou nas seis
+ * checagens do validador nos DOIS modos, contra a superfície de cada um (claro
+ * `#fffdfc`, escuro `#0f172b`) — uma prop de cor livre convidaria o próximo a
+ * escolher um tom bonito e não medido, que é exatamente o que este bloco
+ * existe para impedir. Medido:
+ *
+ *   chutes  claro  ΔE 12,5 protan · 28,1 normal · contraste ≥ 3:1
+ *   chutes  escuro ΔE 12,4 protan · 25,8 normal · contraste ≥ 3:1
+ *
+ * Paleta nova: rode `scripts/validate_palette.js` da skill `dataviz` nos dois
+ * modos ANTES de acrescentá-la aqui.
+ */
+export type PaletaDoGrafico = keyof typeof PALETAS;
 
 /** Gravidade. Reservada: nunca vira "série 3". Sempre com rótulo junto. */
 const COR_DA_GRAVIDADE = {
@@ -81,11 +123,28 @@ const PAD = { esq: 12, dir: 12, topo: 12, base: 12 };
 export function GraficoClinico({
   titulo,
   series,
+  paleta = "clinica",
+  moldura = "cartao",
 }: {
   titulo: string;
   /** Uma ou duas — e as duas só quando dividem a MESMA unidade. */
   series: SerieDesenhavel[];
+  /** A identidade da TELA que desenha, não a do dado. Ver `PALETAS`. */
+  paleta?: PaletaDoGrafico;
+  /**
+   * ⚠️ **`"nenhuma"` PARA QUEM JÁ DESENHOU O CARTÃO.**
+   *
+   * A figura nasceu no painel do médico, onde ela É o cartão — borda de 1px e
+   * fundo chapado. No app da paciente todo cartão usa `card-material`, e o
+   * contador embrulhava esta figura num deles: duas bordas concêntricas, com a
+   * de dentro sendo justamente o cartão de contorno que o app da paciente já
+   * tinha tirado de todas as outras telas. É a mesma lição do ponto do gráfico
+   * que se anunciava como botão — trazer um componente do painel para o app da
+   * paciente é trazer as propriedades dele junto.
+   */
+  moldura?: "cartao" | "nenhuma";
 }) {
+  const caixa = `${moldura === "cartao" ? "rounded-2xl border border-border bg-background p-4" : ""} ${PALETAS[paleta]}`;
   const id = useId();
   const [ativo, setAtivo] = useState<{ i: number; j: number } | null>(null);
 
@@ -130,8 +189,8 @@ export function GraficoClinico({
 
   if (!desenho) {
     return (
-      <figure className="rounded-2xl border border-border bg-background p-4">
-        <figcaption className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+      <figure className={caixa}>
+        <figcaption className="font-serif text-[15px] font-semibold text-muted-foreground">
           {titulo}
         </figcaption>
         {/* Diz o que falta, e não "sem dados": a paciente registrar duas vezes é
@@ -149,9 +208,9 @@ export function GraficoClinico({
   const alerta = usaveis.some((s) => s.pontos.some((p) => p.gravidade && p.gravidade !== "normal"));
 
   return (
-    <figure className={`rounded-2xl border border-border bg-background p-4 ${TOKENS_DE_COR}`}>
+    <figure className={caixa}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <figcaption className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+        <figcaption className="font-serif text-[15px] font-semibold text-muted-foreground">
           {titulo}
         </figcaption>
         {/* O último valor como número grande: é o que ele lê primeiro, e um
@@ -235,10 +294,18 @@ export function GraficoClinico({
                       onMouseEnter={() => setAtivo({ i, j })}
                       onFocus={() => setAtivo({ i, j })}
                       tabIndex={0}
-                      role="button"
-                      aria-label={`${s.rotulo} ${p.valor} ${s.unidade} em ${new Date(
-                        p.em,
-                      ).toLocaleDateString("pt-BR")}`}
+                      /* ⚠️ **`role="img"`, e NUNCA `role="button"`.** Ele não
+                         tem `onClick` nem ação de teclado: um leitor de tela
+                         anunciava "botão", ela apertava Enter e nada
+                         acontecia. E medido, o alvo rende 13×13px — a varredura
+                         de acessibilidade o contava, com razão, como um
+                         controle de toque muito abaixo dos 44px. Ele não é um
+                         controle: é um PONTO DE DADO com descrição, focável
+                         para quem navega por teclado enxergar o balão. Os
+                         valores continuam legíveis por outros dois caminhos —
+                         a fita de estatísticas e a lista logo abaixo. */
+                      role="img"
+                      aria-label={`${s.rotulo} ${p.valor} ${s.unidade} em ${diaCurto(p.em)}`}
                     />
                     <circle
                       cx={x(p.em)}
@@ -284,7 +351,7 @@ export function GraficoClinico({
                   style={{ background: COR_DA_GRAVIDADE.atencao }}
                   aria-hidden
                 />
-                ⚠️ atenção
+                Atenção
               </span>
               <span className="flex items-center gap-1.5">
                 <span
@@ -292,7 +359,7 @@ export function GraficoClinico({
                   style={{ background: COR_DA_GRAVIDADE.grave }}
                   aria-hidden
                 />
-                🔴 fora da faixa
+                Fora da faixa
               </span>
             </>
           )}
@@ -307,21 +374,11 @@ export function GraficoClinico({
             <span className="font-semibold text-foreground">
               {usaveis[ativo.i].pontos[ativo.j].valor} {usaveis[ativo.i].unidade}
             </span>{" "}
-            · {usaveis[ativo.i].rotulo} ·{" "}
-            {new Date(usaveis[ativo.i].pontos[ativo.j].em).toLocaleDateString("pt-BR", {
-              day: "2-digit",
-              month: "short",
-              year: "2-digit",
-            })}
+            · {usaveis[ativo.i].rotulo} · {diaCurto(usaveis[ativo.i].pontos[ativo.j].em)}
           </>
         ) : (
           <>
-            {usaveis[0].pontos.length} registros ·{" "}
-            {new Date(usaveis[0].pontos[0].em).toLocaleDateString("pt-BR", {
-              day: "2-digit",
-              month: "short",
-            })}{" "}
-            até hoje
+            {usaveis[0].pontos.length} registros · {diaCurto(usaveis[0].pontos[0].em)} até hoje
             {/* A faixa verde ao fundo precisa se explicar: sem isto ela é uma
                 mancha, e o médico não sabe se ela vale 90–140 ou 70–100. Em
                 texto, e não como rótulo dentro do SVG — texto lá dentro escala

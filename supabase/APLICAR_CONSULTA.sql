@@ -63,13 +63,13 @@ CREATE TABLE IF NOT EXISTS public.consultations (
 
   -- MEDIDAS AFERIDAS. Mesmas faixas de `sinais-clinicos.ts` — se divergirem, a
   -- tela marca o que o banco aceita, ou o banco recusa o que a tela mostra.
-  systolic         integer      CHECK (systolic IS NULL OR systolic BETWEEN 50 AND 300),
-  diastolic        integer      CHECK (diastolic IS NULL OR diastolic BETWEEN 20 AND 200),
-  weight_kg        numeric(5,2) CHECK (weight_kg IS NULL OR weight_kg BETWEEN 25 AND 350),
+  systolic         integer      CHECK (systolic IS NULL OR systolic >= 50),
+  diastolic        integer      CHECK (diastolic IS NULL OR diastolic >= 20),
+  weight_kg        numeric(5,2) CHECK (weight_kg IS NULL OR weight_kg > 0),
   -- Altura uterina: uma das duas medidas que só existem em consultório.
-  fundal_height_cm numeric(4,1) CHECK (fundal_height_cm IS NULL OR fundal_height_cm BETWEEN 5 AND 60),
+  fundal_height_cm numeric(4,1) CHECK (fundal_height_cm IS NULL OR fundal_height_cm > 0),
   -- BPM FETAL, não materno. `health_logs.heart_rate_bpm` é dela; este é do bebê.
-  fetal_bpm        integer      CHECK (fetal_bpm IS NULL OR fetal_bpm BETWEEN 60 AND 220),
+  fetal_bpm        integer      CHECK (fetal_bpm IS NULL OR fetal_bpm >= 60),
   CONSTRAINT consultations_pa_par CHECK (num_nonnulls(systolic, diastolic) <> 1),
 
   /* O QUE ELA PODE VER.
@@ -161,3 +161,45 @@ COMMENT ON TABLE public.consultations IS
    ──────────────────────────────────────────────────────────────────────────── */
 CREATE UNIQUE INDEX IF NOT EXISTS consultations_sem_duplicata
     ON public.consultations (doctor_id, user_id, occurred_at);
+
+-- ────────────────────────────────────────────────────────────────────────────
+-- ⚠️ OS TETOS DE PLAUSIBILIDADE SAÍRAM — e este bloco existe porque o
+-- `CREATE TABLE IF NOT EXISTS` acima É NO-OP numa base que já tem a tabela.
+-- Sem ele, o dono rodaria o arquivo, leria "pronto", e a `consultations` dele
+-- continuaria com o teto de 350 kg: o app aceitaria e o banco recusaria com
+-- 23514, para sempre.
+--
+-- Idempotente por DROP + ADD, e não por "pula se já existe" — o objetivo aqui é
+-- justamente REESCREVER uma regra que já está lá. `NOT VALID` porque o que já
+-- está gravado não é reavaliado.
+-- ────────────────────────────────────────────────────────────────────────────
+DO $sem_teto$
+DECLARE
+  alvo record;
+BEGIN
+  IF to_regclass('public.consultations') IS NULL THEN RETURN; END IF;
+  FOR alvo IN
+    SELECT * FROM (VALUES
+      ('systolic',         'systolic IS NULL OR systolic >= 50'),
+      ('diastolic',        'diastolic IS NULL OR diastolic >= 20'),
+      ('weight_kg',        'weight_kg IS NULL OR weight_kg > 0'),
+      ('fundal_height_cm', 'fundal_height_cm IS NULL OR fundal_height_cm > 0'),
+      ('fetal_bpm',        'fetal_bpm IS NULL OR fetal_bpm >= 60')
+    ) AS t(coluna, regra)
+  LOOP
+    CONTINUE WHEN NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'consultations'
+         AND column_name = alvo.coluna
+    );
+    EXECUTE format(
+      'ALTER TABLE public.consultations DROP CONSTRAINT IF EXISTS %I',
+      'consultations_' || alvo.coluna || '_check'
+    );
+    EXECUTE format(
+      'ALTER TABLE public.consultations ADD CONSTRAINT %I CHECK (%s) NOT VALID',
+      'consultations_' || alvo.coluna || '_check', alvo.regra
+    );
+  END LOOP;
+END
+$sem_teto$;

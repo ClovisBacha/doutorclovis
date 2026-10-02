@@ -180,3 +180,142 @@ export function ordenarPessoas(
     })
     .slice(0, limite);
 }
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * O FEED MISTURADO  (ago/2026)
+ *
+ * Pedido do dono: mostrar publicações de quem ela segue E de quem ela não
+ * segue, com uma configuração para voltar ao fechado.
+ *
+ * ⚠️ **ISTO REVERTE O ARRANJO DO "VOCÊ ESTÁ EM DIA", e o argumento antigo fica
+ * registrado porque ele não era estético.** A zona de sugestões só abria depois
+ * que o feed de quem ela segue acabava, e a razão era: interlaçar desconhecidas
+ * entre as pessoas que ela escolheu, num app de gestação de alto risco, faz a
+ * paciente ler um relato duro sem saber se veio de uma amiga ou de uma estranha.
+ *
+ * O que venceu é de produto, e é do dono: um feed que só mostra quem ela já
+ * segue não tem como crescer, e conta nova abre vazia.
+ *
+ * ⚠️ **MAS O RÓTULO NÃO SAIU** — e ele é a proteção que sobrevive à mistura.
+ * Cada publicação de fora continua marcada "Sugerido para você". Misturar sem
+ * avisar seria a única versão desta mudança que eu não faria.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
+/**
+ * Uma descoberta a cada quantas publicações de quem ela segue.
+ *
+ * Quatro é o que mantém a sensação de "meu feed com tempero" em vez de "feed de
+ * estranhos com algumas amigas". Um número menor inverte o dono da tela.
+ */
+export const CADENCIA_DA_DESCOBERTA = 4;
+
+/**
+ * Costura as descobertas dentro do feed de quem ela segue.
+ *
+ * ⚠️ **NUNCA NA PRIMEIRA POSIÇÃO.** Abrir o aplicativo e a primeira coisa ser
+ * uma desconhecida é o pior caso desta mudança: ela vem ver as amigas e recebe
+ * um estranho na cara. A primeira leva pertence a quem ela escolheu, sempre.
+ *
+ * ⚠️ **E AS SOBRAS VÃO PARA O FIM, nunca descartadas.** Quem segue duas pessoas
+ * tem duas publicações e vinte descobertas; jogar fora dezoito deixaria a tela
+ * quase vazia justamente para quem mais precisa descobrir gente.
+ */
+export function intercalarDescobertas<T>(
+  seguidos: readonly T[],
+  descobertas: readonly T[],
+  cadencia: number = CADENCIA_DA_DESCOBERTA,
+): T[] {
+  if (descobertas.length === 0) return [...seguidos];
+  if (seguidos.length === 0) return [...descobertas];
+  const passo = Math.max(1, Math.floor(cadencia));
+
+  const saida: T[] = [];
+  let fila = 0;
+  for (let i = 0; i < seguidos.length; i++) {
+    saida.push(seguidos[i]);
+    /* `i + 1` para contar publicações JÁ colocadas: com `i`, a primeira
+       descoberta entraria na posição 1 quando a cadência fosse 1. */
+    if ((i + 1) % passo === 0 && fila < descobertas.length) {
+      saida.push(descobertas[fila++]);
+    }
+  }
+  for (; fila < descobertas.length; fila++) saida.push(descobertas[fila]);
+  return saida;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   AS TAGS EM ALTA
+   ══════════════════════════════════════════════════════════════════════════ */
+
+export type TagEmAlta = { tag: string; quantas: number };
+
+/**
+ * ⚠️ **"EM ALTA" AQUI É FREQUÊNCIA, e NUNCA engajamento.**
+ *
+ * É a mesma linha que a zona de sugestões traçou: numa base de gestação de alto
+ * risco, o post que mais engaja é o da EMERGÊNCIA — o sangramento, o susto, a
+ * internação. Uma lista de assuntos ordenada por reação poria o pior dia de
+ * alguém como "o que está bombando", e para desconhecidas.
+ *
+ * O que conta é quantas PUBLICAÇÕES usaram a tag. Uma tag é um assunto; quantas
+ * pessoas escreveram sobre ele é a única pergunta que a lista responde.
+ *
+ * ⚠️ **E há um PISO de duas publicações.** Uma tag usada uma vez não é assunto —
+ * é uma frase de uma pessoa, e pô-la numa lista de "em alta" a expõe a
+ * desconhecidas por acidente.
+ */
+export const MINIMO_PARA_ESTAR_EM_ALTA = 2;
+
+/**
+ * ⚠️ **A ORDEM DESEMPATA PELA TAG, e isso não é detalhe.** Sem desempate fixo, a
+ * mesma lista troca de ordem entre duas aberturas — e uma lista que se mexe
+ * sozinha ensina que ela não significa nada.
+ */
+export function ordenarTagsEmAlta(
+  contagem: ReadonlyMap<string, number> | Record<string, number>,
+  teto = 12,
+): TagEmAlta[] {
+  const entradas =
+    contagem instanceof Map ? [...contagem.entries()] : Object.entries(contagem ?? {});
+  return entradas
+    .map(([tag, quantas]) => ({ tag, quantas }))
+    .filter((t) => t.tag.trim().length > 0 && t.quantas >= MINIMO_PARA_ESTAR_EM_ALTA)
+    .sort((a, b) => (b.quantas === a.quantas ? a.tag.localeCompare(b.tag) : b.quantas - a.quantas))
+    .slice(0, teto);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   AS BUSCAS RECENTES
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * ⚠️ **AS BUSCAS RECENTES FICAM NO APARELHO, e nunca no servidor.**
+ *
+ * O que ela procura na busca é o nome de pessoas e o nome de assuntos — e num
+ * app de gestação de alto risco, "quem eu procurei" é um dado que não precisa
+ * existir em lugar nenhum além da tela dela. É a mesma decisão da busca DENTRO
+ * da conversa, que roda local pelo mesmo motivo.
+ *
+ * ⚠️ **E a chave carrega o id da conta**: o aparelho é compartilhado, e a lista
+ * de quem a mãe procurou não pode aparecer para a filha que usa o mesmo
+ * celular.
+ */
+export const BUSCAS_RECENTES_MAX = 8;
+
+export function chaveDasBuscasRecentes(euId: string): string {
+  return `dc-rede-buscas-${euId}`;
+}
+
+/**
+ * ⚠️ **O TERMO NOVO VAI PARA O TOPO, e o repetido SOBE em vez de duplicar.**
+ * Sem a deduplicação, procurar "ana" três vezes enche a lista inteira com a
+ * mesma palavra — e o resto do histórico some por causa do teto.
+ */
+export function comBuscaNova(recentes: readonly string[], termo: string): string[] {
+  const t = termo.trim();
+  if (t.length < 2) return [...recentes];
+  const semEle = recentes.filter((r) => r.toLowerCase() !== t.toLowerCase());
+  return [t, ...semEle].slice(0, BUSCAS_RECENTES_MAX);
+}

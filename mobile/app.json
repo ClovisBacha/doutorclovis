@@ -1,0 +1,85 @@
+{
+  "expo": {
+    "name": "Obstétrica",
+    "slug": "obstetrica",
+    "scheme": "obstetrica",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#fffaf6",
+    "ios": {
+      "bundleIdentifier": "br.com.obstetrica.app",
+      "supportsTablet": false,
+      "usesAppleSignIn": true,
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "CFBundleDevelopmentRegion": "pt-BR",
+        "CFBundleLocalizations": ["pt-BR"],
+        "NSLocationWhenInUseUsageDescription": "Se você acionar o SOS, sua localização vai junto na mensagem para a pessoa que você escolheu como contato de emergência.",
+        "NSCameraUsageDescription": "Para você tirar foto da sua barriga, do seu bebê ou do seu ultrassom e publicar na Comunidade ou mostrar o seu prato para a nutricionista.",
+        "NSPhotoLibraryUsageDescription": "Para você escolher fotos que já estão no seu celular e publicar na Comunidade ou mostrar o seu prato para a nutricionista.",
+        "LSApplicationQueriesSchemes": ["whatsapp"]
+      },
+      "privacyManifests": {
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+          }
+        ]
+      }
+    },
+    "android": {
+      "package": "br.com.obstetrica.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#FEE2EA",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-image",
+      "expo-secure-store",
+      "expo-apple-authentication",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/icon.png",
+          "imageWidth": 160,
+          "backgroundColor": "#FEE2EA"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Se você acionar o SOS, sua localização vai junto na mensagem para a pessoa que você escolheu como contato de emergência."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Para você escolher fotos que já estão no seu celular e publicar na Comunidade ou mostrar o seu prato para a nutricionista.",
+          "cameraPermission": "Para você tirar foto da sua barriga, do seu bebê ou do seu ultrassom e publicar na Comunidade ou mostrar o seu prato para a nutricionista.",
+          "microphonePermission": false
+        }
+      ],
+      "expo-video"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}

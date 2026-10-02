@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { AppBottomNav, type BottomSection } from "@/components/app-mobile-shell";
+import { AppBottomNav, type DestaqueDoTutorial } from "@/components/app-mobile-shell";
+import { MascoteDaHome } from "@/components/mascote-da-home";
 import { TutorialDaBolha } from "@/components/tutorial-da-bolha";
 
 /**
@@ -34,7 +35,7 @@ export const Route = createFileRoute("/preview-tutorial")({
 
 function PreviewTutorial() {
   const { nome, escura } = Route.useSearch();
-  const [destaque, setDestaque] = useState<BottomSection | "sos" | null>(null);
+  const [destaque, setDestaque] = useState<DestaqueDoTutorial>(null);
   const [aberto, setAberto] = useState(true);
   /* O passo mora aqui pelo mesmo motivo que mora na página real: quem desmonta
      não pode ser quem lembra. */
@@ -48,6 +49,36 @@ function PreviewTutorial() {
           : "linear-gradient(180deg,#0244e4,#7fd4ff)",
       }}
     >
+      {/* O TOPO da home, só o que o tutorial acende: o ☰ e a bolha. Os dois
+          cartões novos (set/2026) apontam para cá, e sem estas duas peças a
+          bancada mostraria um cartão falando de um botão que não está na tela
+          — o mesmo defeito que o cartão do "chat" teve por um mês. */}
+      <div className="absolute inset-x-5 top-[calc(env(safe-area-inset-top)+0.75rem)] z-[39] flex items-center justify-between">
+        <button
+          type="button"
+          aria-label="Menu"
+          className={`press flex h-10 w-10 items-center justify-center rounded-full text-white ${destaque === "menu" ? "z-[39] dc-nav-destaque" : ""}`}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            className="h-6 w-6"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.9"
+            strokeLinecap="round"
+          >
+            <path d="M4 7h16M4 12h16M4 17h16" />
+          </svg>
+        </button>
+        <MascoteDaHome
+          humor="feliz"
+          calado
+          destacado={destaque === "bolha"}
+          tamanho={88}
+          onAbrir={() => {}}
+          onAbrirRecados={() => {}}
+        />
+      </div>
       {!aberto && (
         <button
           onClick={() => {
@@ -64,7 +95,7 @@ function PreviewTutorial() {
           nome={nome || null}
           passo={passo}
           onAvancar={() => setPasso((v) => v + 1)}
-          onPasso={(d) => setDestaque(d as BottomSection | "sos" | null)}
+          onPasso={(d) => setDestaque(d as DestaqueDoTutorial)}
           onFechar={() => setAberto(false)}
         />
       )}
