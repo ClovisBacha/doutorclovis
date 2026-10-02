@@ -17,6 +17,7 @@ import { BEBE, BOLHA } from "~/componentes/artes";
 import { Botao, Cartao, Linha, Pilula, T, Tela, toque } from "~/componentes/base";
 import { parametroDaBancada } from "~/lib/bancada";
 import { gestacaoDoPerfil } from "~/lib/gestacao";
+import { semGeneroDoBebe } from "~/lib/nutricao/frase-do-topo";
 import { useSessao } from "~/lib/sessao";
 import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
 
@@ -191,9 +192,9 @@ export default function Bebe() {
       {nutri ? (
         <Cartao fundo={cor.nutricaoFundo}>
           <T tipo="rotulo" cor={cor.nutricao}>
-            No prato: {nutri.titulo}
+            No prato: {semGeneroDoBebe(nutri.titulo)}
           </T>
-          <T>{nutri.texto}</T>
+          <T>{semGeneroDoBebe(nutri.texto)}</T>
         </Cartao>
       ) : null}
 

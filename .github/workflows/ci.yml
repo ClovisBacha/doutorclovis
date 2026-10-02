@@ -186,3 +186,21 @@ jobs:
       - name: Log do servidor
         if: failure()
         run: tail -60 /tmp/dev.log
+
+  # O app React Native (mobile/) tem o seu próprio portão: tsc, os testes das
+  # regras do app e o empacotamento iOS pelo Metro + Hermes — que é onde uma
+  # regex que o Hermes recusa, ou um import de módulo de servidor, quebraria.
+  # As dependências do site entram também porque o app importa ../src/lib.
+  app-rn:
+    name: App React Native
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bun install --frozen-lockfile
+        working-directory: mobile
+      - run: bash scripts/verificar.sh
+        working-directory: mobile

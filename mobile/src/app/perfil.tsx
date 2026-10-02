@@ -16,6 +16,7 @@ import { limparRastrosLocais } from "~/lib/armazem";
 import { ehBancada } from "~/lib/bancada";
 import { deYmd, mascaraDeData, paraYmd, RECADO_DA_DATA, recusaDaDum } from "~/lib/datas";
 import { gravarPerfil } from "~/lib/gravar-perfil";
+import { CartaoDaPermissaoDeIA } from "~/lib/ia/PermissaoDeIA";
 import { abrir, PRIVACIDADE, TERMOS } from "~/lib/links";
 import { useSessao } from "~/lib/sessao";
 import { excluirMinhaConta, ligarModoCuidado, PALAVRA_DE_CONFIRMACAO } from "~/servidor/conta";
@@ -271,6 +272,8 @@ function FormularioDoPerfil() {
             />
           </Linha>
         </Cartao>
+
+        <CartaoDaPermissaoDeIA />
 
         <Cartao>
           <Botao rotulo="Termos de uso" tipo="texto" aoTocar={() => abrir(TERMOS)} />
