@@ -6,8 +6,9 @@ import {
   useRouterState,
   HeadContent,
   Scripts,
+  type ErrorComponentProps,
 } from "@tanstack/react-router";
-import { useEffect, useState, lazy, Suspense, type ReactNode } from "react";
+import { useEffect, useMemo, useState, lazy, Suspense, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -84,7 +85,16 @@ function NotFoundComponent() {
 /** Recarrega UMA vez por sessão — sem isto, um erro de rede vira laço de F5. */
 const CHAVE_RECARGA = "dc-recarreguei-por-pedaco-antigo";
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+function ErrorComponent({ error: erroCru, reset }: ErrorComponentProps) {
+  /* ⚠️ Desde o router 1.170, `error` chega como `unknown`: qualquer valor
+     lançado. O resto desta tela precisa de um `Error` de verdade (nome,
+     mensagem, pilha). `useMemo` para que um valor que não é `Error` não vire
+     um objeto novo a cada render, o que faria os efeitos abaixo rodarem sem
+     parar. */
+  const error = useMemo(
+    () => (erroCru instanceof Error ? erroCru : new Error(String(erroCru))),
+    [erroCru],
+  );
   console.error(error);
   const router = useRouter();
   const { location } = useRouterState();

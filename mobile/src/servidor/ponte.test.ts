@@ -33,10 +33,13 @@ describe("o id de uma função de servidor", () => {
 });
 
 describe("o corpo do pedido", () => {
+  /* O `f` é o conjunto de recursos do seroval, e muda com a versão dele (63 no
+     1.5.x, 127 no 1.6.x). É por isso que o app e o site têm de usar a MESMA
+     versão: a catraca está em `src/lib/ponte-do-app.test.ts`, do lado do site. */
   test("é o formato do seroval que o servidor desserializa", async () => {
     const corpo = JSON.stringify(await toJSONAsync({ data: {} }));
     expect(corpo).toBe(
-      '{"t":{"t":10,"i":0,"p":{"k":["data"],"v":[{"t":10,"i":1,"p":{"k":[],"v":[]},"o":0}]},"o":0},"f":63,"m":[]}',
+      '{"t":{"t":10,"i":0,"p":{"k":["data"],"v":[{"t":10,"i":1,"p":{"k":[],"v":[]},"o":0}]},"o":0},"f":127,"m":[]}',
     );
   });
 });

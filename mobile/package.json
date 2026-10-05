@@ -39,7 +39,7 @@
     "react-native-svg": "15.15.4",
     "react-native-url-polyfill": "^4.0.0",
     "react-native-web": "^0.21.2",
-    "seroval": "1.5.2"
+    "seroval": "1.6.8"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",

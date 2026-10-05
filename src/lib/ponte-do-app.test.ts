@@ -86,3 +86,22 @@ describe("as funções de servidor que o app nativo chama", () => {
     expect(m.map((x) => x[2])).toEqual(["listLivesPublic"]);
   });
 });
+
+describe("⚠️ o app e o site falam o MESMO seroval", () => {
+  /* O corpo de cada chamada é o JSON do seroval, e o campo `f` dele é o
+     conjunto de recursos da versão que serializou. O servidor desserializa com
+     a versão do site; um app com outra versão manda um formato que ninguém
+     testou (foi o que a atualização do TanStack Start de 05/10/2026 pegou: o
+     site foi para o seroval 1.6.8 e o app ficou no 1.5.2). As duas versões
+     vêm dos dois lockfiles, e têm de ser uma só. */
+  function versaoDoSeroval(lock: string): string | null {
+    return readFileSync(lock, "utf8").match(/"seroval": \["seroval@([0-9.]+)"/)?.[1] ?? null;
+  }
+
+  test("a versão do lock do app é a do lock do site", () => {
+    const site = versaoDoSeroval(join(RAIZ, "bun.lock"));
+    const app = versaoDoSeroval(join(RAIZ, "mobile", "bun.lock"));
+    expect(site).toBeTruthy();
+    expect(app).toBe(site);
+  });
+});
