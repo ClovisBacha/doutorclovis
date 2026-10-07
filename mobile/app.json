@@ -52,7 +52,12 @@
       "expo-router",
       "expo-font",
       "expo-image",
-      "expo-secure-store",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false
+        }
+      ],
       "expo-apple-authentication",
       [
         "expo-splash-screen",
@@ -65,7 +70,10 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Se você acionar o SOS, sua localização vai junto na mensagem para a pessoa que você escolheu como contato de emergência."
+          "locationWhenInUsePermission": "Se você acionar o SOS, sua localização vai junto na mensagem para a pessoa que você escolheu como contato de emergência.",
+          "locationAlwaysAndWhenInUsePermission": "Se você acionar o SOS, sua localização vai junto na mensagem para a pessoa que você escolheu como contato de emergência.",
+          "locationAlwaysPermission": "Se você acionar o SOS, sua localização vai junto na mensagem para a pessoa que você escolheu como contato de emergência.",
+          "motionUsagePermission": "Para os cartões do app acompanharem o movimento do seu celular com um leve efeito 3D."
         }
       ],
       [
@@ -74,6 +82,12 @@
           "photosPermission": "Para você escolher fotos que já estão no seu celular e publicar na Comunidade ou mostrar o seu prato para a nutricionista.",
           "cameraPermission": "Para você tirar foto da sua barriga, do seu bebê ou do seu ultrassom e publicar na Comunidade ou mostrar o seu prato para a nutricionista.",
           "microphonePermission": false
+        }
+      ],
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "Para os cartões do app acompanharem o movimento do seu celular com um leve efeito 3D."
         }
       ],
       "expo-video"
