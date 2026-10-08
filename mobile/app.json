@@ -10,6 +10,7 @@
     "backgroundColor": "#fffaf6",
     "ios": {
       "bundleIdentifier": "br.com.obstetrica.app",
+      "buildNumber": "2",
       "supportsTablet": false,
       "usesAppleSignIn": true,
       "config": {
@@ -90,7 +91,8 @@
           "motionPermission": "Para os cartões do app acompanharem o movimento do seu celular com um leve efeito 3D."
         }
       ],
-      "expo-video"
+      "expo-video",
+      "./plugins/ciclo-de-cena"
     ],
     "experiments": {
       "typedRoutes": false
