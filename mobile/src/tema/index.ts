@@ -10,6 +10,11 @@ export const cor = {
   primariaEscura: "#8f4b49",
   primariaSuave: "#d79d9a",
   rosaMarca: "#FEE2EA",
+  // A entrada (login/cadastro): o degradê do rosa da marca ao creme, as bolhas
+  // que flutuam atrás e o "vidro" das pílulas sobre o degradê.
+  entradaPessego: "#FFEDE4",
+  entradaLilas: "#E9DDF6",
+  entradaVidro: "rgba(255,253,252,0.82)",
   apagado: "#f9eee8",
   textoApagado: "#6d5855",
   destaque: "#ffe2de",

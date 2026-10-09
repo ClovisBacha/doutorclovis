@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import { useState } from "react";
 import { Botao, Campo, Cartao, T, Tela } from "~/componentes/base";
+import { FolhaDaEntrada, FundoDaEntrada } from "~/componentes/entrada";
 import { CabecalhoDaMarca } from "~/componentes/marca";
 import { SITE } from "~/config";
 import { supabase } from "~/servidor/supabase";
@@ -27,35 +28,37 @@ export default function Esqueci() {
   }
 
   return (
-    <Tela bordas={["top", "bottom"]}>
-      <CabecalhoDaMarca subtitulo="Vamos criar uma senha nova." />
-      {enviado ? (
-        <Cartao>
-          <T tipo="subtitulo">Confira seu e-mail</T>
-          <T>
-            Se houver conta com {email.trim()}, chega um link para definir a senha. Depois, volte
-            aqui e entre.
-          </T>
-        </Cartao>
-      ) : (
-        <>
-          <Campo
-            rotulo="E-mail da conta"
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            autoComplete="email"
-          />
-          {erro ? (
-            <T tipo="apagado" cor={cor.urgente}>
-              {erro}
+    <FundoDaEntrada>
+      <Tela bordas={["top", "bottom"]} fundo="transparent">
+        <CabecalhoDaMarca compacto subtitulo="Vamos criar uma senha nova." />
+        {enviado ? (
+          <Cartao>
+            <T tipo="subtitulo">Confira seu e-mail</T>
+            <T>
+              Se houver conta com {email.trim()}, chega um link para definir a senha. Depois, volte
+              aqui e entre.
             </T>
-          ) : null}
-          <Botao rotulo="Enviar link" aoTocar={enviar} carregando={carregando} />
-        </>
-      )}
-      <Botao rotulo="Voltar para entrar" tipo="texto" aoTocar={() => router.replace("/entrar")} />
-    </Tela>
+          </Cartao>
+        ) : (
+          <FolhaDaEntrada>
+            <Campo
+              rotulo="E-mail da conta"
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              autoComplete="email"
+            />
+            {erro ? (
+              <T tipo="apagado" cor={cor.urgente}>
+                {erro}
+              </T>
+            ) : null}
+            <Botao rotulo="Enviar link" aoTocar={enviar} carregando={carregando} />
+          </FolhaDaEntrada>
+        )}
+        <Botao rotulo="Voltar para entrar" tipo="texto" aoTocar={() => router.replace("/entrar")} />
+      </Tela>
+    </FundoDaEntrada>
   );
 }

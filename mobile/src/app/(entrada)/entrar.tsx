@@ -2,8 +2,15 @@ import * as AppleAuthentication from "expo-apple-authentication";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Platform, View } from "react-native";
-import { Botao, Campo, Cartao, T, Tela } from "~/componentes/base";
+import { Botao, Campo, T, Tela } from "~/componentes/base";
+import {
+  DivisorDaEntrada,
+  FolhaDaEntrada,
+  FrasesQueGiram,
+  FundoDaEntrada,
+} from "~/componentes/entrada";
 import { CabecalhoDaMarca } from "~/componentes/marca";
+import { Entrada } from "~/componentes/movimento";
 import { appleDisponivel, entrarComApple } from "~/lib/apple";
 import { supabase } from "~/servidor/supabase";
 import { cor, espaco, raio } from "~/tema";
@@ -50,67 +57,85 @@ export default function Entrar() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <Tela bordas={["top", "bottom"]}>
-        <CabecalhoDaMarca subtitulo="Sua gestação, um dia de cada vez — com aulas, cuidado e outras gestantes do seu lado." />
-        <View style={{ gap: espaco.md, marginTop: espaco.lg }}>
-          <Campo
-            rotulo="E-mail"
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            autoComplete="email"
-            keyboardType="email-address"
-            textContentType="emailAddress"
-            placeholder="voce@email.com"
-          />
-          <Campo
-            rotulo="Senha"
-            value={senha}
-            onChangeText={setSenha}
-            secureTextEntry
-            autoComplete="password"
-            textContentType="password"
-            placeholder="Sua senha"
-            onSubmitEditing={entrar}
-          />
-          {erro ? (
-            <T tipo="apagado" cor={cor.urgente}>
-              {erro}
-            </T>
-          ) : null}
-          <Botao rotulo="Entrar" aoTocar={entrar} carregando={carregando} />
-          {comApple ? (
-            <AppleAuthentication.AppleAuthenticationButton
-              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
-              cornerRadius={raio.pilula}
-              style={{ height: 48 }}
-              onPress={apple}
-            />
-          ) : null}
-          <Botao rotulo="Esqueci a senha" tipo="texto" aoTocar={() => router.push("/esqueci")} />
-        </View>
-        <Cartao fundo={cor.apagado} estilo={{ marginTop: espaco.md }}>
-          <T tipo="apagado">
-            Entrou com o Google no site? Toque em "Esqueci a senha" com o mesmo e-mail para criar
-            uma senha e entrar aqui.
-          </T>
-        </Cartao>
-        <View style={{ marginTop: espaco.lg, gap: espaco.sm }}>
-          <T tipo="apagado" centro>
-            Primeira vez por aqui?
-          </T>
-          <Botao
-            rotulo="Criar minha conta"
-            tipo="secundario"
-            aoTocar={() => router.push("/cadastro")}
-          />
-        </View>
-      </Tela>
-    </KeyboardAvoidingView>
+    <FundoDaEntrada>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <Tela bordas={["top", "bottom"]} fundo="transparent" estilo={{ gap: espaco.lg }}>
+          <Entrada>
+            <CabecalhoDaMarca subtitulo="Sua gestação, um dia de cada vez — com aulas, cuidado e outras gestantes do seu lado." />
+          </Entrada>
+          <Entrada atraso={120}>
+            <FrasesQueGiram />
+          </Entrada>
+          <Entrada atraso={220}>
+            <FolhaDaEntrada>
+              {/* A Apple pede o botão dela com o mesmo destaque das outras
+                  formas de entrar; no alto, ele é o caminho de um toque. */}
+              {comApple ? (
+                <>
+                  <AppleAuthentication.AppleAuthenticationButton
+                    buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                    buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                    cornerRadius={raio.pilula}
+                    style={{ height: 50 }}
+                    onPress={apple}
+                  />
+                  <DivisorDaEntrada texto="ou com o seu e-mail" />
+                </>
+              ) : null}
+              <Campo
+                rotulo="E-mail"
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                autoComplete="email"
+                keyboardType="email-address"
+                textContentType="emailAddress"
+                placeholder="voce@email.com"
+              />
+              <Campo
+                rotulo="Senha"
+                value={senha}
+                onChangeText={setSenha}
+                secureTextEntry
+                autoComplete="password"
+                textContentType="password"
+                placeholder="Sua senha"
+                onSubmitEditing={entrar}
+              />
+              {erro ? (
+                <T tipo="apagado" cor={cor.urgente}>
+                  {erro}
+                </T>
+              ) : null}
+              <Botao rotulo="Entrar" aoTocar={entrar} carregando={carregando} />
+              <Botao
+                rotulo="Esqueci a senha"
+                tipo="texto"
+                aoTocar={() => router.push("/esqueci")}
+              />
+              <T tipo="apagado" centro estilo={{ fontSize: 13, lineHeight: 18 }}>
+                Entrou com o Google no site? Toque em “Esqueci a senha” com o mesmo e-mail para
+                criar uma senha e entrar aqui.
+              </T>
+            </FolhaDaEntrada>
+          </Entrada>
+          <Entrada atraso={320}>
+            <View style={{ gap: espaco.sm }}>
+              <T tipo="apagado" centro>
+                Primeira vez por aqui?
+              </T>
+              <Botao
+                rotulo="Criar minha conta"
+                tipo="secundario"
+                aoTocar={() => router.push("/cadastro")}
+              />
+            </View>
+          </Entrada>
+        </Tela>
+      </KeyboardAvoidingView>
+    </FundoDaEntrada>
   );
 }

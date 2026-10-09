@@ -45,11 +45,21 @@ export async function entrarComApple(): Promise<
       token: credencial.identityToken,
       nonce: cru,
     });
-    if (error)
+    if (error) {
+      /* "Unacceptable audience": a Apple disse sim, mas o Supabase não conhece
+         este app — falta o bundle id nos Client IDs do provedor Apple. É
+         configuração do painel, e a mensagem não pode mandar tentar de novo. */
+      if (/audience/i.test(error.message))
+        return {
+          ok: false,
+          mensagem:
+            "O login com a Apple ainda está sendo ativado. Por enquanto, entre com e-mail e senha.",
+        };
       return {
         ok: false,
         mensagem: "Não foi possível entrar com a Apple agora. Tente com e-mail e senha.",
       };
+    }
     /* A Apple só manda o nome no PRIMEIRO login: guardá-lo agora, ou nunca. */
     const nome = [credencial.fullName?.givenName, credencial.fullName?.familyName]
       .filter(Boolean)

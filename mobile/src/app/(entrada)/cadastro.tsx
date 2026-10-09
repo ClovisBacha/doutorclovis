@@ -2,6 +2,7 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, View } from "react-native";
 import { Botao, Campo, Cartao, Linha, T, Tela, toque } from "~/componentes/base";
+import { FolhaDaEntrada, FundoDaEntrada } from "~/componentes/entrada";
 import { CabecalhoDaMarca } from "~/componentes/marca";
 import { SITE } from "~/config";
 import { abrir, PRIVACIDADE, TERMOS } from "~/lib/links";
@@ -61,79 +62,83 @@ export default function Cadastro() {
 
   if (enviado) {
     return (
-      <Tela bordas={["top", "bottom"]}>
-        <CabecalhoDaMarca />
-        <Cartao>
-          <T tipo="subtitulo">Falta um passo</T>
-          <T>
-            Mandamos um link para {email.trim()}. Abra o e-mail, toque no link para confirmar e
-            volte aqui para entrar.
-          </T>
-          <T tipo="apagado">Não chegou? Olhe a caixa de spam ou promoções.</T>
-        </Cartao>
-        <Botao rotulo="Já confirmei — entrar" aoTocar={() => router.replace("/entrar")} />
-      </Tela>
+      <FundoDaEntrada>
+        <Tela bordas={["top", "bottom"]} fundo="transparent">
+          <CabecalhoDaMarca compacto />
+          <Cartao>
+            <T tipo="subtitulo">Falta um passo</T>
+            <T>
+              Mandamos um link para {email.trim()}. Abra o e-mail, toque no link para confirmar e
+              volte aqui para entrar.
+            </T>
+            <T tipo="apagado">Não chegou? Olhe a caixa de spam ou promoções.</T>
+          </Cartao>
+          <Botao rotulo="Já confirmei — entrar" aoTocar={() => router.replace("/entrar")} />
+        </Tela>
+      </FundoDaEntrada>
     );
   }
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <Tela bordas={["top", "bottom"]}>
-        <CabecalhoDaMarca subtitulo="Crie sua conta." />
-        <View style={{ gap: espaco.md, marginTop: espaco.md }}>
-          <Campo
-            rotulo="Seu nome"
-            value={nome}
-            onChangeText={setNome}
-            autoComplete="name"
-            textContentType="name"
-            placeholder="Como quer ser chamada"
-          />
-          <Campo
-            rotulo="E-mail"
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            autoComplete="email"
-            textContentType="emailAddress"
-          />
-          <Campo
-            rotulo="Senha"
-            value={senha}
-            onChangeText={setSenha}
-            secureTextEntry
-            autoComplete="new-password"
-            textContentType="newPassword"
-            dica="Pelo menos 8 caracteres."
-          />
-          <Caixa
-            marcada={maior}
-            aoTocar={() => setMaior((v) => !v)}
-            rotulo="Tenho 18 anos ou mais."
-          />
-          <Caixa
-            marcada={aceite}
-            aoTocar={() => setAceite((v) => !v)}
-            rotulo="Li e concordo com os Termos de uso, a Política de privacidade e as regras da Comunidade (tolerância zero com conteúdo ofensivo ou abusivo)."
-          />
-          <Linha estilo={{ flexWrap: "wrap" }}>
-            <Botao rotulo="Ler os Termos" tipo="texto" aoTocar={() => abrir(TERMOS)} />
-            <Botao rotulo="Ler a Privacidade" tipo="texto" aoTocar={() => abrir(PRIVACIDADE)} />
-          </Linha>
-          {erro ? (
-            <T tipo="apagado" cor={cor.urgente}>
-              {erro}
-            </T>
-          ) : null}
-          <Botao rotulo="Criar conta" aoTocar={criar} carregando={carregando} />
-          <Botao rotulo="Já tenho conta" tipo="texto" aoTocar={() => router.back()} />
-        </View>
-      </Tela>
-    </KeyboardAvoidingView>
+    <FundoDaEntrada>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <Tela bordas={["top", "bottom"]} fundo="transparent">
+          <CabecalhoDaMarca compacto subtitulo="Crie sua conta." />
+          <FolhaDaEntrada estilo={{ marginTop: espaco.sm }}>
+            <Campo
+              rotulo="Seu nome"
+              value={nome}
+              onChangeText={setNome}
+              autoComplete="name"
+              textContentType="name"
+              placeholder="Como quer ser chamada"
+            />
+            <Campo
+              rotulo="E-mail"
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              autoComplete="email"
+              textContentType="emailAddress"
+            />
+            <Campo
+              rotulo="Senha"
+              value={senha}
+              onChangeText={setSenha}
+              secureTextEntry
+              autoComplete="new-password"
+              textContentType="newPassword"
+              dica="Pelo menos 8 caracteres."
+            />
+            <Caixa
+              marcada={maior}
+              aoTocar={() => setMaior((v) => !v)}
+              rotulo="Tenho 18 anos ou mais."
+            />
+            <Caixa
+              marcada={aceite}
+              aoTocar={() => setAceite((v) => !v)}
+              rotulo="Li e concordo com os Termos de uso, a Política de privacidade e as regras da Comunidade (tolerância zero com conteúdo ofensivo ou abusivo)."
+            />
+            <Linha estilo={{ flexWrap: "wrap" }}>
+              <Botao rotulo="Ler os Termos" tipo="texto" aoTocar={() => abrir(TERMOS)} />
+              <Botao rotulo="Ler a Privacidade" tipo="texto" aoTocar={() => abrir(PRIVACIDADE)} />
+            </Linha>
+            {erro ? (
+              <T tipo="apagado" cor={cor.urgente}>
+                {erro}
+              </T>
+            ) : null}
+            <Botao rotulo="Criar conta" aoTocar={criar} carregando={carregando} />
+            <Botao rotulo="Já tenho conta" tipo="texto" aoTocar={() => router.back()} />
+          </FolhaDaEntrada>
+        </Tela>
+      </KeyboardAvoidingView>
+    </FundoDaEntrada>
   );
 }
 
