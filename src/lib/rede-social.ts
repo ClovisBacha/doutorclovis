@@ -370,7 +370,18 @@ export type EspecieDeAviso =
   | "reagiu"
   | "aceitou"
   | "marcou"
-  | "reagiu_story";
+  | "reagiu_story"
+  /**
+   * Comentou numa publicação dela.
+   *
+   * ⚠️ O índice dedupa por `(dono, quem, espécie, post)`, então dez comentários
+   * da mesma pessoa no mesmo post viram UM aviso. É o certo: a caixa ♡ diz
+   * "Fulana comentou", e dez linhas iguais seriam a mesma informação repetida
+   * com cara de dez pessoas.
+   */
+  | "comentou"
+  /** Mencionou ela num post ou comentário. */
+  | "mencionou";
 
 /**
  * ⚠️ **Reação NÃO manda push — só o pedido para seguir manda.**
@@ -391,11 +402,79 @@ export type EspecieDeAviso =
  * que fica esperando resposta.
  */
 export function avisoMandaPush(e: EspecieDeAviso): boolean {
-  return e === "pediu_para_seguir";
+  /**
+   * ⚠️ **O QUE PEDE ALGUMA COISA DELA, e nada mais.**
+   *
+   * A régua devolvia `true` só para `pediu_para_seguir`, e as outras sete
+   * espécies tinham texto de push escrito e NENHUM uso: comentar, mencionar e
+   * marcar não avisavam ninguém. A caixa ♡ gravava e a pessoa só ficava sabendo
+   * se abrisse o app por conta própria — numa aba cuja graça inteira é alguém
+   * te responder.
+   *
+   * ⚠️ **E o corte não é "o que é importante", é "o que PEDE".** O push deste
+   * app é o mesmo canal do aviso de emergência: gastá-lo com o coraçãozinho de
+   * madrugada ensina a ignorá-lo, e quem desliga por causa disso desliga o SOS
+   * junto. Por isso `reagiu` e `reagiu_story` ficam de fora — são afago, e
+   * afago espera ela abrir. `seguiu` também: ninguém precisa fazer nada.
+   *
+   * Entram: o pedido (decisão dela), o comentário (é conversa dirigida a ela),
+   * a menção (chamaram pelo nome) e a marcação (o nome dela numa foto de outra
+   * pessoa — e ela pode querer tirar).
+   *
+   * ⚠️ **`aceitou` FICOU DE FORA, e o teste pegou minha inconsistência.** Eu
+   * escrevi "o que PEDE alguma coisa dela" e em seguida incluí `aceitou`, que
+   * não pede nada: ela mandou o pedido, e vai encontrar a resposta quando
+   * abrir. A decisão já estava tomada e testada; o critério novo, aplicado
+   * direito, chega nela sozinho.
+   */
+  return e === "pediu_para_seguir" || e === "comentou" || e === "mencionou" || e === "marcou";
+}
+
+/**
+ * ⚠️ **O QUE ELA PODE DESLIGAR, e o que NÃO.**
+ *
+ * Antes disto o único jeito de parar de receber aviso da Comunidade era
+ * desligar a notificação do app inteiro — o mesmo canal por onde chega o aviso
+ * de emergência e o lembrete de consulta. "Ou tudo, ou nada" numa gestação de
+ * alto risco é uma escolha que ninguém deveria ter de fazer.
+ *
+ * ⚠️ **A lista é do que ela DESLIGOU, e não do que ligou.** Guardar o que está
+ * ligado faria toda espécie nova nascer DESLIGADA para quem já usava o app — e
+ * um recurso que nasce mudo para a base inteira é um recurso que ninguém
+ * descobre. Desligado é sempre escolha explícita.
+ */
+export const AVISOS_QUE_ELA_DESLIGA: { chave: EspecieDeAviso; rotulo: string }[] = [
+  { chave: "pediu_para_seguir", rotulo: "Pedidos para te acompanhar" },
+  { chave: "comentou", rotulo: "Comentários nas suas publicações" },
+  { chave: "mencionou", rotulo: "Quando te mencionam" },
+  { chave: "marcou", rotulo: "Quando te marcam numa foto" },
+];
+
+/**
+ * ⚠️ **FALHA ABERTO: sem saber o que ela desligou, o aviso VAI.**
+ *
+ * O pior caso aqui é um push que ela preferia não receber; o oposto é o
+ * silêncio — e silêncio numa leitura degradada some sem deixar rastro nenhum,
+ * exatamente como o defeito que fez esta régua existir.
+ */
+export function podeAvisar(e: EspecieDeAviso, desligados: readonly string[] | null): boolean {
+  if (!avisoMandaPush(e)) return false;
+  if (!desligados) return true;
+  return !desligados.includes(e);
 }
 
 export function textoDoAviso(e: EspecieDeAviso, quem: string): string {
   switch (e) {
+    case "mencionou":
+      /* ⚠️ Também sem o texto: o comentário ou a legenda onde ela foi
+         mencionada pode ser justamente o que ela não deve ler sem contexto. */
+      return `${quem} mencionou você`;
+    case "comentou":
+      /* ⚠️ O TEXTO NÃO TRAZ O COMENTÁRIO. Um trecho na caixa faria a frase de
+         quem escreveu aparecer numa tela que ela abre por reflexo — e é
+         justamente o comentário duro que ela não deve encontrar sem contexto,
+         fora da publicação onde ele está. Ela toca e vai ler onde ele vive. */
+      return `${quem} comentou na sua publicação`;
     case "seguiu":
       return `${quem} começou a te acompanhar`;
     case "pediu_para_seguir":
@@ -505,6 +584,20 @@ export function haQuantoPublicou(iso: string, agora: number): string {
 /** Mínimo e máximo de opções. O CHECK do banco repete os dois. */
 export const OPCOES_MIN = 2;
 export const OPCOES_MAX = 4;
+
+/**
+ * O TETO DO TEXTO DO STORY.
+ *
+ * ⚠️ **Um número só, lido pela tela E pelo `zod` do servidor.** Ele já existia
+ * cravado em `publicarStory` (`z.string().max(200)`) e a tela não tinha campo
+ * nenhum — quando o campo nasceu, um `200` digitado nele seria a segunda cópia
+ * do mesmo limite, e a divergência apareceria como a paciente digitando até o
+ * fim e o servidor recusando sem dizer por quê.
+ *
+ * 200 e não mais: o texto pousa POR CIMA da foto, e um parágrafo ali tapa o
+ * conteúdo que o story existe para mostrar.
+ */
+export const TEXTO_DO_STORY_MAX = 200;
 /** Uma opção é um rótulo curto, não um parágrafo. */
 export const LIMITE_DA_OPCAO = 40;
 
@@ -637,3 +730,249 @@ export function conjuntoDeBloqueio(ids: Iterable<string>, degradado: boolean): C
     has: (id: string) => degradado || set.has(id),
   };
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   FIXAR PUBLICAÇÃO NO PERFIL
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Quantas publicações cabem fixadas.
+ *
+ * ⚠️ **Três, e o número é de LAYOUT antes de ser de produto.** A grade do
+ * perfil tem três colunas (ver `medidas-instagram.ts`): com três fixadas, a
+ * primeira fileira inteira é o que ela escolheu mostrar e a segunda já é a
+ * ordem cronológica. Com quatro, sobra uma sozinha numa fileira nova e o
+ * recorte deixa de ser legível como recorte — vira "algumas publicações no
+ * começo".
+ */
+export const FIXADOS_MAX = 3;
+
+/**
+ * A ordem da grade do perfil: fixadas primeiro, depois o resto.
+ *
+ * ⚠️ **A ORDEM DENTRO DAS FIXADAS É A DE FIXAÇÃO, não a de publicação.** Fixar
+ * é um gesto de agora: quem acabou de fixar espera ver aquilo na frente. Ordenar
+ * as três fixadas por `criadoEm` faria a mais nova ir para o fim quando ela
+ * fixasse uma foto antiga — e ela não teria como corrigir, porque não há como
+ * reordenar.
+ *
+ * ⚠️ **E é uma ORDENAÇÃO ESTÁVEL sobre a lista que chega.** Ela NÃO reordena o
+ * resto: o que não é fixado mantém exatamente a ordem em que veio do servidor,
+ * que já é cronológica e já carrega a paginação. Reordenar aqui faria a segunda
+ * página aparecer embaralhada em relação à primeira.
+ */
+export function ordenarComFixados<T extends { fixadoEm?: string | null }>(posts: T[]): T[] {
+  const fixados = posts.filter((p) => !!p.fixadoEm);
+  if (fixados.length === 0) return posts;
+  const resto = posts.filter((p) => !p.fixadoEm);
+  fixados.sort((a, b) => Date.parse(b.fixadoEm!) - Date.parse(a.fixadoEm!));
+  return [...fixados, ...resto];
+}
+
+/**
+ * Posso fixar mais uma?
+ *
+ * ⚠️ **Quem já está fixada NÃO conta como "mais uma"** — refixar o que já está
+ * fixado é um toque sem efeito, e recusá-lo com "você já tem três" seria o app
+ * respondendo a uma pergunta que ninguém fez.
+ */
+export function podeFixar(v: { jaFixados: number; esteJaEstaFixado: boolean }): boolean {
+  if (v.esteJaEstaFixado) return true;
+  return v.jaFixados < FIXADOS_MAX;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   A CAMADA DO STORY
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * As camadas que um STORY aceita.
+ *
+ * ⚠️ **É um SUBCONJUNTO de `Visibilidade`, e não um tipo novo.** Duas escadas
+ * de visibilidade no mesmo app divergiriam no primeiro ajuste — e aqui a
+ * divergência apareceria como um story alcançando quem o post equivalente não
+ * alcança, que é o pior jeito de descobrir um bug de privacidade.
+ *
+ * ⚠️ **`publico` FICA DE FORA, de propósito.** Um story público seria visto por
+ * quem ela não conhece — e a fileira de bolinhas não tem rótulo de procedência
+ * nenhum: a paciente abriria achando que é de alguém que ela segue. O post pode
+ * ser público porque toda publicação de fora carrega "Sugerido para você"; o
+ * story não carrega, então não pode.
+ */
+export type VisibilidadeDoStory = Extract<Visibilidade, "seguidores" | "amigas">;
+
+/**
+ * ⚠️ **O padrão é `seguidores`, e é o comportamento que os stories já tinham.**
+ *
+ * Fechar por padrão faria as publicações futuras dela alcançarem menos gente que
+ * as de ontem sem ela ter pedido — e ela descobriria pelo silêncio. Quem quiser
+ * fechar, fecha por publicação.
+ *
+ * ⚠️ Note que isto é o CONTRÁRIO do padrão do post (`amigas`), e a diferença é
+ * deliberada: lá a camada existe desde sempre e nasceu fechada; aqui ela está
+ * chegando a um formato que já era aberto, e mudar o alcance de quem não pediu
+ * nada é pior que oferecer a escolha.
+ */
+export const VISIBILIDADE_DO_STORY_PADRAO: VisibilidadeDoStory = "seguidores";
+
+export const VISIBILIDADES_DO_STORY: {
+  chave: VisibilidadeDoStory;
+  rotulo: string;
+  sub: string;
+}[] = [
+  { chave: "seguidores", rotulo: "Quem me segue", sub: "Como sempre foi" },
+  { chave: "amigas", rotulo: "Só amigas", sub: "Quem você já conhece" },
+];
+
+/**
+ * Limpa o que vem do cliente.
+ *
+ * ⚠️ **Desconhecido cai no PADRÃO, e nunca no mais aberto.** Um valor estranho
+ * (formato antigo, corpo montado à mão) não pode alargar o alcance de um story
+ * — e como o padrão é `seguidores`, que já era o comportamento, o pior caso é
+ * "ficou como antes".
+ */
+export function camadaDoStory(bruto: unknown): VisibilidadeDoStory {
+  return bruto === "amigas" ? "amigas" : VISIBILIDADE_DO_STORY_PADRAO;
+}
+
+/**
+ * Este story alcança quem está olhando?
+ *
+ * ⚠️ **A régua é POR STORY, e o recorte por AUTOR não basta.** A leitura da
+ * fileira monta a lista de autoras (`sigo ∪ amigas`) e busca os stories delas —
+ * mas dentro dessa lista há gente que eu SIGO sem ser amiga, e é justamente
+ * dessa gente que o story `amigas` tem de se esconder. Filtrar só por autora
+ * entregaria o story fechado a toda a fileira.
+ *
+ * ⚠️ **A autora sempre vê o próprio**, inclusive o fechado: sem isto, publicar
+ * em `amigas` faria o story sumir da fileira dela mesma, e ela concluiria que a
+ * publicação falhou.
+ */
+export function storyAlcanca(v: {
+  euId: string;
+  autorId: string;
+  camada: VisibilidadeDoStory;
+  somosAmigas: boolean;
+}): boolean {
+  if (v.euId === v.autorId) return true;
+  return v.camada === "amigas" ? v.somosAmigas : true;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   QUEM PODE COMENTAR
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * ⚠️ **O POST ESCOLHE QUEM VÊ; NINGUÉM ESCOLHIA QUEM RESPONDE.**
+ *
+ * Hoje é tudo ou nada — `comentarios_abertos` fecha para todo mundo. Num app
+ * cuja decisão central foi limitar conselho de leiga (os 20,9% de respostas
+ * erradas medidos em fóruns de gestação), "só amigas podem comentar" é a peça
+ * que faltava: ela deixa a publicação visível e restringe QUEM opina.
+ *
+ * ⚠️ **O padrão é `todos`**, que é o comportamento de hoje. Fechar por padrão
+ * emudeceria as conversas já existentes sem ninguém ter pedido.
+ */
+export type QuemComenta = "todos" | "seguidores" | "amigas";
+
+export const QUEM_COMENTA_PADRAO: QuemComenta = "todos";
+
+export const QUEM_COMENTA: { chave: QuemComenta; rotulo: string; sub: string }[] = [
+  { chave: "todos", rotulo: "Todo mundo", sub: "Quem puder ver a publicação" },
+  { chave: "seguidores", rotulo: "Quem me segue", sub: "Só quem acompanha você" },
+  { chave: "amigas", rotulo: "Só amigas", sub: "Quem você já conhece" },
+];
+
+/** Limpa o que vem do cliente. Desconhecido cai no padrão. */
+export function quemComentaDe(bruto: unknown): QuemComenta {
+  return bruto === "seguidores" || bruto === "amigas" ? bruto : QUEM_COMENTA_PADRAO;
+}
+
+/**
+ * A camada de comentário NUNCA pode ser mais aberta que a de visibilidade.
+ *
+ * ⚠️ **Quem não vê não comenta — e sem esta régua a tela prometeria o
+ * contrário.** Um post da camada `amigas` com "todo mundo pode comentar" é uma
+ * combinação sem sentido: as pessoas a quem "todo mundo" se refere não veem a
+ * publicação. Oferecer a combinação faria a autora acreditar que abriu a
+ * conversa quando não abriu nada.
+ *
+ * A ordem de abertura é `publico` > `seguidores` > `amigas`; a de comentário
+ * usa as duas últimas mais `todos`, que equivale a "todos os que veem".
+ */
+const ABERTURA: Record<Visibilidade, number> = { publico: 3, seguidores: 2, amigas: 1 };
+const ABERTURA_DO_COMENTARIO: Record<QuemComenta, number> = {
+  todos: 3,
+  seguidores: 2,
+  amigas: 1,
+};
+
+export function apertarQuemComenta(v: {
+  visibilidade: Visibilidade;
+  quemComenta: QuemComenta;
+}): QuemComenta {
+  /* ⚠️ `todos` num post `publico` continua `todos` — ali "todos os que veem" É
+     todo mundo. O aperto só acontece quando a publicação é mais fechada. */
+  if (ABERTURA_DO_COMENTARIO[v.quemComenta] <= ABERTURA[v.visibilidade]) return v.quemComenta;
+  return v.visibilidade === "amigas" ? "amigas" : "seguidores";
+}
+
+/**
+ * Esta pessoa pode comentar nesta publicação?
+ *
+ * ⚠️ **A autora sempre pode**, inclusive no próprio post fechado: responder a
+ * quem comentou é o uso mais comum, e uma régua que a barrasse tornaria a opção
+ * "só amigas" inutilizável para quem não tem amigas na rede ainda.
+ *
+ * ⚠️ **E ela NÃO substitui `podeVerPost`.** Quem não vê a publicação não chega
+ * ao campo de comentário; esta régua recorta DENTRO de quem já vê.
+ */
+export function podeComentar(v: {
+  euId: string;
+  autorId: string;
+  quemComenta: QuemComenta;
+  sigoAtivo: boolean;
+  somosAmigas: boolean;
+}): boolean {
+  if (v.euId === v.autorId) return true;
+  if (v.quemComenta === "todos") return true;
+  if (v.quemComenta === "amigas") return v.somosAmigas;
+  /* `seguidores`: quem SEGUE a autora. ⚠️ Amiga entra também — o grafo de
+     amizade deste app é um vínculo mais forte que seguir, e barrar a amiga que
+     não segue seria a régua contradizendo a própria escada. */
+  return v.sigoAtivo || v.somosAmigas;
+}
+
+/**
+ * ⚠️ **O LINK DA BIO É LIMPO NO SERVIDOR, e não confiado ao campo.**
+ *
+ * `javascript:alert(1)` numa bio é XSS na tela de quem VISITA o perfil — e o
+ * `href` é o único lugar do app onde texto de uma paciente vira comportamento
+ * na tela de outra. Só `http` e `https` passam; qualquer outra coisa (`data:`,
+ * `javascript:`, `file:`) vira `null`.
+ *
+ * ⚠️ **E `//exemplo.com` NÃO é aceito como atalho.** Um esquema-relativo herda
+ * o esquema da página e passa despercebido em toda revisão; se ela quer um
+ * link, ela escreve o endereço inteiro — e sem esquema nenhum a gente COMPLETA
+ * com `https://`, que é o caso comum de quem cola "instagram.com/fulana".
+ */
+export function limparLinkDaBio(bruto: string | null | undefined): string | null {
+  const t = (bruto ?? "").trim();
+  if (!t) return null;
+  if (t.startsWith("//")) return null;
+  const comEsquema = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(t) ? t : `https://${t}`;
+  try {
+    const u = new URL(comEsquema);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    /* Um endereço sem ponto no host não leva a lugar nenhum — e `https://oi`
+       renderizado como link é uma promessa que o toque não cumpre. */
+    if (!u.hostname.includes(".")) return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
+/** ⚠️ Teto de tamanho: um `href` gigantesco é a outra forma de abusar do campo. */
+export const LINK_DA_BIO_MAX = 200;

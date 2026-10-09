@@ -10,21 +10,71 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
+import { semComentarios } from "@/lib/sem-comentarios";
+
 const fonte = readFileSync("src/components/painel-no-app.tsx", "utf8");
 
 describe("o resumo não inventa zero", () => {
-  test("o contador de exames só aparece quando o número existe", () => {
-    /* O painel não carrega a lista de exames no shell. Renderizar "0 exames"
-       ali seria afirmar que não há nenhum — sem ter olhado. */
-    expect(fonte).toContain("resumo.examesNovos !== undefined &&");
+  /* ⚠️ ESTE BLOCO TRAVAVA A GRAFIA DE UM CAMPO MORTO, e as três asserções
+     citavam `examesNovos` pelo nome. Ele foi declarado, lido em três lugares e
+     passado por NINGUÉM desde que o envio de exame saiu do produto — então as
+     três ficavam VERDES sobre um cartão que nunca era desenhado, e ficariam
+     VERMELHAS sobre a remoção correta dele.
+
+     A LIÇÃO continua valendo inteira e é o que se cobra agora: nenhum contador
+     desta tela pode mostrar um número que o shell não carregou. O que mudou é
+     que ela deixou de estar amarrada a um nome de campo. */
+
+  /** Os campos declarados no tipo `ResumoDoDia`, com a marca de opcional. */
+  function camposDoResumo(): { nome: string; opcional: boolean }[] {
+    const i = fonte.indexOf("export type ResumoDoDia = {");
+    expect(i).toBeGreaterThan(-1);
+    const fim = fonte.indexOf("\n};", i);
+    expect(fim).toBeGreaterThan(i);
+    const corpo = semComentarios(fonte.slice(i, fim));
+    return [...corpo.matchAll(/^ {2}(\w+)(\??):/gm)].map((m) => ({
+      nome: m[1],
+      opcional: m[2] === "?",
+    }));
+  }
+
+  test("o tipo tem campos de verdade — a extração não passa em vazio", () => {
+    const campos = camposDoResumo();
+    expect(campos.length).toBeGreaterThanOrEqual(5);
+    expect(campos.map((c) => c.nome)).toContain("sosAbertos");
   });
 
-  test("o tipo deixa `examesNovos` opcional, não obrigatório com zero", () => {
-    expect(fonte).toMatch(/examesNovos\?: number;/);
+  /* A GARANTIA, e não a grafia: um contador só pode mostrar um número que o
+     chamador foi OBRIGADO a passar. Campo opcional é um contador que pode
+     nascer em zero sem ninguém ter olhado — e um zero falso nesta tela faz o
+     médico fechar o app com alguém esperando. */
+  test("todo contador lê um campo OBRIGATÓRIO, ou é gateado por !== undefined", () => {
+    const opcionais = new Set(
+      camposDoResumo()
+        .filter((c) => c.opcional)
+        .map((c) => c.nome),
+    );
+    const limpo = semComentarios(fonte);
+    const lidos = [...limpo.matchAll(/n=\{resumo\.(\w+)\}/g)].map((m) => m[1]);
+    /* Três contadores na grade hoje (perguntas, agendamentos, pré-consultas):
+       o piso existe para a varredura não passar em VAZIO, e um `matchAll` que
+       não casa nada deixaria o laço abaixo sem exercitar uma linha sequer. */
+    expect(lidos.length).toBeGreaterThanOrEqual(3);
+    for (const campo of lidos) {
+      if (!opcionais.has(campo)) continue;
+      expect(limpo).toContain(`resumo.${campo} !== undefined &&`);
+    }
   });
 
-  test('"nada esperando" trata ausência como ausência, não como zero', () => {
-    expect(fonte).toContain("(resumo.examesNovos ?? 0) === 0");
+  test('"nada esperando" soma TODOS os contadores desenhados', () => {
+    const limpo = semComentarios(fonte);
+    const lidos = new Set([...limpo.matchAll(/n=\{resumo\.(\w+)\}/g)].map((m) => m[1]));
+    const i = limpo.indexOf("const nada =");
+    expect(i).toBeGreaterThan(-1);
+    const bloco = limpo.slice(i, limpo.indexOf(";", i));
+    /* Um contador fora desta soma faz a tela dizer "nada esperando" com ele
+       aceso logo abaixo — a contradição na mesma tela. */
+    for (const campo of lidos) expect(bloco).toContain(`resumo.${campo}`);
   });
 });
 

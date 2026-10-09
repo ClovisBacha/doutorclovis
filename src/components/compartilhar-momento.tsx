@@ -131,8 +131,8 @@ export function CompartilharMomento({
         onClick={() => setAberta(true)}
         className={
           compacto
-            ? "press inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-border px-4 text-[13px] font-semibold"
-            : "press inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-full bg-primary px-5 text-[14px] font-semibold text-primary-foreground"
+            ? "press pill-3d inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-4 text-[13px] font-semibold"
+            : "press btn-3d inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-full bg-primary px-5 text-[14px] font-semibold text-primary-foreground"
         }
       >
         <IconeCompartilhar />
@@ -153,9 +153,7 @@ export function CompartilharMomento({
             style={{ paddingBottom: "max(1.25rem, var(--safe-bottom))" }}
           >
             <p className="text-[15px] font-semibold">Compartilhe essa vitória</p>
-            <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
-              {momento.legenda}
-            </p>
+            <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{momento.legenda}</p>
 
             <div className="mt-4 flex flex-col gap-2">
               <button
@@ -208,7 +206,7 @@ export function CompartilharMomento({
             {/* ⚠️ Diz o que vai acontecer ANTES de ela tocar. "Publicar na
                 Comunidade" abre o compositor — e uma paciente que ache que o
                 toque já publica simplesmente não toca. */}
-            <p className="mt-3 text-center text-[11px] leading-snug text-muted-foreground">
+            <p className="mt-3 text-center text-xs leading-snug text-muted-foreground">
               Nada é publicado sozinho — você confere antes.
             </p>
           </div>

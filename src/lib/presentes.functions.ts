@@ -102,7 +102,21 @@ async function listaViva(
     .select("display_name, baby_name, care_mode, referral_code")
     .eq("id", data.user_id)
     .maybeSingle();
-  if (p?.care_mode) return null;
+  /**
+   * ⚠️ **O PORTÃO DE MODO CUIDADO FALHAVA ABERTO — e aqui dói mais, porque o
+   * objeto vive FORA do aparelho dela.**
+   *
+   * Era `if (p?.care_mode)`. Com a leitura falhando, `p` é `null`,
+   * `p?.care_mode` é `undefined`, o `if` não dispara e **a lista de presentes
+   * continua no ar** — para as trinta pessoas que já têm o link, depois de uma
+   * perda.
+   *
+   * `!p` entra na frente. A página pública já responde o MESMO silêncio para
+   * token inválido, lista fechada e Modo Cuidado, então recusar por falha de
+   * leitura não conta nada a ninguém — e o pior caso é a lista ficar
+   * indisponível por um minuto.
+   */
+  if (!p || p.care_mode) return null;
 
   return { id: data.id, userId: data.user_id, row: data, perfil: p ?? {} };
 }
@@ -271,7 +285,19 @@ export const salvarItens = createServerFn({ method: "POST" })
         titulo: z.string().max(120).nullable().optional(),
         recado: z.string().max(500).nullable().optional(),
         dataDoCha: z.string().max(10).nullable().optional(),
-        itens: z.array(ItemSchema).max(80),
+        /**
+         * ⚠️ **OPCIONAL, e isso é o que separa os dois assuntos.**
+         *
+         * `salvarItens` grava o CONVITE (título, recado, data) e a LISTA. Com
+         * `itens` obrigatório, salvar só o convite obrigaria a tela a
+         * reenviar a lista inteira — e uma diferença de forma entre o que ela
+         * mandou e o que o banco tem apagaria itens que ninguém pediu para
+         * apagar.
+         *
+         * Ausente = "não mexi na lista". Presente (mesmo vazio) = "esta é a
+         * lista agora", que é como a tela de montar sempre a usou.
+         */
+        itens: z.array(ItemSchema).max(80).optional(),
       })
       .parse(i),
   )
@@ -301,7 +327,10 @@ export const salvarItens = createServerFn({ method: "POST" })
       if (error) return { ok: false as const, motivo: "banco" as const };
     }
 
-    for (const it of data.itens) {
+    /* ⚠️ Sem `itens`, o pedido era só do convite — a lista não é tocada. */
+    if (data.itens === undefined) return { ok: true as const };
+
+    for (const it of data.itens ?? []) {
       const linha = {
         lista_id: lista.id,
         tipo: it.tipo,
@@ -351,12 +380,23 @@ export const arquivarItem = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!lista) return { ok: false as const, motivo: "sem-lista" as const };
 
-    const { count } = await sb
+    /* ⚠️ **NÃO CONSEGUIR CONTAR RECUSA.** O `error` era descartado e
+       `(count ?? 0) > 0` virava falso: qualquer falha de leitura ARQUIVAVA o
+       item por cima de uma reserva viva — quebrando, em silêncio, a promessa
+       que o comentário desta função faz três linhas acima ("quem prometeu
+       merece saber antes"). A amiga que reservou o carrinho perde a reserva sem
+       ninguém avisar, e a mãe fica sem o presente achando que ele foi retirado.
+
+       ⚠️ E o motivo é PRÓPRIO: "tem-reserva" sobre uma contagem que falhou
+       faria a mãe procurar uma reserva que talvez não exista. */
+    const { count, error: erroDaContagem } = await sb
       .from("presente_reservas")
       .select("id", { count: "exact", head: true })
       .eq("item_id", data.itemId)
       .is("cancelada_em", null);
-    if ((count ?? 0) > 0) return { ok: false as const, motivo: "tem-reserva" as const };
+    if (erroDaContagem || count === null)
+      return { ok: false as const, motivo: "contagem-ilegivel" as const };
+    if (count > 0) return { ok: false as const, motivo: "tem-reserva" as const };
 
     const { error } = await sb
       .from("presente_itens")

@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { AppBottomNav, AppHomeScreen, useSkyNow } from "@/components/app-mobile-shell";
+import { falaDaDica, FUNCOES_DO_APP } from "@/lib/mapa-do-app";
 import { publicarAtalhos } from "@/lib/atalhos-da-aba";
 
 /**
@@ -39,6 +40,10 @@ export const Route = createFileRoute("/preview-home")({
        armadilha que `preview-saude` documenta para `?w=`. */
     notif: s.notif === true || Number(s.notif) > 0 || String(s.notif ?? "") === "1",
     quantos: Math.max(0, Number(s.quantos ?? s.notif) || 0),
+    /* `?dica=1`: a bolha fala o "Você sabia?" da semana. O estado só nasce de
+       uma conta com sete dias sem dica e funções por abrir — sem a bancada, a
+       fala mais longa que o balão recebe nunca teria sido olhada. */
+    dica: s.dica === true || String(s.dica ?? "") === "1",
     // `?clima=1` liga a consulta real de clima (Belo Horizonte) — é a única
     // forma de fotografar o cartão de saudação, que só existe quando há
     // clima. Sem o parâmetro a bancada continua offline.
@@ -48,6 +53,15 @@ export const Route = createFileRoute("/preview-home")({
        uma aba que publicou atalhos, e no app quem publica é o feed — atrás do
        login. Sem isto, a nuvem seria mais uma tela que ninguém olhou. */
     atalhos: s.atalhos === true || String(s.atalhos ?? "") === "1",
+    /* `?medico=com|sem|carregando|ilegivel` — os QUATRO estados do cartão do
+       médico. A bancada nunca passou `medico`, então ela só desenhava um deles
+       (o "sem"), e era justamente o único que já estava certo: os outros três
+       nasceram, viveram e quebraram sem ninguém nunca ter olhado. */
+    medico: (["com", "sem", "carregando", "ilegivel"] as const).includes(
+      String(s.medico ?? "") as never,
+    )
+      ? (String(s.medico) as "com" | "sem" | "carregando" | "ilegivel")
+      : ("sem" as const),
   }),
   head: () => ({
     meta: [{ title: "Bancada da home" }, { name: "robots", content: "noindex" }],
@@ -56,7 +70,7 @@ export const Route = createFileRoute("/preview-home")({
 });
 
 function PreviewHome() {
-  const { w, notif, quantos, clima, atalhos } = Route.useSearch();
+  const { w, notif, quantos, clima, atalhos, dica, medico } = Route.useSearch();
   const { slot } = useSkyNow(null);
   const escuro = slot.dark;
 
@@ -90,8 +104,31 @@ function PreviewHome() {
           babyTone={0}
           careMode={false}
           skyTheme="v2"
+          /* ⚠️ O DADO e o ESTADO vêm juntos, como na produção: um médico
+             carregado com estado "perguntando" é uma corrida que o app não
+             produz, e fabricá-la aqui aprovaria uma tela que não existe. */
+          medico={
+            medico === "com"
+              ? { nome: "Dra. Marina Costa", specialty: "Obstetrícia", crm: "CRM-MG 12345" }
+              : null
+          }
+          estadoDoMedico={
+            medico === "carregando"
+              ? "perguntando"
+              : medico === "ilegivel"
+                ? "ilegivel"
+                : "respondeu"
+          }
           temNaoLidas={notif}
           naoLidas={quantos}
+          dica={
+            dica
+              ? {
+                  ...falaDaDica(FUNCOES_DO_APP.find((f) => f.id === "sons")!),
+                  aoTocar: () => alert("abriria: Bem-estar → Sons"),
+                }
+              : null
+          }
           homeCity={clima ? { nome: "Belo Horizonte", lat: -19.92, lon: -43.94 } : null}
         />
       </div>

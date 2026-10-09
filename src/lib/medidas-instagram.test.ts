@@ -89,12 +89,16 @@ describe("os números do cabeçalho", () => {
   test("⚠️ seguidores e seguindo NÃO são públicos", () => {
     // A única divergência deliberada do modelo, e ela é pesquisada: um placar
     // público de audiência num app de gestação de alto risco mede popularidade
-    // num momento em que a pessoa já está sendo medida clinicamente, e dá
-    // número objetivo a uma comparação que sem número seria só sensação.
+    // num momento em que a pessoa já está sendo medida clinicamente.
     //
-    // Se um dia isto virar `true`, que seja com alguém tendo lido esta linha.
-    expect(NUMEROS_PUBLICOS.seguidores).toBe(false);
-    expect(NUMEROS_PUBLICOS.seguindo).toBe(false);
+    // ⚠️ O DONO REVERTEU, e o teste foi REESCRITO em vez de apagado: "é uma
+    // rede social, são pessoas que vão seguir a pessoa, e é pra mostrar sim".
+    // Uma rede social sem contador não lê como discrição, lê como incompleta.
+    expect(NUMEROS_PUBLICOS.seguidores).toBe(true);
+    expect(NUMEROS_PUBLICOS.seguindo).toBe(true);
+    // O que continua valendo: publicações sempre aparece — é sobre o que ela
+    // fez, não sobre quantas pessoas a acham interessante.
+    expect(NUMEROS_PUBLICOS.publicacoes).toBe(true);
   });
 
   test("publicações aparece sempre — é sobre o que ela fez", () => {
