@@ -32,6 +32,13 @@
  *   /preview-instagram?tela=conferir → a conferência do story, com a moldura
  *   /preview-instagram?tela=conferir&selo=0 → sem semana para carimbar
  *   /preview-instagram?tela=story&carimbo=1 → o visor com a moldura
+ *   /preview-instagram?tela=story&videoStory=1 → o primeiro story é VÍDEO
+ *   /preview-instagram?tela=story&sensivelStory=1 → o véu do aviso de conteúdo
+ *   /preview-instagram?memoria=1 → o cartão "há um ano, você publicou isto"
+ *   /preview-instagram?tela=perfil&meu=1&album=1 → a grade agrupada por semana
+ *   /preview-instagram?suspensa=1  → a conta suspensa pela plataforma
+ *   /preview-instagram?palavraOculta=1 → o feed com um post recolhido pelo filtro
+ *   /preview-instagram?tela=perfil&meu=1 → o ♡ dos curtidos e o "Story escondido de…"
  *   /preview-instagram?tela=espelho&trancado=1 → o estado da MAIORIA: perfil fechado
  *   /preview-instagram?tela=perfil&meu=1&selo=0 → o perfil sem os selos
  *   /preview-instagram?vazio=1      → conta NOVA: a fileira de pessoas é tudo
@@ -48,6 +55,13 @@
  * quando o feed de quem ela segue ACABOU — aqui, depois de rolar até o fim.
  */
 import { useEffect, useMemo, useState } from "react";
+import { OnboardingDaComunidade } from "@/components/onboarding-da-comunidade";
+import { MaisDaComunidade } from "@/components/mais-da-comunidade";
+import { Comentarios } from "@/components/rede-comentarios";
+import { chaveDoRascunhoDeComentario, serializarRascunho } from "@/lib/comentarios";
+import { FiltroDePalavras } from "@/components/rede-social";
+import { CaixaDeEntrada, Conversa, MandarPublicacao } from "@/components/rede-conversa";
+import type { Filho } from "@/lib/filhos";
 import type { Persona } from "@/lib/selo-do-perfil";
 import { createFileRoute } from "@tanstack/react-router";
 import {
@@ -70,7 +84,15 @@ import {
   type PerguntaNaTela,
   type PessoaNaLista,
   type Story,
+  TelaDaTag,
+  ArquivoDeStories,
+  ListaDeBloqueados,
+  GradeSimples,
+  MeusDesfechos,
 } from "@/components/rede-instagram";
+import { ConversaDoGrupo, CriarGrupo, ChamarParaGrupo } from "@/components/rede-grupo";
+import type { MensagemDoGrupo } from "@/components/rede-grupo";
+import type { GrupoNaTela } from "@/lib/grupo.functions";
 import type {
   AtividadeNaTela,
   BolhaDeStory,
@@ -86,6 +108,44 @@ export const Route = createFileRoute("/preview-instagram")({
     /* ⚠️ `== null` e NÃO `=== undefined`: o router serializa e revalida, e na
        segunda passada chega `null`. Mesma armadilha de `preview-saude`. */
     tela: q.tela == null ? "feed" : String(q.tela),
+    /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
+    tag: q.tag == null ? "28semanas" : String(q.tag),
+    /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
+    restrito: q.restrito == null ? 0 : Number(q.restrito),
+    silenciado: q.silenciado == null ? 0 : Number(q.silenciado),
+    /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
+    favorita: q.favorita == null ? 0 : Number(q.favorita),
+    /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
+    notas: q.notas == null ? 0 : Number(q.notas),
+    /* Uma mensagem recolhida pelo filtro de palavras DELA. */
+    oculta: q.oculta == null ? 0 : Number(q.oculta),
+    /* ⚠️ `rascunhoStory`, e não `rascunho`: este último já existe e é o do
+       compositor de POST. Duas bancadas do mesmo nome mostrariam o estado de
+       uma na tela da outra. */
+    rascunhoStory: q.rascunhoStory == null ? 0 : Number(q.rascunhoStory),
+    fixados: q.fixados == null ? 0 : Number(q.fixados),
+    /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. A ordem por
+       curtidas só se enxerga com um comentário muito curtido no meio da lista,
+       que é exatamente o que não se fabrica numa conta de teste. */
+    ordem: q.ordem == null ? "recentes" : String(q.ordem),
+    /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. Os quatro
+       cartões só abrem UMA vez na vida da conta, e o "já vi" viaja na nuvem:
+       sem a bancada, conferir o desenho exigiria uma conta recém-criada, e
+       depois de olhar uma vez ela nunca mais mostraria. */
+    onboarding: q.onboarding == null ? 0 : Number(q.onboarding),
+    /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. O véu do
+       conteúdo sensível só existe num post que alguém marcou, e a legenda do
+       vídeo exige um post com vídeo: os dois são impossíveis de fotografar sem
+       a bancada. */
+    sensivel: q.sensivel == null ? 0 : Number(q.sensivel),
+    /* O rascunho guardado: sem isto ele exige fechar o app no meio de uma
+       frase e reabrir — o estado que ninguém confere por acaso. */
+    rascunhoComent: q.rascunhoComent == null ? 0 : Number(q.rascunhoComent),
+    quadro: q.quadro == null ? 0 : Number(q.quadro),
+    /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
+    instavel: q.instavel == null ? 0 : Number(q.instavel),
+    /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
+    fechado: q.fechado == null ? 0 : Number(q.fechado),
     meu: q.meu == null ? false : !!q.meu,
     vazio: q.vazio == null ? false : !!q.vazio,
     /* ⚠️ `== null` e NÃO `=== undefined` — mesma armadilha de sempre. */
@@ -93,6 +153,12 @@ export const Route = createFileRoute("/preview-instagram")({
     /* ⚠️ `== null` e NÃO `=== undefined` — mesma armadilha de sempre. */
     oficial: q.oficial == null ? 1 : Number(q.oficial),
     entao: q.entao == null ? false : !!q.entao,
+    /* ⚠️ `== null` e NÃO `=== undefined` — a mesma armadilha de sempre: na
+       revalidação chega `null`, e `!!null` seria `false` mesmo com o parâmetro
+       na URL. Ver o comentário do topo. */
+    filhos: q.filhos == null ? "" : String(q.filhos),
+    /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
+    conversa: q.conversa == null ? "" : String(q.conversa),
     /* ⚠️ `== null` e não `=== undefined`: na revalidação chega `null`, e
        `Number(null)` é 0. Mesma armadilha de `preview-saude`. */
     sugeridas: q.sugeridas == null ? 1 : Number(q.sugeridas),
@@ -117,6 +183,17 @@ export const Route = createFileRoute("/preview-instagram")({
     selo: q.selo == null ? 1 : Number(q.selo),
     trancado: q.trancado == null ? false : !!q.trancado,
     carimbo: q.carimbo == null ? false : !!q.carimbo,
+    /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
+    videoStory: q.videoStory == null ? 0 : Number(q.videoStory),
+    /* O story marcado como sensível: o véu só nasce de uma marca de verdade. */
+    sensivelStory: q.sensivelStory == null ? 0 : Number(q.sensivelStory),
+    /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
+    memoria: q.memoria == null ? 0 : Number(q.memoria),
+    /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
+    album: q.album == null ? 0 : Number(q.album),
+    /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
+    palavraOculta: q.palavraOculta == null ? 0 : Number(q.palavraOculta),
+    suspensa: q.suspensa == null ? 0 : Number(q.suspensa),
     desafio: q.desafio == null ? "" : String(q.desafio),
     /* ⚠️ `== null` e nunca `=== undefined` — a mesma armadilha de sempre. O
        padrão é ABERTA: o estado que a tela existe para mostrar é o botão,
@@ -180,9 +257,14 @@ const POSTS: PostNaTela[] = CORES.map((c, i) => ({
      em vez de um buraco cinza. */
   texto:
     i === 5
-      ? "Hoje ela mexeu tanto que acordei rindo 🥹"
+      ? "Hoje ela mexeu tanto que acordei rindo 🥹 #trigemeas"
       : i === 0
-        ? "Ultrassom de hoje — a mãozinha no rosto bem na hora da foto"
+        ? /* ⚠️ **A LEGENDA DE EXEMPLO CARREGA UM `@` E UMA `#`, e não é
+             enfeite.** Elas só viram link dentro de `TextoComLinks`, e sem uma
+             legenda que as contenha a bancada desenharia o caso que NUNCA
+             falha — texto puro — enquanto o único caminho novo do recurso
+             ficava sem ninguém nunca ter olhado. */
+          "Ultrassom de hoje — a mãozinha no rosto 💛 obrigada @marina.costa #28semanas"
         : null,
   imagemUrl: i === 5 ? null : foto(c[0], c[1], c[2]),
   /* ⚠️ Metade COM miniatura e metade SEM, de propósito: o recuo é permanente
@@ -233,6 +315,35 @@ const POSTS: PostNaTela[] = CORES.map((c, i) => ({
   /* O post 2 (o carrossel de três) vira a comparação: é ele que prova os dois
      carimbos sobre as duas primeiras fotos. */
   comparacao: i === 2 ? { antes: "18s", agora: "32s" } : null,
+  /* O post 3 é um mesversário: é ele que prova o rótulo do marco no cartão. */
+  marco: i === 3 ? { tipo: "mesversario", dias: 91 } : null,
+  /* O post 1 vira vídeo — é ele que prova o player no cartão.
+
+     ⚠️ **ARQUIVO DO PRÓPRIO SITE, nunca um host externo.** A primeira versão
+     apontava para um vídeo de exemplo na internet: a bancada passava a depender
+     de rede alheia, e a varredura da CI roda sem ela. Este `.webm` já é
+     embarcado (é um dos sons de ambiente) e serve para provar o player. */
+  videoUrl: i === 1 ? "/sons/riacho.webm" : null,
+  /* ⚠️ **O FILTRO DE PALAVRAS NO FEED só se vê com um post que bate.** O
+     servidor calcula (a lista dela nunca viaja), então sem a bancada olhar o
+     véu exigiria uma conta com palavra escondida e um post de outra pessoa que
+     a contenha. */
+  batePalavraMinha: false,
+  /* O post 4 é uma republicação — prova o quadro da original no cartão. */
+  /* ⚠️ O ÍNDICE 0, e não o último: o feed da bancada desenha só as primeiras
+     publicações (`POSTS.slice`), então uma fixture no fim NUNCA aparece — foi
+     assim que este quadro passou uma rodada inteira sem ser visto. */
+  ehRepost: i === 0,
+  repost:
+    i === 0
+      ? {
+          id: "orig",
+          autorId: "u9",
+          autorNome: "Juliana",
+          texto: "chegou o enxoval 💛",
+          imagemUrl: null,
+        }
+      : null,
   /* O post 0 nasce EDITADO — é ele que prova o selo "editado" ao lado da hora. */
   editadoEm: i === 0 ? atras(20) : null,
   /* O post 1 nasce GUARDADO: é ele que prova o marcador aceso ao lado do
@@ -256,6 +367,14 @@ const POSTS: PostNaTela[] = CORES.map((c, i) => ({
   /* ⚠️ O post 8 é a RESPOSTA de uma pergunta anônima — a única forma de
      fotografar o cabeçalho citado sem duas contas e uma caixinha aberta. */
   pergunta: i === 8 ? "Como você escolheu o nome da Helena? 💛" : null,
+  /* ⚠️ `?fixados=1` acende as duas primeiras — o pino na célula da grade e o
+     botão aceso no cartão são impossíveis de fotografar sem uma conta com
+     publicação fixada de verdade, e a fixação é justamente o que muda a ORDEM
+     da grade. */
+  fixadoEm: null,
+  /* ⚠️ `?soAmigas=1` fecha o comentário do primeiro post — o estado em que a
+     tela mostra "só as amigas dela podem comentar" em vez do campo. */
+  quemComenta: "todos" as const,
 }));
 
 /* A fileira de stories: os dois primeiros ACESOS, o resto apagado — é o
@@ -273,6 +392,29 @@ const STORIES: Story[] = [
 function maisUmaPagina(quantos: number, pagina: number): PostNaTela[] {
   return POSTS.slice(0, quantos).map((p) => ({ ...p, id: `${p.id}-pg${pagina}` }));
 }
+
+/**
+ * OS FILHOS DE MENTIRA — três arranjos que a produção leva meses para produzir.
+ *
+ * ⚠️ Sem isto, o editor de filhos e a tira de marcos eram IMPOSSÍVEIS de olhar:
+ * os dois falam com o servidor, e sem sessão a tela mostra o erro — que é
+ * justamente o estado que elas não precisam provar. É a lição do
+ * `PerfilDaAmigaTela`, aplicada antes de custar uma rodada.
+ */
+const FILHOS_DE_MENTIRA: Record<string, Filho[]> = {
+  /* Mãe de um bebê de 3 meses: o caso do mesversário e dos marcos. */
+  bebe: [{ id: "f1", nome: "Helena", sexo: "f", nascidoEm: "2026-05-24", previstoPara: null }],
+  /* Grávida de gêmeas: prova a concordância. */
+  gemeas: [
+    { id: "f1", nome: null, sexo: "f", nascidoEm: null, previstoPara: "2026-12-01" },
+    { id: "f2", nome: null, sexo: "f", nascidoEm: null, previstoPara: "2026-12-01" },
+  ],
+  /* ⚠️ O caso que nenhum app de gestação representa: mãe E grávida. */
+  ambos: [
+    { id: "f1", nome: "Ana", sexo: "f", nascidoEm: "2023-04-10", previstoPara: null },
+    { id: "f2", nome: null, sexo: "m", nascidoEm: null, previstoPara: "2026-12-01" },
+  ],
+};
 
 function Bancada() {
   const {
@@ -295,10 +437,33 @@ function Bancada() {
     selo,
     trancado,
     carimbo,
+    videoStory,
+    sensivelStory,
+    memoria,
+    album,
+    palavraOculta,
     desafio,
     caixinha,
     perguntas,
     remover,
+    filhos,
+    conversa,
+    tag,
+    restrito,
+    silenciado,
+    favorita,
+    notas,
+    oculta,
+    rascunhoStory,
+    fixados,
+    ordem,
+    rascunhoComent,
+    onboarding,
+    sensivel,
+    quadro,
+    instavel,
+    fechado,
+    suspensa,
   } = Route.useSearch();
 
   /* O desafio da semana. Sem a bancada, conferir o cartão exigiria uma criadora
@@ -334,8 +499,24 @@ function Bancada() {
     publico: true,
     meuVinculo: meu ? null : "ativo",
     souEu: meu,
-    silenciado: false,
-    meusSeguidores: meu ? 137 : null,
+    /* ⚠️ O `@` tem de estar aqui, e a primeira verificação no navegador achou
+       a linha VAZIA: sem ele a bancada desenha o perfil de quem nunca
+       escolheu — o único estado que já era certo — e o endereço novo ficava
+       sem ninguém nunca ter olhado. */
+    handle: meu ? "marina.costa" : "carol.andrade",
+    /* ⚠️ `?silenciado=1` fotografa o botão no estado LIGADO — "Deixar de
+       silenciar Fulana". Ele estava cravado em `false`, então metade do
+       controle nunca tinha sido olhada: o estado que só existe DEPOIS de
+       silenciar alguém de verdade. Mesma falta do `?restrito=1`, no controle
+       ao lado. */
+    silenciado: silenciado === 1,
+    favorita: favorita === 1,
+    /* ⚠️ `?restrito=1` fotografa o botão no estado LIGADO e o texto que ele
+       mostra ali — impossível de ver sem uma restrição real, e é o texto que
+       explica o recurso inteiro. */
+    restrito: restrito === 1,
+    seguidores: meu ? 137 : 412,
+    seguindo: meu ? 208 : 190,
     euSigo: meu ? 64 : null,
     /* ⚠️ Os dois selos são independentes: `?selo=0` desliga os dois, `?selo=1`
        liga os dois, e `?selo=2` liga SÓ o do bebê — que é o caso que prova que
@@ -354,6 +535,8 @@ function Bancada() {
     /* ⚠️ Ligada por padrão, e só no perfil de OUTRA pessoa a caixinha desenha
        — no meu, o que existe é a caixa cheia, que é tela própria. `?caixinha=0`
        fecha, que é o estado em que o botão some. */
+    linhaDosFilhos: "Mãe da Helena, 3 meses",
+    feedSoSeguindo: false,
     aceitaPerguntas: caixinha !== 0,
     /* A aba "Do bebê" segue a MESMA chave da semana — é o mesmo fato. */
     bebe:
@@ -433,6 +616,22 @@ function Bancada() {
       /* ⚠️ A bancada GRAVA a edição no estado, e não num alert: o que precisa
          ser olhado é o texto trocando e o selo "editado" nascendo — com um
          alert, a tela nunca mostraria nem um nem outro. */
+      /* ⚠️ **A BANCADA PASSA `republicar`, senão o botão NUNCA aparece.** Ele
+         só nasce quando a prop existe — e uma bancada sem ela mediria uma tela
+         que a produção não tem, que é o defeito que `acoesDaBancada` já
+         documenta para as outras ações. */
+      republicar: (_p: PostNaTela) => alert("abriria o compositor republicando"),
+      /* ⚠️ A bancada precisa da prop, senão o botão NUNCA aparece — a mesma
+         lição de `republicar`. */
+      compartilhar: (_p: PostNaTela) => alert("abriria a folha do sistema"),
+      /* ⚠️ A bancada precisa da prop, senão o botão NUNCA aparece — a mesma
+         lição de `republicar` e de `compartilhar`. Medido: a primeira
+         verificação no navegador achou ZERO botões "Adicionar ao seu story"
+         justamente por isto. */
+      storyComPost: (p: PostNaTela) => alert(`levaria o post ${p.id} para o compositor de story`),
+      /* ⚠️ Idem para o pino: sem a prop, o botão de fixar não existe na bancada
+         e o estado aceso continuaria sem ninguém ter olhado. */
+      fixar: (p: PostNaTela, v: boolean) => alert(v ? `fixaria ${p.id}` : `soltaria ${p.id}`),
       editar: async (p: PostNaTela, t: string) => {
         setEdicoes((m) => ({ ...m, [p.id]: t }));
         return true;
@@ -447,7 +646,7 @@ function Bancada() {
     ps.map((p0) => {
       const p =
         p0.id in edicoes
-          ? { ...p0, texto: edicoes[p0.id] || null, editadoEm: new Date().toISOString() }
+          ? { ...p0, texto: edicoes[p0.id] || null, editadoEm: new Date(AGORA).toISOString() }
           : p0;
       if (!(p.id in reacoes)) return p;
       const nova = reacoes[p.id];
@@ -489,7 +688,12 @@ function Bancada() {
   if (tela === "editar") {
     return (
       <div className="mx-auto max-w-md py-2">
-        <EditarPerfil perfil={perfil} aoSalvar={async () => true} aoFechar={() => history.back()} />
+        <EditarPerfil
+          perfil={perfil}
+          aoSalvar={async () => true}
+          aoFechar={() => history.back()}
+          filhosDeMentira={FILHOS_DE_MENTIRA[filhos] ?? FILHOS_DE_MENTIRA.bebe}
+        />
       </div>
     );
   }
@@ -592,6 +796,13 @@ function Bancada() {
         autorNome: "Marina Costa",
         autorAvatar: null,
         imagemUrl: foto(c[0], c[1], c[2]),
+        /* ⚠️ **O CARROSSEL DE STORY só se vê com mais de uma foto**, e o segundo
+           story da bancada traz três: sem ele, os pontinhos e o deslizar não
+           existiriam em nenhuma tela que dá para olhar. */
+        imagens:
+          n === 1
+            ? CORES.slice(0, 3).map((cc) => foto(cc[0], cc[1], cc[2]))
+            : [foto(c[0], c[1], c[2])],
         texto: n === 1 ? "31 semanas hoje 🤍" : null,
         criadoEm: atras(60 * (n + 1)),
         visto: false,
@@ -611,7 +822,31 @@ function Bancada() {
               }
             : null,
         minhaReacao: null,
+        /* ⚠️ `?quadro=1` põe uma publicação compartilhada DENTRO do story — o
+           cartão só existe quando alguém compartilha de verdade, e ele é
+           resolvido no servidor para quem assiste, então sem a bancada ele
+           nasceria sem ninguém nunca ter olhado. */
+        postCompartilhado:
+          quadro === 1 && n === 0
+            ? {
+                id: "p0",
+                autorNome: "Marina Costa",
+                imagemUrl: foto(CORES[0][0], CORES[0][1], CORES[0][2]),
+                texto: "o ultrassom de hoje 🍼",
+              }
+            : null,
         perguntaAberta: n === 2,
+        /* ⚠️ **O VÍDEO só no PRIMEIRO story**, e o contraste é o ponto: os
+           outros dois continuam sendo foto, e é assim que dá para ver que o
+           player entra no lugar certo e que a barrinha do tempo passa a durar o
+           vídeo em vez dos cinco segundos cravados. */
+        videoUrl: videoStory === 1 && n === 0 ? "/sons/riacho.webm" : null,
+        /* ⚠️ Idem para o véu: marcado só no primeiro. Sem a bancada, conferir
+           esta tela exigiria uma conta de verdade publicando um story marcado —
+           e o véu some no primeiro toque, então ainda seria preciso acertar o
+           instante. */
+        sensivel: sensivelStory === 1 && n === 0,
+        motivoSensivel: sensivelStory === 1 && n === 0 ? "Perda gestacional" : null,
       })),
     };
     return (
@@ -637,6 +872,12 @@ function Bancada() {
         souEu={meu}
         aoQuemViu={async () => GENTE}
         aoApagarStory={() => alert("apagaria o story")}
+        /* ⚠️ A bancada RECEBE a foto e a descreve, em vez de dar `alert`: o que
+           precisa ser olhado é a prévia, o × que a tira e o relógio parando —
+           e nada disso apareceria com um alert. */
+        aoResponderStory={(_a, _sid, texto, foto) =>
+          alert(`responderia: ${JSON.stringify(texto)}${foto ? ` + foto (${foto.name})` : ""}`)
+        }
       />
     );
   }
@@ -662,7 +903,182 @@ function Bancada() {
            carimbar e o controle não existe. */
         semana={selo === 0 ? null : "32 semanas"}
         aoCancelar={() => history.back()}
-        aoPublicar={({ carimbar }) => alert(carimbar ? "publicaria COM carimbo" : "publicaria sem")}
+        aoPublicar={({ texto, carimbar }) =>
+          alert(`publicaria ${carimbar ? "COM" : "sem"} carimbo · texto: ${texto || "(vazio)"}`)
+        }
+        /* ⚠️ `?rascunhoStory=1` fabrica o rascunho guardado — o único jeito de
+           fotografar a faixa "Você tinha começado um story", que no app só
+           existe depois de ela digitar, sair no meio e voltar. É a mesma razão
+           de sempre: sem a bancada, o estado nasce sem ninguém nunca ter
+           olhado. */
+        rascunho={
+          rascunhoStory === 1
+            ? {
+                texto: "hoje o ultrassom mostrou que ela está de ponta-cabeça 🙃",
+                enquete: ["vai virar", "nasce sentada"],
+                perguntaAberta: false,
+                carimbarSemana: true,
+                em: "2026-08-25T10:00:00.000Z",
+              }
+            : null
+        }
+        /* A bancada NÃO grava: ela desenha o estado, e gravar poluiria o
+           `localStorage` de quem só veio olhar. */
+        aoGuardarRascunho={undefined}
+      />
+    );
+  }
+
+  if (tela === "arquivo") {
+    /**
+     * ⚠️ O arquivo só existe numa conta com stories JÁ EXPIRADOS — ou seja,
+     * publicados ontem. Sem a bancada, conferir esta tela exigiria esperar 24 h
+     * com uma conta de verdade, que é como uma tela nasce sem ninguém nunca ter
+     * olhado.
+     *
+     * `?vazio=1` é quem nunca publicou · `?instavel=1` é a falha de leitura, que
+     * NUNCA pode ter a cara do vazio.
+     */
+    return (
+      <ArquivoDeStories
+        stories={
+          instavel === 1
+            ? null
+            : vazio
+              ? []
+              : CORES.slice(0, 7).map((c, n) => ({
+                  id: `st${n}`,
+                  imagemUrl: foto(c[0], c[1], c[2]),
+                  texto: n === 4 ? "primeira vez que ela mexeu 🤍" : null,
+                  criadoEm: atras(60 * 24 * (n + 1)),
+                  /* O primeiro ainda está no ar — é o que prova a pílula. */
+                  noAr: n === 0,
+                  destacado: n === 1 || n === 3,
+                }))
+        }
+        instavel={instavel === 1}
+        aoVoltar={() => history.back()}
+        aoDestacar={(id, v) => alert(v ? `destacaria ${id}` : `soltaria ${id}`)}
+        aoTentarDeNovo={() => alert("tentaria de novo")}
+      />
+    );
+  }
+
+  /**
+   * ⚠️ AS TRÊS TELAS DO GRUPO NUNCA TIVERAM BANCADA. Nasceram na onda do
+   * direct completo e nunca foram fotografadas: conferir a conversa exigiria
+   * DUAS contas reais, um grupo criado, convites aceitos e mensagens trocadas —
+   * que é exatamente como uma tela passa meses sem ninguém nunca ter olhado.
+   */
+  if (tela === "grupo" || tela === "grupo-chamar") {
+    const membros = [
+      {
+        id: "eu",
+        nome: "Você",
+        avatarUrl: foto(CORES[0][0], CORES[0][1], CORES[0][2]),
+        souEu: true,
+        ehCriadora: true,
+      },
+      {
+        id: "m1",
+        nome: "Marina Costa",
+        avatarUrl: foto(CORES[1][0], CORES[1][1], CORES[1][2]),
+        souEu: false,
+        ehCriadora: false,
+      },
+      { id: "m2", nome: "Carol Andrade", avatarUrl: null, souEu: false, ehCriadora: false },
+      {
+        id: "m3",
+        nome: "Ana Paula",
+        avatarUrl: foto(CORES[3][0], CORES[3][1], CORES[3][2]),
+        souEu: false,
+        ehCriadora: false,
+      },
+    ];
+    const grupo: GrupoNaTela = {
+      id: "g1",
+      nome: "Turma da 28ª semana",
+      membros,
+      souACriadora: true,
+      ultimaEm: atras(12),
+      naoLida: false,
+      silenciado: false,
+    };
+    if (tela === "grupo-chamar") {
+      return (
+        <ChamarParaGrupo
+          grupo={grupo}
+          candidatas={[
+            { id: "c1", nome: "Beatriz Lima", avatar: null },
+            {
+              id: "c2",
+              nome: "Fernanda Souza",
+              avatar: foto(CORES[4][0], CORES[4][1], CORES[4][2]),
+            },
+            /* Já está no grupo — prova que a folha a esconde. */
+            { id: "m1", nome: "Marina Costa", avatar: null },
+          ]}
+          aoFechar={() => history.back()}
+          aoChamou={() => alert("chamou")}
+        />
+      );
+    }
+    const msgs: MensagemDoGrupo[] = [
+      {
+        id: "g-1",
+        souEu: false,
+        autorNome: "Marina Costa",
+        texto: "meninas, alguém mais com azia hoje? 😅",
+        apagada: false,
+        criadaEm: atras(60),
+      },
+      {
+        id: "g-2",
+        souEu: true,
+        autorNome: "Você",
+        texto: "eu! travesseiro mais alto me salvou",
+        apagada: false,
+        criadaEm: atras(52),
+      },
+      /* A apagada prova o desenho do buraco — a conversa não pode fechar
+         sobre ele. */
+      {
+        id: "g-3",
+        souEu: false,
+        autorNome: "Carol Andrade",
+        texto: null,
+        apagada: true,
+        criadaEm: atras(40),
+      },
+      {
+        id: "g-4",
+        souEu: false,
+        autorNome: "Ana Paula",
+        texto: "marquei minha consulta pra sexta, alguém vai no mesmo dia?",
+        apagada: false,
+        criadaEm: atras(12),
+      },
+    ];
+    return (
+      <ConversaDoGrupo
+        grupo={grupo}
+        bancada={msgs}
+        aoVoltar={() => history.back()}
+        aoConvidar={() => alert("abriria a folha de chamar")}
+      />
+    );
+  }
+
+  if (tela === "grupo-novo") {
+    return (
+      <CriarGrupo
+        candidatas={[
+          { id: "c1", nome: "Marina Costa", avatar: foto(CORES[1][0], CORES[1][1], CORES[1][2]) },
+          { id: "c2", nome: "Carol Andrade", avatar: null },
+          { id: "c3", nome: "Beatriz Lima", avatar: foto(CORES[2][0], CORES[2][1], CORES[2][2]) },
+        ]}
+        aoFechar={() => history.back()}
+        aoCriado={(id) => alert(`criou ${id}`)}
       />
     );
   }
@@ -689,13 +1105,485 @@ function Bancada() {
             id: "eu",
             nome: "Marina Costa",
             souEu: false,
-            meusSeguidores: null,
+            seguidores: null,
+            seguindo: null,
             meuVinculo: persona === "estranha" ? null : "ativo",
           }}
           posts={persona === "estranha" ? POSTS.slice(0, 2) : POSTS.slice(0, 5)}
           trancado={trancado && persona === "estranha"}
           carregando={false}
           aoVoltar={() => history.back()}
+        />
+      </div>
+    );
+  }
+
+  const filhosDaBancada = FILHOS_DE_MENTIRA[filhos] ?? undefined;
+
+  /**
+   * ⚠️ A CAIXA DE ENTRADA E A CONVERSA SÃO IMPOSSÍVEIS DE OLHAR SEM ISTO.
+   * As duas falam com o servidor e exigem sessão E uma segunda conta que tenha
+   * escrito para você — coisa que uma conta de teste não produz. Os três
+   * arranjos abaixo são os que importam: conversa normal, pedido recebido
+   * (a caixa separada) e pedido enviado (o campo travado).
+   */
+  const CONVERSAS_DE_MENTIRA = [
+    {
+      id: "c1",
+      comId: "u1",
+      comNome: "Marina Costa",
+      comAvatar: null,
+      previa: "vou levar o exame na consulta",
+      ultimaEm: "2026-08-24T10:00:00Z",
+      naoLida: true,
+      pedido: false,
+      euIniciei: false,
+    },
+    {
+      id: "c2",
+      comId: "u2",
+      comNome: "Carol",
+      comAvatar: null,
+      previa: "oi! vi seu post 💛",
+      ultimaEm: "2026-08-23T18:00:00Z",
+      naoLida: true,
+      pedido: true,
+      euIniciei: false,
+    },
+    {
+      id: "c3",
+      comId: "u3",
+      comNome: "Juliana",
+      comAvatar: null,
+      previa: "oi, tudo bem?",
+      ultimaEm: "2026-08-22T09:00:00Z",
+      naoLida: false,
+      pedido: true,
+      euIniciei: true,
+    },
+  ];
+
+  if (tela === "comentarios") {
+    /**
+     * ⚠️ SEM ISTO OS COMENTÁRIOS SÃO IMPOSSÍVEIS DE OLHAR: a lista vem do
+     * servidor e exige sessão MAIS um post com comentários de outras contas.
+     * `?conversa=fechados` mostra o estado que a dona liga — e nele "Responder"
+     * NÃO existe em linha nenhuma, que é o estado que o botão tinha de ganhar.
+     */
+    /* ⚠️ **A CONVERSA, O CORAÇÃO E A MARCA DE OCULTO PRECISAM ESTAR AQUI.**
+       Os três só existem numa conta de verdade — com três pessoas escrevendo,
+       alguém curtindo e uma restrição ativa. Sem a bancada, o estado que a
+       tela passaria meses sem ninguém olhar é justamente o novo.
+
+       ⚠️ E as duas ocultas vêm com `recolhido: true`, que é o que o servidor
+       manda: sem ele a bancada desenharia o texto à mostra com uma etiqueta
+       embaixo — o estado ANTIGO, que o filtro foi consertado para não ter.
+       Bancada que aprova o que o servidor não produz é pior que bancada
+       nenhuma. */
+    const meus = [
+      {
+        id: "k1",
+        autorId: "u1",
+        autorNome: "Marina Costa",
+        autorAvatar: null,
+        texto: "que linda! 💛",
+        criadoEm: "2026-08-24T10:00:00Z",
+        possoApagar: false,
+        respondeA: null,
+        curtidas: 3,
+        euCurti: true,
+        /* ⚠️ Duas raízes com "Fixar" — é o que a produção entrega (o servidor
+           dá `possoFixar` a toda raiz não-oculta), e é a única forma de ver se
+           a linha de ações ainda cabe a 393px com o quarto rótulo. */
+        possoFixar: true,
+      },
+      {
+        id: "k1r1",
+        autorId: "u9",
+        autorNome: "Você",
+        autorAvatar: null,
+        texto: "obrigada, Marina 🥹",
+        criadoEm: "2026-08-24T10:02:00Z",
+        possoApagar: true,
+        respondeA: "k1",
+        curtidas: 1,
+        euCurti: false,
+      },
+      {
+        id: "k1r2",
+        autorId: "u3",
+        autorNome: "Ana Paula",
+        autorAvatar: null,
+        texto: "concordo demais",
+        criadoEm: "2026-08-24T10:03:00Z",
+        possoApagar: false,
+        respondeA: "k1",
+        curtidas: 0,
+        euCurti: false,
+      },
+      {
+        id: "k1r3",
+        autorId: "u4",
+        autorNome: "Bruna",
+        autorAvatar: null,
+        texto: "que fofa",
+        criadoEm: "2026-08-24T10:04:00Z",
+        possoApagar: false,
+        respondeA: "k1",
+        curtidas: 0,
+        euCurti: false,
+      },
+      {
+        id: "k1r4",
+        autorId: "u5",
+        autorNome: "Tia Zezé",
+        autorAvatar: null,
+        texto: "linda demais!",
+        criadoEm: "2026-08-24T10:04:30Z",
+        possoApagar: false,
+        respondeA: "k1",
+        curtidas: 0,
+        euCurti: false,
+      },
+      {
+        id: "k2",
+        autorId: "u2",
+        autorNome: "Carol",
+        autorAvatar: null,
+        texto: "também estou de 30 semanas, vamos juntas",
+        criadoEm: "2026-08-24T10:05:00Z",
+        possoApagar: true,
+        respondeA: null,
+        curtidas: 0,
+        euCurti: false,
+        /* ⚠️ **O SELO DE FIXADO e o "Fixar" só existem para a dona do post** —
+           e a régua roda no servidor, então sem a bancada eles exigiriam uma
+           publicação de verdade com um comentário de verdade fixado nela. */
+        fixadoEm: "2026-08-24T11:00:00Z",
+        possoFixar: true,
+      },
+      {
+        /* ⚠️ **O NÚMERO SÓ VIRA BOTÃO PARA QUEM ESCREVEU.** Este é meu, com
+           curtidas: é o único jeito de fotografar a folha "Quem curtiu". */
+        id: "k5",
+        autorId: "eu",
+        autorNome: "Você",
+        autorAvatar: null,
+        texto: "obrigada, meninas 💛",
+        criadoEm: "2026-08-24T10:08:00Z",
+        possoApagar: true,
+        respondeA: null,
+        curtidas: 3,
+        euCurti: false,
+        souOAutor: true,
+      },
+      /* ⚠️ As DUAS marcas de oculto, que só a dona do post recebe — e que são
+         impossíveis de fotografar sem uma restrição e um filtro ativos. */
+      {
+        id: "k3",
+        autorId: "u6",
+        autorNome: "Cunhada",
+        autorAvatar: null,
+        texto: "seu bebê parece pequeno pra essa idade",
+        criadoEm: "2026-08-24T10:06:00Z",
+        possoApagar: true,
+        respondeA: null,
+        curtidas: 0,
+        euCurti: false,
+        oculto: "restrito" as const,
+        recolhido: true,
+      },
+      {
+        id: "k4",
+        autorId: "u7",
+        autorNome: "Alguém",
+        autorAvatar: null,
+        texto: "minha prima teve isso e perdi o sono",
+        criadoEm: "2026-08-24T10:07:00Z",
+        possoApagar: true,
+        respondeA: null,
+        curtidas: 0,
+        euCurti: false,
+        oculto: "palavra" as const,
+        recolhido: true,
+      },
+      /* ⚠️ **ESTE EXISTE PARA A ORDEM PODER MUDAR.** Sem um comentário TARDIO e
+         MUITO curtido, as duas ordens desenham exatamente a mesma lista — os
+         dados da bancada já vinham em curtidas decrescentes — e o seletor
+         parecia inerte na foto. Bancada que não consegue provar o recurso é
+         bancada que aprova qualquer coisa. */
+      {
+        id: "k5",
+        autorId: "u9",
+        autorNome: "Juliana",
+        autorAvatar: null,
+        texto: "@marina o meu passou depois da 32ª, aguenta firme 💛 #30semanas",
+        criadoEm: "2026-08-24T10:30:00Z",
+        possoApagar: false,
+        respondeA: null,
+        curtidas: 12,
+        euCurti: false,
+      },
+    ];
+    /* ⚠️ **ESCREVE O STORAGE ANTES DE MONTAR, e não num efeito.** O componente
+       lê o rascunho na primeira renderização; gravado depois, a bancada
+       mostraria sempre o campo vazio — que é o único estado que ela não
+       precisava provar. Mesma lição da bancada do ritual de boas-vindas. */
+    if (rascunhoComent) {
+      try {
+        localStorage.setItem(
+          chaveDoRascunhoDeComentario("bancada", "00000000-0000-0000-0000-000000000001"),
+          serializarRascunho("eu ia contar que comigo foi parec", new Date()),
+        );
+      } catch {
+        /* Sem storage: a bancada abre sem o rascunho. */
+      }
+    }
+    return (
+      <div className="mx-auto max-w-[430px] pt-6">
+        <Comentarios
+          postId="00000000-0000-0000-0000-000000000001"
+          /* ⚠️ Sem os dois, `TextoComLinks` desenha o `@` como TEXTO — e a
+             bancada aprovaria uma menção que não vira link, que é justamente o
+             que faltava. */
+          aoAbrirArroba={(h) => alert(`abrir @${h}`)}
+          aoAbrirTag={(t) => alert(`abrir #${t}`)}
+          bancada={{
+            comentarios: meus,
+            abertos: conversa !== "fechados",
+            souADona: true,
+            /* ⚠️ A ordem vem por prop porque quem ordena é o SERVIDOR: sem
+               sessão, trocar o seletor não recarregaria nada e a bancada
+               mostraria um controle que não faz efeito. */
+            ordem: ordem === "relevantes" ? ("relevantes" as const) : ("recentes" as const),
+            euId: "bancada",
+            curtidas: [
+              { id: "u2", nome: "Carol", avatarUrl: null },
+              { id: "u3", nome: "Bruna", avatarUrl: null },
+              { id: "u4", nome: "Ana Paula", avatarUrl: null },
+            ],
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (tela === "filtro") {
+    /* ⚠️ O cartão do filtro busca a lista do servidor e por isso abriria vazio
+       sem sessão — e vazio é o único estado que ele NÃO precisava provar.
+       `?vazio=1` mostra a lista sem nenhuma palavra. */
+    return (
+      <div className="mx-auto max-w-md py-4">
+        <FiltroDePalavras bancada={vazio ? [] : ["perdi", "aborto", "parto normal"]} />
+      </div>
+    );
+  }
+
+  if (tela === "conversas") {
+    /**
+     * ⚠️ **A FILEIRA "MESMA FASE" É IMPOSSÍVEL DE OLHAR SEM ISTO.** Ela exige
+     * DUAS contas reais na mesma fase, com perfil aberto, sem conversa entre si
+     * e sem bloqueio — e a régua ainda esconde a fileira abaixo de duas
+     * candidatas. `?sugeridas=0` mostra a caixa sem ela, que é o estado da
+     * maioria; `?conversa=pedido` abre a caixa de pedidos, onde a fileira NÃO
+     * pode aparecer.
+     */
+    const daFase =
+      semSugestoes || conversa === "pedido"
+        ? []
+        : [
+            {
+              id: "s1",
+              nome: "Marina Costa",
+              avatarUrl: null,
+              fase: "t2" as const,
+              ultimaVez: null,
+            },
+            { id: "s2", nome: "Bruna", avatarUrl: null, fase: "t2" as const, ultimaVez: null },
+            { id: "s3", nome: "Ana Paula", avatarUrl: null, fase: "t2" as const, ultimaVez: null },
+          ];
+    return (
+      <div className="mx-auto max-w-[430px]">
+        <CaixaDeEntrada
+          aoVoltar={() => history.back()}
+          aoAbrir={() => {}}
+          aoFalarCom={(id, rascunho) => alert(`abriria conversa com ${id}\n\n"${rascunho}"`)}
+          bancada={CONVERSAS_DE_MENTIRA}
+          /* ⚠️ **AS NOTAS vivem 24 h e dependem do grafo.** Sem a bancada,
+             fotografar a fileira exigiria duas contas reais e uma nota escrita
+             na última hora. `?notas=1`. */
+          notasDeBancada={
+            notas === 1
+              ? [
+                  {
+                    autor: { id: "eu", nome: "Você", avatarUrl: null },
+                    texto: "hoje foi um dia bom 💛",
+                    criadaEm: "2026-08-25T20:00:00Z",
+                    souEu: true,
+                  },
+                  {
+                    autor: { id: "u2", nome: "Carol", avatarUrl: null },
+                    texto: "não consigo dormir 😅",
+                    criadaEm: "2026-08-25T23:10:00Z",
+                    souEu: false,
+                  },
+                  {
+                    autor: { id: "u3", nome: "Bruna", avatarUrl: null },
+                    texto: "enjoo voltou",
+                    criadaEm: "2026-08-25T18:00:00Z",
+                    souEu: false,
+                  },
+                ]
+              : []
+          }
+          sugeridasDeBancada={daFase}
+        />
+      </div>
+    );
+  }
+
+  if (tela === "mandar") {
+    /* ⚠️ A folha só sabe desenhar com conversas que JÁ existem — e é essa a
+       trava do recurso (nada de busca aqui, ou o botão de compartilhar viraria
+       um segundo caminho para escrever a desconhecidas). `?vazio=1` mostra o
+       estado de quem ainda não tem conversa, que é o que ensina a régua. */
+    return (
+      <div className="mx-auto max-w-[430px]">
+        <MandarPublicacao
+          /* ⚠️ `?alvo=story` mostra o título próprio do story — a mesma folha
+             serve os dois, e o texto é a única coisa que muda. */
+          alvo={{ tipo: quadro === 1 ? "story" : "post", id: "p1" }}
+          aoFechar={() => history.back()}
+          bancada={vazio ? [] : CONVERSAS_DE_MENTIRA}
+        />
+      </div>
+    );
+  }
+
+  if (tela === "conversa") {
+    /* `?conversa=pedido` mostra o campo travado de quem já mandou a sua. */
+    const qual = conversa === "pedido" ? CONVERSAS_DE_MENTIRA[2] : CONVERSAS_DE_MENTIRA[0];
+    return (
+      <div className="mx-auto max-w-[430px]">
+        <Conversa
+          conversa={qual}
+          aoVoltar={() => history.back()}
+          bancada={{
+            pedido: qual.pedido,
+            euIniciei: qual.euIniciei,
+            mensagens:
+              conversa === "pedido"
+                ? [
+                    {
+                      id: "m1",
+                      souEu: true,
+                      texto: "oi, tudo bem?",
+                      criadaEm: "2026-08-22T09:00:00Z",
+                      apagada: false,
+                    },
+                  ]
+                : [
+                    {
+                      id: "m1",
+                      souEu: false,
+                      texto: "oi! como você está?",
+                      criadaEm: "2026-08-24T09:00:00Z",
+                      apagada: false,
+                    },
+                    {
+                      id: "m2",
+                      souEu: true,
+                      texto: "melhor hoje, obrigada 💛",
+                      criadaEm: "2026-08-24T09:30:00Z",
+                      apagada: false,
+                    },
+                    {
+                      id: "m3",
+                      souEu: true,
+                      texto: "",
+                      criadaEm: "2026-08-24T09:40:00Z",
+                      apagada: true,
+                    },
+                    {
+                      id: "m4",
+                      souEu: false,
+                      texto: "vou levar o exame na consulta",
+                      criadaEm: "2026-08-24T10:00:00Z",
+                      apagada: false,
+                    },
+                    /* ⚠️ **O ÁUDIO precisa estar aqui, e é o que faltava.** A
+                       voz no direct tinha servidor pronto e ZERO tela — nem
+                       gravador, nem player — e passou despercebida justamente
+                       porque a bancada não desenhava nenhuma mensagem de voz.
+                       O `audioUrl` é um WAV mínimo em data URI: um endereço
+                       assinado de verdade não existe sem conta. */
+                    {
+                      id: "m4a",
+                      souEu: false,
+                      texto: null,
+                      audioUrl:
+                        "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=",
+                      duracaoSeg: 37,
+                      criadaEm: "2026-08-24T10:05:00Z",
+                      apagada: false,
+                    },
+                    /* ⚠️ **A FOTO, o ✓✓ e o ANEXO precisam estar aqui.** Os três
+                       só existem em conversa de verdade, com upload feito e
+                       carimbo de leitura — sem a bancada, o único jeito de
+                       olhá-los seria duas contas reais trocando mensagem, que é
+                       exatamente como uma tela passa meses sem revisão. */
+                    {
+                      id: "m5",
+                      souEu: true,
+                      texto: "olha o ultrassom de hoje 🥹",
+                      criadaEm: "2026-08-24T10:20:00Z",
+                      apagada: false,
+                      /* ⚠️ Data URL, e nunca um endereço de fora: a bancada roda
+                         na CI, que não tem rede aberta — e uma foto externa já
+                         custou um mismatch de hidratação neste repo. */
+                      imagemUrl: foto("#f7c8d8", "#c9e4f5", "🤍"),
+                      lidaPelaOutra: true,
+                    },
+                    {
+                      id: "m6",
+                      souEu: true,
+                      texto: "essa aqui me lembrou você",
+                      criadaEm: "2026-08-24T10:30:00Z",
+                      apagada: false,
+                      refTipo: "post" as const,
+                      refId: "p1",
+                      lidaPelaOutra: false,
+                    },
+                    {
+                      id: "m7",
+                      souEu: false,
+                      texto: "que linda 💛",
+                      criadaEm: "2026-08-24T10:40:00Z",
+                      apagada: false,
+                      refTipo: "story" as const,
+                      refId: "s1",
+                    },
+                    /* ⚠️ **A MENSAGEM RECOLHIDA pelo filtro de palavras DELA.**
+                       Ela só nasce de uma lista de palavras escrita numa conta
+                       de verdade e de uma mensagem que caia nela — sem a
+                       bancada, o único jeito de olhar seria duas contas reais e
+                       a palavra certa. `?oculta=1`. */
+                    ...(oculta === 1
+                      ? [
+                          {
+                            id: "m8",
+                            souEu: false,
+                            /* ⚠️ O texto NÃO viaja quando está recolhido — o
+                               servidor manda `null`, e a bancada imita isso. */
+                            texto: null,
+                            criadaEm: "2026-08-24T10:50:00Z",
+                            apagada: false,
+                            recolhida: true,
+                          },
+                        ]
+                      : []),
+                  ],
+          }}
         />
       </div>
     );
@@ -713,6 +1601,10 @@ function Bancada() {
         <NovoPost
           /* A aula de hoje, para o anexo aparecer na bancada. */
           aulaDeHoje={{ tema: "nutrição" }}
+          /* ⚠️ Sem um bebê NASCIDO a tira de marcos não existe — e ela é
+             justamente o que precisa ser olhado. `?filhos=bebe` é o padrão
+             aqui; `?filhos=gemeas` prova que a tira NÃO aparece na gestação. */
+          filhosDeMentira={FILHOS_DE_MENTIRA[filhos] ?? FILHOS_DE_MENTIRA.bebe}
           momentoInicial={
             comFotoDeHoje
               ? {
@@ -762,7 +1654,7 @@ function Bancada() {
                   enquete: null,
                   comAula: false,
                   marcadas: ["marina"],
-                  em: new Date().toISOString(),
+                  em: new Date(AGORA).toISOString(),
                 }
               : null
           }
@@ -819,6 +1711,252 @@ function Bancada() {
     );
   }
 
+  if (tela === "mais") {
+    /**
+     * ⚠️ **O LEQUE DA COMUNIDADE NUNCA TEVE BANCADA — e foi assim que ele
+     * chegou a catorze bolinhas** sem ninguém olhar (o dono viu no aparelho:
+     * passava por cima do relógio). A folha "Mais" recebe tudo por prop, então
+     * aqui ela abre sobre um fundo neutro, com os três grupos e um emblema na
+     * Caixinha — o único estado que muda o desenho.
+     */
+    const diga = (o: string) => () => alert(`abriria ${o}`);
+    return (
+      <div className="min-h-[100svh] bg-background">
+        <MaisDaComunidade
+          onFechar={() => history.back()}
+          grupos={[
+            {
+              id: "minhas",
+              titulo: "Minhas coisas",
+              itens: [
+                {
+                  id: "salvos",
+                  rotulo: "Salvos",
+                  descricao: "As publicações que você guardou",
+                  icone: "salvos",
+                  aoTocar: diga("Salvos"),
+                },
+                {
+                  id: "arquivados",
+                  rotulo: "Arquivados",
+                  descricao: "Publicações que você tirou do ar",
+                  icone: "arquivados",
+                  aoTocar: diga("Arquivados"),
+                },
+                {
+                  id: "arquivo-stories",
+                  rotulo: "Meus stories",
+                  descricao: "Tudo o que você já publicou por 24 horas",
+                  icone: "stories",
+                  aoTocar: diga("Meus stories"),
+                },
+                {
+                  id: "favoritas",
+                  rotulo: "Favoritas",
+                  descricao: "O que as pessoas que você marcou publicaram",
+                  icone: "favoritas",
+                  aoTocar: diga("Favoritas"),
+                },
+              ],
+            },
+            {
+              id: "descobrir",
+              titulo: "Descobrir",
+              itens: [
+                {
+                  id: "explorar",
+                  rotulo: "Explorar",
+                  descricao: "Publicações públicas e assuntos em alta",
+                  icone: "explorar",
+                  aoTocar: diga("Explorar"),
+                },
+                {
+                  id: "buscar",
+                  rotulo: "Buscar",
+                  descricao: "Pessoas com perfil público e #assuntos",
+                  icone: "buscar",
+                  aoTocar: diga("Buscar"),
+                },
+              ],
+            },
+            {
+              id: "seguranca",
+              titulo: "Segurança",
+              itens: [
+                {
+                  id: "bloqueados",
+                  rotulo: "Bloqueados",
+                  descricao: "Quem você bloqueou, e desbloquear",
+                  icone: "bloqueados",
+                  aoTocar: diga("Bloqueados"),
+                },
+                {
+                  id: "desfechos",
+                  rotulo: "Suas denúncias",
+                  descricao: "O que aconteceu com cada uma",
+                  icone: "denuncias",
+                  aoTocar: diga("Suas denúncias"),
+                },
+                {
+                  id: "caixinha",
+                  rotulo: "Caixinha",
+                  descricao: "Perguntas anônimas que você recebeu",
+                  icone: "caixinha",
+                  emblema: vazio ? 0 : 2,
+                  aoTocar: diga("Caixinha"),
+                },
+              ],
+            },
+          ]}
+        />
+      </div>
+    );
+  }
+
+  if (tela === "bloqueados") {
+    /**
+     * ⚠️ **A ÚNICA TELA DE SEGURANÇA DA ABA SEM BANCADA, até aqui.** Os três
+     * estados que mais importam não se fabricam numa conta de teste: `?erro=1`
+     * (a leitura falhou — e "você não bloqueou ninguém" sobre uma falha a faria
+     * bloquear de novo), `?vazio=1` (ninguém) e o carregando.
+     */
+    const pessoas =
+      instavel === 1
+        ? ("erro" as const)
+        : vazio
+          ? []
+          : [
+              { id: "b1", nome: "Cunhada", avatarUrl: null, bio: null, sigo: null, souEu: false },
+              { id: "b2", nome: "Alguém", avatarUrl: null, bio: null, sigo: null, souEu: false },
+            ];
+    return (
+      <div className="mx-auto max-w-[430px] px-4 pt-2">
+        <ListaDeBloqueados
+          pessoas={pessoas}
+          aoVoltar={() => history.back()}
+          aoDesbloquear={(id) => alert(`desbloquearia ${id}`)}
+          aoTentarDeNovo={() => alert("recarregaria a lista")}
+        />
+      </div>
+    );
+  }
+
+  /**
+   * ⚠️ **AS TRÊS TELAS NOVAS SÓ NASCEM DE UMA CONTA COM HISTÓRIA** — esconder
+   * o story de alguém, reagir a publicações de semanas atrás, denunciar e
+   * esperar a plataforma responder. Sem a bancada, olhar qualquer uma delas
+   * exigiria duas contas e uma denúncia de verdade.
+   *
+   * `?instavel=1` é o estado que mais importa nas três: "não consegui ler" NÃO
+   * pode ter a cara de "não há nada" — nesta lista o vazio faria a paciente
+   * esconder o story de novo, e nos desfechos a faria concluir que a denúncia
+   * dela foi ignorada.
+   */
+  if (tela === "escondidos") {
+    return (
+      <div className="mx-auto max-w-[430px] px-4 pt-2">
+        <ListaDeBloqueados
+          titulo="Story escondido de"
+          explicacao="Quem está aqui não vê os seus stories. O resto continua igual, e ninguém é avisada."
+          vazio="Você não escondeu seu story de ninguém."
+          rotuloDaAcao="Voltar a mostrar"
+          pessoas={
+            instavel === 1
+              ? ("erro" as const)
+              : vazio
+                ? []
+                : [
+                    {
+                      id: "e1",
+                      nome: "Tia Zezé",
+                      avatarUrl: null,
+                      bio: null,
+                      sigo: null,
+                      souEu: false,
+                    },
+                    {
+                      id: "e2",
+                      nome: "Chefe",
+                      avatarUrl: null,
+                      bio: null,
+                      sigo: null,
+                      souEu: false,
+                    },
+                  ]
+          }
+          aoVoltar={() => history.back()}
+          aoDesbloquear={(id) => alert(`voltaria a mostrar para ${id}`)}
+          aoTentarDeNovo={() => alert("recarregaria a lista")}
+        />
+      </div>
+    );
+  }
+
+  if (tela === "curtidos") {
+    return (
+      <div className="mx-auto max-w-md py-2">
+        <GradeSimples
+          titulo="O que você reagiu"
+          vazio="Você ainda não reagiu a nada."
+          posts={instavel === 1 ? ("erro" as const) : vazio ? [] : POSTS.slice(0, 6)}
+          aoVoltar={() => history.back()}
+          aoAbrirPost={(id) => alert(`abriria o post ${id}`)}
+          aoTentarDeNovo={() => alert("recarregaria")}
+        />
+      </div>
+    );
+  }
+
+  if (tela === "desfechos") {
+    return (
+      <div className="mx-auto max-w-md py-2">
+        <MeusDesfechos
+          desfechos={
+            instavel === 1
+              ? ("erro" as const)
+              : vazio
+                ? []
+                : [
+                    /* ⚠️ Os QUATRO estados numa tela só, porque é a diferença
+                       entre eles que a tela existe para mostrar — inclusive o
+                       "ainda não olhamos", que é o mais comum. */
+                    {
+                      id: "d1",
+                      alvo: "post",
+                      motivo: "conselho médico",
+                      em: "2026-08-19T10:00:00Z",
+                      desfecho: "removido",
+                    },
+                    {
+                      id: "d2",
+                      alvo: "perfil",
+                      motivo: "se passa por outra pessoa",
+                      em: "2026-08-17T10:00:00Z",
+                      desfecho: "avisado",
+                    },
+                    {
+                      id: "d3",
+                      alvo: "comentario",
+                      motivo: "ofensa",
+                      em: "2026-08-15T10:00:00Z",
+                      desfecho: "sem_acao",
+                    },
+                    {
+                      id: "d4",
+                      alvo: "story",
+                      motivo: "conteúdo impróprio",
+                      em: "2026-08-14T10:00:00Z",
+                      desfecho: null,
+                    },
+                  ]
+          }
+          aoVoltar={() => history.back()}
+          aoTentarDeNovo={() => alert("recarregaria")}
+        />
+      </div>
+    );
+  }
+
   if (tela === "salvos") {
     return (
       <div className="mx-auto max-w-md py-2">
@@ -827,6 +1965,17 @@ function Bancada() {
           aoVoltar={() => history.back()}
           aoAbrirPost={(id) => alert(`abriria o post ${id}`)}
         />
+      </div>
+    );
+  }
+
+  if (tela === "tag") {
+    /* ⚠️ A página da `#` pede posts ao servidor e por isso mostraria "vazio"
+       sem sessão — a bancada existe para o cabeçalho, a frase da régua e a
+       grade poderem ser olhados sem duas contas e um post público real. */
+    return (
+      <div className="mx-auto max-w-md py-2">
+        <TelaDaTag tag={tag} aoVoltar={() => history.back()} />
       </div>
     );
   }
@@ -917,7 +2066,38 @@ function Bancada() {
       ) : tela === "perfil" ? (
         <TelaDePerfil
           perfil={perfil}
-          posts={vazio ? [] : POSTS}
+          /* ⚠️ Com `?fixados=1`, as duas PRIMEIRAS vêm fixadas — e é isso que
+             prova a grade: o pino nas células e a ordem. As datas de fixação
+             são cravadas (a mais recente primeiro), pela mesma razão de todas
+             as datas desta bancada. */
+          posts={
+            vazio
+              ? []
+              : fixados === 1
+                ? POSTS.map((p, i) =>
+                    i < 2
+                      ? { ...p, fixadoEm: i === 0 ? atras(30) : atras(600), souAAutora: true }
+                      : p,
+                  )
+                : POSTS
+          }
+          /* ⚠️ **O ÁLBUM só nasce de uma conta com uma gestação inteira
+             publicada** — as seções saem da DUM, que nunca chega ao navegador.
+             Sem a bancada, olhar esta tela exigiria um ano de uso.
+             ⚠️ E ele só vale no MEU perfil: `?album=1` sem `?meu=1` prova que a
+             lista não é oferecida a terceiros. As seções são CRAVADAS, nunca
+             derivadas de `Date.now()` — a régua roda no servidor, e aqui o que
+             se olha é o desenho. */
+          album={
+            album === 1 && meu
+              ? [
+                  { chave: "semana:8", titulo: "8 semanas", posts: POSTS.slice(0, 1) },
+                  { chave: "semana:20", titulo: "20 semanas", posts: POSTS.slice(1, 4) },
+                  { chave: "semana:34", titulo: "34 semanas", posts: POSTS.slice(4, 6) },
+                  { chave: "depois", titulo: "Depois", posts: POSTS.slice(6, 7) },
+                ]
+              : null
+          }
           aoVoltar={() => history.back()}
           aoSeguir={() => alert("seguir")}
           aoAbrirPost={(id) => alert(`abriria o post ${id}`)}
@@ -925,11 +2105,31 @@ function Bancada() {
           aoAbrirSalvos={meu ? () => alert("abriria os salvos") : undefined}
           aoAbrirEspelho={meu ? () => alert("abriria o espelho") : undefined}
           aoBloquear={meu ? undefined : () => alert("bloquearia")}
+          /* ⚠️ **AS TRÊS PROPS NOVAS PRECISAM ESTAR AQUI, e a bancada provou
+             por quê**: sem elas o ♡ e o "Story escondido de…" não desenham, e
+             a bancada aprovaria a tela sem os controles — o defeito que o `@` e
+             o áudio do direct já produziram aqui. Foi ao passá-las que apareceu
+             o defeito de verdade: o "Story escondido de…" vivia dentro de um ⋯
+             que só existe no perfil dos OUTROS. */
+          aoAbrirCurtidos={meu ? () => alert("abriria o que você reagiu") : undefined}
+          aoAbrirEscondidos={meu ? () => alert("abriria a lista de escondidos") : undefined}
+          aoEsconderStory={meu ? undefined : () => alert("esconderia o story desta pessoa")}
           /* ⚠️ Sem a bancada, olhar o seletor de motivo exigiria duas contas e
              uma denúncia de verdade — e é justamente a tela que precisa ser
              lida com calma antes de existir. */
           aoDenunciarPerfil={meu ? undefined : (m) => alert(`denunciaria o perfil por "${m}"`)}
           aoSilenciar={meu ? undefined : (v) => alert(v ? "silenciaria" : "voltaria a ouvir")}
+          /* ⚠️ `?favorita=1` estava documentado como "o 'Tirar dos favoritos'"
+             e o botão NUNCA desenhou: a bancada cravava a bandeira e não
+             passava a ação. Bancada que anuncia um controle que ela não desenha
+             é pior que bancada nenhuma. */
+          aoFavoritar={meu ? undefined : (v) => alert(v ? "favoritaria" : "tiraria dos favoritos")}
+          /* ⚠️ Sem esta prop o botão de restringir NÃO desenha, e a bancada
+             aprovaria uma tela sem o controle novo — o defeito que o `@` já
+             produziu uma vez aqui. */
+          aoRestringir={
+            meu ? undefined : (v) => alert(v ? "restringiria" : "deixaria de restringir")
+          }
           /* ⚠️ Sem esta prop o botão "Usar este código" não desenha, e a
              bancada aprovaria a pílula sem o controle que é o ponto dela. */
           aoAplicarCodigo={(c) => alert(`aplicaria o código ${c}`)}
@@ -944,116 +2144,234 @@ function Bancada() {
           aoAbrirSOS={() => alert("abriria a Central de Emergência")}
         />
       ) : (
-        <TelaPrincipal
-          posts={vazio ? [] : comReacoes([...POSTS.slice(0, 4), ...extras])}
-          stories={vazio ? [] : STORIES}
-          /* ⚠️ A zona de sugestões só abre quando o feed de quem ela segue
+        <>
+          {/* ⚠️ Na produção ele vive DENTRO de `RedeNoApp`, depois de todos os
+              `if (onde.t === …) return` — ou seja, só sobre o feed. Aqui a
+              bancada renderiza o MESMO componente com `bancada`, que força a
+              abertura sem tocar no blob da jornada: gravar "já vi" a partir de
+              uma bancada apagaria o tutorial da conta de verdade. */}
+          {!!onboarding && <OnboardingDaComunidade careMode={false} bancada />}
+          <TelaPrincipal
+            /* A bolinha ⊞ "Mais" da fileira de stories — a porta do hub. Sem a
+               prop a bancada aprovaria uma fileira sem ela, que é exatamente o
+               estado que o estudo de navegação achou em produção. */
+            aoAbrirSecoes={() => {}}
+            /* ⚠️ **A SUSPENSÃO É DECISÃO DA PLATAFORMA, e a paciente é
+               avisada** — é a única das três (luto, pausa, suspensão) em que o
+               app fala. Sem esta prop o aviso não desenha, e a bancada
+               aprovaria a tela sem a única coisa que impede a conta de sumir em
+               silêncio. */
+            suspensa={suspensa === 1}
+            posts={
+              vazio
+                ? []
+                : comReacoes(
+                    /* ⚠️ **O VÉU E A LEGENDA SÓ EXISTEM COM UM POST QUE OS TENHA.**
+                     Sem isto a bancada desenharia o único estado que já era
+                     certo — o post normal — e o recurso passaria por ela sem
+                     nunca ter sido olhado. É a lição do áudio do direct, que
+                     sobreviveu meses porque a bancada não desenhava nenhum. */
+                    palavraOculta === 1
+                      ? [
+                          {
+                            ...POSTS[0]!,
+                            id: "p-palavra",
+                            /* ⚠️ O véu do FILTRO tem rótulo próprio ("Escondido
+                               pelo seu filtro de palavras") e NÃO diz qual
+                               palavra — ela escondeu aquilo de propósito. */
+                            batePalavraMinha: true,
+                            souAAutora: false,
+                            texto: "não foi dessa vez. obrigada a quem escreveu 💛",
+                          },
+                          ...POSTS.slice(1, 4),
+                        ]
+                      : sensivel
+                        ? [
+                            {
+                              ...POSTS[0]!,
+                              id: "p-sens",
+                              sensivel: true,
+                              motivoSensivel: "perda",
+                              texto: "hoje faz um mês. obrigada a quem ficou 💛",
+                            },
+                            {
+                              ...POSTS[2]!,
+                              id: "p-video",
+                              imagemUrl: null,
+                              videoUrl:
+                                "data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDE=",
+                              videoLegenda: "O bebê mexendo — dá para ver o pezinho na direita.",
+                              texto: "olha ele hoje 🥹",
+                            },
+                            ...POSTS.slice(0, 3),
+                          ]
+                        : [...POSTS.slice(0, 4), ...extras],
+                  )
+            }
+            stories={vazio ? [] : STORIES}
+            /* ⚠️ A zona de sugestões só abre quando o feed de quem ela segue
              acabou — por isso ela aparece na bancada quando `temMais` some, ou
              seja, depois de rolar até o fim. `?sugeridas=0` mostra o feed sem
              ela; `?vazio=1` mostra a conta nova, em que a fileira de pessoas é
              a única coisa na tela. */
-          sugestoes={semSugestoes ? [] : comReacoes(POSTS.slice(5, 8))}
-          pessoas={semSugestoes || fase === "vazio" ? [] : GENTE}
-          aoSeguirPessoa={(id) => console.log("seguiria", id)}
-          /* ⚠️ O convite pelo WhatsApp depende do `referral_code` da conta, que
+            sugestoes={semSugestoes ? [] : comReacoes(POSTS.slice(5, 8))}
+            pessoas={semSugestoes || fase === "vazio" ? [] : GENTE}
+            aoSeguirPessoa={(id) => console.log("seguiria", id)}
+            /* ⚠️ **AS DUAS PRECISAM VIR DA BANCADA, e a falta delas foi medida.**
+             `@` e `#` só viram link quando `TextoComLinks` recebe estes dois —
+             sem eles a legenda desenha texto puro, que é exatamente o caso que
+             nunca falha. A primeira verificação no navegador achou ZERO links
+             na legenda com o recurso inteiro pronto: a bancada estava passando
+             props num formato diferente do da produção, que é a mesma lição
+             que o `memo` do cartão já custou uma medição falsa. */
+            aoAbrirArroba={(h) => alert(`abriria o perfil de @${h}`)}
+            aoAbrirTag={(t) => alert(`abriria a página de #${t}`)}
+            /* ⚠️ **`?instavel=1` É A ÚNICA FORMA DE OLHAR A TELA DO "NÃO
+             CARREGOU".** Ela só nasce de uma falha de leitura no servidor —
+             bloqueio ou grafo de amizade caindo —, que não se fabrica numa
+             conta de teste. Sem a bancada, o estado ficaria sem ninguém nunca
+             ter olhado, que é como ele nasceu. */
+            /* ⚠️ `?fechado=1` fotografa o modo "Só quem eu sigo" LIGADO — o
+             estado em que a zona de sugeridas tem de sumir, e que a bancada
+             nunca desenhou. Foi por essa falta que a condição invertida
+             sobreviveu. */
+            soSeguindo={fechado === 1}
+            instavel={instavel === 1}
+            aoTentarDeNovo={() => alert("recarregaria o feed")}
+            /* ⚠️ O convite pelo WhatsApp depende do `referral_code` da conta, que
              nasce no servidor — sem a bancada, olhar este cartão exigiria uma
              conta de verdade. `?semcodigo=1` prova o estado em que ele NÃO
              aparece, que é o único jeito de conferir que um convite sem
              indicação nunca é oferecido. */
-          convite={{ codigo: semCodigo ? null : "MARIA7X" }}
-          /* ⚠️ O lembrete do "então e agora" só nasce de uma conta com uma foto
+            convite={{ codigo: semCodigo ? null : "MARIA7X" }}
+            /* ⚠️ **A MEMÓRIA só nasce de uma publicação de UM ANO ATRÁS, do
+             mesmo ciclo, de quem já registrou o nascimento — e some para
+             sempre depois de aparecer uma vez.** Sem a bancada, olhá-la exigiria
+             uma conta com um ano de uso e acertar a janela de três dias. É o
+             caso extremo do que as bancadas existem para resolver.
+             ⚠️ E ela vence o lembrete e perde da retrospectiva (um cartão de
+             cada vez): `?memoria=1` implica `?retro=0`. */
+            memoria={
+              memoria === 1
+                ? {
+                    post: {
+                      ...POSTS[0],
+                      /* ⚠️ `AGORA` cravado, nunca `Date.now()` — ver a nota do
+                       lembrete logo abaixo. */
+                      criadoEm: new Date(AGORA - 366 * 86_400_000).toISOString(),
+                      texto: "primeira foto da barriga 🤍",
+                    },
+                    texto: "Há um ano, você publicou isto.",
+                  }
+                : null
+            }
+            aoVerMemoria={() => {}}
+            /* ⚠️ O lembrete do "então e agora" só nasce de uma conta com uma foto
              de 28+ dias e a janela de sete dias vencida — sem a bancada,
              olhá-lo exigiria esperar um mês com uma conta de verdade.
              ⚠️ E ele NÃO aparece junto da retrospectiva (um cartão de cada
              vez), então `?entao=1` implica `?retro=0`. */
-          lembreteEntao={
-            entao
-              ? {
-                  id: "p-antigo",
-                  imagemUrl: foto(CORES[2][0], CORES[2][1], CORES[2][2]),
-                  criadoEm: new Date(Date.now() - 34 * 86_400_000).toISOString(),
-                }
-              : null
-          }
-          aoCompararAgora={() => console.log("abriria o compositor comparando")}
-          aoDispensarEntao={() => console.log("dispensou")}
-          /* ⚠️ A BANCADA GUARDA A REAÇÃO, e isso não é capricho: com
+            lembreteEntao={
+              entao
+                ? {
+                    id: "p-antigo",
+                    imagemUrl: foto(CORES[2][0], CORES[2][1], CORES[2][2]),
+                    /* ⚠️ **`AGORA` CRAVADO, e nunca `Date.now()`.** Esta linha
+                     roda no RENDER: o servidor calcula um instante e o cliente
+                     calcula outro, e o texto derivado ("há 34 dias") pode
+                     divergir na virada do minuto — o React descarta a árvore e
+                     redesenha. É a mesma família do mismatch que já derrubou o
+                     app inteiro, e o próprio cabeçalho deste arquivo declara a
+                     regra três seções acima. */
+                    criadoEm: new Date(AGORA - 34 * 86_400_000).toISOString(),
+                  }
+                : null
+            }
+            aoCompararAgora={() => console.log("abriria o compositor comparando")}
+            aoDispensarEntao={() => console.log("dispensou")}
+            /* ⚠️ A BANCADA GUARDA A REAÇÃO, e isso não é capricho: com
              `aoReagir={() => {}}` era impossível ver a mecânica INTEIRA — o
              emoji escolhido pousando na linha, o pulo, o resumo se
              reordenando, o toque duplo virando coração. A tela desenhava e
              nunca respondia, que é o estado em que uma tela passa meses sem
              ninguém perceber que ela não funciona. */
-          aoReagir={acoesDaBancada.reagir}
-          aoAbrirPerfil={acoesDaBancada.abrirPerfil}
-          aoSalvar={acoesDaBancada.salvar}
-          aoVotar={acoesDaBancada.votar}
-          aoApagar={acoesDaBancada.apagar}
-          /* ⚠️ A denúncia do FEED — a lacuna que fechava o círculo: a caixinha
+            aoReagir={acoesDaBancada.reagir}
+            aoAbrirPerfil={acoesDaBancada.abrirPerfil}
+            aoSalvar={acoesDaBancada.salvar}
+            aoVotar={acoesDaBancada.votar}
+            aoApagar={acoesDaBancada.apagar}
+            /* ⚠️ A denúncia do FEED — a lacuna que fechava o círculo: a caixinha
              tinha denúncia e o canal com mais alcance não tinha. */
-          aoDenunciar={acoesDaBancada.denunciar}
-          aoTirarMarcacao={acoesDaBancada.tirarMarcacao}
-          aoEditar={acoesDaBancada.editar}
-          aoVerQuemReagiu={acoesDaBancada.verQuemReagiu}
-          /* ⚠️ O cartão só existe aos DOMINGOS e com semana publicada — sem a
+            aoDenunciar={acoesDaBancada.denunciar}
+            aoRepublicar={acoesDaBancada.republicar}
+            aoCompartilhar={acoesDaBancada.compartilhar}
+            aoStoryComPost={acoesDaBancada.storyComPost}
+            aoFixar={acoesDaBancada.fixar}
+            aoTirarMarcacao={acoesDaBancada.tirarMarcacao}
+            aoEditar={acoesDaBancada.editar}
+            aoVerQuemReagiu={acoesDaBancada.verQuemReagiu}
+            /* ⚠️ O cartão só existe aos DOMINGOS e com semana publicada — sem a
              bancada, olhá-lo exigiria esperar o domingo certo com uma conta que
              publicou naquela semana. `?retro=0` mostra o feed sem ele (o caso
              de seis dias em sete), `?retro=1foto` prova a grade de uma foto só
              e `?retro=vazia` o cartão sem foto, que é o da semana que só virou. */
-          retro={
-            entao || retroModo === "0"
-              ? null
-              : {
-                  fotos:
-                    retroModo === "vazia"
-                      ? []
-                      : retroModo === "1foto"
-                        ? [foto(CORES[0][0], CORES[0][1], CORES[0][2])]
-                        : CORES.slice(0, 4).map((c) => foto(c[0], c[1], c[2])),
-                  publicacoes: retroModo === "vazia" ? 0 : 3,
-                  reacoes: retroModo === "vazia" ? 0 : 12,
-                  semanaQueVirou: 29,
-                }
-          }
-          aoFecharRetro={() => alert("dispensaria o resumo da semana")}
-          /* ⚠️ A rolagem infinita só dá para conferir com MAIS de uma página, e
+            retro={
+              entao || memoria === 1 || retroModo === "0"
+                ? null
+                : {
+                    fotos:
+                      retroModo === "vazia"
+                        ? []
+                        : retroModo === "1foto"
+                          ? [foto(CORES[0][0], CORES[0][1], CORES[0][2])]
+                          : CORES.slice(0, 4).map((c) => foto(c[0], c[1], c[2])),
+                    publicacoes: retroModo === "vazia" ? 0 : 3,
+                    reacoes: retroModo === "vazia" ? 0 : 12,
+                    semanaQueVirou: 29,
+                  }
+            }
+            aoFecharRetro={() => alert("dispensaria o resumo da semana")}
+            /* ⚠️ A rolagem infinita só dá para conferir com MAIS de uma página, e
              uma conta de verdade levaria semanas para ter 21 publicações. Aqui
              a sentinela entrega três páginas e então diz que acabou. */
-          desafio={oDesafio}
-          /* ⚠️ A live vem do servidor (`listLivesPublic`), então sem a bancada
+            desafio={oDesafio}
+            /* ⚠️ A live vem do servidor (`listLivesPublic`), então sem a bancada
              o cartão do topo do feed seria impossível de olhar sem cadastrar
              uma live real com data no futuro — que é como um cartão passa
              meses sem ninguém nunca ter visto. `?live=agora` mostra o estado
              "ao vivo". */
-          /* ⚠️ O recorte por fase é decidido no SERVIDOR (ele lê a DUM de cada
+            /* ⚠️ O recorte por fase é decidido no SERVIDOR (ele lê a DUM de cada
              candidata), então sem a bancada o interruptor e o vazio dele
              seriam impossíveis de olhar sem duas contas reais com DUMs
              diferentes. `?fase=1` liga; `?fase=vazio` mostra o estado em que
              ninguém corresponde — que é o que precisa continuar tendo saída. */
-          mesmaFase={fase !== ""}
-          aoTrocarFase={() => {}}
-          live={
-            live === "nao"
-              ? null
-              : {
-                  id: "l1",
-                  titulo: "Sinais de trabalho de parto: o que observar",
-                  quando: new Date(Date.now() + (live === "agora" ? -5 : 5) * 60_000).toISOString(),
-                  link: "https://exemplo.com/live",
-                  aoVivo: live === "agora",
-                }
-          }
-          aoEntrarNoDesafio={(e) => alert(e ? "entraria" : "sairia")}
-          aoIrParaOJogo={() => alert("iria para o Caminho")}
-          /* ⚠️ Com `?fase=`, a bancada encerra a paginação: a fileira de
+            mesmaFase={fase !== ""}
+            aoTrocarFase={() => {}}
+            live={
+              live === "nao"
+                ? null
+                : {
+                    id: "l1",
+                    titulo: "Sinais de trabalho de parto: o que observar",
+                    /* ⚠️ Idem — ver `AGORA`. */
+                    quando: new Date(AGORA + (live === "agora" ? -5 : 5) * 60_000).toISOString(),
+                    link: "https://exemplo.com/live",
+                    aoVivo: live === "agora",
+                  }
+            }
+            aoEntrarNoDesafio={(e) => alert(e ? "entraria" : "sairia")}
+            aoIrParaOJogo={() => alert("iria para o Caminho")}
+            /* ⚠️ Com `?fase=`, a bancada encerra a paginação: a fileira de
              sugeridas (e o interruptor do recorte) só aparece quando o feed
              acaba, e rolar três páginas para conferir um interruptor é como
              uma tela passa meses sem ninguém nunca ter olhado. */
-          temMais={!vazio && paginas < 3 && fase === ""}
-          aoChegarNoFim={() => {
-            setExtras((e) => [...e, ...maisUmaPagina(4, paginas + 1)]);
-            setPaginas((n) => n + 1);
-          }}
-        />
+            temMais={!vazio && paginas < 3 && fase === ""}
+            aoChegarNoFim={() => {
+              setExtras((e) => [...e, ...maisUmaPagina(4, paginas + 1)]);
+              setPaginas((n) => n + 1);
+            }}
+          />
+        </>
       )}
       {vendoQuemReagiu && (
         <FolhaDeQuemReagiu

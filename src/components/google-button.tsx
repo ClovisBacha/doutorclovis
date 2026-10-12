@@ -57,7 +57,7 @@ export function GoogleButton({
       type="button"
       onClick={go}
       disabled={busy}
-      className="flex w-full items-center justify-center gap-2.5 rounded-full border border-border bg-card px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary disabled:opacity-60"
+      className="pill-3d press flex min-h-11 w-full items-center justify-center gap-2.5 rounded-full px-5 py-2.5 text-sm font-semibold text-foreground disabled:opacity-60"
     >
       <GoogleIcon />
       {busy ? "Redirecionando…" : label}
@@ -122,7 +122,7 @@ export function AppleButton({
       type="button"
       onClick={go}
       disabled={busy}
-      className="flex w-full items-center justify-center gap-2.5 rounded-full border border-border bg-card px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary disabled:opacity-60"
+      className="pill-3d press flex min-h-11 w-full items-center justify-center gap-2.5 rounded-full px-5 py-2.5 text-sm font-semibold text-foreground disabled:opacity-60"
     >
       <AppleIcon />
       {busy ? "Redirecionando…" : label}

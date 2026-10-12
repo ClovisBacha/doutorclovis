@@ -102,7 +102,7 @@ export function NotificacoesDoMedico() {
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-4">
+    <div className="rounded-2xl card-material p-4">
       <p className="text-sm font-semibold text-foreground">
         {estado === "negado" ? "Avisos bloqueados neste aparelho" : "Receber avisos neste aparelho"}
       </p>

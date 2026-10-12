@@ -625,9 +625,20 @@ async function buildMedidasBlock(patientId: string): Promise<string> {
       }
       const gl = sinalGlicemia(l.glucose_mg_dl as number);
       if (gl && ultimaGli === null) {
-        ultimaGli = `- Última glicemia registrada por ela: ${l.glucose_mg_dl} mg/dL em ${dia}${
-          gl.gravidade !== "normal" ? ` — ${gl.nota}` : " (dentro do alvo)"
-        }`;
+        /* ⚠️ **`normal` NÃO É "dentro do alvo", e o bloco parou de dizer isso.**
+           O app não registra se a medida foi em JEJUM ou depois de comer, e os
+           alvos de rastreio são diferentes (jejum <95; 1h depois de comer
+           <140) — `sinalGlicemia` usa o limite mais permissivo de propósito,
+           para não pintar de laranja uma glicemia normal medida depois do
+           almoço, e o comentário dela diz isso. O efeito colateral é que 118
+           cai em `normal` e pode ser jejum ALTERADO: dizer "(dentro do alvo)"
+           era o app afirmando o contrário do que ele sabe. A mesma correção
+           está em `nutricao-perfil.ts`. A PRESSÃO fica como está — ali os dois
+           números são a medida inteira, e não há a ambiguidade do jejum. */
+        ultimaGli =
+          gl.gravidade !== "normal"
+            ? `- Última glicemia registrada por ela: ${l.glucose_mg_dl} mg/dL em ${dia} — ${gl.nota}`
+            : `- Última glicemia registrada por ela: ${l.glucose_mg_dl} mg/dL em ${dia}. O app NÃO registra se foi em jejum ou depois de comer, e o alvo é diferente nos dois casos (jejum abaixo de 95; uma hora depois de comer abaixo de 140) — NUNCA afirme que este valor está dentro do alvo.`;
       }
       /* Alterados dos últimos 14 dias, no máximo três: uma lista longa vira
          recitação, e três já mostram que não é medida isolada. */

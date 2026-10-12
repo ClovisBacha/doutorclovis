@@ -758,11 +758,22 @@ export const getMyDoctorPix = createServerFn({ method: "POST" })
  * carteirinha nomeando um profissional que não a acompanha. Numa emergência
  * isso não é um detalhe de cadastro.
  *
- * Devolve `null` — e quem chama cai no `doctor.config` — em três casos, todos
- * legítimos: a paciente ainda não tem médico vinculado, o médico não
- * preencheu o WhatsApp, ou a tabela `doctors` ainda não existe no banco (as
- * migrations multi-tenant são posteriores à instalação atual). Nenhum deles
- * pode derrubar a tela.
+ * Devolve `{ ok: true, doctor: null }` em três casos, todos legítimos: a
+ * paciente ainda não tem médico vinculado, o médico não preencheu o cadastro,
+ * ou a tabela `doctors` ainda não existe no banco (as migrations multi-tenant
+ * são posteriores à instalação atual). Nenhum deles pode derrubar a tela.
+ *
+ * ⚠️ **E `{ ok: false }` NÃO É O MESMO QUE "ela não tem médico".** Até set/2026
+ * o `catch` daqui devolvia o mesmo vazio de sucesso, e o comentário dizia que
+ * "a tela usa o padrão" — só que o padrão da tela é AFIRMAR, com todas as
+ * letras, "Você ainda não tem médico". Ou seja: uma sessão vencida ou um banco
+ * fora do ar faziam o app negar, para sempre e sem erro nenhum, o vínculo de
+ * que o SOS depende para avisar alguém. Falha aberta, no dado mais caro desta
+ * tela.
+ *
+ * Quem separa os dois é `ok`, e quem decide o que a tela tem o direito de
+ * dizer é `cartaoDoMedico` (`lib/cartao-do-medico.ts`) — a régua única do
+ * cartão da home e da Central de Emergência.
  */
 export type DoctorContato = {
   nome: string;
@@ -779,7 +790,10 @@ export const getMyDoctorContact = createServerFn({ method: "POST" })
     const vazio = { ok: true as const, doctor: null as DoctorContato | null };
     try {
       const user = await requireUser(data.accessToken);
-      if (!user) return vazio;
+      /* ⚠️ Sessão que não resolve é "NÃO SEI QUEM É ELA", nunca "ela não tem
+         médico" — as duas coisas caíam no mesmo vazio, e só uma delas é um
+         fato sobre o cadastro dela. */
+      if (!user) return { ok: false as const, doctor: null as DoctorContato | null };
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { data: prof } = await (supabaseAdmin as any)
         .from("patient_profiles")
@@ -804,8 +818,11 @@ export const getMyDoctorContact = createServerFn({ method: "POST" })
         } satisfies DoctorContato,
       };
     } catch {
-      // Tabela ausente, rede caída, token vencido: a tela usa o padrão.
-      return vazio;
+      /* ⚠️ NÃO devolve `vazio`: não sabemos se ela tem médico, e dizer que não
+         tem é a afirmação que este endpoint existe para não fazer. A tabela
+         `doctors` ausente NÃO cai aqui — ela devolve `{ data: null }` sem
+         lançar e já é tratada acima como um dos vazios legítimos. */
+      return { ok: false as const, doctor: null as DoctorContato | null };
     }
   });
 

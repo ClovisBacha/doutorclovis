@@ -36,7 +36,9 @@ const semComentarios = (p: string) =>
 const cantinhoFns = semComentarios("src/lib/cantinho.functions.ts");
 const sementinhas = semComentarios("src/lib/sementinhas.functions.ts");
 const jogo = semComentarios("src/components/gestacao-path.tsx");
-const conta = semComentarios("src/routes/_authenticated/minha-conta.tsx");
+/* ⚠️ O Cantinho saiu de `minha-conta.tsx` em set/2026 — move verbatim,
+   conferido por hash. */
+const conta = semComentarios("src/components/cantinho-tab.tsx");
 const css = readFileSync("src/styles.css", "utf8");
 
 /** As quatro atividades de bem-estar, como o servidor as nomeia. */

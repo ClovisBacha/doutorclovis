@@ -136,7 +136,7 @@ export function SimulacaoDoCerebro({
               </span>
             ) : (
               <>
-                <span className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] opacity-70">
+                <span className="mb-1.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.12em] opacity-70">
                   <span aria-hidden>{v.emoji}</span> {v.titulo}
                 </span>
                 <p className="leading-relaxed">{caso.resposta}</p>
@@ -152,7 +152,7 @@ export function SimulacaoDoCerebro({
         <span className="mt-1 block opacity-80">{v.explica}</span>
       </div>
 
-      <p className={`mt-3 text-[11px] leading-relaxed ${t.fraco}`}>{AVISO_DA_SIMULACAO}</p>
+      <p className={`mt-3 text-xs leading-relaxed ${t.fraco}`}>{AVISO_DA_SIMULACAO}</p>
     </div>
   );
 }

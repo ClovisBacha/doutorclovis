@@ -56,6 +56,13 @@ export function ChaDeBebe({
   const [dados, setDados] = useState<BancadaDoCha | null>(bancada ?? null);
   const [carregando, setCarregando] = useState(!bancada);
   const [novoTitulo, setNovoTitulo] = useState("");
+  /* ⚠️ **`titulo` É DA LISTA; `novoTitulo` é do ITEM.** Os dois existiam com
+     nomes parecidos e só um tinha tela — foi assim que os três campos do
+     convite passaram despercebidos. */
+  const [titulo, setTitulo] = useState(bancada?.lista?.titulo ?? "");
+  const [recado, setRecado] = useState(bancada?.lista?.recado ?? "");
+  const [dataDoCha, setDataDoCha] = useState(bancada?.lista?.dataDoCha ?? "");
+  const [salvandoConvite, setSalvandoConvite] = useState(false);
   /* ⚠️ **AS COTAS NÃO TINHAM COMO NASCER.** O servidor aceita `tipo: "cota"`,
      a régua está inteira e testada (`cotas.ts`, com o caso do R$ 1.200 ÷ 7), e
      a página pública desenha a reserva de cota — mas o único lugar do `src/`
@@ -94,7 +101,16 @@ export function ChaDeBebe({
         const { minhaLista } = await import("@/lib/presentes.functions");
         const r = await minhaLista({ data: { accessToken: token } });
         if (!vivo) return;
-        if (r.ok) setDados({ lista: r.lista, guardados: r.guardados });
+        if (r.ok) {
+          setDados({ lista: r.lista, guardados: r.guardados });
+          /* ⚠️ **OS CAMPOS SÃO SEMEADOS AQUI, e não no `useState`.** O
+             inicializador roda uma vez, ANTES de a lista chegar — sem esta
+             linha, os três abririam vazios sobre um convite já escrito, e o
+             primeiro salvamento apagaria o que ela tinha. */
+          setTitulo(r.lista.titulo ?? "");
+          setRecado(r.lista.recado ?? "");
+          setDataDoCha(r.lista.dataDoCha ?? "");
+        }
       } catch {
         /* Sem lista a tela mostra o vazio, não um erro: ela não pediu isto
            agora, veio ver o que já tem. */
@@ -232,10 +248,16 @@ export function ChaDeBebe({
       const { arquivarItem, minhaLista } = await import("@/lib/presentes.functions");
       const r = await arquivarItem({ data: { accessToken: token, itemId } });
       if (!r.ok) {
+        /* ⚠️ "contagem-ilegivel" tem texto PRÓPRIO: dizer "alguém já reservou"
+           sobre uma leitura que falhou faria a mãe procurar uma reserva que
+           talvez não exista, e desistir de tirar um item que ela pode tirar. */
+        const motivo = "motivo" in r ? r.motivo : null;
         toast.error(
-          "motivo" in r && r.motivo === "tem-reserva"
+          motivo === "tem-reserva"
             ? "Alguém já reservou esse item — fale com ela antes de tirar 💛"
-            : "Não deu para tirar o item.",
+            : motivo === "contagem-ilegivel"
+              ? "Não consegui conferir se alguém já reservou — tente de novo."
+              : "Não deu para tirar o item.",
         );
         return;
       }
@@ -304,26 +326,149 @@ export function ChaDeBebe({
     }
   }
 
+  /**
+   * O convite mudou em relação ao que está guardado?
+   *
+   * ⚠️ **É o que impede o botão de prometer trabalho que não existe.** Sem a
+   * comparação, "Salvar convite" fica aceso para sempre — e um botão que
+   * sempre pode ser tocado ensina que tocar nele não significa nada.
+   */
+  const mudouConvite =
+    !!dados &&
+    (titulo.trim() !== (dados.lista.titulo ?? "") ||
+      recado.trim() !== (dados.lista.recado ?? "") ||
+      dataDoCha !== (dados.lista.dataDoCha ?? ""));
+
+  /**
+   * O nome do bebê no exemplo do campo.
+   *
+   * ⚠️ **SEM ARTIGO, e eu reintroduzi essa armadilha nesta mesma rodada.**
+   * Escrevi o artigo saindo da PRIMEIRA LETRA e o resultado medido foi
+   * "Chá de bebê **do** Helena": inicial não é sinal de gênero em português, e
+   * `baby_name` não carrega gênero nenhum. É o mesmo defeito que o bolão teve
+   * ("Quando o Helena nasce?") e que o agradecimento do chá já documenta —
+   * aparecendo pela terceira vez, num arquivo diferente.
+   *
+   * O travessão resolve sem adivinhar nada.
+   */
+  const nomeDoBebe = dados?.lista.bebeNome ?? null;
+  const placeholderDoTitulo = nomeDoBebe ? `Chá de bebê — ${nomeDoBebe}` : "Chá de bebê";
+
+  async function salvarConvite() {
+    if (!dados || salvandoConvite || !mudouConvite) return;
+    setSalvandoConvite(true);
+    try {
+      const s = await supabase.auth.getSession();
+      const token = s.data.session?.access_token;
+      if (!token) return;
+      const { salvarItens, minhaLista } = await import("@/lib/presentes.functions");
+      /**
+       * ⚠️ **SEM `itens` — e é o servidor que separa os dois assuntos.**
+       *
+       * `salvarItens` grava o convite E a lista. Reenviar a lista aqui pediria
+       * que a tela remontasse a forma exata que o schema espera, e qualquer
+       * diferença apagaria itens que ninguém pediu para apagar. O campo virou
+       * opcional: ausente quer dizer "não mexi na lista".
+       *
+       * ⚠️ **E vazio vira `null`, nunca `""`.** A coluna é `text` nullable, e a
+       * página pública decide o texto padrão pelo `null`: com string vazia, o
+       * convite abriria com um título em branco em vez do padrão.
+       */
+      const r = await salvarItens({
+        data: {
+          accessToken: token,
+          titulo: titulo.trim() || null,
+          recado: recado.trim() || null,
+          dataDoCha: dataDoCha || null,
+        },
+      });
+      if (!r.ok) {
+        toast.error("Não deu para salvar o convite.");
+        return;
+      }
+      /* Relê do servidor: é ele que decide o que ficou guardado, e pintar o que
+         eu mandei deixaria a tela certa e o banco diferente. */
+      const novo = await minhaLista({ data: { accessToken: token } });
+      if (novo.ok) setDados({ lista: novo.lista, guardados: novo.guardados });
+      toast.success("Convite salvo 💛");
+    } catch {
+      toast.error("Não deu para salvar o convite.");
+    } finally {
+      setSalvandoConvite(false);
+    }
+  }
+
   return (
     <div className="space-y-5">
+      {/* O título mora no cabeçalho da porta (`CabecalhoDaPorta`, em
+          `minha-conta`), que já diz "Chá de bebê" sobre a família rosa. Aqui fica
+          só a frase de abertura — um segundo título seria eco. */}
       <header>
-        <h2 className="text-xl font-semibold">🎁 Chá de bebê</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Monte a lista, mande o link. Quem quiser dar escolhe o que ainda cabe.
         </p>
       </header>
 
+      {/* ─── O CONVITE: TÍTULO, RECADO E DATA ──────────────────────────────
+          ⚠️ **AS TRÊS COLUNAS EXISTIAM E NÃO TINHAM PORTA NENHUMA.**
+          `salvarItens` aceita `titulo`, `recado` e `dataDoCha`, o handler as
+          grava e `minhaLista` as devolve — e o único chamador mandava só
+          `itens`. A lista abria com o texto padrão para todo mundo, e a
+          página que a amiga recebe é justamente onde essas três informações
+          fazem o convite parecer um convite.
+
+          ⚠️ **`type="date"`, e não texto.** Data em campo livre já custou três
+          horas nesta base (`confirmed_time` aceitando "manhã"), e aqui ela vai
+          para uma coluna `date`. */}
+      <section className="rounded-3xl card-material p-4">
+        <p className="font-serif text-[15px] font-semibold text-muted-foreground">O convite</p>
+        <input
+          value={titulo}
+          onChange={(e) => setTitulo(e.target.value.slice(0, 120))}
+          /* ⚠️ **O NOME DO BEBÊ VAI SEM ARTIGO CRAVADO** — "d{a|o}" sai da
+              primeira letra, senão "A Miguel". É a mesma armadilha que o bolão
+              teve e que o agradecimento do chá já documenta. */
+          placeholder={placeholderDoTitulo}
+          aria-label="Título da lista"
+          className="mt-2 min-h-[44px] w-full rounded-2xl border border-border bg-background px-3 text-sm"
+        />
+        <textarea
+          value={recado}
+          onChange={(e) => setRecado(e.target.value.slice(0, 500))}
+          rows={2}
+          placeholder="Um recado para quem abrir (opcional)"
+          aria-label="Recado da lista"
+          className="mt-2 w-full resize-none rounded-2xl border border-border bg-background px-3 py-2 text-sm"
+        />
+        <label className="mt-2 flex items-center gap-2 text-sm">
+          <span className="shrink-0 text-muted-foreground">Data do chá</span>
+          <input
+            type="date"
+            value={dataDoCha}
+            onChange={(e) => setDataDoCha(e.target.value)}
+            aria-label="Data do chá"
+            className="min-h-[44px] flex-1 rounded-2xl border border-border bg-background px-3 text-sm"
+          />
+        </label>
+        <button
+          type="button"
+          disabled={salvandoConvite || !mudouConvite}
+          onClick={() => void salvarConvite()}
+          className="press mt-2 min-h-[44px] w-full rounded-2xl bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+        >
+          {salvandoConvite ? "Salvando…" : mudouConvite ? "Salvar convite" : "Convite salvo"}
+        </button>
+      </section>
+
       {/* ─── O LINK ────────────────────────────────────────────────────── */}
-      <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Seu link
-        </p>
+      <section className="rounded-3xl card-material p-4">
+        <p className="font-serif text-[15px] font-semibold text-muted-foreground">Seu link</p>
         <p className="mt-1 break-all text-sm text-foreground">{url}</p>
         <div className="mt-3 flex gap-2">
           <button
             type="button"
             onClick={copiar}
-            className="press flex-1 rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground"
+            className="btn-3d press min-h-11 flex-1 rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground"
           >
             Copiar convite
           </button>
@@ -331,7 +476,7 @@ export function ChaDeBebe({
             href={linkDeWhatsApp(textoDoConvite({ bebeNome: lista.bebeNome, url }))}
             target="_blank"
             rel="noreferrer"
-            className="press flex-1 rounded-xl border border-border px-3 py-2 text-center text-sm font-medium"
+            className="pill-3d press min-h-11 flex-1 rounded-xl px-3 py-2 text-center text-sm font-semibold"
           >
             Mandar no WhatsApp
           </a>
@@ -339,7 +484,7 @@ export function ChaDeBebe({
       </section>
 
       {/* ─── O QUE JÁ CHEGOU ───────────────────────────────────────────── */}
-      <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      <section className="rounded-3xl card-material p-4">
         <h3 className="font-semibold">Fraldas</h3>
         <ul className="mt-2 space-y-1.5">
           {ordemDeUrgencia(saldos).map((t) => {
@@ -363,7 +508,7 @@ export function ChaDeBebe({
       </section>
 
       {/* ─── OS OUTROS ITENS ───────────────────────────────────────────── */}
-      <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      <section className="rounded-3xl card-material p-4">
         <div className="flex items-baseline justify-between">
           <h3 className="font-semibold">Na lista</h3>
           <span className="text-xs tabular-nums text-muted-foreground">
@@ -377,41 +522,70 @@ export function ChaDeBebe({
               const e = i.tipo === "cota" ? estadoDaCota(i.meta, i.reservado) : null;
               return (
                 <li key={i.id} className="text-sm">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="min-w-0 flex-1">{i.titulo}</span>
-                    <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                      {e ? legendaDaCota(e) : i.reservado > 0 ? "reservado 💛" : "—"}
+                  {/* ⚠️ A LINHA INTEIRA É O ALVO, e não um ✕ de canto — é o
+                      MESMO padrão da lista de registros clínicos da aba Saúde e
+                      das abas de chutes e contrações, pelo mesmo motivo medido:
+                      um ✕ com `-my-2` encavala a caixa da linha vizinha, e o
+                      toque 10px abaixo do centro tirava o ITEM ERRADO. Medido a
+                      393px antes: caixa 29×32, alvo EFETIVO 30×26 nas linhas
+                      com vizinho abaixo.
+                      ⚠️ E NÃO se conserta com `after:-inset`: foi tentado e
+                      medido — o pseudo-elemento do vizinho fica por cima e a
+                      altura efetiva CAI de 18 para 6px. O conserto é a altura
+                      da linha.
+                      ⚠️ `<span>`, NUNCA `<div>`, no agrupamento: `<button>` só
+                      aceita conteúdo de fraseado, e este repositório já ficou
+                      SEM ABRIR por árvore inválida (`<ul>` dentro de `<p>`).
+                      ⚠️ E `min-h-11`, nunca `h-11`: com altura fixa um título
+                      longo é cortado — e o título é o que identifica QUAL item
+                      está sendo tirado. */}
+                  <button
+                    type="button"
+                    onClick={() => setConfirmando(confirmando === i.id ? null : i.id)}
+                    aria-expanded={confirmando === i.id}
+                    aria-label={`Tirar ${i.titulo} da lista`}
+                    className="press flex min-h-11 w-full items-center justify-between gap-2 text-left"
+                  >
+                    <span className="flex min-w-0 flex-1 items-baseline gap-2">
+                      <span className="min-w-0 flex-1">{i.titulo}</span>
+                      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                        {e ? legendaDaCota(e) : i.reservado > 0 ? "reservado 💛" : "—"}
+                      </span>
                     </span>
-                    {/* ⚠️ Alvo de 44px e ✕ desenhado em texto: é o único
-                        controle destrutivo desta tela, e mirar num × de 16px
-                        ao lado do nome do item é pedir para errar. */}
-                    <button
-                      type="button"
-                      onClick={() => setConfirmando(confirmando === i.id ? null : i.id)}
-                      aria-label={`Tirar ${i.titulo} da lista`}
-                      className="press -my-2 shrink-0 px-2 py-2 text-base leading-none text-muted-foreground"
+                    {/* O ✕ deixou de ser CONTROLE e virou afordância: quem
+                        recebe o toque é a linha. `aria-hidden` para o leitor de
+                        tela não anunciar o glifo além do rótulo da linha. */}
+                    <span
+                      aria-hidden
+                      className="shrink-0 text-base leading-none text-muted-foreground"
                     >
                       ✕
-                    </button>
-                  </div>
+                    </span>
+                  </button>
                   {/* ⚠️ MENSAGEM SEPARADA, e não o mesmo botão virando "tem
                       certeza?" — a mesma decisão do cancelar consulta, e pelo
                       mesmo motivo: o segundo toque no lugar do primeiro
                       confirma o que ela ainda estava lendo. */}
                   {confirmando === i.id && (
-                    <div className="mt-1.5 flex items-center gap-2 rounded-xl bg-muted/60 px-3 py-2">
-                      <span className="min-w-0 flex-1 text-xs">Tirar da lista?</span>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-xl bg-muted/60 px-3 py-2">
+                      {/* ⚠️ A CONFIRMAÇÃO DIZ O NOME, e é a última defesa contra
+                          o toque na linha errada — que é literalmente o risco
+                          desta lista. "Tirar da lista?" sozinho não dá a ela
+                          nenhuma chance de perceber que a linha aberta não é a
+                          que ela mirou. O `aria-label` do controle já dizia o
+                          nome; a TELA não dizia. */}
+                      <span className="min-w-0 flex-1 text-xs">Tirar “{i.titulo}” da lista?</span>
                       <button
                         type="button"
                         onClick={() => void tirar(i.id)}
-                        className="press shrink-0 rounded-lg bg-destructive px-3 py-1.5 text-xs font-semibold text-destructive-foreground"
+                        className="press min-h-11 shrink-0 rounded-lg bg-destructive px-4 text-xs font-semibold text-destructive-foreground"
                       >
                         Tirar
                       </button>
                       <button
                         type="button"
                         onClick={() => setConfirmando(null)}
-                        className="press shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs"
+                        className="press min-h-11 shrink-0 rounded-lg border border-border px-4 text-xs"
                       >
                         Não
                       </button>
@@ -426,13 +600,13 @@ export function ChaDeBebe({
             value={novoTitulo}
             onChange={(e) => setNovoTitulo(e.target.value.slice(0, 120))}
             placeholder="Acrescentar um item"
-            className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm"
+            className="min-h-11 min-w-0 flex-1 rounded-xl border border-border bg-background px-3 text-sm"
           />
           <button
             type="button"
             onClick={acrescentar}
             disabled={ehCota && !pedacos}
-            className="press shrink-0 rounded-xl border border-primary/40 px-3 py-2 text-sm font-medium text-primary disabled:opacity-40"
+            className="press min-h-11 shrink-0 rounded-xl border border-primary/40 px-4 text-sm font-medium text-primary disabled:opacity-40"
           >
             Pôr na lista
           </button>
@@ -442,7 +616,10 @@ export function ChaDeBebe({
             ⚠️ **Desligado por padrão.** A maioria dos itens de um chá é item
             simples; abrir o formulário já em modo cota faria toda mãe decidir
             sobre divisão para acrescentar uma mamadeira. */}
-        <label className="mt-2 flex items-center gap-2 text-[13px] text-muted-foreground">
+        {/* ⚠️ O ALVO DE UM CHECKBOX NATIVO É O `<label>`, e não a caixinha de
+            16×16: tocar no rótulo alterna. Medido antes: label 359×20 — a
+            largura estava boa e a ALTURA era metade do mínimo. */}
+        <label className="mt-2 flex min-h-11 items-center gap-2 text-[13px] text-muted-foreground">
           <input
             type="checkbox"
             checked={ehCota}
@@ -460,7 +637,7 @@ export function ChaDeBebe({
 
         {ehCota && (
           <div className="mt-2 rounded-2xl border border-border p-3">
-            <label className="block text-[12px] text-muted-foreground" htmlFor="valor-da-cota">
+            <label className="block text-xs text-muted-foreground" htmlFor="valor-da-cota">
               Quanto custa, mais ou menos?
             </label>
             <div className="mt-1 flex items-center gap-2">
@@ -476,7 +653,7 @@ export function ChaDeBebe({
                   setPedacos(null);
                 }}
                 placeholder="1200"
-                className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                className="min-h-11 min-w-0 flex-1 rounded-xl border border-border bg-background px-3 text-sm"
               />
             </div>
 
@@ -487,7 +664,7 @@ export function ChaDeBebe({
                 um número livre reintroduziria exatamente isso. */}
             {sugestoesDeCota.length > 0 ? (
               <>
-                <p className="mt-2.5 text-[12px] text-muted-foreground">Dividir em:</p>
+                <p className="mt-2.5 text-xs text-muted-foreground">Dividir em:</p>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {sugestoesDeCota.map((n) => (
                     <button
@@ -510,7 +687,7 @@ export function ChaDeBebe({
               /* ⚠️ Diz o PISO, não "valor inválido": sem o número ela não sabe
                  o que corrigir, e o piso é a regra inteira. */
               valorDaCota.trim() !== "" && (
-                <p className="mt-2.5 text-[12px] text-muted-foreground">
+                <p className="mt-2.5 text-xs text-muted-foreground">
                   Para dividir, o presente precisa custar pelo menos R$ 50 — cada cota não pode
                   ficar abaixo de R$ 25.
                 </p>
@@ -535,7 +712,7 @@ export function ChaDeBebe({
 
       {/* ─── A QUEM AGRADECER ──────────────────────────────────────────── */}
       {pessoas.length > 0 && (
-        <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+        <section className="rounded-3xl card-material p-4">
           <h3 className="font-semibold">Agradecer</h3>
           <p className="mt-1 text-xs text-muted-foreground">
             O texto já vem pronto — dá pra mudar antes de mandar.
