@@ -193,19 +193,20 @@ export function Caminho(p: PropsDoCaminho) {
   const { avisar, aviso } = useAviso({ direita: 72 });
 
   /* ── Espalhar o que ela comprou e a trilha ainda não viu ──
-     Nas MESMAS posições que o site daria (a régua e a altura são as dele):
-     quem semear primeiro, aqui ou lá, grava o layout que os dois mostram. */
+     PERTO DE HOJE, onde o Caminho abre (a régua do app — `semearPertoDeHoje`):
+     ela compra no Cantinho, volta e encontra o enfeite na primeira tela. Só
+     depois do pull da nuvem, para não semear sobre um blob atrasado. */
   const avisouCheia = useRef(false);
   const { podeSemear, possuidos, decoracao, aoGravarDecoracao } = p;
   useEffect(() => {
     if (!podeSemear || !possuidos) return;
-    const r = semearNovos(decoracao, possuidos, alturaDaTrilha);
+    const r = semearNovos(decoracao, possuidos, alturaDaTrilha, Y_INICIAL_DO_SITE + yDeHoje);
     if (r.esperando > 0 && !avisouCheia.current) {
       avisouCheia.current = true;
       avisar(`A trilha está cheia (${DECOR_MAX} enfeites). Os novos esperam no ✏️ Arrumar.`);
     }
     if (r.decoracao) aoGravarDecoracao(r.decoracao);
-  }, [podeSemear, possuidos, decoracao, alturaDaTrilha, aoGravarDecoracao, avisar]);
+  }, [podeSemear, possuidos, decoracao, alturaDaTrilha, yDeHoje, aoGravarDecoracao, avisar]);
 
   /* ── O modo Arrumar ── */
   const [arrumando, setArrumando] = useState(false);

@@ -2,11 +2,11 @@
  * OS ENFEITES DO CANTINHO NA TRILHA — e o que a lojinha do app mostra.
  * Sem react-native aqui: é testado pelo bun.
  *
- * A régua de onde cada enfeite nasce é a do site (`seedDecor`, `hashStr` e
- * `loadDecor` em src/components/gestacao-path.tsx), copiada porque mora num
- * componente; o teste `enfeites.test.ts` confere o mesmo vetor que o site usa.
- * O layout é da PACIENTE (`dc-path-decor` no blob da jornada): ela arruma no
- * site e vê igual no app, e vice-versa.
+ * O layout é da PACIENTE (`dc-path-decor` no blob da jornada, o mesmo formato
+ * do `loadDecor` do site): o que ela arrumou continua onde ela pôs.
+ *
+ * ⚠️ A régua de onde um enfeite NOVO nasce é do app (decisão do dono,
+ * 14/10/2026): perto de hoje — ver `semearPertoDeHoje`. O site não muda mais.
  */
 
 import {
@@ -58,14 +58,27 @@ export function lerDecoracao(v: unknown): Decoracao | null {
   return { v: 1, items, seen };
 }
 
-/** Espalha itens novos pela trilha (o `seedDecor` do site, número a número). */
-export function semearEnfeites(
+/**
+ * ESPALHA ITENS NOVOS PERTO DE HOJE — a régua do app (decisão do dono, 14/10).
+ *
+ * A régua do site (`seedDecor`) espalhava a partir do COMEÇO da trilha: quem
+ * estava na semana 24 comprava uma joaninha e só a encontrava rolando até a
+ * semana 1. Aqui cada item nasce em volta do dia de hoje — que é onde o
+ * Caminho abre —, nas calhas dos dois lados, por fora das bolinhas (o meio é
+ * da trilha). O céu nasce acima de hoje, no alto da tela.
+ *
+ * Determinístico (o mesmo hash para o mesmo item) e gravado: depois de nascer,
+ * o enfeite não anda mais sozinho. Uma compra só cai a até ~290 px de hoje,
+ * dentro da primeira tela; um lote grande se abre mais, para não amontoar.
+ */
+export function semearPertoDeHoje(
   ids: readonly string[],
-  altura: number,
+  yDeHoje: number,
+  alturaDaTrilha: number,
   deslocamento: number,
 ): EnfeitePosto[] {
   const fora: EnfeitePosto[] = [];
-  const faixa = Math.max(240, altura - 260);
+  const meia = Math.min(800, 260 + ids.length * 30);
   ids.forEach((id, i) => {
     const item = CANTINHO_BY_ID[id];
     if (!item) return;
@@ -74,19 +87,18 @@ export function semearEnfeites(
     const especial = item.type === "especial";
     const copias = especial ? 1 : 2;
     for (let e = 0; e < copias; e++) {
-      const y =
-        item.type === "ceu"
-          ? 40 + (((h % 90) + e * 110 + idx * 37) % 200)
-          : 130 + (((h % 400) + e * 880 + idx * 270) % faixa);
+      const mistura = (h % 997) + e * 389 + i * 211;
+      const desvio = item.type === "ceu" ? -60 - (mistura % 220) : (mistura % (2 * meia)) - meia;
       const lado = (e + idx) % 2;
-      const ruido = (h >>> (e + 2)) % 10;
-      const x =
-        item.type === "ceu" ? 12 + ((h >>> (e + 5)) % 76) : lado === 0 ? 8 + ruido : 82 + ruido;
+      /* Calhas de 7–11% e 89–93%: as bolinhas da trilha chegam a 16% e 84%
+         da largura, e o enfeite desenhado ATRÁS de uma delas é o enfeite que
+         ela comprou e não vê. */
+      const ruido = (h >>> (e + 2)) % 5;
       fora.push({
-        k: `s${idx}-${e}-${id}`,
+        k: `h${idx}-${e}-${id}`,
         id,
-        x,
-        y,
+        x: lado === 0 ? 7 + ruido : 89 + ruido,
+        y: limitar(Math.round(yDeHoje + desvio), 20, Math.max(20, alturaDaTrilha - 20)),
         s: especial ? 1.6 : item.type === "planta" ? 1.25 : 1,
       });
     }
@@ -116,8 +128,8 @@ export function climasDela(possuidos: readonly string[]): string[] {
 
 /**
  * Semeia o que ela comprou e ainda não foi visto pela trilha (o efeito de
- * auto-colocação do site): cada item novo nasce em duas cópias (o especial, em
- * uma), até o teto de 120.
+ * auto-colocação do site, com a régua do app — perto de hoje): cada item novo
+ * nasce em duas cópias (o especial, em uma), até o teto de 120.
  *
  * ⚠️ Só é marcado como visto o que COUBE: o resto ESPERA a vaga (e `esperando`
  * diz quantos, para a tela avisar que a trilha está cheia). Marcar tudo de uma
@@ -128,6 +140,7 @@ export function semearNovos(
   atual: Decoracao | null,
   possuidos: readonly string[],
   alturaDaTrilha: number,
+  yDeHoje: number,
 ): { decoracao: Decoracao | null; esperando: number } {
   const base = atual ?? { v: 1 as const, items: [], seen: [] };
   const novos = bandeja(possuidos).filter((id) => !base.seen.includes(id));
@@ -145,7 +158,10 @@ export function semearNovos(
   return {
     decoracao: {
       v: 1,
-      items: [...base.items, ...semearEnfeites(cabem, alturaDaTrilha, base.items.length)],
+      items: [
+        ...base.items,
+        ...semearPertoDeHoje(cabem, yDeHoje, alturaDaTrilha, base.items.length),
+      ],
       seen: [...base.seen, ...cabem],
     },
     esperando,

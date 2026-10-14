@@ -4,6 +4,20 @@ Site institucional e portal do paciente do Dr. Clóvis Bacha, ginecologista e
 obstetra especialista em gestação de alto risco. Migrado do Lovable para
 desenvolvimento no Claude Code.
 
+## ⚠️ O SITE NÃO MUDA MAIS — o produto é o app (decisão do dono, 14/10/2026)
+
+Nas palavras dele: "nada mais deve ser feito no site. O site não é pra existir
+mais." Todo trabalho novo vai para o app (`mobile/`). Nada em `src/` muda —
+nem para consertar um defeito do site, nem para facilitar o app. Quando o app
+precisar de uma regra diferente da do site, ela nasce no app (ex.:
+`semearPertoDeHoje` em `mobile/src/lib/jornada/enfeites.ts`).
+
+⚠️ **Mas o deploy da Vercel NÃO pode sair do ar.** O app chama as funções de
+servidor dele (`/_serverFn/<sha256 do arquivo e do nome>`, ver
+`mobile/src/servidor/ponte.ts`) e importa regras puras de `src/lib`. Tirar o
+site do ar derruba compras, SOS e tudo o que passa pelo servidor — e mexer num
+arquivo de `src/` que o app importa muda o que o app faz.
+
 ## Stack
 
 - **React 19** + **TanStack Start / Router** (SSR, file-based routing)

@@ -1,6 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import {
   bandeja,
   categoriasDaLoja,
@@ -10,7 +8,7 @@ import {
   itensDaLoja,
   lerDecoracao,
   paradasDoDegrade,
-  semearEnfeites,
+  semearPertoDeHoje,
   semearNovos,
   alturaNoSite,
   enfeitesPorBloco,
@@ -26,41 +24,53 @@ import {
 } from "@/lib/cantinho";
 import { CONJUNTO_POR_ID } from "@/lib/conjuntos";
 
-const SITE = readFileSync(
-  join(import.meta.dir, "..", "..", "..", "..", "src", "components", "gestacao-path.tsx"),
-  "utf8",
-);
+describe("os enfeites novos nascem perto de hoje (a régua do app)", () => {
+  const HOJE = 17000;
+  const TRILHA = 27152;
+  const de = (r: ReturnType<typeof semearPertoDeHoje>, id: string) => r.filter((p) => p.id === id);
 
-describe("os enfeites nascem onde nasceriam no site", () => {
-  test("a régua do site é a mesma (seedDecor)", () => {
-    expect(SITE).toContain("const span = Math.max(240, height - 260);");
-    expect(SITE).toContain("? 40 + (((h % 90) + e * 110 + idx * 37) % 200)");
-    expect(SITE).toContain(": 130 + (((h % 400) + e * 880 + idx * 270) % span);");
-    expect(SITE).toContain(
-      'item.type === "ceu" ? 12 + ((h >>> (e + 5)) % 76) : side === 0 ? 8 + jitter : 82 + jitter;',
-    );
+  test("uma compra cai na primeira tela, nas calhas, em duas cópias", () => {
+    const r = semearPertoDeHoje(["bicho-joaninha"], HOJE, TRILHA, 0);
+    expect(r).toHaveLength(2);
+    for (const p of r) {
+      expect(Math.abs(p.y - HOJE)).toBeLessThanOrEqual(290);
+      // por fora das bolinhas (que chegam a 16% e 84% da largura)
+      expect(p.x <= 11 || p.x >= 89).toBe(true);
+    }
+    // uma de cada lado
+    expect(r.some((p) => p.x <= 11) && r.some((p) => p.x >= 89)).toBe(true);
   });
 
-  test("o vetor de referência do site", () => {
-    const r = semearEnfeites(
-      ["ceu-estrelinhas", "bicho-joaninha", "especial-primavera", "planta-suculenta"],
-      27000,
+  test("o céu nasce acima de hoje; o especial em uma cópia, maior; a planta maior", () => {
+    const r = semearPertoDeHoje(
+      ["ceu-estrelinhas", "especial-primavera", "planta-suculenta"],
+      HOJE,
+      TRILHA,
       0,
     );
-    const de = (id: string) => r.filter((p) => p.id === id).map((p) => [p.x, p.y, p.s]);
-    expect(de("ceu-estrelinhas")).toEqual([
-      [59, 98, 1],
-      [73, 208, 1],
-    ]);
-    expect(de("bicho-joaninha")).toEqual([
-      [88, 746, 1],
-      [11, 1626, 1],
-    ]);
-    expect(de("especial-primavera")).toEqual([[8, 830, 1.6]]);
-    expect(de("planta-suculenta")).toEqual([
-      [89, 1091, 1.25],
-      [16, 1971, 1.25],
-    ]);
+    for (const p of de(r, "ceu-estrelinhas")) expect(p.y).toBeLessThan(HOJE);
+    expect(de(r, "especial-primavera")).toHaveLength(1);
+    expect(de(r, "especial-primavera")[0].s).toBe(1.6);
+    expect(de(r, "planta-suculenta").map((p) => p.s)).toEqual([1.25, 1.25]);
+  });
+
+  test("é sempre o mesmo lugar para o mesmo item, e nunca fora da trilha", () => {
+    expect(semearPertoDeHoje(["luz-vela"], HOJE, TRILHA, 3)).toEqual(
+      semearPertoDeHoje(["luz-vela"], HOJE, TRILHA, 3),
+    );
+    for (const p of semearPertoDeHoje(["ceu-estrelinhas", "agua-poca"], 30, TRILHA, 0))
+      expect(p.y).toBeGreaterThanOrEqual(20);
+    for (const p of semearPertoDeHoje(["agua-poca"], TRILHA, TRILHA, 0))
+      expect(p.y).toBeLessThanOrEqual(TRILHA - 20);
+  });
+
+  test("um lote grande se abre mais, sem amontoar", () => {
+    const ids = itensDaLoja([])
+      .filter((i) => i.price > 0 && i.type !== "fundo" && i.type !== "trilha")
+      .map((i) => i.id);
+    const ys = semearPertoDeHoje(ids, HOJE, TRILHA, 0).map((p) => p.y);
+    expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(600);
+    for (const y of ys) expect(Math.abs(y - HOJE)).toBeLessThanOrEqual(800);
   });
 
   test("a bandeja deixa de fora cenário, pele, céu do app e clima", () => {
@@ -77,10 +87,15 @@ describe("os enfeites nascem onde nasceriam no site", () => {
   });
 
   test("semeia só o que é novo, uma vez, e respeita o teto de 120", () => {
-    const primeira = semearNovos(null, ["planta-suculenta", "ceu-estrelinhas"], 27000).decoracao!;
+    const primeira = semearNovos(
+      null,
+      ["planta-suculenta", "ceu-estrelinhas"],
+      27000,
+      17000,
+    ).decoracao!;
     expect(primeira.items).toHaveLength(4);
     expect(primeira.seen).toEqual(["planta-suculenta", "ceu-estrelinhas"]);
-    expect(semearNovos(primeira, ["planta-suculenta", "ceu-estrelinhas"], 27000)).toEqual({
+    expect(semearNovos(primeira, ["planta-suculenta", "ceu-estrelinhas"], 27000, 17000)).toEqual({
       decoracao: null,
       esperando: 0,
     });
@@ -98,11 +113,11 @@ describe("os enfeites nascem onde nasceriam no site", () => {
     // a joaninha (2 vagas) não cabe e PARA a fila, como no site — a
     // primavera, que vinha depois, espera a próxima abertura; e as duas
     // ficam FORA do `seen`, para nascerem quando houver vaga
-    expect(semearNovos(cheia, ["bicho-joaninha", "especial-primavera"], 27000)).toEqual({
+    expect(semearNovos(cheia, ["bicho-joaninha", "especial-primavera"], 27000, 17000)).toEqual({
       decoracao: null,
       esperando: 2,
     });
-    const so = semearNovos(cheia, ["especial-primavera"], 27000);
+    const so = semearNovos(cheia, ["especial-primavera"], 27000, 17000);
     expect(so.decoracao?.items).toHaveLength(120);
     expect(so.esperando).toBe(0);
   });
