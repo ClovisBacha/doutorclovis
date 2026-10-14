@@ -114,3 +114,9 @@ export function dataCurta(iso: string | null | undefined): string | null {
   if (Number.isNaN(d.getTime())) return null;
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
+
+/** "dd/mm/aaaa" de um instante ISO, no fuso do aparelho (a data da conquista). */
+export function dataCompleta(iso: string | null | undefined): string | null {
+  const curta = dataCurta(iso);
+  return curta ? `${curta}/${new Date(iso as string).getFullYear()}` : null;
+}

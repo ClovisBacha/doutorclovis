@@ -9,6 +9,7 @@ import {
   View,
   type LayoutChangeEvent,
 } from "react-native";
+import { useAviso } from "~/componentes/aviso";
 import { toque } from "~/componentes/base";
 import { corCaminho } from "~/componentes/caminho/cores";
 import {
@@ -132,11 +133,7 @@ export function Caminho(p: PropsDoCaminho) {
   }, [alturaDoTopo, alturaDaLista, indiceDeHoje, yDeHoje]);
 
   /* ── O aviso do dia que ainda não abriu ── */
-  const [aviso, setAviso] = useState<{ texto: string; n: number } | null>(null);
-  const avisar = useCallback(
-    (texto: string) => setAviso((a) => ({ texto, n: (a?.n ?? 0) + 1 })),
-    [],
-  );
+  const { avisar, aviso } = useAviso({ direita: 72 });
 
   const renderItem = useCallback(
     ({ item }: { item: Bloco }) =>
@@ -205,7 +202,7 @@ export function Caminho(p: PropsDoCaminho) {
         ListFooterComponent={<View style={{ height: 40 + 64 }} />}
       />
       <BotaoDaLoja saldo={p.saldo} aoTocar={p.aoAbrirLoja} />
-      {aviso ? <Aviso key={aviso.n} texto={aviso.texto} aoSumir={() => setAviso(null)} /> : null}
+      {aviso}
     </View>
   );
 }
@@ -985,45 +982,6 @@ function BotaoDaLoja({ saldo, aoTocar }: { saldo: number | null; aoTocar: () => 
         ) : null}
       </Pressable>
     </View>
-  );
-}
-
-function Aviso({ texto, aoSumir }: { texto: string; aoSumir: () => void }) {
-  const v = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.sequence([
-      Animated.timing(v, { toValue: 1, duration: 200, useNativeDriver: true }),
-      Animated.delay(2600),
-      Animated.timing(v, { toValue: 0, duration: 250, useNativeDriver: true }),
-    ]).start(({ finished }) => finished && aoSumir());
-  }, [v, aoSumir]);
-  return (
-    <Animated.View
-      accessibilityLiveRegion="polite"
-      pointerEvents="none"
-      style={{
-        position: "absolute",
-        left: espaco.lg,
-        right: 72,
-        bottom: espaco.lg,
-        borderRadius: 16,
-        backgroundColor: cor.cartao,
-        borderWidth: 1,
-        borderColor: cor.borda,
-        paddingHorizontal: espaco.md,
-        paddingVertical: espaco.md,
-        shadowColor: corCaminho.sombra,
-        shadowOpacity: 0.12,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 4 },
-        opacity: v,
-        transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
-      }}
-    >
-      <Text style={{ fontFamily: fonte.media, fontSize: 14, lineHeight: 20, color: cor.texto }}>
-        {texto}
-      </Text>
-    </Animated.View>
   );
 }
 

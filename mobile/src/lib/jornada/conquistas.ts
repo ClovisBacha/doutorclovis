@@ -15,7 +15,6 @@ import {
   RARIDADES,
   type CategoriaConquista,
   type ConquistaDef,
-  type Raridade,
 } from "@/lib/conquistas";
 import type { ConquistaDesbloqueada } from "~/servidor/economia";
 
@@ -57,54 +56,53 @@ export function paraResgatar(grade: readonly Cartao[]): number {
   return grade.filter((c) => c.estado === "resgatar").length;
 }
 
-export const CATEGORIAS: readonly { chave: CategoriaConquista; rotulo: string }[] = [
-  { chave: "educacao", rotulo: "Aprender" },
-  { chave: "saude", rotulo: "Cuidar da saúde" },
-  { chave: "diario", rotulo: "Diário" },
-  { chave: "bebe", rotulo: "Bebê" },
-  { chave: "familia", rotulo: "Família" },
+/**
+ * As seções da aba, NA ORDEM E COM OS EMOJIS DO SITE (conquistas-tab.tsx). Os
+ * cartões ficam na ordem do catálogo, sem reordenar: as do pós-parto aparecem
+ * no fim da categoria delas, e a nota do resumo explica que elas esperam o
+ * nascimento.
+ */
+export const SECOES: readonly { chave: CategoriaConquista; rotulo: string; emoji: string }[] = [
+  { chave: "bebe", rotulo: "Bebê", emoji: "👶" },
+  { chave: "saude", rotulo: "Saúde", emoji: "❤️" },
+  { chave: "diario", rotulo: "Diário", emoji: "📝" },
+  { chave: "educacao", rotulo: "Educação", emoji: "🎓" },
+  { chave: "familia", rotulo: "Família", emoji: "👨‍👩‍👧" },
 ];
 
-/**
- * As prateleiras: o que já pode ser resgatado vem primeiro (é o que pede o
- * toque), depois por categoria; as do pós-parto ficam numa prateleira própria
- * — sem isso a gestante leria "3 de 42" contra um teto que ainda nem existe.
- */
-export function prateleiras(
+export function secoes(
   grade: readonly Cartao[],
-  posParto: boolean,
-): { titulo: string; cartoes: Cartao[] }[] {
-  const daFase = grade.filter((c) => posParto || !c.def.posParto);
-  const fora: { titulo: string; cartoes: Cartao[] }[] = [];
-  for (const cat of CATEGORIAS) {
-    const cartoes = daFase
-      .filter((c) => c.def.category === cat.chave && (posParto || !c.def.posParto))
-      .sort(ordemDentro);
-    if (cartoes.length) fora.push({ titulo: cat.rotulo, cartoes });
-  }
-  if (!posParto) {
-    const depois = grade.filter((c) => c.def.posParto).sort(ordemDentro);
-    if (depois.length) fora.push({ titulo: "Depois do nascimento", cartoes: depois });
-  }
-  return fora;
+): { chave: CategoriaConquista; rotulo: string; emoji: string; cartoes: Cartao[] }[] {
+  return SECOES.map((s) => ({
+    ...s,
+    cartoes: grade.filter((c) => c.def.category === s.chave),
+  })).filter((s) => s.cartoes.length > 0);
 }
 
-const PESO_ESTADO: Record<EstadoDaConquista, number> = {
-  resgatar: 0,
-  desbloqueada: 1,
-  resgatada: 1,
-  bloqueada: 2,
-};
-const PESO_RARIDADE: Record<Raridade, number> = { comum: 0, raro: 1, epico: 2 };
-
-function ordemDentro(a: Cartao, b: Cartao): number {
-  const e = PESO_ESTADO[a.estado] - PESO_ESTADO[b.estado];
-  if (e) return e;
-  return PESO_RARIDADE[a.def.raridade] - PESO_RARIDADE[b.def.raridade];
+/**
+ * O cartão "Suas conquistas" do site: X de TODAS (as 39, com as do pós-parto),
+ * a porcentagem, e a nota "N destas só acontecem depois que o bebê nascer"
+ * enquanto nenhuma do pós-parto foi desbloqueada.
+ */
+export function resumo(grade: readonly Cartao[]) {
+  const feitas = grade.filter((c) => c.estado !== "bloqueada").length;
+  const total = grade.length;
+  const posPartoTotal = grade.filter((c) => c.def.posParto).length;
+  const posPartoFeitas = grade.filter((c) => c.def.posParto && c.estado !== "bloqueada").length;
+  return {
+    feitas,
+    total,
+    pct: total ? Math.round((feitas / total) * 100) : 0,
+    posPartoTotal,
+    mostrarNotaDoNascimento: posPartoFeitas === 0 && posPartoTotal > 0,
+  };
 }
 
 /** "12 de 37" — o teto da gestante não conta as do pós-parto. */
-export function placar(grade: readonly Cartao[], posParto: boolean): { feitas: number; total: number } {
+export function placar(
+  grade: readonly Cartao[],
+  posParto: boolean,
+): { feitas: number; total: number } {
   const daFase = grade.filter((c) => posParto || !c.def.posParto);
   return { feitas: daFase.filter((c) => c.estado !== "bloqueada").length, total: daFase.length };
 }

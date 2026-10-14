@@ -14,7 +14,7 @@ import {
 import { contaComoFeita, instanteNoTempo, relogio, segundosDaSessao } from "./respiracao";
 import { inicioDoProximo, linhaDoTempo, montarSessao, posicaoNoTempo } from "./mexer";
 import { planoDoDia, temasDisponiveis } from "./meditacao";
-import { montarGrade, paraResgatar, placar, prateleiras } from "./conquistas";
+import { montarGrade, paraResgatar, placar, resumo, secoes } from "./conquistas";
 
 const unica: QuizQuestion = { q: "?", o: ["a", "b", "c"], a: 2, why: "porque" };
 const varias: QuizQuestion = { q: "?", o: ["a", "b", "c", "d"], a: [0, 2], why: "porque" };
@@ -79,7 +79,9 @@ describe("a aula: uma tentativa por pergunta", () => {
   });
 
   test("o título é a primeira frase da lição", () => {
-    expect(tituloDaLicao("Revisão da semana 24: marco. Outra frase.")).toBe("Revisão da semana 24: marco.");
+    expect(tituloDaLicao("Revisão da semana 24: marco. Outra frase.")).toBe(
+      "Revisão da semana 24: marco.",
+    );
     expect(tituloDaLicao("Sem ponto")).toBe("Sem ponto");
   });
 });
@@ -124,7 +126,14 @@ describe("a respiração 4-4-8", () => {
 
 describe("mexer", () => {
   test("a sessão de 3 minutos cabe em ~3 minutos, com mais de um movimento e tem passo a passo", () => {
-    const seq = montarSessao({ D: 171, minutos: 3, semana: 24, posParto: false, cuidado: false, sintoma: null });
+    const seq = montarSessao({
+      D: 171,
+      minutos: 3,
+      semana: 24,
+      posParto: false,
+      cuidado: false,
+      sintoma: null,
+    });
     expect(seq.length).toBeGreaterThan(0);
     const { total } = linhaDoTempo(seq);
     expect(total).toBeLessThanOrEqual(200);
@@ -132,22 +141,50 @@ describe("mexer", () => {
     for (const m of seq) expect(m.passos.length).toBeGreaterThan(0);
   });
   test("com 38 semanas, nada de chão", () => {
-    const seq = montarSessao({ D: 268, minutos: 5, semana: 38, posParto: false, cuidado: false, sintoma: null });
+    const seq = montarSessao({
+      D: 268,
+      minutos: 5,
+      semana: 38,
+      posParto: false,
+      cuidado: false,
+      sintoma: null,
+    });
     for (const m of seq) expect(m.chao).toBe(false);
   });
   test("no Modo Cuidado vale a régua do pós-parto: sem preparação para o parto, sem chão", () => {
-    const seq = montarSessao({ D: 171, minutos: 5, semana: 24, posParto: false, cuidado: true, sintoma: null });
+    const seq = montarSessao({
+      D: 171,
+      minutos: 5,
+      semana: 24,
+      posParto: false,
+      cuidado: true,
+      sintoma: null,
+    });
     for (const m of seq) {
       expect(m.fases).toContain("pos");
       expect(m.chao).toBe(false);
     }
   });
   test("a queixa dela vem primeiro", () => {
-    const seq = montarSessao({ D: 171, minutos: 3, semana: 24, posParto: false, cuidado: false, sintoma: "caimbra" });
+    const seq = montarSessao({
+      D: 171,
+      minutos: 3,
+      semana: 24,
+      posParto: false,
+      cuidado: false,
+      sintoma: "caimbra",
+    });
     expect(seq.some((m) => m.alivia.includes("caimbra"))).toBe(true);
   });
   test("linha do tempo, posição e pular", () => {
-    const seq = montarSessao({ D: 171, minutos: 5, semana: 24, posParto: false, cuidado: false, sintoma: null });
+    const seq = montarSessao({
+      D: 171,
+      minutos: 5,
+      semana: 24,
+      posParto: false,
+      cuidado: false,
+      sintoma: null,
+    });
     const { trechos, total } = linhaDoTempo(seq);
     expect(posicaoNoTempo(trechos, 0).tipo).toBe("movimento");
     if (trechos.length > 1) {
@@ -178,13 +215,26 @@ describe("a grade de conquistas", () => {
     expect(paraResgatar(g)).toBe(0);
     expect(g.find((c) => c.def.key === "first_journal")!.estado).toBe("desbloqueada");
   });
-  test("na gestação, as do pós-parto ficam na prateleira própria e fora do placar", () => {
+  test("na gestação, o placar do Início não conta as do pós-parto", () => {
     const g = montarGrade(unlocked, []);
     const p = placar(g, false);
     expect(p.feitas).toBe(2);
     expect(p.total).toBeLessThan(g.length);
-    const pr = prateleiras(g, false);
-    expect(pr[pr.length - 1].titulo).toBe("Depois do nascimento");
-    expect(pr.flatMap((x) => x.cartoes).length).toBe(g.length);
+  });
+  test("a aba segue o site: seções na ordem do site, X de todas, e a nota do nascimento", () => {
+    const g = montarGrade(unlocked, []);
+    const sec = secoes(g);
+    expect(sec.map((s) => s.rotulo)).toEqual(["Bebê", "Saúde", "Diário", "Educação", "Família"]);
+    expect(sec.flatMap((s) => s.cartoes).length).toBe(g.length);
+    const r = resumo(g);
+    expect(r.feitas).toBe(2);
+    expect(r.total).toBe(g.length);
+    expect(r.pct).toBe(Math.round((2 / g.length) * 100));
+    expect(r.mostrarNotaDoNascimento).toBe(true);
+    const comPos = montarGrade(
+      [...unlocked, { achievement_key: "first_vaccine", unlocked_at: "2027-01-01T12:00:00Z" }],
+      [],
+    );
+    expect(resumo(comPos).mostrarNotaDoNascimento).toBe(false);
   });
 });

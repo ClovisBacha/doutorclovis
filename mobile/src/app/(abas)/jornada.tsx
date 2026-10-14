@@ -60,7 +60,8 @@ import { cor, espaco, fonte, raio, sombra } from "~/tema";
  *   · gestação: o CAMINHO (componentes/caminho) — o desenho aprovado do site:
  *     a faixa do topo, o humor do dia, e a trilha inteira com fases, semanas
  *     e um nó por dia. Tocar num dia abre a folha do dia (/jornada/dia), com
- *     os cinco momentos; a cesta abre as conquistas;
+ *     os cinco momentos; a cesta abre as Recompensas (Meu Cantinho e
+ *     Conquistas);
  *   · pós-parto: o desafio do dia, a respiração e a gratidão (sem aula, sem
  *     pagamento — o servidor só paga na gestação);
  *   · Modo Cuidado: três cuidados com ela, sem placar, sem bebê, sem festa;
@@ -235,7 +236,7 @@ function JornadaDaGestacao({
             );
           ir(`/jornada/semana?semana=${s}`);
         }}
-        aoAbrirLoja={() => ir("/jornada/conquistas")}
+        aoAbrirLoja={() => ir("/jornada/recompensas")}
         aoAbrirAmigas={() => router.navigate("/comunidade" as never)}
         aoAbrirFolha={setFolha}
         aoContarNascimento={() => router.push("/ritual?editar=1")}
@@ -547,7 +548,7 @@ function BotaoDeConquistas({
       }
       onPress={() => {
         toque();
-        ir("/jornada/conquistas");
+        ir("/jornada/recompensas?aba=conquistas");
       }}
       style={({ pressed }) => [
         {
