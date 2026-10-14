@@ -932,7 +932,7 @@ function BotaoDaLoja({ saldo, aoTocar }: { saldo: number | null; aoTocar: () => 
       />
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Abrir as recompensas"
+        accessibilityLabel="Abrir o Meu Cantinho"
         onPress={() => {
           toque();
           aoTocar();

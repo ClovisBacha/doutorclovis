@@ -33,6 +33,55 @@ export const corRecompensas = {
   sombra: "#372a27",
   /* o véu do aviso de conquista */
   veu: "rgba(0,0,0,0.45)",
+  /* ── O MEU CANTINHO ── */
+  esmeralda300: "#5ee9b5",
+  esmeralda500: "#00bc7d",
+  esmeralda600: "#009966",
+  /* a sanfona "Ganhe mais Sementinhas" (`bg-emerald-50/40`) */
+  esmeralda50_40: "rgba(236,253,245,0.4)",
+  /* a pílula do saldo (`bg-white/70`) e os materiais 3D (`.pill-3d`, `.btn-3d`) */
+  branco70: "rgba(255,255,255,0.7)",
+  branco86: "rgba(255,255,255,0.86)",
+  branco50: "rgba(255,255,255,0.5)",
+  branco42: "rgba(255,255,255,0.42)",
+  branco16: "rgba(255,255,255,0.16)",
+  branco0: "rgba(255,255,255,0)",
+  preto10: "rgba(0,0,0,0.1)",
+  /* a ficha de categoria não escolhida (`text-foreground/60`) */
+  texto60: "rgba(41,20,19,0.6)",
+  /* o botão de preço que ela ainda não alcança */
+  ardosia100: "#f1f5f9",
+  ardosia400: "#90a1b9",
+  /* a Coroa da Coleção e o cadeado de troféus */
+  ambar50: "#fffbeb",
+  ambar100: "#fef3c6",
+  ambar200: "#fee685",
+  ambar200_85: "rgba(254,230,133,0.85)",
+  ambar300: "#ffd230",
+  ambar700: "#bb4d00",
+  ambar700_70: "rgba(187,77,0,0.7)",
+  ambar800: "#973c00",
+  /* "Indique uma amiga" */
+  rosa50: "#fdf2f8",
+  rosa100: "#fce7f3",
+  rosa200: "#fccee8",
+  rosa500: "#f6339a",
+  rosa600: "#e60076",
+  rosa700: "#c6005c",
+  rubi50: "#fff1f2",
+  rubi100: "#ffe4e6",
+  rubi500: "#ff2056",
+  rubi600: "#ec003f",
+  /* "Deixe seu depoimento" */
+  violeta50: "#f5f3ff",
+  violeta200: "#ddd6ff",
+  violeta600: "#7f22fe",
+  violeta700: "#7008e7",
+  fucsia50: "#fdf4ff",
+  /* "Veio pela indicação de alguém?" — o botão do site (`#c9316f`) */
+  embaixadora: "#c9316f",
+  /* o texto que traça o limite ético (`slate-600`) */
+  ardosia600: "#45556c",
   /* PREMIUM — não aparece no app (v1 sem Premium); fica para quando existir. */
 } as const;
 

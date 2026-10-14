@@ -35,7 +35,9 @@ export async function lerCarteiraDoDia(): Promise<CarteiraOk | null> {
     if (estadoDaBancada() === "falhou") return null;
     return {
       ok: true,
-      balance: estadoDaBancada() === "fechado" ? 287 : 245,
+      /* `&saldo=N` vale para a carteira E para o Cantinho: as duas leituras
+         da mesma tela precisam dizer o mesmo número. */
+      balance: Number(parametroDaBancada("saldo") ?? (estadoDaBancada() === "fechado" ? 287 : 245)),
       trofeus: estadoDaBancada() === "fechado" ? 10 : 9,
       recent: [],
       presente:

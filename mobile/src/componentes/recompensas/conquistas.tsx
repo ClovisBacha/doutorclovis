@@ -1,14 +1,20 @@
-import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Easing, Modal, Platform, Pressable, Text, View } from "react-native";
+import { Animated, Easing, Modal, Pressable, Text, View } from "react-native";
 import { conquistaPorChave } from "@/lib/conquistas";
 import { NaoConsegueLer, toque } from "~/componentes/base";
 import { Confete } from "~/componentes/jornada/pecas";
 import type { LeituraDasConquistas } from "~/componentes/jornada/economia";
 import { useMovimentoReduzido } from "~/componentes/movimento";
 import { corRecompensas, quadroDaRaridade } from "~/componentes/recompensas/cores";
+import {
+  CartaoMaterial,
+  Esqueleto,
+  pares,
+  SilencioDoCuidado,
+  vibrar,
+} from "~/componentes/recompensas/pecas";
 import { lerJson, gravarJson } from "~/lib/armazem";
 import { montarGrade, resumo, secoes, type Cartao } from "~/lib/jornada/conquistas";
 import { dataCompleta } from "~/lib/jornada/dia";
@@ -83,7 +89,7 @@ export function AbaDasConquistas({
   if (cuidado || (leitura && leitura !== "carregando" && leitura.careMode)) {
     return <SilencioDoCuidado />;
   }
-  if (leitura === "carregando") return <Esqueleto />;
+  if (leitura === "carregando") return <Esqueleto rotulo="Carregando as conquistas" />;
   if (!leitura || !grade) {
     return (
       <NaoConsegueLer
@@ -405,22 +411,6 @@ export function AbaDasConquistas({
   );
 }
 
-/** O desfecho no dedo — fora da web (lá não há motor, e o navegador reclama). */
-function vibrar(tipo: "sucesso" | "erro") {
-  if (Platform.OS === "web") return;
-  void Haptics.notificationAsync(
-    tipo === "sucesso"
-      ? Haptics.NotificationFeedbackType.Success
-      : Haptics.NotificationFeedbackType.Error,
-  ).catch(() => {});
-}
-
-function pares<T>(lista: readonly T[]): T[][] {
-  const fora: T[][] = [];
-  for (let i = 0; i < lista.length; i += 2) fora.push(lista.slice(i, i + 2));
-  return fora;
-}
-
 function CartaoDaConquista({
   cartao: c,
   aResgatar,
@@ -578,81 +568,5 @@ function CartaoDaConquista({
         {corpo}
       </Pressable>
     </Animated.View>
-  );
-}
-
-/** O `card-material` do site: cartão claro, borda fina, luz no alto e sombra macia. */
-function CartaoMaterial({ children, estilo }: { children: React.ReactNode; estilo?: object }) {
-  return (
-    <View
-      style={[
-        {
-          borderRadius: 28,
-          backgroundColor: cor.cartao,
-          borderWidth: 1,
-          borderColor: cor.borda,
-          shadowColor: corRecompensas.sombra,
-          shadowOpacity: 0.08,
-          shadowRadius: 12,
-          shadowOffset: { width: 0, height: 2 },
-        },
-        estilo,
-      ]}
-    >
-      {children}
-    </View>
-  );
-}
-
-function SilencioDoCuidado() {
-  return (
-    <CartaoMaterial estilo={{ padding: 32, alignItems: "center", gap: espaco.lg }}>
-      <Text
-        style={{
-          fontFamily: fonte.normal,
-          fontSize: 15,
-          lineHeight: 22,
-          textAlign: "center",
-          color: cor.texto,
-        }}
-      >
-        Esta parte do aplicativo está em pausa enquanto o Modo Cuidado estiver ligado.
-      </Text>
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => router.push("/perfil")}
-        style={({ pressed }) => ({
-          minHeight: ALVO_MINIMO,
-          paddingHorizontal: espaco.xl,
-          borderRadius: 999,
-          borderWidth: 1,
-          borderColor: cor.borda,
-          alignItems: "center",
-          justifyContent: "center",
-          opacity: pressed ? 0.7 : 1,
-        })}
-      >
-        <Text style={{ fontFamily: fonte.media, fontSize: 14, color: cor.texto }}>
-          Ajustes do Modo Cuidado
-        </Text>
-      </Pressable>
-    </CartaoMaterial>
-  );
-}
-
-/** O esqueleto enquanto lê (o `TabSkeleton` do site): blocos claros no lugar do conteúdo. */
-function Esqueleto() {
-  const bloco = (h: number) => (
-    <View style={{ height: h, borderRadius: 24, backgroundColor: cor.apagado }} />
-  );
-  return (
-    <View style={{ gap: espaco.md }} accessibilityLabel="Carregando as conquistas">
-      {bloco(120)}
-      {bloco(96)}
-      <View style={{ flexDirection: "row", gap: espaco.md }}>
-        <View style={{ flex: 1 }}>{bloco(140)}</View>
-        <View style={{ flex: 1 }}>{bloco(140)}</View>
-      </View>
-    </View>
   );
 }

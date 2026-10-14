@@ -4,14 +4,15 @@ import { Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAviso } from "~/componentes/aviso";
 import { toque } from "~/componentes/base";
-import { CabecalhoDaPilha } from "~/componentes/cabecalho";
+import { CabecalhoDaPilha, voltarOu } from "~/componentes/cabecalho";
+import { rota } from "~/componentes/jornada/bancada";
 import {
   lerCarteiraDoDia,
   lerConquistas,
   resgatar as resgatarNoServidor,
-  type CarteiraOk,
   type LeituraDasConquistas,
 } from "~/componentes/jornada/economia";
+import { AbaDoCantinho } from "~/componentes/recompensas/cantinho";
 import { AbaDasConquistas } from "~/componentes/recompensas/conquistas";
 import { corRecompensas } from "~/componentes/recompensas/cores";
 import { montarGrade, paraResgatar } from "~/lib/jornada/conquistas";
@@ -22,32 +23,33 @@ type Aba = "cantinho" | "conquistas";
 
 /**
  * AS RECOMPENSAS — o `RecompensasHub` do site: duas abas, "Meu Cantinho" (a
- * lojinha de sementinhas: enfeites, peles das bolinhas, céus e cenários para o
+ * lojinha de sementinhas: enfeites, peles das bolinhas e cenários para o
  * Caminho) e "Conquistas" (os badges, com o número dos que esperam o toque
  * dela ao lado do nome). Abre no Cantinho, como no site; `?aba=conquistas`
  * abre direto nas conquistas.
  *
- * A tela é dona das duas leituras (carteira e conquistas) para as abas
- * concordarem: resgatar uma conquista sobe o saldo que o Cantinho mostra.
+ * ⚠️ O SALDO TEM UM DONO SÓ: esta tela. Resgatar uma conquista sobe o número
+ * que o Cantinho mostra, e comprar no Cantinho desce o das Conquistas — duas
+ * abas com dois saldos discordariam na frente dela.
  */
 export default function Recompensas() {
   const { aba: pedida } = useLocalSearchParams<{ aba?: string }>();
-  /* ⚠️ Enquanto o Meu Cantinho não chega ao app, a tela abre (e fica) nas
-     Conquistas — sem pílula para uma aba que ainda não existe. */
-  const CANTINHO_PRONTO = false;
-  const [aba, setAba] = useState<Aba>(
-    CANTINHO_PRONTO && pedida !== "conquistas" ? "cantinho" : "conquistas",
-  );
+  const [aba, setAba] = useState<Aba>(pedida === "conquistas" ? "conquistas" : "cantinho");
   const { cuidado } = useSessao();
   const { avisar, aviso } = useAviso();
 
-  const [carteira, setCarteira] = useState<CarteiraOk | null | "carregando">("carregando");
+  /* `null` = ainda não sei (ou não consegui ler): a tela mostra "—", nunca 0. */
+  const [saldo, setSaldo] = useState<number | null>(null);
   const [conquistas, setConquistas] = useState<LeituraDasConquistas | null | "carregando">(
     "carregando",
   );
   const recarregar = useCallback(() => {
     setConquistas((c) => (c && c !== "carregando" ? c : "carregando"));
-    void lerCarteiraDoDia().then(setCarteira);
+    /* A carteira credita o check-in do dia: é a leitura mais nova do saldo, e
+       por isso ela vence a do Cantinho. */
+    void lerCarteiraDoDia().then((c) => {
+      if (c && !c.careMode) setSaldo(c.balance);
+    });
     void lerConquistas().then(setConquistas);
   }, []);
   useFocusEffect(
@@ -55,9 +57,9 @@ export default function Recompensas() {
       recarregar();
     }, [recarregar]),
   );
+  /* A leitura do Cantinho só preenche o saldo que a carteira ainda não trouxe. */
+  const aoLerSaldo = useCallback((n: number) => setSaldo((s) => s ?? n), []);
 
-  const saldo =
-    carteira && carteira !== "carregando" && !carteira.careMode ? carteira.balance : null;
   const aResgatar = useMemo(() => {
     if (!conquistas || conquistas === "carregando" || conquistas.careMode || cuidado) return null;
     if (conquistas.resgatadas === null) return null;
@@ -69,8 +71,7 @@ export default function Recompensas() {
     const r = await resgatarNoServidor(key);
     if (r && conquistas && conquistas !== "carregando") {
       setConquistas({ ...conquistas, resgatadas: [...(conquistas.resgatadas ?? []), key] });
-      if (r.granted > 0 && carteira && carteira !== "carregando")
-        setCarteira({ ...carteira, balance: carteira.balance + r.granted });
+      if (r.granted > 0) setSaldo((s) => (s == null ? s : s + r.granted));
     }
     return r;
   }
@@ -80,13 +81,11 @@ export default function Recompensas() {
       <View style={{ paddingHorizontal: espaco.lg, paddingTop: espaco.sm, gap: espaco.md }}>
         <CabecalhoDaPilha titulo="Recompensas" voltarPara="/jornada" />
         <View style={{ flexDirection: "row", gap: espaco.sm }} accessibilityRole="tablist">
-          {CANTINHO_PRONTO ? (
-            <Pilula
-              rotulo="Meu Cantinho"
-              ativa={aba === "cantinho"}
-              aoTocar={() => setAba("cantinho")}
-            />
-          ) : null}
+          <Pilula
+            rotulo="Meu Cantinho"
+            ativa={aba === "cantinho"}
+            aoTocar={() => setAba("cantinho")}
+          />
           <Pilula
             rotulo="Conquistas"
             ativa={aba === "conquistas"}
@@ -96,18 +95,30 @@ export default function Recompensas() {
         </View>
       </View>
       <ScrollView
-        contentContainerStyle={{ padding: 20, paddingBottom: 64 }}
+        contentContainerStyle={{ padding: espaco.lg, paddingBottom: 64 }}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        <AbaDasConquistas
-          leitura={conquistas}
-          saldo={saldo}
-          cuidado={cuidado}
-          resgatar={resgatar}
-          recarregar={recarregar}
-          aoIrAoCantinho={() => (CANTINHO_PRONTO ? setAba("cantinho") : undefined)}
-          avisar={avisar}
-        />
+        {aba === "cantinho" ? (
+          <AbaDoCantinho
+            saldo={saldo}
+            cuidado={cuidado}
+            aoLerSaldo={aoLerSaldo}
+            aoMudarSaldo={setSaldo}
+            aoVerCaminho={() => voltarOu(rota("/jornada") as never)}
+            avisar={avisar}
+          />
+        ) : (
+          <AbaDasConquistas
+            leitura={conquistas}
+            saldo={saldo}
+            cuidado={cuidado}
+            resgatar={resgatar}
+            recarregar={recarregar}
+            aoIrAoCantinho={() => setAba("cantinho")}
+            avisar={avisar}
+          />
+        )}
       </ScrollView>
       {aviso}
     </SafeAreaView>
