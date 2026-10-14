@@ -11,6 +11,7 @@
     "ios": {
       "bundleIdentifier": "br.com.obstetrica.app",
       "buildNumber": "3",
+      "appleTeamId": "8PL2X9F9PV",
       "supportsTablet": false,
       "usesAppleSignIn": true,
       "config": {
