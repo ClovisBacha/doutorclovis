@@ -1,28 +1,18 @@
 import { router, useFocusEffect } from "expo-router";
-import {
-  Award,
-  BookOpen,
-  CalendarDays,
-  ChevronRight,
-  Footprints,
-  Heart,
-  PenLine,
-  Sparkles,
-  Wind,
-} from "lucide-react-native";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Award, ChevronRight, Footprints, PenLine, Sparkles, Wind } from "lucide-react-native";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import { babyForWeek, fruitEmojiForWeek } from "@/lib/gestacao";
-import { carregarQuizDoDia, temQuizNoDia, type DailyQuiz } from "@/lib/daily-quizzes";
-import { gestChallenge, posChallenge } from "@/lib/daily-challenges";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { posChallenge } from "@/lib/daily-challenges";
 import { Botao, Cartao, Carregando, NaoConsegueLer, T, Tela, toque } from "~/componentes/base";
 import { rota } from "~/componentes/jornada/bancada";
 import { SementesSubindo } from "~/componentes/jornada/efeitos";
 import { BolhaViva } from "~/componentes/movimento";
 import { corJornada } from "~/componentes/jornada/cores";
-import { CartaoDoDia, TrilhaDaSemana, type ItemDoDia } from "~/componentes/jornada/dia-de-hoje";
+import { CartaoDoDia, type ItemDoDia } from "~/componentes/jornada/dia-de-hoje";
 import {
   lerCarteiraDoDia,
+  lerContagemDeAmigas,
   lerConquistas,
   lerProgressoDoDia,
   pagarDiaFechado,
@@ -32,30 +22,45 @@ import {
 } from "~/componentes/jornada/economia";
 import { useLivresDeHoje } from "~/componentes/jornada/livres";
 import { Pulsando } from "~/componentes/jornada/pecas";
-import { Placar } from "~/componentes/jornada/placar";
+import { FolhasDoPlacar, Placar, type FolhaDoPlacar } from "~/componentes/jornada/placar";
+import { Caminho } from "~/componentes/caminho/caminho";
 import { useJornada, type DiaDaJornada } from "~/componentes/jornada/usarJornada";
 import { ehBancada } from "~/lib/bancada";
-import { primeiroNome } from "~/lib/gestacao";
 import { montarGrade, paraResgatar, placar as placarDasConquistas } from "~/lib/jornada/conquistas";
-import { diaLongo, diaNaSemana, diasDaSemana, temaDoDia } from "~/lib/jornada/dia";
-import { estadoAtual, gravarChave, marcar, type EstadoDaLoja } from "~/lib/jornada/loja";
+import { diaLongo } from "~/lib/jornada/dia";
+import {
+  estadoAtual,
+  gravarChave,
+  marcar,
+  marcarFlagDoDia,
+  type EstadoDaLoja,
+} from "~/lib/jornada/loja";
+import {
+  CHAVE_CHECKIN,
+  fasesDaGestacao,
+  lerCheckin,
+  marcouHumorHoje,
+  novoCheckin,
+} from "~/lib/jornada/caminho";
 import {
   ATIVIDADES,
+  CHAVE_FIGURINHAS,
   chaveDoPresente,
-  contarMomentos,
+  listaDeNumeros,
   feito,
   flagsDoDia,
-  TOTAL_DO_DIA,
 } from "~/lib/jornada/momentos";
 import { chama as calcularChama } from "~/lib/jornada/trilha";
-import { ALVO_MINIMO, cor, espaco, fonte, raio, sombra } from "~/tema";
+import { cor, espaco, fonte, raio, sombra } from "~/tema";
 
 /**
  * A ABA JORNADA — o coração do app: um dia de cada vez, cinco momentos por dia.
  *
  * Quatro caras, pela situação dela:
- *   · gestação: placar, o cartão do dia com os cinco momentos, a trilha da
- *     semana e as conquistas;
+ *   · gestação: o CAMINHO (componentes/caminho) — o desenho aprovado do site:
+ *     a faixa do topo, o humor do dia, e a trilha inteira com fases, semanas
+ *     e um nó por dia. Tocar num dia abre a folha do dia (/jornada/dia), com
+ *     os cinco momentos; a cesta abre as conquistas;
  *   · pós-parto: o desafio do dia, a respiração e a gratidão (sem aula, sem
  *     pagamento — o servidor só paga na gestação);
  *   · Modo Cuidado: três cuidados com ela, sem placar, sem bebê, sem festa;
@@ -184,186 +189,101 @@ function JornadaDaGestacao({
 }) {
   const { D, semana, perfil, hoje } = dia;
   const { carteira, recarregar } = useCarteira(true);
-  const conquistas = useConquistas(true);
+  /* As conquistas não aparecem no Caminho (moram nas Recompensas), mas a
+     leitura delas é o que DESBLOQUEIA no servidor as que ela acabou de ganhar —
+     por isso a aba continua conferindo ao ganhar foco. */
+  useConquistas(true);
   useReconciliacao(D, loja.pronto, recarregar);
+  const amigas = useContagemDeAmigas();
+  const [folha, setFolha] = useState<FolhaDoPlacar>(null);
 
-  const [quiz, setQuiz] = useState<DailyQuiz | null | "carregando">("carregando");
-  useEffect(() => {
-    let vivo = true;
-    if (!temQuizNoDia(D)) {
-      setQuiz(null);
-      return;
-    }
-    void carregarQuizDoDia(D).then((q) => {
-      if (vivo) setQuiz(q);
-    });
-    return () => {
-      vivo = false;
-    };
-  }, [D]);
-
-  const flags = flagsDoDia(loja.blob, D);
-  const feitos = contarMomentos(flags);
-  const fechado = feitos >= TOTAL_DO_DIA;
   const { dias: diasDeChama, perdoes } = calcularChama(loja.blob, D);
-  const tema = temaDoDia(D);
-  const bebe = babyForWeek(semana);
   const nomeDoBebe = (perfil.baby_name ?? "").trim() || null;
-  const nome = primeiroNome(perfil.display_name ?? perfil.full_name);
-
-  const temAula = temQuizNoDia(D);
-  const desafio = !temAula ? gestChallenge(D) : null;
-
-  const itens: ItemDoDia[] = [];
-  if (temAula) {
-    itens.push({
-      chave: "aula",
-      titulo: "Aula de hoje",
-      sub:
-        quiz && quiz !== "carregando"
-          ? `Uma lição curta e ${quiz.questions.length} perguntas`
-          : "Uma lição curta e algumas perguntas",
-      Icone: BookOpen,
-      feito: feito(flags, "aula"),
-      rotuloDoFeito: "Feita",
-      aoTocar: () => ir("/jornada/aula"),
-    });
-  } else if (desafio) {
-    itens.push({
-      chave: "desafio",
-      titulo: `Desafio do dia ${desafio.emoji}`,
-      sub: desafio.label,
-      linhasDoSub: 3,
-      marcaPorToque: true,
-      Icone: Sparkles,
-      feito: feito(flags, "aula"),
-      aoTocar: () => {
-        if (!feito(flags, "aula")) marcar(D, "aula");
-      },
-    });
-  }
-  itens.push(
-    {
-      chave: "mexer",
-      titulo: "Mexer",
-      sub: "Três minutinhos de movimento",
-      Icone: Footprints,
-      feito: feito(flags, "movement"),
-      aoTocar: () => ir("/jornada/mexer"),
-    },
-    {
-      chave: "meditar",
-      titulo: "Meditar",
-      sub: "Respiração 4-4-8 guiada",
-      Icone: Wind,
-      feito: feito(flags, "meditation"),
-      aoTocar: () => ir("/jornada/meditar"),
-    },
-    {
-      chave: "bebe",
-      titulo: nomeDoBebe ? `Carta para ${nomeDoBebe}` : "Carta para o bebê",
-      sub: "Leia em voz alta, linha a linha",
-      Icone: Heart,
-      feito: feito(flags, "bonding"),
-      aoTocar: () => ir("/jornada/bebe"),
-    },
-    {
-      chave: "gratidao",
-      titulo: "Gratidão",
-      sub: "Uma coisa boa de hoje",
-      Icone: PenLine,
-      feito: feito(flags, "gratitude"),
-      aoTocar: () => ir("/jornada/gratidao"),
-    },
-  );
+  const checkin = lerCheckin(loja.blob[CHAVE_CHECKIN]);
+  const fases = useMemo(() => fasesDaGestacao(D), [D]);
 
   const presente = carteira.estado === "ok" ? carteira.dados.presente : null;
   const presenteNovo = presente && !loja.blob[chaveDoPresente(presente.quando)] ? presente : null;
 
   return (
-    <Tela>
-      <Saudacao
-        titulo="Sua jornada"
-        sub={nome ? `Que bom te ver, ${nome}.` : "Um dia de cada vez."}
-      />
-      <Placar
+    <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: cor.fundo }}>
+      <Caminho
+        hojeD={D}
+        semanaAtual={semana}
+        fases={fases}
+        blob={loja.blob}
         saldo={carteira.estado === "ok" ? carteira.dados.balance : null}
         trofeus={carteira.estado === "ok" ? carteira.dados.trofeus : null}
-        carregando={carteira.estado === "carregando"}
+        carregandoCarteira={carteira.estado === "carregando"}
         chama={diasDeChama}
-        perdoes={perdoes}
-      />
-      {carteira.estado === "falhou" ? (
-        <NaoConsegueLer
-          sossego="Os seus momentos de hoje continuam valendo e ficam guardados neste aparelho."
-          aoTentar={() => void recarregar()}
-        />
-      ) : null}
-      {presenteNovo ? (
-        <AvisoDePresente
-          quantidade={presenteNovo.quantidade}
-          de={presenteNovo.de}
-          nome={presenteNovo.nome}
-          aoFechar={() => gravarChave(chaveDoPresente(presenteNovo.quando), true)}
-        />
-      ) : null}
-
-      <CartaoDoDia
-        sobre={`Semana ${semana} · dia ${diaNaSemana(D)}`}
-        titulo={`${tema.emoji} ${tema.rotulo}`}
-        linha={`${fruitEmojiForWeek(semana)} Do tamanho de ${bebe.fruit.toLowerCase()} · ${bebe.size}`}
-        feitos={feitos}
-        total={TOTAL_DO_DIA}
-        itens={itens}
-        rodape={
-          fechado ? (
-            <T tipo="rotulo" cor={corJornada.roxoEscuro}>
-              ⭐ Cinco estrelas hoje! Amanhã abre o dia {diaNaSemana(D + 1)}
-              {diaNaSemana(D + 1) === 1 ? " da semana " + (semana + 1) : ""}.
-            </T>
-          ) : (
-            <T tipo="apagado">
-              {feitos === 0
-                ? "Comece por qualquer um. Cinco momentos fecham o dia com +20 🌱 de bônus."
-                : `${feitos} de 5 — ${TOTAL_DO_DIA - feitos === 1 ? "falta 1" : `faltam ${TOTAL_DO_DIA - feitos}`} para as cinco estrelas (+20 🌱).`}
-            </T>
-          )
+        amigas={amigas}
+        nomeDoBebe={nomeDoBebe}
+        humorFeito={marcouHumorHoje(checkin, hoje)}
+        aoMarcarHumor={(humor) => {
+          gravarChave(CHAVE_CHECKIN, novoCheckin(checkin, humor, hoje));
+          marcarFlagDoDia(D, "humor");
+        }}
+        aoAbrirDia={(d) => ir(`/jornada/dia?D=${d}`)}
+        aoAbrirSemana={(s) => {
+          /* Abrir o álbum de uma semana que já chegou guarda a figurinha dela,
+             como no site (`collectSticker`). */
+          const figurinhas = listaDeNumeros(loja.blob[CHAVE_FIGURINHAS]);
+          if (s <= semana && !figurinhas.includes(s))
+            gravarChave(
+              CHAVE_FIGURINHAS,
+              [...figurinhas, s].sort((a, b) => a - b),
+            );
+          ir(`/jornada/semana?semana=${s}`);
+        }}
+        aoAbrirLoja={() => ir("/jornada/conquistas")}
+        aoAbrirAmigas={() => router.navigate("/comunidade" as never)}
+        aoAbrirFolha={setFolha}
+        aoContarNascimento={() => router.push("/ritual?editar=1")}
+        topo={
+          <>
+            {carteira.estado === "falhou" ? (
+              <NaoConsegueLer
+                sossego="Os seus momentos de hoje continuam valendo e ficam guardados neste aparelho."
+                aoTentar={() => void recarregar()}
+              />
+            ) : null}
+            {presenteNovo ? (
+              <AvisoDePresente
+                quantidade={presenteNovo.quantidade}
+                de={presenteNovo.de}
+                nome={presenteNovo.nome}
+                aoFechar={() => gravarChave(chaveDoPresente(presenteNovo.quando), true)}
+              />
+            ) : null}
+          </>
         }
       />
-
-      <View style={{ flexDirection: "row", alignItems: "center", marginTop: espaco.sm }}>
-        <T tipo="subtitulo" estilo={{ flex: 1 }}>
-          Semana {semana}
-        </T>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Ver a semana inteira"
-          onPress={() => {
-            toque();
-            ir("/jornada/semana");
-          }}
-          style={({ pressed }) => ({
-            minHeight: ALVO_MINIMO,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 4,
-            paddingLeft: espaco.md,
-            opacity: pressed ? 0.6 : 1,
-          })}
-        >
-          <CalendarDays size={18} color={corJornada.roxo} />
-          <Text style={{ fontFamily: fonte.forte, fontSize: 15, color: corJornada.roxo }}>
-            Ver a semana
-          </Text>
-        </Pressable>
-      </View>
-      <Cartao estilo={{ paddingHorizontal: espaco.sm, paddingVertical: espaco.md }}>
-        <TrilhaDaSemana blob={loja.blob} dias={diasDaSemana(semana)} hojeD={D} hoje={hoje} />
-      </Cartao>
-
-      <BotaoDeConquistas leitura={conquistas} posParto={false} />
-    </Tela>
+      <FolhasDoPlacar
+        aberta={folha}
+        aoFechar={() => setFolha(null)}
+        chama={diasDeChama}
+        perdoes={perdoes}
+        trofeus={carteira.estado === "ok" ? carteira.dados.trofeus : null}
+      />
+    </SafeAreaView>
   );
+}
+
+/** O número de amigas da faixa do Caminho, relido a cada foco da aba. */
+function useContagemDeAmigas(): number | null {
+  const [n, setN] = useState<number | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      let vivo = true;
+      void lerContagemDeAmigas().then((r) => {
+        if (vivo && r != null) setN(r);
+      });
+      return () => {
+        vivo = false;
+      };
+    }, []),
+  );
+  return n;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════

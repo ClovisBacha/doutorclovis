@@ -104,7 +104,43 @@ export function Placar({
         />
       </View>
 
-      <Folha aberta={aberta === "chama"} aoFechar={() => setAberta(null)} titulo="🔥 A sua chama">
+      <FolhasDoPlacar
+        aberta={aberta}
+        aoFechar={() => setAberta(null)}
+        chama={chama}
+        perdoes={perdoes}
+        trofeus={trofeus}
+        pos={pos}
+      />
+    </>
+  );
+}
+
+export type FolhaDoPlacar = null | "sementes" | "chama" | "trofeus";
+
+/**
+ * As três folhas que explicam os números do topo — a chama (com o perdão), as
+ * sementinhas (o que rende quanto) e os troféus. Separadas do placar para o
+ * Caminho usar as mesmas: número sem explicação é número que ninguém persegue.
+ */
+export function FolhasDoPlacar({
+  aberta,
+  aoFechar,
+  chama,
+  perdoes,
+  trofeus,
+  pos = false,
+}: {
+  aberta: FolhaDoPlacar;
+  aoFechar: () => void;
+  chama: number;
+  perdoes: number;
+  trofeus: number | null;
+  pos?: boolean;
+}) {
+  return (
+    <>
+      <Folha aberta={aberta === "chama"} aoFechar={aoFechar} titulo="🔥 A sua chama">
         {chama > 0 ? (
           <View style={{ alignItems: "center" }}>
             <BolhaViva humor="chama" tamanho={120} />
@@ -117,11 +153,7 @@ export function Placar({
         ))}
       </Folha>
 
-      <Folha
-        aberta={aberta === "sementes"}
-        aoFechar={() => setAberta(null)}
-        titulo="🌱 Sementinhas"
-      >
+      <Folha aberta={aberta === "sementes"} aoFechar={aoFechar} titulo="🌱 Sementinhas">
         {pos ? (
           <T>
             No pós-parto, os momentos do dia são só seus: eles acendem a chama, sem somar
@@ -142,7 +174,7 @@ export function Placar({
         {pos ? null : <T tipo="apagado">Os momentos valem no dia em que acontecem.</T>}
       </Folha>
 
-      <Folha aberta={aberta === "trofeus"} aoFechar={() => setAberta(null)} titulo="🏆 Troféus">
+      <Folha aberta={aberta === "trofeus"} aoFechar={aoFechar} titulo="🏆 Troféus">
         <T>
           Cada dia em que você fecha os cinco momentos — a aula e as quatro atividades — vira um
           troféu.

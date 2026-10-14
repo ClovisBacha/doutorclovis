@@ -1,7 +1,7 @@
 import { AppState } from "react-native";
 import { useSyncExternalStore } from "react";
 import { gravarJson, lerJson } from "~/lib/armazem";
-import { marcarMomento, type Blob, type Momento } from "~/lib/jornada/momentos";
+import { chaveDoDia, marcarMomento, type Blob, type Momento } from "~/lib/jornada/momentos";
 import { mesclarBlob } from "~/lib/jornada/sincronia";
 import { supabase } from "~/servidor/supabase";
 
@@ -44,7 +44,13 @@ export type EstadoDaLoja = {
   bancada: boolean;
 };
 
-const VAZIO: EstadoDaLoja = { uid: null, blob: {}, pronto: false, nuvem: "esperando", bancada: false };
+const VAZIO: EstadoDaLoja = {
+  uid: null,
+  blob: {},
+  pronto: false,
+  nuvem: "esperando",
+  bancada: false,
+};
 
 let estado: EstadoDaLoja = VAZIO;
 let marca: string | null = null;
@@ -219,7 +225,11 @@ export function gravarChave(chave: string, valor: unknown) {
  * Marca um momento do dia. Devolve se fechou os cinco AGORA — o chamador é
  * quem celebra e chama o bônus do servidor.
  */
-export function marcar(D: number, m: Momento, pos = false): { fechouAgora: boolean; jaEstava: boolean } {
+export function marcar(
+  D: number,
+  m: Momento,
+  pos = false,
+): { fechouAgora: boolean; jaEstava: boolean } {
   if (!estado.uid) return { fechouAgora: false, jaEstava: false };
   const r = marcarMomento(estado.blob, D, m, { pos });
   if (r.jaEstava) return { fechouAgora: false, jaEstava: true };
@@ -230,4 +240,20 @@ export function marcar(D: number, m: Momento, pos = false): { fechouAgora: boole
     agendarPush();
   }
   return { fechouAgora: r.fechouAgora, jaEstava: false };
+}
+
+/**
+ * Acende uma flag a mais no dia que NÃO é um dos cinco momentos — o `humor` do
+ * check-in "Como você está hoje?". Ela acende a chama (qualquer flag do dia
+ * conta) mas não é estrela, não paga e não fecha o dia, como no site.
+ */
+export function marcarFlagDoDia(D: number, flag: string, pos = false) {
+  const chave = chaveDoDia(D, pos);
+  const atual = estado.blob[chave];
+  const dia =
+    typeof atual === "object" && atual !== null && !Array.isArray(atual)
+      ? (atual as Record<string, unknown>)
+      : {};
+  if (dia[flag] === true) return;
+  gravarChave(chave, { ...dia, [flag]: true });
 }

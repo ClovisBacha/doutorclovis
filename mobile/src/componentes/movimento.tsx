@@ -87,6 +87,29 @@ const ARTES = {
 
 export type HumorDaBolha = keyof typeof VIDEOS;
 
+/** A arte parada também tem a SURPRESA (a visita de madrugada, o dia cheio). */
+export type HumorDaArte = HumorDaBolha | "surpresa";
+
+/**
+ * A bolha como ARTE parada (fundo transparente), flutuando devagar — para
+ * telas de fundo em degradê, onde o quadrado rosa do vídeo apareceria.
+ */
+export function ArteDaBolha({ humor, tamanho }: { humor: HumorDaArte; tamanho: number }) {
+  const fonte = humor === "surpresa" ? ARTE_SURPRESA : ARTES[humor];
+  return (
+    <Flutuar>
+      <Image
+        source={fonte}
+        style={{ width: tamanho, height: tamanho }}
+        contentFit="contain"
+        accessible={false}
+      />
+    </Flutuar>
+  );
+}
+
+const ARTE_SURPRESA = require("../../../src/assets/bolha/surpresa.webp");
+
 /** O rosa do fundo dos vídeos (medido nos quadros), para o recorte sumir. */
 export const ROSA_DO_VIDEO = "#FDDFE7";
 

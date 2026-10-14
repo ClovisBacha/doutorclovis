@@ -10,6 +10,7 @@ import {
   type Atividade,
   type Carteira,
 } from "~/servidor/economia";
+import { contarAmigas } from "~/servidor/amigas";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { estadoDaBancada } from "~/componentes/jornada/bancada";
 
@@ -121,7 +122,8 @@ export async function lerConquistas(): Promise<LeituraDasConquistas | null> {
     ].map(([achievement_key, unlocked_at]) => ({ achievement_key, unlocked_at }));
     return {
       unlocked,
-      resgatadas: estado === "neutro" ? null : ["first_login", "profile_complete", "first_health_log"],
+      resgatadas:
+        estado === "neutro" ? null : ["first_login", "profile_complete", "first_health_log"],
       careMode: false,
     };
   }
@@ -144,6 +146,20 @@ export async function resgatar(
   try {
     const r = await resgatarConquista({ key });
     return r.ok ? { granted: r.granted, repetido: r.repetido } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Quantas amigas ela tem (o número da faixa do Caminho); `null` = não sabemos. */
+export async function lerContagemDeAmigas(): Promise<number | null> {
+  if (ehBancada()) {
+    await espera();
+    return Number(parametroDaBancada("amigas") ?? 3) || 0;
+  }
+  try {
+    const r = await contarAmigas();
+    return r && r.ok ? r.amigas : null;
   } catch {
     return null;
   }

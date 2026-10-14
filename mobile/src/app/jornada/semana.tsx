@@ -1,3 +1,4 @@
+import { useLocalSearchParams } from "expo-router";
 import { ChevronLeft, ChevronRight, Lock } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
@@ -36,9 +37,16 @@ import { cor, espaco, fonte, raio } from "~/tema";
 export default function Semana() {
   const { dia, loja } = useJornada();
   const atual = dia.modo === "gestacao" ? dia.semana : null;
-  const [semana, setSemana] = useState<number | null>(atual);
+  /* `?semana=N` — a moeda da barra da semana, no Caminho, abre ESTA semana. */
+  const { semana: pedida } = useLocalSearchParams<{ semana?: string }>();
+  const inicial = (a: number | null) => {
+    if (a == null) return null;
+    const n = Number(pedida);
+    return Number.isFinite(n) && n >= SEMANA_MINIMA ? Math.min(a, Math.floor(n)) : a;
+  };
+  const [semana, setSemana] = useState<number | null>(() => inicial(atual));
   useEffect(() => {
-    if (semana == null && atual != null) setSemana(atual);
+    if (semana == null && atual != null) setSemana(inicial(atual));
   }, [atual, semana]);
 
   if (dia.modo === "carregando") {
