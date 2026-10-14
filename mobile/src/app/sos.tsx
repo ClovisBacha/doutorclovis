@@ -20,6 +20,7 @@ import {
   type MedicoLocal,
 } from "~/lib/kit-sos";
 import { lerKitDoSos } from "~/lib/kit-sos-armazem";
+import { tocarAlarmeDoSos } from "~/lib/alarme-do-sos";
 import { abrir, ligar } from "~/lib/links";
 import { localizacaoNegada, localizacaoParaSocorro, type Ponto } from "~/lib/localizacao";
 import { lerMedicoLocal } from "~/lib/medico-local";
@@ -125,6 +126,7 @@ export default function Sos() {
     if (!sessao) {
       setAviso({ fase: "semRede" });
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      void tocarAlarmeDoSos("falhou");
       return;
     }
     try {
@@ -147,14 +149,19 @@ export default function Sos() {
           ? Haptics.NotificationFeedbackType.Success
           : Haptics.NotificationFeedbackType.Error,
       ).catch(() => {});
+      setAviso({ fase: "feito", canais: r.canais, mensagem: r.mensagem, zapAbriu: false });
+      /* O MESMO desfecho no ouvido, pela MESMA régua da vibração. E o
+         WhatsApp só abre depois do som: aberto antes, ele levaria o app para
+         segundo plano e cortaria o alarme. */
+      await tocarAlarmeDoSos(chegouEmTodos ? "enviado" : "falhou");
       /* O WhatsApp do contato abre SOZINHO, e só DEPOIS do servidor: e-mail e
          SMS já saíram. A mensagem é a mesma que foi por e-mail, para quem
          receber pelos dois canais não ler duas versões do mesmo socorro. */
-      const zapAbriu =
-        telContato && r.mensagem ? await abrirWhatsApp(telContato, r.mensagem) : false;
-      setAviso({ fase: "feito", canais: r.canais, mensagem: r.mensagem, zapAbriu });
+      if (telContato && r.mensagem && (await abrirWhatsApp(telContato, r.mensagem)))
+        setAviso({ fase: "feito", canais: r.canais, mensagem: r.mensagem, zapAbriu: true });
     } catch {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      void tocarAlarmeDoSos("falhou");
       setAviso({ fase: "semRede" });
     }
   }

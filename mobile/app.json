@@ -10,7 +10,7 @@
     "backgroundColor": "#fffaf6",
     "ios": {
       "bundleIdentifier": "br.com.obstetrica.app",
-      "buildNumber": "4",
+      "buildNumber": "5",
       "appleTeamId": "8PL2X9F9PV",
       "supportsTablet": false,
       "usesAppleSignIn": true,
@@ -93,7 +93,15 @@
         }
       ],
       "expo-video",
-      "./plugins/ciclo-de-cena"
+      "./plugins/ciclo-de-cena",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false
