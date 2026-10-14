@@ -6,9 +6,15 @@ import {
   FlatList,
   Pressable,
   Text,
+  useWindowDimensions,
   View,
   type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from "react-native";
+import { Image } from "expo-image";
+import Svg, { Circle, Defs, RadialGradient, Stop } from "react-native-svg";
+import { estadoDoNo as estadoDaPele, type TrilhaSkin } from "@/lib/trilha-skins";
 import { useAviso } from "~/componentes/aviso";
 import { toque } from "~/componentes/base";
 import { corCaminho } from "~/componentes/caminho/cores";
@@ -25,6 +31,13 @@ import {
   Pulsar,
   TrofeuParado,
 } from "~/componentes/caminho/pecas";
+import {
+  BarraDeArrumar,
+  BotaoDeArrumar,
+  EnfeiteNaTrilha,
+  FundoEAr,
+  type ArrumarEnfeite,
+} from "~/componentes/caminho/enfeites";
 import { useMovimentoReduzido } from "~/componentes/movimento";
 import { parametroDaBancada } from "~/lib/bancada";
 import {
@@ -41,6 +54,22 @@ import {
   type Bloco,
   type Fase,
 } from "~/lib/jornada/caminho";
+import {
+  alturaNoSite,
+  bandeja as bandejaDe,
+  climasDela,
+  DECOR_MAX,
+  enfeitesPorBloco,
+  enfeitesVisiveis,
+  moverEnfeite,
+  novoEnfeite,
+  paradasDoDegrade,
+  semearNovos,
+  Y_INICIAL_DO_SITE,
+  type Decoracao,
+  type EnfeiteNoBloco,
+  type EnfeitePosto,
+} from "~/lib/jornada/enfeites";
 import type { Blob } from "~/lib/jornada/momentos";
 import { listaDeNumeros } from "~/lib/jornada/momentos";
 import { estadoDoNo } from "~/lib/jornada/trilha";
@@ -61,8 +90,9 @@ import { ALVO_MINIMO, cor, espaco, fonte } from "~/tema";
  * Cada bloco tem altura fixa (`montarCaminho`), então o deslocamento de hoje
  * sai de uma soma.
  *
- * Os enfeites comprados no Cantinho (e o lápis de arrumá-los) chegam com a
- * tela de Recompensas: o app ainda não tem a loja.
+ * O que ela compra no Cantinho mora aqui: os enfeites espalhados pela trilha
+ * (nas posições do SITE — o layout é o mesmo nos dois, no blob da jornada), o
+ * cenário e o ar atrás dela, e a pele das bolinhas. O ✏️ abre o modo Arrumar.
  */
 
 export type PropsDoCaminho = {
@@ -87,6 +117,17 @@ export type PropsDoCaminho = {
   aoContarNascimento: () => void;
   /** O que vem antes do humor (o presente que chegou, a carteira que falhou). */
   topo?: ReactNode;
+  /** O layout dos enfeites (`dc-path-decor`), como está gravado. */
+  decoracao: Decoracao | null;
+  /** O que ela tem no Cantinho (`null` = ainda não sei: vale o layout gravado). */
+  possuidos: readonly string[] | null;
+  /** O cenário equipado (o degradê do catálogo), ou nenhum. */
+  cenario: string | null;
+  /** A pele das bolinhas, se ela equipou uma. */
+  pele: TrilhaSkin | null;
+  /** O blob da nuvem já chegou: só então se espalha enfeite novo. */
+  podeSemear: boolean;
+  aoGravarDecoracao: (d: Decoracao) => void;
 };
 
 export function Caminho(p: PropsDoCaminho) {
@@ -113,6 +154,22 @@ export function Caminho(p: PropsDoCaminho) {
 
   const feitos = useMemo(() => listaDeNumeros(p.blob["dc-path-done-days"]), [p.blob]);
   const figurinhas = useMemo(() => listaDeNumeros(p.blob["dc-path-stickers"]), [p.blob]);
+  const parado = useMovimentoReduzido();
+  const { width: largura } = useWindowDimensions();
+
+  /* ── O Cantinho na trilha ── */
+  const alturas = useMemo(() => blocos.map((b) => b.altura), [blocos]);
+  const alturaDaTrilha = useMemo(() => alturaNoSite(alturas), [alturas]);
+  const visiveis = useMemo(
+    () => enfeitesVisiveis(p.decoracao, p.possuidos),
+    [p.decoracao, p.possuidos],
+  );
+  const porBloco = useMemo(() => enfeitesPorBloco(visiveis, alturas), [visiveis, alturas]);
+  const paradas = useMemo(() => (p.cenario ? paradasDoDegrade(p.cenario) : null), [p.cenario]);
+  /* O clima vem do que ela POSSUI, nunca de onde ele está: ele é o ar da
+     trilha, e não tem lugar (o defeito da Poeira de estrelas no site). */
+  const climas = useMemo(() => climasDela(p.possuidos ?? []), [p.possuidos]);
+  const bandeja = useMemo(() => bandejaDe(p.possuidos ?? []), [p.possuidos]);
 
   /* ── Abrir centrado em HOJE ── */
   const lista = useRef<FlatList<Bloco>>(null);
@@ -135,10 +192,107 @@ export function Caminho(p: PropsDoCaminho) {
   /* ── O aviso do dia que ainda não abriu ── */
   const { avisar, aviso } = useAviso({ direita: 72 });
 
+  /* ── Espalhar o que ela comprou e a trilha ainda não viu ──
+     Nas MESMAS posições que o site daria (a régua e a altura são as dele):
+     quem semear primeiro, aqui ou lá, grava o layout que os dois mostram. */
+  const avisouCheia = useRef(false);
+  const { podeSemear, possuidos, decoracao, aoGravarDecoracao } = p;
+  useEffect(() => {
+    if (!podeSemear || !possuidos) return;
+    const r = semearNovos(decoracao, possuidos, alturaDaTrilha);
+    if (r.esperando > 0 && !avisouCheia.current) {
+      avisouCheia.current = true;
+      avisar(`A trilha está cheia (${DECOR_MAX} enfeites). Os novos esperam no ✏️ Arrumar.`);
+    }
+    if (r.decoracao) aoGravarDecoracao(r.decoracao);
+  }, [podeSemear, possuidos, decoracao, alturaDaTrilha, aoGravarDecoracao, avisar]);
+
+  /* ── O modo Arrumar ── */
+  const [arrumando, setArrumando] = useState(false);
+  const [selecionado, setSelecionado] = useState<string | null>(null);
+  const [arrastando, setArrastando] = useState(false);
+  const historico = useRef<EnfeitePosto[][]>([]);
+  const [passos, setPassos] = useState(0);
+  const rolagem = useRef(new Animated.Value(0)).current;
+  const rolagemAgora = useRef(0);
+
+  /* As mudanças valem sobre o layout INTEIRO gravado (inclusive o que não está
+     à vista), e cada uma guarda o estado anterior para o Desfazer. */
+  const gravar = useCallback(
+    (items: EnfeitePosto[]) => {
+      const atual = decoracao ?? { v: 1 as const, items: [], seen: [] };
+      historico.current = [...historico.current.slice(-39), atual.items];
+      setPassos(historico.current.length);
+      aoGravarDecoracao({ v: 1, items, seen: atual.seen });
+    },
+    [decoracao, aoGravarDecoracao],
+  );
+  const todos = decoracao?.items ?? [];
+
+  const arrumar = useMemo<Omit<ArrumarEnfeite, "selecionado"> | null>(
+    () =>
+      arrumando
+        ? {
+            aoSelecionar: setSelecionado,
+            aoArrastar: setArrastando,
+            aoMover: (k, dx, dy) =>
+              gravar(
+                todos.map((q) =>
+                  q.k === k
+                    ? moverEnfeite(q, (dx / Math.max(1, largura)) * 100, dy, alturaDaTrilha)
+                    : q,
+                ),
+              ),
+            aoRedimensionar: (k, s) => gravar(todos.map((q) => (q.k === k ? { ...q, s } : q))),
+            aoTirar: (k) => {
+              setSelecionado(null);
+              gravar(todos.filter((q) => q.k !== k));
+            },
+          }
+        : null,
+    [arrumando, gravar, todos, largura, alturaDaTrilha],
+  );
+
+  function porDaBandeja(id: string) {
+    if (todos.length >= DECOR_MAX) {
+      avisar(`A trilha já tem ${DECOR_MAX} enfeites — tire algum com o ✕ antes.`);
+      return;
+    }
+    /* Nasce no meio do que está à vista, para ela ver o item aparecer. */
+    const meio =
+      rolagemAgora.current + (alturaDaLista ?? 0) / 2 - (alturaDoTopo ?? 0) + Y_INICIAL_DO_SITE;
+    const k = `u${Date.now().toString(36)}-${id}`;
+    gravar([...todos, novoEnfeite(id, meio, alturaDaTrilha, k)]);
+    setSelecionado(k);
+  }
+
+  function desfazer() {
+    const antes = historico.current.pop();
+    setPassos(historico.current.length);
+    if (!antes) return;
+    setSelecionado(null);
+    aoGravarDecoracao({ v: 1, items: antes, seen: decoracao?.seen ?? [] });
+  }
+
   const renderItem = useCallback(
-    ({ item }: { item: Bloco }) =>
-      item.tipo === "fase" ? (
-        <FaixaDaFase fase={item.fase} travada={item.travada} altura={item.altura} />
+    ({ item, index }: { item: Bloco; index: number }) => {
+      const enfeites = (
+        <EnfeitesDoBloco
+          enfeites={porBloco[index] ?? []}
+          semana={p.semanaAtual}
+          parado={parado}
+          arrumar={arrumar}
+          selecionado={selecionado}
+        />
+      );
+      return item.tipo === "fase" ? (
+        <FaixaDaFase
+          fase={item.fase}
+          travada={item.travada}
+          altura={item.altura}
+          enfeites={enfeites}
+          arrumando={arrumando}
+        />
       ) : (
         <BlocoDaSemana
           bloco={item}
@@ -149,9 +303,39 @@ export function Caminho(p: PropsDoCaminho) {
           aoAbrirDia={p.aoAbrirDia}
           aoAbrirSemana={p.aoAbrirSemana}
           avisar={avisar}
+          pele={p.pele}
+          enfeites={enfeites}
+          arrumando={arrumando}
         />
-      ),
-    [p.hojeD, p.blob, feitos, figurinhas, p.aoAbrirDia, p.aoAbrirSemana, avisar],
+      );
+    },
+    [
+      p.hojeD,
+      p.blob,
+      p.semanaAtual,
+      p.pele,
+      feitos,
+      figurinhas,
+      p.aoAbrirDia,
+      p.aoAbrirSemana,
+      avisar,
+      porBloco,
+      parado,
+      arrumar,
+      selecionado,
+      arrumando,
+    ],
+  );
+
+  const aoRolar = useMemo(
+    () =>
+      Animated.event([{ nativeEvent: { contentOffset: { y: rolagem } } }], {
+        useNativeDriver: true,
+        listener: (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+          rolagemAgora.current = e.nativeEvent.contentOffset.y;
+        },
+      }),
+    [rolagem],
   );
 
   return (
@@ -165,45 +349,126 @@ export function Caminho(p: PropsDoCaminho) {
         aoAbrirFolha={p.aoAbrirFolha}
         aoAbrirAmigas={p.aoAbrirAmigas}
       />
-      <FlatList
-        ref={lista}
-        data={blocos}
-        keyExtractor={(b) => (b.tipo === "fase" ? `f${b.fase.n}` : `s${b.semana}`)}
-        renderItem={renderItem}
-        getItemLayout={(_, i) => ({
-          length: blocos[i].altura,
-          offset: (alturaDoTopo ?? 0) + deslocamentos[i],
-          index: i,
-        })}
-        initialScrollIndex={indiceDeHoje > 0 && !rolou.current ? indiceDeHoje : undefined}
-        initialNumToRender={3}
-        windowSize={7}
-        extraData={alturaDoTopo}
-        onLayout={(e: LayoutChangeEvent) => setAlturaDaLista(e.nativeEvent.layout.height)}
-        onScrollToIndexFailed={() => {}}
-        showsVerticalScrollIndicator={false}
-        ListHeaderComponent={
-          <View
-            onLayout={(e) => setAlturaDoTopo(e.nativeEvent.layout.height)}
-            style={{
-              paddingHorizontal: 20,
-              paddingTop: espaco.lg,
-              gap: espaco.lg,
-              paddingBottom: espaco.lg,
-            }}
-          >
-            {p.topo}
-            {p.semanaAtual >= 37 ? (
-              <CartaoDoNascimento nome={p.nomeDoBebe} aoTocar={p.aoContarNascimento} />
-            ) : null}
-            {p.humorFeito ? null : <CartaoDoHumor aoMarcar={p.aoMarcarHumor} />}
-          </View>
-        }
-        ListFooterComponent={<View style={{ height: 40 + 64 }} />}
-      />
-      <BotaoDaLoja saldo={p.saldo} aoTocar={p.aoAbrirLoja} />
+      <View style={{ flex: 1 }}>
+        <FundoEAr
+          paradas={paradas}
+          climas={climas}
+          rolagem={rolagem}
+          alturaDoTopo={alturaDoTopo ?? 0}
+          alturaDaLista={alturaDaLista ?? 0}
+          alturaDaTrilha={alturaDaTrilha}
+          largura={largura}
+          parado={parado}
+        />
+        <Animated.FlatList
+          ref={lista as never}
+          data={blocos}
+          onScroll={aoRolar}
+          scrollEventThrottle={16}
+          scrollEnabled={!arrastando}
+          keyExtractor={(b) => (b.tipo === "fase" ? `f${b.fase.n}` : `s${b.semana}`)}
+          renderItem={renderItem}
+          getItemLayout={(_, i) => ({
+            length: blocos[i].altura,
+            offset: (alturaDoTopo ?? 0) + deslocamentos[i],
+            index: i,
+          })}
+          initialScrollIndex={indiceDeHoje > 0 && !rolou.current ? indiceDeHoje : undefined}
+          initialNumToRender={3}
+          windowSize={7}
+          extraData={[alturaDoTopo, porBloco, arrumando, selecionado, p.pele, parado]}
+          onLayout={(e: LayoutChangeEvent) => setAlturaDaLista(e.nativeEvent.layout.height)}
+          onScrollToIndexFailed={() => {}}
+          showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            <View
+              onLayout={(e) => setAlturaDoTopo(e.nativeEvent.layout.height)}
+              style={{
+                paddingHorizontal: 20,
+                paddingTop: espaco.lg,
+                gap: espaco.lg,
+                paddingBottom: espaco.lg,
+              }}
+            >
+              {p.topo}
+              {p.semanaAtual >= 37 ? (
+                <CartaoDoNascimento nome={p.nomeDoBebe} aoTocar={p.aoContarNascimento} />
+              ) : null}
+              {p.humorFeito ? null : <CartaoDoHumor aoMarcar={p.aoMarcarHumor} />}
+            </View>
+          }
+          ListFooterComponent={<View style={{ height: 40 + 64 + (arrumando ? 120 : 0) }} />}
+        />
+      </View>
+      {arrumando ? (
+        <BarraDeArrumar
+          quantos={visiveis.length}
+          podeDesfazer={passos > 0}
+          aoDesfazer={desfazer}
+          aoTerminar={() => {
+            setArrumando(false);
+            setSelecionado(null);
+          }}
+          bandeja={bandeja}
+          aoPor={porDaBandeja}
+        />
+      ) : (
+        <>
+          {bandeja.length > 0 ? (
+            <BotaoDeArrumar
+              aoTocar={() => {
+                /* Cada sessão de Arrumar começa com o Desfazer zerado: ele
+                   desfaz o que ela acabou de fazer, nunca uma visita antiga. */
+                historico.current = [];
+                setPassos(0);
+                setArrumando(true);
+              }}
+            />
+          ) : null}
+          <BotaoDaLoja saldo={p.saldo} aoTocar={p.aoAbrirLoja} />
+        </>
+      )}
       {aviso}
     </View>
+  );
+}
+
+/** Os enfeites de um bloco — desenhados ANTES do resto, para a trilha ficar por cima. */
+function EnfeitesDoBloco({
+  enfeites,
+  semana,
+  parado,
+  arrumar,
+  selecionado,
+}: {
+  enfeites: EnfeiteNoBloco[];
+  semana: number;
+  parado: boolean;
+  arrumar: Omit<ArrumarEnfeite, "selecionado"> | null;
+  selecionado: string | null;
+}) {
+  return (
+    <>
+      {/* No modo Arrumar, um toque fora dos enfeites tira a seleção — e a
+          trilha embaixo não abre dia nenhum. */}
+      {arrumar ? (
+        <Pressable
+          accessible={false}
+          onPress={() => arrumar.aoSelecionar(null)}
+          style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }}
+        />
+      ) : null}
+      {enfeites.map((e) => (
+        <EnfeiteNaTrilha
+          key={e.p.k}
+          p={e.p}
+          y={e.y}
+          semana={semana}
+          parado={parado}
+          arrumar={arrumar ? { ...arrumar, selecionado: selecionado === e.p.k } : undefined}
+        />
+      ))}
+    </>
   );
 }
 
@@ -430,65 +695,83 @@ function CartaoDoNascimento({ nome, aoTocar }: { nome: string | null; aoTocar: (
    A faixa da fase
    ══════════════════════════════════════════════════════════════════════════ */
 
-function FaixaDaFase({ fase, travada, altura }: { fase: Fase; travada: boolean; altura: number }) {
+function FaixaDaFase({
+  fase,
+  travada,
+  altura,
+  enfeites,
+  arrumando,
+}: {
+  fase: Fase;
+  travada: boolean;
+  altura: number;
+  enfeites?: ReactNode;
+  arrumando?: boolean;
+}) {
   const fundo = travada ? corCaminho.faixaTravada : corDaFaixa(fase.from);
   const labio = travada ? corCaminho.faixaTravadaLabio : labioDaFaixa(fase.from);
   return (
-    <View style={{ height: altura, paddingHorizontal: espaco.lg, paddingTop: 8 }}>
-      <View>
-        {/* O lábio: a faixa "pousada" 4 px acima de uma sombra sólida. */}
-        <View
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            top: 4,
-            bottom: -4,
-            borderRadius: 24,
-            backgroundColor: labio,
-          }}
-        />
-        <View
-          accessibilityRole="header"
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            borderRadius: 24,
-            backgroundColor: fundo,
-            paddingHorizontal: 20,
-            paddingVertical: espaco.lg,
-            shadowColor: corCaminho.sombra,
-            shadowOpacity: 0.12,
-            shadowRadius: 14,
-            shadowOffset: { width: 0, height: 10 },
-          }}
-        >
-          <View style={{ flex: 1 }}>
-            <Text
-              style={{
-                fontFamily: fonte.forte,
-                fontSize: 13,
-                letterSpacing: 0.8,
-                textTransform: "uppercase",
-                color: corCaminho.textoClaro80,
-              }}
-            >
-              Fase {fase.n} · Semanas {fase.from}–{fase.to}
-            </Text>
-            <Text
-              style={{ marginTop: 2, fontFamily: fonte.titulo, fontSize: 20, color: cor.branco }}
-            >
-              {fase.name}
-            </Text>
-          </View>
-          {travada ? (
-            <View style={{ opacity: 0.5 }}>
-              <IconeCadeado cor={corCaminho.cadeado} />
+    <View style={{ height: altura }}>
+      {enfeites}
+      <View
+        pointerEvents={arrumando ? "none" : "auto"}
+        style={{ paddingHorizontal: espaco.lg, paddingTop: 8 }}
+      >
+        <View>
+          {/* O lábio: a faixa "pousada" 4 px acima de uma sombra sólida. */}
+          <View
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              top: 4,
+              bottom: -4,
+              borderRadius: 24,
+              backgroundColor: labio,
+            }}
+          />
+          <View
+            accessibilityRole="header"
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              borderRadius: 24,
+              backgroundColor: fundo,
+              paddingHorizontal: 20,
+              paddingVertical: espaco.lg,
+              shadowColor: corCaminho.sombra,
+              shadowOpacity: 0.12,
+              shadowRadius: 14,
+              shadowOffset: { width: 0, height: 10 },
+            }}
+          >
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{
+                  fontFamily: fonte.forte,
+                  fontSize: 13,
+                  letterSpacing: 0.8,
+                  textTransform: "uppercase",
+                  color: corCaminho.textoClaro80,
+                }}
+              >
+                Fase {fase.n} · Semanas {fase.from}–{fase.to}
+              </Text>
+              <Text
+                style={{ marginTop: 2, fontFamily: fonte.titulo, fontSize: 20, color: cor.branco }}
+              >
+                {fase.name}
+              </Text>
             </View>
-          ) : (
-            <Emoji tamanho={36}>{fase.emoji}</Emoji>
-          )}
+            {travada ? (
+              <View style={{ opacity: 0.5 }}>
+                <IconeCadeado cor={corCaminho.cadeado} />
+              </View>
+            ) : (
+              <Emoji tamanho={36}>{fase.emoji}</Emoji>
+            )}
+          </View>
         </View>
       </View>
     </View>
@@ -508,6 +791,9 @@ function BlocoDaSemana({
   aoAbrirDia,
   aoAbrirSemana,
   avisar,
+  pele,
+  enfeites,
+  arrumando,
 }: {
   bloco: Extract<Bloco, { tipo: "semana" }>;
   hojeD: number;
@@ -517,12 +803,19 @@ function BlocoDaSemana({
   aoAbrirDia: (D: number) => void;
   aoAbrirSemana: (semana: number) => void;
   avisar: (texto: string) => void;
+  pele: TrilhaSkin | null;
+  enfeites?: ReactNode;
+  arrumando?: boolean;
 }) {
   const inicio = bloco.semana * 7;
   const porVir = inicio > hojeD;
   return (
     <View style={{ height: bloco.altura }}>
-      <View style={{ position: "absolute", left: 12, right: 12, top: 8 }}>
+      {enfeites}
+      <View
+        pointerEvents={arrumando ? "none" : "auto"}
+        style={{ position: "absolute", left: 12, right: 12, top: 8 }}
+      >
         <BarraDaSemana
           semana={bloco.semana}
           porVir={porVir}
@@ -547,6 +840,8 @@ function BlocoDaSemana({
           blob={blob}
           aoAbrir={() => aoAbrirDia(d.D)}
           avisar={avisar}
+          pele={pele}
+          arrumando={arrumando}
         />
       ))}
     </View>
@@ -745,6 +1040,8 @@ function NoDoDia({
   blob,
   aoAbrir,
   avisar,
+  pele,
+  arrumando,
 }: {
   D: number;
   x: number;
@@ -754,6 +1051,8 @@ function NoDoDia({
   blob: Blob;
   aoAbrir: () => void;
   avisar: (texto: string) => void;
+  pele: TrilhaSkin | null;
+  arrumando?: boolean;
 }) {
   const e = estadoDoNo(blob, D, hojeD);
   const hoje = e.tipo === "hoje";
@@ -779,6 +1078,7 @@ function NoDoDia({
           : ", não concluído");
   return (
     <View
+      pointerEvents={arrumando ? "none" : "box-none"}
       style={{
         position: "absolute",
         left: `${x}%`,
@@ -863,17 +1163,43 @@ function NoDoDia({
             <AnelDeTarefas tamanho={tamanho} feitos={fechado ? 5 : momentos} cor={cheia.main} />
           ) : null}
           <Pulsar ativo={hoje && !fechado}>
-            <Moeda3D tamanho={tamanho} tom={tom}>
-              {hoje && !fechado ? (
-                <Emoji tamanho={30}>🎁</Emoji>
-              ) : fechado ? (
-                <Text
-                  style={{ fontFamily: fonte.titulo, fontSize: hoje ? 30 : 24, color: cor.branco }}
-                >
-                  ✓
-                </Text>
-              ) : null}
-            </Moeda3D>
+            {pele ? (
+              /* COM PELE: a arte substitui a bolinha inteira — sem o relevo,
+                 sem o ✓ e sem o 🎁. Quem diz o estado agora é o desenho
+                 (adormecido, desperto, florido). 42% maior que a bolinha: a
+                 arte tem ar em volta do objeto, medido no site lado a lado. */
+              <View
+                style={{
+                  width: tamanho,
+                  height: tamanho,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <BrilhoDaPele caixa={tamanho} cor={cheia.main} />
+                <Image
+                  source={pele.arte[estadoDaPele(fechado, hoje)] as never}
+                  style={{ width: tamanho * 1.42, height: tamanho * 1.42 }}
+                  contentFit="contain"
+                />
+              </View>
+            ) : (
+              <Moeda3D tamanho={tamanho} tom={tom}>
+                {hoje && !fechado ? (
+                  <Emoji tamanho={30}>🎁</Emoji>
+                ) : fechado ? (
+                  <Text
+                    style={{
+                      fontFamily: fonte.titulo,
+                      fontSize: hoje ? 30 : 24,
+                      color: cor.branco,
+                    }}
+                  >
+                    ✓
+                  </Text>
+                ) : null}
+              </Moeda3D>
+            )}
           </Pulsar>
         </View>
         {comEstrelas ? (
@@ -883,6 +1209,40 @@ function NoDoDia({
         ) : null}
       </Pressable>
     </View>
+  );
+}
+
+/**
+ * O `drop-shadow(0 6px 10px <cor>55)` que o site põe na arte da pele: um halo
+ * na cor da semana, 6 px abaixo do globo. Desenhado, e não `shadow*` da View —
+ * na web a sombra da View é um RETÂNGULO em volta da caixa (o quadrado que a
+ * primeira foto mostrou), e no iPhone ela seguiria a arte: dois desenhos.
+ */
+function BrilhoDaPele({ caixa, cor: tinta }: { caixa: number; cor: string }) {
+  /* A arte tem 1,42× a caixa, e o globo, ~66% dela. O perfil é o de um disco
+     desfocado pelo `blur 10px` do CSS (σ = 5 px): 0,33 por dentro, metade na
+     borda e quase nada 10 px fora — uma franja, nunca um disco. */
+  const R = caixa * 1.42 * 0.33;
+  const raio = R + 10;
+  const id = `brilho-${caixa}-${tinta.replace("#", "")}`;
+  const em = (r: number) => String(Math.max(0, r) / raio);
+  return (
+    <Svg
+      pointerEvents="none"
+      width={raio * 2}
+      height={raio * 2}
+      style={{ position: "absolute", left: caixa / 2 - raio, top: caixa / 2 - raio + 6 }}
+    >
+      <Defs>
+        <RadialGradient id={id} cx="50%" cy="50%" r="50%">
+          <Stop offset={em(R - 5)} stopColor={tinta} stopOpacity={0.28} />
+          <Stop offset={em(R)} stopColor={tinta} stopOpacity={0.16} />
+          <Stop offset={em(R + 5)} stopColor={tinta} stopOpacity={0.05} />
+          <Stop offset="1" stopColor={tinta} stopOpacity={0} />
+        </RadialGradient>
+      </Defs>
+      <Circle cx={raio} cy={raio} r={raio} fill={`url(#${id})`} />
+    </Svg>
   );
 }
 

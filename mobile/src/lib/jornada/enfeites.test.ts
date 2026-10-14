@@ -12,6 +12,12 @@ import {
   paradasDoDegrade,
   semearEnfeites,
   semearNovos,
+  alturaNoSite,
+  enfeitesPorBloco,
+  escalaArrastada,
+  fatiaDoDegrade,
+  moverEnfeite,
+  novoEnfeite,
 } from "~/lib/jornada/enfeites";
 import {
   CANTINHO_BY_ID,
@@ -71,10 +77,13 @@ describe("os enfeites nascem onde nasceriam no site", () => {
   });
 
   test("semeia só o que é novo, uma vez, e respeita o teto de 120", () => {
-    const primeira = semearNovos(null, ["planta-suculenta", "ceu-estrelinhas"], 27000)!;
+    const primeira = semearNovos(null, ["planta-suculenta", "ceu-estrelinhas"], 27000).decoracao!;
     expect(primeira.items).toHaveLength(4);
     expect(primeira.seen).toEqual(["planta-suculenta", "ceu-estrelinhas"]);
-    expect(semearNovos(primeira, ["planta-suculenta", "ceu-estrelinhas"], 27000)).toBeNull();
+    expect(semearNovos(primeira, ["planta-suculenta", "ceu-estrelinhas"], 27000)).toEqual({
+      decoracao: null,
+      esperando: 0,
+    });
     const cheia = {
       v: 1 as const,
       items: Array.from({ length: 119 }, (_, i) => ({
@@ -87,9 +96,40 @@ describe("os enfeites nascem onde nasceriam no site", () => {
       seen: [],
     };
     // a joaninha (2 vagas) não cabe e PARA a fila, como no site — a
-    // primavera, que vinha depois, espera a próxima abertura
-    expect(semearNovos(cheia, ["bicho-joaninha", "especial-primavera"], 27000)).toBeNull();
-    expect(semearNovos(cheia, ["especial-primavera"], 27000)?.items).toHaveLength(120);
+    // primavera, que vinha depois, espera a próxima abertura; e as duas
+    // ficam FORA do `seen`, para nascerem quando houver vaga
+    expect(semearNovos(cheia, ["bicho-joaninha", "especial-primavera"], 27000)).toEqual({
+      decoracao: null,
+      esperando: 2,
+    });
+    const so = semearNovos(cheia, ["especial-primavera"], 27000);
+    expect(so.decoracao?.items).toHaveLength(120);
+    expect(so.esperando).toBe(0);
+  });
+
+  test("cada enfeite cai no bloco certo, na altura certa dentro dele", () => {
+    // blocos de 120, 112 e 78 — começando em y = 8, como no site
+    const alturas = [120, 112, 78];
+    expect(alturaNoSite(alturas)).toBe(8 + 310 + 40);
+    const em = (y: number) => ({ k: `k${y}`, id: "planta-trevo", x: 50, y, s: 1 });
+    const porBloco = enfeitesPorBloco([em(0), em(8), em(127), em(128), em(240), em(9999)], alturas);
+    expect(porBloco.map((b) => b.map((e) => e.y))).toEqual([[-8, 0, 119], [0], [0, 9999 - 240]]);
+  });
+
+  test("arrastar, redimensionar e pôr da bandeja ficam dentro da trilha", () => {
+    const p = { k: "a", id: "planta-trevo", x: 90, y: 100, s: 1 };
+    expect(moverEnfeite(p, 20, -500, 27000)).toEqual({ ...p, x: 97, y: 20 });
+    expect(moverEnfeite(p, -5, 26950, 27000)).toEqual({ ...p, x: 85, y: 26980 });
+    expect(escalaArrastada(1, 80, 80)).toBe(2);
+    expect(escalaArrastada(1, -400, 0)).toBe(0.5);
+    expect(escalaArrastada(4, 400, 400)).toBe(4.5);
+    expect(novoEnfeite("bicho-joaninha", 5, 27000, "u1")).toEqual({
+      k: "u1",
+      id: "bicho-joaninha",
+      x: 50,
+      y: 40,
+      s: 1.4,
+    });
   });
 
   test("o layout gravado é limpo ao ler, e o de clima nunca aparece", () => {
@@ -122,6 +162,13 @@ describe("o cenário equipado", () => {
     expect(
       paradasDoDegrade("linear-gradient(180deg,#f3e8ff 0%,#fde2e4 55%,#fff 100%)")[2].cor,
     ).toBe("#ffffff");
+  });
+  test("a fatia da janela à vista leva as pontas e as paradas do meio", () => {
+    const p = paradasDoDegrade("linear-gradient(180deg,#fde7c8 0%,#fbcfa0 40%,#f6e6cf 100%)");
+    const f = fatiaDoDegrade(p, 0.3, 0.5);
+    expect(f.cores).toEqual([corNoDegrade(p, 0.3), "#fbcfa0", corNoDegrade(p, 0.5)]);
+    expect(f.posicoes.map((n) => Number(n.toFixed(3)))).toEqual([0, 0.5, 1]);
+    expect(fatiaDoDegrade(p, 0.9, 0.9).cores).toHaveLength(2);
   });
 });
 

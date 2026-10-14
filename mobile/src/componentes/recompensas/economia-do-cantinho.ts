@@ -34,6 +34,7 @@ import {
  *   ?bancada=1        os seis primeiros itens sem Premium, 420 🌱, 12 🏆 — os
  *                     mesmos números da bancada do site (/preview-cantinho)
  *   &vazio=1          só o que o servidor dá a todas (os itens grátis)
+ *   &itens=a,b  &clima=c   itens a mais (bichos, luzes, o ar da trilha)
  *   &saldo=N  &trofeus=N  &fundo=<id do cenário em uso>
  */
 
@@ -74,6 +75,12 @@ function cantinhoDaBancada(): CantinhoOk {
     : CANTINHO_ITEMS.filter((i) => !i.premium)
         .slice(0, 6)
         .map((i) => i.id);
+  /* `&itens=` e `&clima=`: o que mais ela "tem", para fotografar o que não
+     está nos seis (os bichos que andam, as luzes, o ar da trilha). */
+  for (const nome of ["itens", "clima"]) {
+    for (const id of (parametroDaBancada(nome) ?? "").split(","))
+      if (CANTINHO_BY_ID[id.trim()]) comprados.push(id.trim());
+  }
   bancada = {
     ok: true,
     balance: Number(parametroDaBancada("saldo") ?? 420),

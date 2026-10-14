@@ -21,6 +21,10 @@ import {
   type LeituraDasConquistas,
 } from "~/componentes/jornada/economia";
 import { useLivresDeHoje } from "~/componentes/jornada/livres";
+import { lerOCantinho, type CantinhoOk } from "~/componentes/recompensas/economia-do-cantinho";
+import { fundoBgFor } from "@/lib/cantinho";
+import { SKIN_KEY, TRILHA_SKINS } from "@/lib/trilha-skins";
+import { CHAVE_DECOR, lerDecoracao, type Decoracao } from "~/lib/jornada/enfeites";
 import { Pulsando } from "~/componentes/jornada/pecas";
 import { FolhasDoPlacar, Placar, type FolhaDoPlacar } from "~/componentes/jornada/placar";
 import { Caminho } from "~/componentes/caminho/caminho";
@@ -206,6 +210,17 @@ function JornadaDaGestacao({
   const presente = carteira.estado === "ok" ? carteira.dados.presente : null;
   const presenteNovo = presente && !loja.blob[chaveDoPresente(presente.quando)] ? presente : null;
 
+  /* ── O Cantinho na trilha: o que ela tem, o cenário e a pele ── */
+  const cantinho = useCantinhoDaTrilha();
+  const decorGravada = loja.blob[CHAVE_DECOR];
+  const decoracao = useMemo(() => lerDecoracao(decorGravada), [decorGravada]);
+  const possuidos = cantinho ? (cantinho.careMode ? [] : cantinho.owned) : null;
+  const cenario =
+    cantinho && !cantinho.careMode ? fundoBgFor(cantinho.equippedFundo, semana) : null;
+  const skin = loja.blob[SKIN_KEY];
+  const pele = typeof skin === "string" ? (TRILHA_SKINS[skin] ?? null) : null;
+  const aoGravarDecoracao = useCallback((d: Decoracao) => gravarChave(CHAVE_DECOR, d), []);
+
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: cor.fundo }}>
       <Caminho
@@ -240,6 +255,12 @@ function JornadaDaGestacao({
         aoAbrirAmigas={() => router.navigate("/comunidade" as never)}
         aoAbrirFolha={setFolha}
         aoContarNascimento={() => router.push("/ritual?editar=1")}
+        decoracao={decoracao}
+        possuidos={possuidos}
+        cenario={cenario}
+        pele={pele}
+        podeSemear={loja.pronto && loja.nuvem === "ok"}
+        aoGravarDecoracao={aoGravarDecoracao}
         topo={
           <>
             {carteira.estado === "falhou" ? (
@@ -268,6 +289,28 @@ function JornadaDaGestacao({
       />
     </SafeAreaView>
   );
+}
+
+/**
+ * O Cantinho dela, relido a cada foco da aba: quem compra um enfeite nas
+ * Recompensas e volta ao Caminho já o encontra espalhado. Falha de leitura
+ * guarda a última leitura boa (e, sem nenhuma, `null`: a trilha mostra o
+ * layout gravado, como o site enquanto a lista não chega).
+ */
+function useCantinhoDaTrilha(): CantinhoOk | null {
+  const [c, setC] = useState<CantinhoOk | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      let vivo = true;
+      void lerOCantinho().then((r) => {
+        if (vivo && r) setC(r);
+      });
+      return () => {
+        vivo = false;
+      };
+    }, []),
+  );
+  return c;
 }
 
 /** O número de amigas da faixa do Caminho, relido a cada foco da aba. */

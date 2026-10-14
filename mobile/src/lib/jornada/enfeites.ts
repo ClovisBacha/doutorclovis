@@ -117,16 +117,21 @@ export function climasDela(possuidos: readonly string[]): string[] {
 /**
  * Semeia o que ela comprou e ainda não foi visto pela trilha (o efeito de
  * auto-colocação do site): cada item novo nasce em duas cópias (o especial, em
- * uma), até o teto de 120. Devolve `null` quando não há nada novo.
+ * uma), até o teto de 120.
+ *
+ * ⚠️ Só é marcado como visto o que COUBE: o resto ESPERA a vaga (e `esperando`
+ * diz quantos, para a tela avisar que a trilha está cheia). Marcar tudo de uma
+ * vez fazia o item recém-comprado sumir para sempre — o defeito do Pavão no site.
+ * `decoracao` é `null` quando não há nada novo que caiba.
  */
 export function semearNovos(
   atual: Decoracao | null,
   possuidos: readonly string[],
   alturaDaTrilha: number,
-): Decoracao | null {
+): { decoracao: Decoracao | null; esperando: number } {
   const base = atual ?? { v: 1 as const, items: [], seen: [] };
   const novos = bandeja(possuidos).filter((id) => !base.seen.includes(id));
-  if (novos.length === 0) return null;
+  if (novos.length === 0) return { decoracao: null, esperando: 0 };
   const cabem: string[] = [];
   let usados = base.items.length;
   for (const id of novos) {
@@ -135,11 +140,15 @@ export function semearNovos(
     cabem.push(id);
     usados += custo;
   }
-  if (cabem.length === 0) return null;
+  const esperando = novos.length - cabem.length;
+  if (cabem.length === 0) return { decoracao: null, esperando };
   return {
-    v: 1,
-    items: [...base.items, ...semearEnfeites(cabem, alturaDaTrilha, base.items.length)],
-    seen: [...base.seen, ...cabem],
+    decoracao: {
+      v: 1,
+      items: [...base.items, ...semearEnfeites(cabem, alturaDaTrilha, base.items.length)],
+      seen: [...base.seen, ...cabem],
+    },
+    esperando,
   };
 }
 
@@ -156,6 +165,90 @@ export function enfeitesVisiveis(
   const semClima = d.items.filter((p) => CANTINHO_BY_ID[p.id]?.type !== "clima");
   if (!possuidos || possuidos.length === 0) return semClima;
   return semClima.filter((p) => possuidos.includes(p.id));
+}
+
+/* ── A trilha do site × os blocos do app ───────────────────────────────────
+
+   As posições gravadas são as do SITE: `x` em % da largura e `y` em px desde o
+   topo da trilha de `buildFullJourney`, que começa em y = 8 e termina com 40
+   de respiro. Os blocos do app (`montarCaminho`) têm as MESMAS alturas, então
+   o enfeite de y = 1234 no site cai no mesmo lugar da mesma semana aqui. */
+
+/** Onde o primeiro bloco começa na trilha do site. */
+export const Y_INICIAL_DO_SITE = 8;
+
+/** A altura da trilha no site (`height` de `buildFullJourney`) — é com ela que se semeia. */
+export function alturaNoSite(alturas: readonly number[]): number {
+  return Y_INICIAL_DO_SITE + alturas.reduce((s, h) => s + h, 0) + 40;
+}
+
+export type EnfeiteNoBloco = { p: EnfeitePosto; y: number };
+
+/**
+ * Em que bloco cada enfeite mora, e a altura dele DENTRO do bloco — a lista do
+ * app é virtualizada, e cada bloco desenha só os seus. Antes do primeiro bloco,
+ * fica no primeiro; depois do último, no último.
+ */
+export function enfeitesPorBloco(
+  enfeites: readonly EnfeitePosto[],
+  alturas: readonly number[],
+): EnfeiteNoBloco[][] {
+  const fora: EnfeiteNoBloco[][] = alturas.map(() => []);
+  if (alturas.length === 0) return fora;
+  const inicios: number[] = [];
+  let soma = Y_INICIAL_DO_SITE;
+  for (const h of alturas) {
+    inicios.push(soma);
+    soma += h;
+  }
+  for (const p of enfeites) {
+    let lo = 0;
+    let hi = alturas.length - 1;
+    while (lo < hi) {
+      const m = (lo + hi + 1) >> 1;
+      if (inicios[m] <= p.y) lo = m;
+      else hi = m - 1;
+    }
+    fora[lo].push({ p, y: p.y - inicios[lo] });
+  }
+  return fora;
+}
+
+/* ── O modo Arrumar (as contas do `onPathPointerMove` e do `addDecor`) ──── */
+
+/** Arrastar: `dx` em % da largura, `dy` em px; nunca sai da trilha. */
+export function moverEnfeite(
+  p: EnfeitePosto,
+  dxPct: number,
+  dyPx: number,
+  alturaDaTrilha: number,
+): EnfeitePosto {
+  return {
+    ...p,
+    x: limitar(p.x + dxPct, 3, 97),
+    y: limitar(p.y + dyPx, 20, Math.max(20, alturaDaTrilha - 20)),
+  };
+}
+
+/** A alça ⤢: o arrasto na diagonal muda o tamanho (160 px = 1 de escala). */
+export function escalaArrastada(s0: number, dx: number, dy: number): number {
+  return limitar(s0 + (dx + dy) / 160, ESCALA_MIN, ESCALA_MAX);
+}
+
+/** O item tirado da bandeja: nasce no meio do que está à vista, para ela vê-lo aparecer. */
+export function novoEnfeite(
+  id: string,
+  ySite: number,
+  alturaDaTrilha: number,
+  chave: string,
+): EnfeitePosto {
+  return {
+    k: chave,
+    id,
+    x: 50,
+    y: limitar(ySite, 40, Math.max(40, alturaDaTrilha - 40)),
+    s: 1.4,
+  };
 }
 
 /* ── O cenário (fundo) equipado ─────────────────────────────────────────── */
@@ -195,6 +288,38 @@ export function corNoDegrade(paradas: readonly Parada[], t: number): string {
     }
   }
   return paradas[paradas.length - 1].cor;
+}
+
+/**
+ * O pedaço do degradê entre `t0` e `t1` (0..1 da trilha inteira), pronto para
+ * um `LinearGradient`: as cores das pontas e as paradas que caem no meio.
+ *
+ * O site pinta o cenário na trilha INTEIRA (~27.000 px); o app pinta só a
+ * janela que está à vista — um degradê dessa altura viraria uma textura de
+ * centenas de megabytes no iPhone.
+ */
+export function fatiaDoDegrade(
+  paradas: readonly Parada[],
+  t0: number,
+  t1: number,
+): { cores: string[]; posicoes: number[] } {
+  const a = limitar(t0, 0, 1);
+  const b = limitar(t1, 0, 1);
+  if (b <= a) {
+    const c = corNoDegrade(paradas, a);
+    return { cores: [c, c], posicoes: [0, 1] };
+  }
+  const cores = [corNoDegrade(paradas, a)];
+  const posicoes = [0];
+  for (const p of paradas) {
+    if (p.pos > a && p.pos < b) {
+      cores.push(p.cor);
+      posicoes.push((p.pos - a) / (b - a));
+    }
+  }
+  cores.push(corNoDegrade(paradas, b));
+  posicoes.push(1);
+  return { cores, posicoes };
 }
 
 /* ── A lojinha do app (v1: sem Premium) ─────────────────────────────────── */

@@ -13,6 +13,10 @@ import { ehBancada, parametroDaBancada } from "~/lib/bancada";
  *   /jornada?bancada=1&semana=38        outra semana
  *   /jornada?bancada=1&pos=1            pós-parto (bebê com 20 dias)
  *   /jornada?bancada=1&presente=1       com um presente para anunciar
+ *   &pele=trilha-jardim                 as bolinhas com a pele (a do site)
+ *   &itens=bicho-coelho,luz-vela        itens a mais no Cantinho de exemplo
+ *   &clima=clima-petalas                o ar da trilha (a `?clima=` do site)
+ *   &fundo=fundo-amanhecer              o cenário equipado
  */
 
 export function estadoDaBancada(): string | null {
@@ -20,7 +24,18 @@ export function estadoDaBancada(): string | null {
 }
 
 /** Os parâmetros que valem para a bancada inteira (passam de tela em tela). */
-const QUE_VIAJAM = ["bancada", "semana", "luto", "pos", "bebe"] as const;
+const QUE_VIAJAM = [
+  "bancada",
+  "semana",
+  "luto",
+  "pos",
+  "bebe",
+  "saldo",
+  "pele",
+  "itens",
+  "clima",
+  "fundo",
+] as const;
 
 /** Uma rota com a bancada junto, para a navegação dentro dela não perdê-la. */
 export function rota(caminho: string): string {
@@ -37,10 +52,19 @@ export function rota(caminho: string): string {
 export function blobDaBancada(hojeD: number, pos: boolean): Blob {
   const estado = estadoDaBancada();
   const blob: Blob = {};
-  const cinco = { desafio: true, w_movement: true, w_meditation: true, w_bonding: true, w_gratitude: true, bemestar: true };
+  const cinco = {
+    desafio: true,
+    w_movement: true,
+    w_meditation: true,
+    w_bonding: true,
+    w_gratitude: true,
+    bemestar: true,
+  };
   if (pos) {
-    for (let d = hojeD - 6; d < hojeD; d++) if (d >= 7 && d !== hojeD - 3) blob[`dc-path-pos-day-${d}`] = { desafio: true };
-    if (estado === "fechado") blob[`dc-path-pos-day-${hojeD}`] = { desafio: true, w_meditation: true, w_gratitude: true };
+    for (let d = hojeD - 6; d < hojeD; d++)
+      if (d >= 7 && d !== hojeD - 3) blob[`dc-path-pos-day-${d}`] = { desafio: true };
+    if (estado === "fechado")
+      blob[`dc-path-pos-day-${hojeD}`] = { desafio: true, w_meditation: true, w_gratitude: true };
     return blob;
   }
   const feitos: number[] = [];
@@ -48,7 +72,12 @@ export function blobDaBancada(hojeD: number, pos: boolean): Blob {
     if (d < 7) continue;
     const resto = (hojeD - d) % 4;
     if (resto === 2) {
-      blob[`dc-path-day-${d}`] = { desafio: true, w_meditation: true, w_gratitude: true, bemestar: true };
+      blob[`dc-path-day-${d}`] = {
+        desafio: true,
+        w_meditation: true,
+        w_gratitude: true,
+        bemestar: true,
+      };
     } else {
       blob[`dc-path-day-${d}`] = cinco;
       feitos.push(d);
@@ -62,5 +91,7 @@ export function blobDaBancada(hojeD: number, pos: boolean): Blob {
   }
   blob["dc-path-done-days"] = feitos;
   blob["dc-path-stickers"] = Array.from(new Set(feitos.map((d) => Math.floor(d / 7))));
+  const pele = parametroDaBancada("pele");
+  if (pele) blob["dc-path-skin"] = pele;
   return blob;
 }
