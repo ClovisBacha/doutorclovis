@@ -36,10 +36,9 @@ export default function Raiz() {
         <GuardaDaSessao />
         <StatusBar style="dark" />
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: cor.fundo } }}>
-          <Stack.Screen
-            name="sos"
-            options={{ presentation: "fullScreenModal", animation: "slide_from_bottom" }}
-          />
+          {/* Folha (pageSheet), como a Central de Emergência do site: a tela
+              de trás aparece escurecida em cima, e arrastar para baixo fecha. */}
+          <Stack.Screen name="sos" options={{ presentation: "modal" }} />
         </Stack>
       </ProvedorDeSessao>
     </SafeAreaProvider>

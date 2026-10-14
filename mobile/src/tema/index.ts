@@ -22,6 +22,8 @@ export const cor = {
   borda: "#ede0db",
   divisor: "#f3ece8",
   branco: "#ffffff",
+  /** Só para o QR da ficha: leitor de QR quer preto puro no branco. */
+  preto: "#000000",
   // Famílias (mesmas do site): a cor diz de que assunto é a tela.
   chutes: "#0369a1",
   chutesFundo: "#e0f2fe",
@@ -39,6 +41,28 @@ export const cor = {
   urgenteFundo: "#fee2e2",
   urgenteBorda: "#fecaca",
   urgentePressionado: "#991b1b",
+  // O SOS, nas cores do desenho aprovado do site (emergency-sheet.tsx):
+  // o círculo vermelho vivo, o âmbar de "ninguém foi avisado", o rosa dos
+  // detalhes e o verde do WhatsApp.
+  sosTopo: "#fd1010",
+  sosBase: "#e80709",
+  sosHalo: "rgba(253,16,16,0.16)",
+  sosAmbarTopo: "#f0a30a",
+  sosAmbarBase: "#d98600",
+  sosRosa: "#e11d48",
+  sosRosaFundo: "#ffe4e6",
+  sosRosaAro: "#fda4af",
+  sosRosaLinha: "rgba(244,63,94,0.08)",
+  sosRosaPonto: "#f43f5e",
+  zapTopo: "#2da348",
+  zapBase: "#259941",
+  okPonto: "#059669",
+  okClaro: "#ecfdf5",
+  atencaoClaro: "#fffbeb",
+  atencaoTexto: "#92400e",
+  atencaoForte: "#78350f",
+  aro: "rgba(0,0,0,0.06)",
+  sosFicha: "#fcf4f1",
   atencao: "#b45309",
   atencaoFundo: "#fef3c7",
   ok: "#047857",
