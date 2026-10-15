@@ -1,12 +1,10 @@
 import * as Haptics from "expo-haptics";
 import { useKeepAwake } from "expo-keep-awake";
-import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { Pause, Play, TriangleAlert, X } from "lucide-react-native";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Platform, Pressable, ScrollView, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import Svg, { Circle, Defs, Ellipse, RadialGradient, Stop } from "react-native-svg";
+import Svg, { Circle } from "react-native-svg";
 import {
   ajustarNotas,
   SINAIS_DE_PARADA,
@@ -16,15 +14,25 @@ import {
   type Sintoma,
 } from "@/lib/exercicios";
 import { Botao, Cartao, Carregando, T, Tela, toque } from "~/componentes/base";
+import {
+  BolhaComBalao,
+  BotaoDaVoz,
+  Escolha,
+  FundoDaAtividade,
+  RodapeDaAtividade,
+  Secao,
+  TituloDaAtividade,
+  type PaletaDaAtividade,
+} from "~/componentes/jornada/atividade";
 import { corMovimento } from "~/componentes/jornada/cores";
 import { FiguraMovimento } from "~/componentes/jornada/figura-movimento";
 import { concluirMomento, FimDoMomento, type Desfecho } from "~/componentes/jornada/fim";
 import { BarraDoTopo, Ficha } from "~/componentes/jornada/pecas";
-import { BolhaViva } from "~/componentes/movimento";
 import { useAtividade } from "~/componentes/jornada/usarJornada";
 import { pararVozes, tocarVoz } from "~/lib/audio/voz";
 import { VOZ_DO_MOVIMENTO } from "~/lib/audio/vozes";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
+import { anotarNoDiario } from "~/lib/jornada/diario";
 import { estadoAtual, gravarChave } from "~/lib/jornada/loja";
 import {
   DURACAO_PADRAO,
@@ -53,6 +61,17 @@ import { ALVO_MINIMO, cor, espaco, fonte } from "~/tema";
  * Bancada: /jornada/mexer?bancada=1 [&etapa=sinais|sessao|fim|feita] [&luto=1]
  *          [&semana=38] [&sintoma=lombar] [&minutos=2|5|10] [&semchao=1] [&t=<segundos da sessão>]
  */
+
+const PALETA: PaletaDaAtividade = {
+  fundo: [corMovimento.fundoTopo, corMovimento.fundoMeio, corMovimento.fundoBase],
+  forte: corMovimento.forte,
+  titulo: corMovimento.titulo,
+  secao: corMovimento.secao,
+  borda: corMovimento.borda,
+  vidro: corMovimento.vidro,
+  discreto: corMovimento.discreto,
+  brancoSuave: corMovimento.branco80,
+};
 
 /* No luto, os sinais que só existem numa gestação em curso saem da lista. */
 const SO_NA_GESTACAO = new Set(["Perda de líquido", "Contrações que se repetem"]);
@@ -187,6 +206,12 @@ export default function Mexer() {
                         aoTocar={() => {
                           gravarChave(CHAVE_NOTAS_EXERCICIO, ajustarNotas(notas, seq, sintoma, d));
                           setAvaliou(d);
+                          const rotulo =
+                            SINTOMAS.find((x) => x.chave === sintoma)?.rotulo ?? sintoma;
+                          void anotarNoDiario(
+                            at.uid,
+                            `Exercício de ${minutos} min · ${rotulo}: ${d.toLowerCase()}`,
+                          );
                         }}
                       />
                     ))}
@@ -211,7 +236,7 @@ export default function Mexer() {
       ? SINAIS_DE_PARADA.filter((s) => !SO_NA_GESTACAO.has(s))
       : SINAIS_DE_PARADA;
     return (
-      <FundoVerde>
+      <FundoDaAtividade paleta={PALETA}>
         <View style={{ paddingHorizontal: espaco.lg }}>
           <BarraDoTopo titulo="Antes de começar" aoSair={() => setEtapa("escolha")} />
         </View>
@@ -253,7 +278,7 @@ export default function Mexer() {
             aoTocar={() => setEtapa("sessao")}
           />
         </ScrollView>
-      </FundoVerde>
+      </FundoDaAtividade>
     );
   }
 
@@ -264,56 +289,24 @@ export default function Mexer() {
       : "Diga o que está incomodando, que eu monto a sequência pra você.";
 
   return (
-    <FundoVerde>
+    <FundoDaAtividade paleta={PALETA}>
       <View style={{ paddingHorizontal: espaco.lg }}>
         <BarraDoTopo />
       </View>
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: espaco.xl, paddingBottom: espaco.xxl }}
       >
-        {/* O porta-voz, GRANDE e falando num balão — "ele que vai interagir
-            com as pessoas", nas palavras do dono no app antigo. */}
-        <View style={{ alignItems: "center" }}>
-          <BolhaViva humor="exercicio" tamanho={168} moldura={false} />
-          <SombraDoChao />
-          <Text
-            style={{
-              marginTop: espaco.sm,
-              maxWidth: 272,
-              borderRadius: 16,
-              borderWidth: 1,
-              borderColor: corMovimento.balaoBorda,
-              backgroundColor: corMovimento.balaoFundo,
-              paddingHorizontal: 14,
-              paddingVertical: espaco.sm,
-              overflow: "hidden",
-              fontFamily: fonte.normal,
-              fontSize: 13,
-              lineHeight: 18,
-              color: corMovimento.balaoTexto,
-            }}
-          >
-            {fala}
-          </Text>
-        </View>
-        <Text
-          style={{
-            marginTop: espaco.lg,
-            textAlign: "center",
-            fontFamily: fonte.media,
-            fontSize: 26,
-            lineHeight: 32,
-            color: corMovimento.titulo,
-          }}
-        >
+        <BolhaComBalao humor="exercicio" fala={fala} />
+        <TituloDaAtividade paleta={PALETA}>
           {at.cuidado ? "Mexer devagar" : "Mexer o corpo"}
-        </Text>
+        </TituloDaAtividade>
 
-        <Secao>O que está incomodando?</Secao>
+        <Secao paleta={PALETA}>O que está incomodando?</Secao>
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: espaco.sm }}>
           {SINTOMAS.map((s) => (
             <Escolha
               key={s.chave}
+              paleta={PALETA}
               ativa={sintoma === s.chave}
               aoTocar={() => setSintoma((x) => (x === s.chave ? null : s.chave))}
               rotulo={s.rotulo}
@@ -324,11 +317,12 @@ export default function Mexer() {
           ))}
         </View>
 
-        <Secao>De quanto tempo você tem?</Secao>
+        <Secao paleta={PALETA}>De quanto tempo você tem?</Secao>
         <View style={{ flexDirection: "row", gap: espaco.sm }}>
           {DURACOES_MEXER.map((m) => (
             <Escolha
               key={m}
+              paleta={PALETA}
               ativa={minutos === m}
               aoTocar={() => setMinutos(m)}
               rotulo={`${m} min`}
@@ -403,129 +397,15 @@ export default function Mexer() {
           serve pra você, pule esse.
         </Text>
       </ScrollView>
-      <View
-        style={{
-          borderTopWidth: 1,
-          borderTopColor: corMovimento.borda,
-          backgroundColor: corMovimento.vidro,
-          paddingHorizontal: espaco.xl,
-          paddingTop: espaco.md,
-          paddingBottom: espaco.md,
-        }}
-      >
+      <RodapeDaAtividade paleta={PALETA}>
         <Botao
           rotulo={`Começar · ${minutos} min`}
           corFundo={corMovimento.forte}
           aoTocar={() => setEtapa("sinais")}
           desabilitado={!seq.length}
         />
-      </View>
-    </FundoVerde>
-  );
-}
-
-/** O degradê verde do app antigo, atrás de todas as telas do Movimento. */
-function FundoVerde({ children }: { children: ReactNode }) {
-  return (
-    <LinearGradient
-      colors={[corMovimento.fundoTopo, corMovimento.fundoMeio, corMovimento.fundoBase]}
-      style={{ flex: 1 }}
-    >
-      <SafeAreaView edges={["top", "bottom"]} style={{ flex: 1 }}>
-        {children}
-      </SafeAreaView>
-    </LinearGradient>
-  );
-}
-
-/** A sombra no chão, embaixo da bolha: sem ela, a bolha parece um adesivo. */
-function SombraDoChao() {
-  return (
-    <Svg width={150} height={18} style={{ marginTop: -6 }}>
-      <Defs>
-        <RadialGradient id="sombra-do-chao" cx="50%" cy="50%" rx="50%" ry="50%">
-          <Stop offset="0" stopColor="#000000" stopOpacity={0.16} />
-          <Stop offset="1" stopColor="#000000" stopOpacity={0} />
-        </RadialGradient>
-      </Defs>
-      <Ellipse cx={75} cy={9} rx={75} ry={9} fill="url(#sombra-do-chao)" />
-    </Svg>
-  );
-}
-
-function Secao({ children }: { children: string }) {
-  return (
-    <Text
-      accessibilityRole="header"
-      style={{
-        marginTop: espaco.xl,
-        marginBottom: espaco.sm,
-        fontFamily: fonte.forte,
-        fontSize: 13,
-        letterSpacing: 0.65,
-        textTransform: "uppercase",
-        color: corMovimento.secao,
-      }}
-    >
-      {children}
-    </Text>
-  );
-}
-
-/** Os botões de escolha do app antigo: verde cheio quando escolhido. */
-function Escolha({
-  rotulo,
-  ativa,
-  aoTocar,
-  centro,
-  estilo,
-  children,
-}: {
-  rotulo: string;
-  ativa: boolean;
-  aoTocar: () => void;
-  centro?: boolean;
-  estilo?: { width?: `${number}%`; flex?: number };
-  children?: ReactNode;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: ativa }}
-      accessibilityLabel={rotulo}
-      onPress={() => {
-        toque();
-        aoTocar();
-      }}
-      style={({ pressed }) => ({
-        ...estilo,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: centro ? "center" : "flex-start",
-        gap: espaco.sm,
-        minHeight: centro ? 48 : ALVO_MINIMO + 8,
-        paddingHorizontal: espaco.md,
-        paddingVertical: 10,
-        borderRadius: 16,
-        borderWidth: ativa ? 0 : 1,
-        borderColor: corMovimento.borda,
-        backgroundColor: ativa ? corMovimento.forte : corMovimento.vidro,
-        opacity: pressed ? 0.8 : 1,
-      })}
-    >
-      {children}
-      <Text
-        style={{
-          flexShrink: 1,
-          fontFamily: centro ? fonte.titulo : fonte.forte,
-          fontSize: centro ? 14 : 13,
-          lineHeight: centro ? 20 : 17,
-          color: ativa ? cor.branco : centro ? corMovimento.forte : corMovimento.titulo,
-        }}
-      >
-        {rotulo}
-      </Text>
-    </Pressable>
+      </RodapeDaAtividade>
+    </FundoDaAtividade>
   );
 }
 
@@ -735,11 +615,8 @@ function Sessao({
   const resta = pos.tipo === "movimento" || pos.tipo === "troca" ? pos.restante : 0;
 
   return (
-    <LinearGradient
-      colors={[corMovimento.fundoTopo, corMovimento.fundoMeio, corMovimento.fundoBase]}
-      style={{ flex: 1 }}
-    >
-      <SafeAreaView edges={["top", "bottom"]} style={{ flex: 1 }}>
+    <FundoDaAtividade paleta={PALETA}>
+      <View style={{ flex: 1 }}>
         {Platform.OS !== "web" ? <MantemAcesa /> : null}
         <View
           style={{
@@ -789,26 +666,12 @@ function Sessao({
                 <Pause size={15} color={corMovimento.forte} fill={corMovimento.forte} />
               )}
             </BotaoDoTopo>
-            {/* A voz é o 🗣️ do app antigo — apagado quando desligada. */}
-            <Pressable
-              accessibilityRole="switch"
-              accessibilityLabel="Voz"
-              accessibilityState={{ checked: voz }}
-              hitSlop={8}
-              onPress={() => {
-                toque();
-                setVoz((v) => !v);
-              }}
-              style={({ pressed }) => ({
-                minWidth: 28,
-                minHeight: 36,
-                alignItems: "center",
-                justifyContent: "center",
-                opacity: (voz ? 1 : 0.4) * (pressed ? 0.7 : 1),
-              })}
-            >
-              <Text style={{ fontSize: 18, lineHeight: 24 }}>🗣️</Text>
-            </Pressable>
+            <BotaoDaVoz
+              ligada={voz}
+              aoTocar={() => setVoz((v) => !v)}
+              corLigada={corMovimento.secao}
+              corDesligada={corMovimento.bordaForte}
+            />
           </View>
         </View>
         {/* O aviso médico fica fixo, discreto, na tela do exercício. */}
@@ -996,8 +859,8 @@ function Sessao({
         ) : (
           <Carregando texto="Terminando…" />
         )}
-      </SafeAreaView>
-    </LinearGradient>
+      </View>
+    </FundoDaAtividade>
   );
 }
 

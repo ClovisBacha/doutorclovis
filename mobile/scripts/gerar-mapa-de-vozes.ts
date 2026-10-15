@@ -10,6 +10,7 @@
  *
  * O teste `vozes.test.ts` cobra que o mapa bate com as pastas.
  */
+import { execFileSync } from "node:child_process";
 import { readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -55,4 +56,8 @@ for (const f of med)
 linhas.push("};");
 linhas.push("");
 writeFileSync(SAIDA, linhas.join("\n"));
+/* Sai já formatado: sem isto, cada geração brigaria com o formatador do commit. */
+execFileSync(join(RAIZ, "node_modules", ".bin", "prettier"), ["--write", SAIDA], {
+  stdio: "ignore",
+});
 console.log(`vozes.ts: ${mov.length} movimentos, 3 da respiração, ${med.length} da meditação`);

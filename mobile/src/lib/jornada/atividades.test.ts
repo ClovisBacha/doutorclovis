@@ -21,7 +21,7 @@ import {
   posicaoNoTempo,
   temChaoParaTirar,
 } from "./mexer";
-import { planoDoDia, temasDisponiveis } from "./meditacao";
+import { lerRegistro, planoDaSessao, temasDisponiveis } from "./meditacao";
 import { montarGrade, paraResgatar, placar, resumo, secoes } from "./conquistas";
 
 const unica: QuizQuestion = { q: "?", o: ["a", "b", "c"], a: 2, why: "porque" };
@@ -111,13 +111,27 @@ describe("a respiração 4-4-8", () => {
     expect(relogio(65)).toBe("1:05");
   });
   test("o plano de um minuto tem acolhimento e volta", () => {
-    const p = planoDoDia({ minutos: 1, tema: "Calma", semanas: 24, cuidado: false, D: 171 });
+    const p = planoDaSessao({
+      minutos: 1,
+      tema: "Calma",
+      semanas: 24,
+      cuidado: false,
+      densidade: "guiada",
+      registro: lerRegistro(null),
+    });
     expect(p.totalCiclos).toBe(4);
     expect(p.deixas.length).toBeGreaterThan(0);
   });
   test("no Modo Cuidado nenhuma fala cita o bebê, e os temas de bebê saem", () => {
-    for (const minutos of [1, 2, 5] as const) {
-      const p = planoDoDia({ minutos, tema: "Calma", semanas: 24, cuidado: true, D: 171 });
+    for (const minutos of [1, 2, 5, 10] as const) {
+      const p = planoDaSessao({
+        minutos,
+        tema: "Calma",
+        semanas: 24,
+        cuidado: true,
+        densidade: "guiada",
+        registro: lerRegistro(null),
+      });
       for (const d of p.deixas) expect(/beb[êe]/i.test(d.fala.texto)).toBe(false);
     }
     const temas = temasDisponiveis({ cuidado: true, posParto: false }).map((t) => t.tema);

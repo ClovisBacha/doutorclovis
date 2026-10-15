@@ -85,3 +85,47 @@ export const corMovimento = {
   balaoBorda: "#fee685",
   balaoTexto: "#7b3306",
 } as const;
+
+/**
+ * A MEDITAÇÃO é violeta, como no app antigo (`MeditationBlock` do site): o
+ * degradê violet-100 → fuchsia-50 → branco, o círculo que respira e a bolha
+ * dormindo dentro dele. Tailwind 4, como o site.
+ */
+export const corMeditacao = {
+  fundoTopo: "#ede9fe",
+  fundoMeio: "#fdf4ff",
+  fundoBase: "#ffffff",
+  forte: "#7008e7",
+  titulo: "#4d179a",
+  texto: "rgba(93,14,192,0.75)",
+  secao: "#8e51ff",
+  familia: "#a684ff",
+  borda: "#ddd6ff",
+  claro: "#ede9fe",
+  icone: "#7f22fe",
+  iconeApagado: "#c4b4ff",
+  vidro: "rgba(255,255,255,0.7)",
+  vidroForte: "rgba(255,255,255,0.75)",
+  discreto: "rgba(112,8,231,0.7)",
+  dica: "rgba(112,8,231,0.6)",
+  brancoSuave: "rgba(255,255,255,0.75)",
+  barra: "#8e51ff",
+  barraTrilho: "#ddd6ff",
+  restante: "rgba(142,81,255,0.8)",
+  fase: "#8e51ff",
+  circuloBorda: "rgba(166,132,255,0.5)",
+  circuloClaro: "rgba(255,255,255,0.95)",
+  circuloEscuro: "rgba(196,180,255,0.7)",
+  halo: "#f6cfff",
+  frase: "#4d179a",
+  fraseApagada: "rgba(142,81,255,0.6)",
+  veu: "rgba(245,243,255,0.88)",
+  pausaFundo: "rgba(142,81,255,0.1)",
+  folhaVeu: "rgba(77,23,154,0.3)",
+  seloDoDia: "#ede9fe",
+  seloDoDiaAtivo: "rgba(255,255,255,0.25)",
+  branco30: "rgba(255,255,255,0.3)",
+  branco80: "rgba(255,255,255,0.8)",
+  branco85: "rgba(255,255,255,0.85)",
+  fechar: "#45556c",
+} as const;
