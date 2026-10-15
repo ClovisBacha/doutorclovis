@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import {
   cartaComNome,
-  cartaDoDia,
   fraseDeUltimaLeitura,
   registrarLeitura,
   ultimaLeitura,
@@ -15,6 +14,7 @@ import { BarraDoTopo, BolhaFalando, voltarParaJornada } from "~/componentes/jorn
 import { useAtividade } from "~/componentes/jornada/usarJornada";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { estadoAtual, gravarChave } from "~/lib/jornada/loja";
+import { cartaDoDiaNoApp } from "~/lib/jornada/cartas";
 import { CHAVE_CARTAS_LIDAS } from "~/lib/jornada/momentos";
 import { cor, espaco, fonte, raio, sombra } from "~/tema";
 
@@ -40,12 +40,19 @@ export default function Bebe() {
 
   const carta = useMemo(() => {
     if (!at.pronto || at.cuidado) return null;
-    const c = cartaDoDia({ dia: at.D ?? new Date().getDate(), semanas: at.semana, posParto: at.pos });
+    /* A carta do dia sem repetir a de ontem (a troca de fase repetia). */
+    const c = cartaDoDiaNoApp({
+      dia: at.D ?? new Date().getDate(),
+      semanas: at.semana,
+      posParto: at.pos,
+    });
     return cartaComNome(c, at.perfil?.baby_name ?? null);
   }, [at.pronto, at.cuidado, at.D, at.semana, at.pos, at.perfil?.baby_name]);
 
   const leituras = (estadoAtual().blob[CHAVE_CARTAS_LIDAS] ?? {}) as LeiturasDeCartas;
-  const fraseDeLeitura = carta ? fraseDeUltimaLeitura(ultimaLeitura(leituras, carta.id), new Date()) : null;
+  const fraseDeLeitura = carta
+    ? fraseDeUltimaLeitura(ultimaLeitura(leituras, carta.id), new Date())
+    : null;
 
   useEffect(() => {
     if (aplicouBancada || !at.pronto || !ehBancada()) return;
@@ -65,7 +72,15 @@ export default function Bebe() {
     setEtapa("fim");
     if (!carta || !at.uid) return;
     gravarChave(CHAVE_CARTAS_LIDAS, registrarLeitura(leituras, carta.id, new Date()));
-    setDesfecho(await concluirMomento({ uid: at.uid, D: at.D, momento: "bonding", cuidado: at.cuidado, pos: at.pos }));
+    setDesfecho(
+      await concluirMomento({
+        uid: at.uid,
+        D: at.D,
+        momento: "bonding",
+        cuidado: at.cuidado,
+        pos: at.pos,
+      }),
+    );
   }
 
   if (!at.pronto) {
@@ -80,7 +95,9 @@ export default function Bebe() {
     return (
       <Tela bordas={["top", "bottom"]}>
         <BarraDoTopo titulo="Jornada" />
-        <T>Hoje a jornada é sobre cuidar de você. Respirar, mexer devagar e escrever continuam aqui.</T>
+        <T>
+          Hoje a jornada é sobre cuidar de você. Respirar, mexer devagar e escrever continuam aqui.
+        </T>
         <Botao rotulo="Voltar" aoTocar={voltarParaJornada} corFundo={corJornada.roxo} />
       </Tela>
     );
@@ -105,7 +122,11 @@ export default function Bebe() {
     const ultima = linha >= carta.lines.length - 1;
     return (
       <Tela bordas={["top", "bottom"]}>
-        <BarraDoTopo fechar progresso={(linha + 1) / carta.lines.length} aoSair={() => setEtapa("intro")} />
+        <BarraDoTopo
+          fechar
+          progresso={(linha + 1) / carta.lines.length}
+          aoSair={() => setEtapa("intro")}
+        />
         <T tipo="apagado" centro>
           Leia em voz alta, sem pressa. Toque para a próxima linha.
         </T>
@@ -131,7 +152,14 @@ export default function Bebe() {
           ]}
         >
           <Text style={{ fontSize: 34, textAlign: "center" }}>{carta.emoji}</Text>
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 19, color: corJornada.roxoEscuro, textAlign: "center" }}>
+          <Text
+            style={{
+              fontFamily: fonte.titulo,
+              fontSize: 19,
+              color: corJornada.roxoEscuro,
+              textAlign: "center",
+            }}
+          >
             {carta.title}
           </Text>
           {carta.lines.slice(0, linha + 1).map((l, i) => (
@@ -161,7 +189,13 @@ export default function Bebe() {
 
   return (
     <Tela bordas={["top", "bottom"]}>
-      <BarraDoTopo titulo={at.perfil?.baby_name?.trim() ? `Carta para ${at.perfil.baby_name.trim()}` : "Carta para o bebê"} />
+      <BarraDoTopo
+        titulo={
+          at.perfil?.baby_name?.trim()
+            ? `Carta para ${at.perfil.baby_name.trim()}`
+            : "Carta para o bebê"
+        }
+      />
       <BolhaFalando
         humor="apaixonado"
         fala={
@@ -188,12 +222,20 @@ export default function Bebe() {
         ]}
       >
         <Text style={{ fontSize: 46 }}>{carta.emoji}</Text>
-        <Text style={{ fontFamily: fonte.titulo, fontSize: 22, color: cor.texto, textAlign: "center" }}>{carta.title}</Text>
+        <Text
+          style={{ fontFamily: fonte.titulo, fontSize: 22, color: cor.texto, textAlign: "center" }}
+        >
+          {carta.title}
+        </Text>
         <T tipo="apagado" centro>
           Uma carta de 1 minuto · {carta.lines.length} linhas
         </T>
       </View>
-      <Botao rotulo="Começar a ler" corFundo={corJornada.roxo} aoTocar={() => setEtapa("leitura")} />
+      <Botao
+        rotulo="Começar a ler"
+        corFundo={corJornada.roxo}
+        aoTocar={() => setEtapa("leitura")}
+      />
     </Tela>
   );
 }
