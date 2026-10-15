@@ -42,6 +42,7 @@ import { Medida } from "~/componentes/medida";
 import { useSessao } from "~/lib/sessao";
 import { ALVO_MINIMO, cor, espaco, raio } from "~/tema";
 import { AvisoMedico } from "~/componentes/aviso-medico";
+import { IA_NO_APP } from "~/config";
 
 function saudacao(h: number) {
   if (h < 5) return "Boa madrugada";
@@ -215,15 +216,17 @@ export default function Inicio() {
           aoTocar={() => router.push("/saude/contracoes")}
         />
       ) : null}
-      <Atalho
-        ordem={5}
-        Icone={Apple}
-        titulo="Perguntar à nutricionista"
-        texto="Pode comer? O que fazer com o que tem em casa?"
-        corIcone={cor.nutricao}
-        fundoIcone={cor.nutricaoFundo}
-        aoTocar={() => router.push("/nutricao")}
-      />
+      {IA_NO_APP ? (
+        <Atalho
+          ordem={5}
+          Icone={Apple}
+          titulo="Perguntar à nutricionista"
+          texto="Pode comer? O que fazer com o que tem em casa?"
+          corIcone={cor.nutricao}
+          fundoIcone={cor.nutricaoFundo}
+          aoTocar={() => router.push("/nutricao")}
+        />
+      ) : null}
       {!cuidado ? (
         <Atalho
           ordem={6}

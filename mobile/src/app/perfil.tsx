@@ -21,7 +21,7 @@ import { celularE164, emailValido } from "@/lib/medico-da-gestante";
 import { CartaoDaPermissaoDeIA } from "~/lib/ia/PermissaoDeIA";
 import { abrir, PRIVACIDADE, TERMOS } from "~/lib/links";
 import { AvisoMedico } from "~/componentes/aviso-medico";
-import { CONTATO_EMAIL } from "~/config";
+import { CONTATO_EMAIL, IA_NO_APP } from "~/config";
 import { CabecalhoDaPilha } from "~/componentes/cabecalho";
 import { useSessao } from "~/lib/sessao";
 import { excluirMinhaConta, ligarModoCuidado, PALAVRA_DE_CONFIRMACAO } from "~/servidor/conta";
@@ -334,7 +334,7 @@ function FormularioDoPerfil() {
           </Linha>
         </Cartao>
 
-        <CartaoDaPermissaoDeIA />
+        {IA_NO_APP ? <CartaoDaPermissaoDeIA /> : null}
 
         <AvisoMedico />
 

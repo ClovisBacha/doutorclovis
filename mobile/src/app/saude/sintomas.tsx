@@ -7,6 +7,7 @@ import { Botao, Campo, Cartao, Linha, T, Tela, toque } from "~/componentes/base"
 import { BotaoLigar192, Cabecalho } from "~/componentes/saude/pecas";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { lerPermissaoDeIA } from "~/lib/ia/permissao";
+import { IA_NO_APP } from "~/config";
 import { gestacaoDoPerfil } from "~/lib/gestacao";
 import { numeroDoCampo } from "~/lib/saude/registros";
 import { orientacaoLocal, piorNivel, sintomasParaMarcar } from "~/lib/saude/triagem-local";
@@ -86,7 +87,7 @@ export default function Sintomas() {
        nível sai da régua do app, a IA só reescreve as palavras. Nunca se
        pergunta AQUI: quem marcou um sintoma não pode ser parada por uma folha. */
     let final = local;
-    const podeIA = !!uid && (await lerPermissaoDeIA(uid)) !== null;
+    const podeIA = IA_NO_APP && !!uid && (await lerPermissaoDeIA(uid)) !== null;
     if (!cuidado && podeIA) {
       try {
         const r = await avaliarSintomas({

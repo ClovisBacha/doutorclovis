@@ -26,6 +26,7 @@ import { useSessao } from "~/lib/sessao";
 import { supabase } from "~/servidor/supabase";
 import { ALVO_MINIMO, cor, espaco, fonte, raio, sombra } from "~/tema";
 import { AvisoMedico } from "~/componentes/aviso-medico";
+import { IA_NO_APP } from "~/config";
 
 /**
  * O HUB DA SAÚDE: blocos grandes com a peça 3D e o dado de cada um.
@@ -150,15 +151,20 @@ export default function HubDaSaude() {
             rota: "/saude/contracoes",
           },
         ]),
-    {
-      chave: "nutricao",
-      rotulo: "Nutrição",
-      dado: "O que comer e beber",
-      arte: "nutricao",
-      tinta: cor.nutricao,
-      fundo: cor.nutricaoFundo,
-      rota: "/nutricao",
-    },
+    /* A Nutrição é a nutricionista com IA: some com a IA desligada. */
+    ...(!IA_NO_APP
+      ? []
+      : [
+          {
+            chave: "nutricao",
+            rotulo: "Nutrição",
+            dado: "O que comer e beber",
+            arte: "nutricao" as const,
+            tinta: cor.nutricao,
+            fundo: cor.nutricaoFundo,
+            rota: "/nutricao",
+          },
+        ]),
   ];
 
   return (
