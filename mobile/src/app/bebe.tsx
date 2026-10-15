@@ -23,6 +23,7 @@ import { CabecalhoDaPilha } from "~/componentes/cabecalho";
 import { Medida } from "~/componentes/medida";
 import { useSessao } from "~/lib/sessao";
 import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
+import { AvisoMedico } from "~/componentes/aviso-medico";
 
 const SEMANAS = Array.from({ length: WEEK_MAX - WEEK_MIN + 1 }, (_, i) => WEEK_MIN + i);
 const LARGURA_CHIP = 52;
@@ -199,6 +200,7 @@ export default function Bebe() {
           Informação geral. Quem decide os seus exames é a sua equipe de saúde.
         </T>
       </Cartao>
+      <AvisoMedico curto />
     </Tela>
   );
 }

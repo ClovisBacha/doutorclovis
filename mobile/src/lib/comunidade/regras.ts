@@ -17,6 +17,7 @@ import {
 } from "@/lib/rede-social";
 import { CARTOES_DA_COMUNIDADE, type CartaoDaComunidade } from "@/lib/onboarding-da-comunidade";
 import type { ComentarioNaTela, PostNaTela } from "~/servidor/rede";
+import { CONTATO_EMAIL } from "~/config";
 
 /* ── Limites que o app conhece ─────────────────────────────────────────── */
 
@@ -33,6 +34,47 @@ export const LADO_MAXIMO_DA_FOTO = 1080;
 export const COMPRESSAO_DA_FOTO = 0.72;
 /** A foto de perfil é quadrada, 512. */
 export const LADO_DO_AVATAR = 512;
+
+/* ── O filtro de ofensa (Apple 1.2) ────────────────────────────────────── */
+
+/**
+ * A RÉGUA DE OFENSA — a mesma que o servidor aplica nos COMENTÁRIOS
+ * (`REDUZ_OFENSA` em `@/lib/comentarios`), copiada porque aquele módulo
+ * arrasta a régua clínica inteira para o pacote. `regras.test.ts` confere que
+ * as duas são idênticas.
+ *
+ * Por que no app: o servidor filtra ofensa no comentário, mas o post e a bio
+ * só passam pela régua clínica — e o site não muda mais. A Apple pede "um
+ * jeito de filtrar o conteúdo ofensivo antes de ele ser publicado".
+ */
+export const REGUA_DE_OFENSA = new RegExp(
+  [
+    /* Ataque direto à pessoa. Formas com e sem acento, e o plural. */
+    "\\b(idiota|burra|burro|imbecil|est[uú]pid[ao]|ret[aá]rdad[ao]|otári[ao])\\b",
+    "\\b(vagabund[ao]|piranha|vadia|puta|prostitut[ao])\\b",
+    "\\b(nojent[ao]|horr[íi]vel voc[êe]|voc[êe] [ée] horr[íi]vel)\\b",
+    /* Ataque ao corpo — o mais comum em foto de gestante. */
+    "\\b(gorda|baleia|obesa nojenta|que barriga feia|t[aá] muito gorda)\\b",
+    /* Ataque à mãe. */
+    "\\b(m[ãa]e horr[íi]vel|n[ãa]o merece ser m[ãa]e|coitad[ao] do beb[êe] com voc[êe])\\b",
+    /* Morte e desejo de mal. */
+    "\\b(morre|se mata|espero que voc[êe] perca|tomara que perca)\\b",
+  ].join("|"),
+  "i",
+);
+
+/** O texto (post, bio, descrição da foto) bate na régua de ofensa? */
+export function ehOfensivo(texto: string | null | undefined): boolean {
+  const t = (texto ?? "").trim();
+  return !!t && REGUA_DE_OFENSA.test(t);
+}
+
+/** A recusa: explica, nunca acusa — a mesma voz do recado do comentário no site. */
+export function recadoDaOfensa(onde: "post" | "bio"): string {
+  return onde === "bio"
+    ? "A bio não pode ser salva assim: ela tem palavras que as regras da Comunidade não permitem."
+    : "Esta publicação não pode ir ao ar: ela tem palavras que as regras da Comunidade não permitem.";
+}
 
 /* ── Chamadas ao servidor ──────────────────────────────────────────────── */
 
@@ -398,6 +440,10 @@ export const PONTOS_DAS_REGRAS: readonly { titulo: string; texto: string }[] = [
     titulo: "Você tem o controle",
     texto:
       "Em toda publicação, perfil e comentário, o botão ⋯ tem Denunciar e Bloquear. Quem você bloqueia deixa de ver você e você deixa de ver essa pessoa.",
+  },
+  {
+    titulo: "Fale com a gente",
+    texto: `Viu algo grave ou precisa de ajuda com a Comunidade? Escreva para ${CONTATO_EMAIL}.`,
   },
 ];
 

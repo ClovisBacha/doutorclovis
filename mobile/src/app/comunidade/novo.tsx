@@ -2,7 +2,17 @@ import { MOTIVOS_SENSIVEIS } from "@/lib/conteudo-sensivel";
 import { LIMITE_DO_TEXTO, VISIBILIDADES, type Visibilidade } from "@/lib/rede-social";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { Camera, Check, ChevronDown, ChevronUp, Globe, ImagePlus, Lock, Users, X } from "lucide-react-native";
+import {
+  Camera,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Globe,
+  ImagePlus,
+  Lock,
+  Users,
+  X,
+} from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -23,7 +33,13 @@ import { FolhaDasRegras } from "~/componentes/comunidade/regras";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { api } from "~/lib/comunidade/api";
 import { escolherDaGaleria, tirarFoto, type ResultadoDaEscolha } from "~/lib/comunidade/fotos";
-import { FOTOS_POR_POST, fotosParaPublicar, mensagemDoErro } from "~/lib/comunidade/regras";
+import {
+  ehOfensivo,
+  FOTOS_POR_POST,
+  fotosParaPublicar,
+  mensagemDoErro,
+  recadoDaOfensa,
+} from "~/lib/comunidade/regras";
 import { marcarFeedSujo } from "~/lib/comunidade/sinal";
 import { useRegrasDaComunidade } from "~/lib/comunidade/usar-regras";
 import { useSessao } from "~/lib/sessao";
@@ -61,7 +77,9 @@ export default function NovoPost() {
      sozinho para mostrar a recusa do servidor com o recado. */
   useEffect(() => {
     if (!ehBancada()) return;
-    setTexto("Primeiro passeio no parque com essa barriga de 24 semanas. O fim de tarde estava lindo 🌅");
+    setTexto(
+      "Primeiro passeio no parque com essa barriga de 24 semanas. O fim de tarde estava lindo 🌅",
+    );
     setFotos(["bancada:hero", "bancada:bastidores"]);
     if (parametroDaBancada("recusa") === "1") {
       const exemplo = "Tomei chá de canela e passou a cólica, façam também!";
@@ -89,6 +107,13 @@ export default function NovoPost() {
     if (enviando) return;
     if (!t && fotos.length === 0) {
       setRecusa(mensagemDoErro("vazio"));
+      return;
+    }
+    /* O filtro de ofensa antes de sair do aparelho (Apple 1.2): a mesma régua
+       que o servidor aplica nos comentários. O texto fica para ela reescrever. */
+    if (ehOfensivo(t) || ehOfensivo(alt)) {
+      setRecusa(recadoDaOfensa("post"));
+      setTimeout(() => rolagem.current?.scrollToEnd({ animated: true }), 50);
       return;
     }
     setEnviando(true);
@@ -127,7 +152,12 @@ export default function NovoPost() {
         <Cabecalho titulo="Publicar" />
         <View style={{ padding: espaco.lg }}>
           <T tipo="apagado">Publicar não está disponível agora.</T>
-          <Botao rotulo="Voltar" tipo="secundario" aoTocar={voltar} estilo={{ marginTop: espaco.md }} />
+          <Botao
+            rotulo="Voltar"
+            tipo="secundario"
+            aoTocar={voltar}
+            estilo={{ marginTop: espaco.md }}
+          />
         </View>
       </SafeAreaView>
     );
@@ -144,16 +174,33 @@ export default function NovoPost() {
             accessibilityState={{ disabled: !podePublicar }}
             disabled={!podePublicar}
             onPress={publicar}
-            style={{ minHeight: ALVO_MINIMO, justifyContent: "center", paddingHorizontal: espaco.md }}
+            style={{
+              minHeight: ALVO_MINIMO,
+              justifyContent: "center",
+              paddingHorizontal: espaco.md,
+            }}
           >
-            <Text style={{ fontFamily: fonte.titulo, fontSize: 16, color: podePublicar ? cor.primaria : cor.primariaSuave }}>
+            <Text
+              style={{
+                fontFamily: fonte.titulo,
+                fontSize: 16,
+                color: podePublicar ? cor.primaria : cor.primariaSuave,
+              }}
+            >
               Publicar
             </Text>
           </Pressable>
         }
       />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <ScrollView ref={rolagem} contentContainerStyle={{ padding: espaco.lg, gap: espaco.lg, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <ScrollView
+          ref={rolagem}
+          contentContainerStyle={{ padding: espaco.lg, gap: espaco.lg, paddingBottom: 60 }}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={{ gap: 6 }}>
             <TextInput
               value={texto}
@@ -180,30 +227,85 @@ export default function NovoPost() {
                 color: cor.texto,
               }}
             />
-            <Text style={{ alignSelf: "flex-end", fontFamily: fonte.normal, fontSize: 13, color: texto.length > LIMITE_DO_TEXTO - 40 ? cor.atencao : cor.textoApagado }}>
+            <Text
+              style={{
+                alignSelf: "flex-end",
+                fontFamily: fonte.normal,
+                fontSize: 13,
+                color: texto.length > LIMITE_DO_TEXTO - 40 ? cor.atencao : cor.textoApagado,
+              }}
+            >
               {texto.length}/{LIMITE_DO_TEXTO}
             </Text>
           </View>
 
           {/* Fotos */}
           <View style={{ gap: espaco.sm }}>
-            <T tipo="rotulo">Fotos ({fotos.length}/{FOTOS_POR_POST})</T>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: espaco.sm }}>
+            <T tipo="rotulo">
+              Fotos ({fotos.length}/{FOTOS_POR_POST})
+            </T>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: espaco.sm }}
+            >
               {fotos.map((f, i) => (
-                <View key={`${i}-${f.slice(-16)}`} style={{ width: 104, height: 130, borderRadius: raio.md, overflow: "hidden", backgroundColor: cor.apagado }}>
-                  <Image source={fonteDaImagem(f)} style={{ width: 104, height: 130 }} contentFit="cover" />
+                <View
+                  key={`${i}-${f.slice(-16)}`}
+                  style={{
+                    width: 104,
+                    height: 130,
+                    borderRadius: raio.md,
+                    overflow: "hidden",
+                    backgroundColor: cor.apagado,
+                  }}
+                >
+                  <Image
+                    source={fonteDaImagem(f)}
+                    style={{ width: 104, height: 130 }}
+                    contentFit="cover"
+                  />
                   {i === 0 && fotos.length > 1 ? (
-                    <View style={{ position: "absolute", left: 6, bottom: 6, backgroundColor: "rgba(41,20,19,0.65)", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 }}>
-                      <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: cor.branco }}>Capa</Text>
+                    <View
+                      style={{
+                        position: "absolute",
+                        left: 6,
+                        bottom: 6,
+                        backgroundColor: "rgba(41,20,19,0.65)",
+                        borderRadius: 999,
+                        paddingHorizontal: 8,
+                        paddingVertical: 2,
+                      }}
+                    >
+                      <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: cor.branco }}>
+                        Capa
+                      </Text>
                     </View>
                   ) : null}
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={`Tirar a foto ${i + 1}`}
                     onPress={() => setFotos((x) => x.filter((_, k) => k !== i))}
-                    style={{ position: "absolute", top: 0, right: 0, width: ALVO_MINIMO, height: ALVO_MINIMO, alignItems: "center", justifyContent: "center" }}
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      right: 0,
+                      width: ALVO_MINIMO,
+                      height: ALVO_MINIMO,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
                   >
-                    <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: "rgba(41,20,19,0.7)", alignItems: "center", justifyContent: "center" }}>
+                    <View
+                      style={{
+                        width: 26,
+                        height: 26,
+                        borderRadius: 13,
+                        backgroundColor: "rgba(41,20,19,0.7)",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
                       <X size={16} color={cor.branco} />
                     </View>
                   </Pressable>
@@ -232,7 +334,9 @@ export default function NovoPost() {
                   }}
                 >
                   <ImagePlus size={26} color={cor.primaria} />
-                  <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: cor.primariaEscura }}>
+                  <Text
+                    style={{ fontFamily: fonte.forte, fontSize: 13, color: cor.primariaEscura }}
+                  >
                     {preparando ? "Preparando…" : "Adicionar"}
                   </Text>
                 </Pressable>
@@ -246,12 +350,21 @@ export default function NovoPost() {
                 accessibilityRole="button"
                 accessibilityState={{ expanded: descricaoAberta }}
                 onPress={() => setDescricaoAberta((v) => !v)}
-                style={{ minHeight: ALVO_MINIMO, flexDirection: "row", alignItems: "center", gap: espaco.sm }}
+                style={{
+                  minHeight: ALVO_MINIMO,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: espaco.sm,
+                }}
               >
                 <Text style={{ flex: 1, fontFamily: fonte.forte, fontSize: 15, color: cor.texto }}>
                   Descrever a foto{alt.trim() ? " ✓" : ""}
                 </Text>
-                {descricaoAberta ? <ChevronUp size={20} color={cor.textoApagado} /> : <ChevronDown size={20} color={cor.textoApagado} />}
+                {descricaoAberta ? (
+                  <ChevronUp size={20} color={cor.textoApagado} />
+                ) : (
+                  <ChevronDown size={20} color={cor.textoApagado} />
+                )}
               </Pressable>
               {descricaoAberta ? (
                 <Campo
@@ -297,8 +410,14 @@ export default function NovoPost() {
                   >
                     <Icone size={20} color={ativa ? cor.primariaEscura : cor.textoApagado} />
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontFamily: fonte.forte, fontSize: 15, color: cor.texto }}>{v.rotulo}</Text>
-                      <Text style={{ fontFamily: fonte.normal, fontSize: 13, color: cor.textoApagado }}>{v.sub}</Text>
+                      <Text style={{ fontFamily: fonte.forte, fontSize: 15, color: cor.texto }}>
+                        {v.rotulo}
+                      </Text>
+                      <Text
+                        style={{ fontFamily: fonte.normal, fontSize: 13, color: cor.textoApagado }}
+                      >
+                        {v.sub}
+                      </Text>
                     </View>
                     {ativa ? <Check size={20} color={cor.primaria} /> : null}
                   </Pressable>
@@ -308,7 +427,14 @@ export default function NovoPost() {
           </View>
 
           {/* Sensível */}
-          <View style={{ gap: espaco.sm, backgroundColor: cor.cartao, borderRadius: raio.md, padding: espaco.md }}>
+          <View
+            style={{
+              gap: espaco.sm,
+              backgroundColor: cor.cartao,
+              borderRadius: raio.md,
+              padding: espaco.md,
+            }}
+          >
             <Linha>
               <View style={{ flex: 1 }}>
                 <T tipo="rotulo">Marcar como sensível</T>
@@ -344,7 +470,15 @@ export default function NovoPost() {
                         justifyContent: "center",
                       }}
                     >
-                      <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: ativo ? cor.textoDestaque : cor.texto }}>{m.rotulo}</Text>
+                      <Text
+                        style={{
+                          fontFamily: fonte.forte,
+                          fontSize: 14,
+                          color: ativo ? cor.textoDestaque : cor.texto,
+                        }}
+                      >
+                        {m.rotulo}
+                      </Text>
                     </Pressable>
                   );
                 })}
@@ -353,7 +487,15 @@ export default function NovoPost() {
           </View>
 
           {recusa ? (
-            <View accessibilityLiveRegion="polite" style={{ backgroundColor: cor.atencaoFundo, borderRadius: raio.md, padding: espaco.lg, gap: 4 }}>
+            <View
+              accessibilityLiveRegion="polite"
+              style={{
+                backgroundColor: cor.atencaoFundo,
+                borderRadius: raio.md,
+                padding: espaco.lg,
+                gap: 4,
+              }}
+            >
               <T tipo="rotulo" cor={cor.atencao}>
                 Não foi publicado
               </T>
@@ -363,7 +505,12 @@ export default function NovoPost() {
             </View>
           ) : null}
 
-          <Botao rotulo="Publicar" aoTocar={publicar} carregando={enviando} desabilitado={!podePublicar} />
+          <Botao
+            rotulo="Publicar"
+            aoTocar={publicar}
+            carregando={enviando}
+            desabilitado={!podePublicar}
+          />
         </ScrollView>
       </KeyboardAvoidingView>
 

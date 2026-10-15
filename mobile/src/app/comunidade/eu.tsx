@@ -3,15 +3,33 @@ import { LIMITE_DA_BIO, PERFIL_PUBLICO_PADRAO } from "@/lib/rede-social";
 import { router } from "expo-router";
 import { Ban, Camera, ChevronRight, Trash2 } from "lucide-react-native";
 import { useCallback, useEffect, useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, Text, TextInput, View } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  Switch,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Botao, Campo, Cartao, Carregando, Linha, NaoConsegueLer, T, toque } from "~/componentes/base";
+import {
+  Botao,
+  Campo,
+  Cartao,
+  Carregando,
+  Linha,
+  NaoConsegueLer,
+  T,
+  toque,
+} from "~/componentes/base";
 import { Cabecalho } from "~/componentes/comunidade/cabecalho";
 import { FolhaDeOpcoes, useAviso } from "~/componentes/comunidade/folha";
 import { Avatar } from "~/componentes/comunidade/imagem";
 import { api } from "~/lib/comunidade/api";
 import { escolherAvatar } from "~/lib/comunidade/fotos";
-import { mensagemDoErro } from "~/lib/comunidade/regras";
+import { ehOfensivo, mensagemDoErro, recadoDaOfensa } from "~/lib/comunidade/regras";
 import type { PerfilNaTela } from "~/servidor/rede";
 import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
 
@@ -67,12 +85,26 @@ export default function MeuPerfil() {
   const fotoNaTela = avatar === undefined ? (perfil?.avatarUrl ?? null) : avatar;
   const mudou =
     !!perfil &&
-    (nome.trim() !== (perfil.nome ?? "") || bio.trim() !== (perfil.bio ?? "") || avatar !== undefined);
+    (nome.trim() !== (perfil.nome ?? "") ||
+      bio.trim() !== (perfil.bio ?? "") ||
+      avatar !== undefined);
 
   const salvar = async () => {
     if (!perfil || salvando) return;
     if (!nome.trim()) {
       aviso.mostrar("O nome não pode ficar vazio.", true);
+      return;
+    }
+    /* O filtro de ofensa antes de sair do aparelho (Apple 1.2). */
+    if (ehOfensivo(nome)) {
+      aviso.mostrar(
+        "O nome não pode ser salvo assim: ele tem palavras que as regras da Comunidade não permitem.",
+        true,
+      );
+      return;
+    }
+    if (ehOfensivo(bio)) {
+      setErroBio(recadoDaOfensa("bio"));
       return;
     }
     setSalvando(true);
@@ -90,7 +122,11 @@ export default function MeuPerfil() {
       return;
     }
     toque(false);
-    aviso.mostrar(r.parcial ? "Salvo em parte. Uma das mudanças não pegou — tente de novo mais tarde." : "Perfil salvo.");
+    aviso.mostrar(
+      r.parcial
+        ? "Salvo em parte. Uma das mudanças não pegou — tente de novo mais tarde."
+        : "Perfil salvo.",
+    );
     setPerfil({ ...perfil, nome: nome.trim(), bio: bio.trim() || null, avatarUrl: fotoNaTela });
     setAvatar(undefined);
   };
@@ -101,7 +137,12 @@ export default function MeuPerfil() {
     const r = await api.salvarPerfilSocial({ publico: v });
     if (!r.ok || r.parcial) {
       setPublico(antes);
-      aviso.mostrar(r.ok ? "Não deu para mudar essa opção agora. Tente mais tarde." : mensagemDoErro(r.motivo, r.recado), true);
+      aviso.mostrar(
+        r.ok
+          ? "Não deu para mudar essa opção agora. Tente mais tarde."
+          : mensagemDoErro(r.motivo, r.recado),
+        true,
+      );
       return;
     }
     aviso.mostrar(v ? "Seu perfil agora é público." : "Seu perfil agora é fechado.");
@@ -141,7 +182,8 @@ export default function MeuPerfil() {
     });
   };
 
-  const handleMudou = !!perfil && normalizarHandle(handle.replace(/^@/, "")) !== (perfil.handle ?? "");
+  const handleMudou =
+    !!perfil && normalizarHandle(handle.replace(/^@/, "")) !== (perfil.handle ?? "");
 
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: cor.fundo }}>
@@ -149,12 +191,21 @@ export default function MeuPerfil() {
       {estado === "carregando" ? <Carregando /> : null}
       {estado === "falhou" ? (
         <View style={{ padding: espaco.lg }}>
-          <NaoConsegueLer sossego="Seu perfil e o que você publicou continuam guardados." aoTentar={() => void carregar()} />
+          <NaoConsegueLer
+            sossego="Seu perfil e o que você publicou continuam guardados."
+            aoTentar={() => void carregar()}
+          />
         </View>
       ) : null}
       {estado === "pronto" && perfil ? (
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-          <ScrollView contentContainerStyle={{ padding: espaco.lg, gap: espaco.lg, paddingBottom: 80 }} keyboardShouldPersistTaps="handled">
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
+          <ScrollView
+            contentContainerStyle={{ padding: espaco.lg, gap: espaco.lg, paddingBottom: 80 }}
+            keyboardShouldPersistTaps="handled"
+          >
             {/* Quem sou */}
             <Cartao>
               <Linha estilo={{ gap: espaco.lg }}>
@@ -164,7 +215,21 @@ export default function MeuPerfil() {
                   onPress={() => setMenuFoto(true)}
                 >
                   <Avatar id={perfil.id} nome={nome || perfil.nome} url={fotoNaTela} tamanho={76} />
-                  <View style={{ position: "absolute", right: -2, bottom: -2, width: 28, height: 28, borderRadius: 14, backgroundColor: cor.primaria, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: cor.cartao }}>
+                  <View
+                    style={{
+                      position: "absolute",
+                      right: -2,
+                      bottom: -2,
+                      width: 28,
+                      height: 28,
+                      borderRadius: 14,
+                      backgroundColor: cor.primaria,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderWidth: 2,
+                      borderColor: cor.cartao,
+                    }}
+                  >
                     <Camera size={14} color={cor.branco} />
                   </View>
                 </Pressable>
@@ -172,12 +237,30 @@ export default function MeuPerfil() {
                   <T tipo="subtitulo">{perfil.nome}</T>
                   {perfil.handle ? <T tipo="apagado">@{perfil.handle}</T> : null}
                   <Linha estilo={{ gap: espaco.lg, marginTop: 4 }}>
-                    {perfil.seguidores != null ? <T tipo="apagado"><Text style={{ fontFamily: fonte.forte, color: cor.texto }}>{perfil.seguidores}</Text> seguidores</T> : null}
-                    {perfil.seguindo != null ? <T tipo="apagado"><Text style={{ fontFamily: fonte.forte, color: cor.texto }}>{perfil.seguindo}</Text> seguindo</T> : null}
+                    {perfil.seguidores != null ? (
+                      <T tipo="apagado">
+                        <Text style={{ fontFamily: fonte.forte, color: cor.texto }}>
+                          {perfil.seguidores}
+                        </Text>{" "}
+                        seguidores
+                      </T>
+                    ) : null}
+                    {perfil.seguindo != null ? (
+                      <T tipo="apagado">
+                        <Text style={{ fontFamily: fonte.forte, color: cor.texto }}>
+                          {perfil.seguindo}
+                        </Text>{" "}
+                        seguindo
+                      </T>
+                    ) : null}
                   </Linha>
                 </View>
               </Linha>
-              <Botao rotulo="Ver como os outros veem" tipo="secundario" aoTocar={() => router.push(`/comunidade/perfil/${perfil.id}`)} />
+              <Botao
+                rotulo="Ver como os outros veem"
+                tipo="secundario"
+                aoTocar={() => router.push(`/comunidade/perfil/${perfil.id}`)}
+              />
             </Cartao>
 
             {/* Pedidos */}
@@ -191,15 +274,40 @@ export default function MeuPerfil() {
                         accessibilityRole="button"
                         accessibilityLabel={`Abrir o perfil de ${p.nome}`}
                         onPress={() => router.push(`/comunidade/perfil/${p.id}`)}
-                        style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: espaco.sm, minHeight: ALVO_MINIMO }}
+                        style={{
+                          flex: 1,
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: espaco.sm,
+                          minHeight: ALVO_MINIMO,
+                        }}
                       >
                         <Avatar id={p.id} nome={p.nome} url={p.avatarUrl} tamanho={40} />
-                        <Text numberOfLines={1} style={{ flex: 1, fontFamily: fonte.forte, fontSize: 15, color: cor.texto }}>{p.nome}</Text>
+                        <Text
+                          numberOfLines={1}
+                          style={{
+                            flex: 1,
+                            fontFamily: fonte.forte,
+                            fontSize: 15,
+                            color: cor.texto,
+                          }}
+                        >
+                          {p.nome}
+                        </Text>
                       </Pressable>
                     </Linha>
                     <Linha>
-                      <Botao rotulo="Aceitar" aoTocar={() => responder(p, true)} estilo={{ flex: 1 }} />
-                      <Botao rotulo="Recusar" tipo="secundario" aoTocar={() => responder(p, false)} estilo={{ flex: 1 }} />
+                      <Botao
+                        rotulo="Aceitar"
+                        aoTocar={() => responder(p, true)}
+                        estilo={{ flex: 1 }}
+                      />
+                      <Botao
+                        rotulo="Recusar"
+                        tipo="secundario"
+                        aoTocar={() => responder(p, false)}
+                        estilo={{ flex: 1 }}
+                      />
                     </Linha>
                   </Cartao>
                 ))}
@@ -230,7 +338,13 @@ export default function MeuPerfil() {
             {/* Editar */}
             <View style={{ gap: espaco.md }}>
               <T tipo="subtitulo">Editar</T>
-              <Campo rotulo="Nome" value={nome} onChangeText={setNome} maxLength={60} autoCapitalize="words" />
+              <Campo
+                rotulo="Nome"
+                value={nome}
+                onChangeText={setNome}
+                maxLength={60}
+                autoCapitalize="words"
+              />
               <View style={{ gap: 6 }}>
                 <Campo
                   rotulo="Bio"
@@ -244,24 +358,65 @@ export default function MeuPerfil() {
                   placeholder="Uma frase sobre você"
                   style={{ minHeight: 80 }}
                 />
-                <Text style={{ alignSelf: "flex-end", fontFamily: fonte.normal, fontSize: 13, color: cor.textoApagado }}>
+                <Text
+                  style={{
+                    alignSelf: "flex-end",
+                    fontFamily: fonte.normal,
+                    fontSize: 13,
+                    color: cor.textoApagado,
+                  }}
+                >
                   {bio.length}/{LIMITE_DA_BIO}
                 </Text>
                 {erroBio ? (
-                  <View style={{ backgroundColor: cor.atencaoFundo, borderRadius: raio.md, padding: espaco.md }}>
-                    <Text style={{ fontFamily: fonte.media, fontSize: 14, lineHeight: 20, color: cor.texto }}>{erroBio}</Text>
+                  <View
+                    style={{
+                      backgroundColor: cor.atencaoFundo,
+                      borderRadius: raio.md,
+                      padding: espaco.md,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontFamily: fonte.media,
+                        fontSize: 14,
+                        lineHeight: 20,
+                        color: cor.texto,
+                      }}
+                    >
+                      {erroBio}
+                    </Text>
                   </View>
                 ) : null}
               </View>
-              <Botao rotulo="Salvar" aoTocar={() => void salvar()} carregando={salvando} desabilitado={!mudou} />
+              <Botao
+                rotulo="Salvar"
+                aoTocar={() => void salvar()}
+                carregando={salvando}
+                desabilitado={!mudou}
+              />
             </View>
 
             {/* @ */}
             <View style={{ gap: 6 }}>
               <T tipo="rotulo">Seu @</T>
               <Linha>
-                <View style={{ flex: 1, flexDirection: "row", alignItems: "center", minHeight: ALVO_MINIMO + 4, borderRadius: raio.md, borderWidth: 1, borderColor: erroHandle ? cor.atencao : cor.borda, backgroundColor: cor.cartao, paddingLeft: espaco.md }}>
-                  <Text style={{ fontFamily: fonte.forte, fontSize: 16, color: cor.textoApagado }}>@</Text>
+                <View
+                  style={{
+                    flex: 1,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    minHeight: ALVO_MINIMO + 4,
+                    borderRadius: raio.md,
+                    borderWidth: 1,
+                    borderColor: erroHandle ? cor.atencao : cor.borda,
+                    backgroundColor: cor.cartao,
+                    paddingLeft: espaco.md,
+                  }}
+                >
+                  <Text style={{ fontFamily: fonte.forte, fontSize: 16, color: cor.textoApagado }}>
+                    @
+                  </Text>
                   <TextInput
                     value={handle}
                     onChangeText={(t) => {
@@ -275,18 +430,46 @@ export default function MeuPerfil() {
                     accessibilityLabel="Seu @"
                     placeholder="seunome"
                     placeholderTextColor={cor.textoApagado}
-                    style={{ flex: 1, minHeight: ALVO_MINIMO, paddingHorizontal: 4, fontFamily: fonte.normal, fontSize: 16, color: cor.texto }}
+                    style={{
+                      flex: 1,
+                      minHeight: ALVO_MINIMO,
+                      paddingHorizontal: 4,
+                      fontFamily: fonte.normal,
+                      fontSize: 16,
+                      color: cor.texto,
+                    }}
                   />
                 </View>
-                <Botao rotulo="Salvar @" tipo="secundario" aoTocar={() => void salvarHandle()} carregando={salvandoHandle} desabilitado={!handleMudou} estilo={{ paddingHorizontal: espaco.lg }} />
+                <Botao
+                  rotulo="Salvar @"
+                  tipo="secundario"
+                  aoTocar={() => void salvarHandle()}
+                  carregando={salvandoHandle}
+                  desabilitado={!handleMudou}
+                  estilo={{ paddingHorizontal: espaco.lg }}
+                />
               </Linha>
-              <T tipo="apagado">Letras sem acento, números, ponto e sublinhado. Dá para trocar duas vezes a cada 14 dias.</T>
-              {erroHandle ? <T tipo="apagado" cor={cor.atencao}>{erroHandle}</T> : null}
-              {okHandle ? <T tipo="apagado" cor={cor.ok}>{okHandle}</T> : null}
+              <T tipo="apagado">
+                Letras sem acento, números, ponto e sublinhado. Dá para trocar duas vezes a cada 14
+                dias.
+              </T>
+              {erroHandle ? (
+                <T tipo="apagado" cor={cor.atencao}>
+                  {erroHandle}
+                </T>
+              ) : null}
+              {okHandle ? (
+                <T tipo="apagado" cor={cor.ok}>
+                  {okHandle}
+                </T>
+              ) : null}
             </View>
 
             {/* Bloqueados */}
-            <Cartao aoTocar={() => router.push("/comunidade/bloqueados")} rotuloAcessivel="Pessoas bloqueadas">
+            <Cartao
+              aoTocar={() => router.push("/comunidade/bloqueados")}
+              rotuloAcessivel="Pessoas bloqueadas"
+            >
               <Linha>
                 <Ban size={20} color={cor.textoApagado} />
                 <T tipo="rotulo" estilo={{ flex: 1 }}>
@@ -312,7 +495,8 @@ export default function MeuPerfil() {
               setTimeout(() => {
                 void escolherAvatar().then((r) => {
                   if (r.ok) setAvatar(r.foto);
-                  else if (r.motivo === "falhou") aviso.mostrar("Não conseguimos preparar essa foto. Tente outra.", true);
+                  else if (r.motivo === "falhou")
+                    aviso.mostrar("Não conseguimos preparar essa foto. Tente outra.", true);
                 });
               }, 500),
           },

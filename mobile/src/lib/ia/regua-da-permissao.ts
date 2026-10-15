@@ -13,7 +13,9 @@
  * ⚠️ E ele é por uid: aparelho compartilhado não herda o "sim" de outra conta.
  */
 
-export const VERSAO_DA_PERMISSAO = 1;
+/* v2 (15/10/2026): a permissão passou a valer também para a triagem de
+   sintomas — um uso novo, então toda paciente vê a folha de novo. */
+export const VERSAO_DA_PERMISSAO = 2;
 
 export type RegistroDaPermissao = { versao: number; em: string };
 
@@ -59,6 +61,7 @@ export const FOLHA_DA_PERMISSAO = {
     "O que você escrever na conversa.",
     "A foto do prato ou do rótulo, quando você mandar uma.",
     "Algumas informações do seu perfil e dos seus registros: semana da gestação (ou data do parto), alergias, medicações, preferências de comida, e peso, pressão, glicemia, humor e sintomas que você anotou nos últimos dias.",
+    "Na triagem de sintomas: os sintomas que você marcar e a semana da gestação, para a IA escrever a orientação com outras palavras. O nível de alerta não depende da IA: ele sai da régua do app, com ou sem permissão.",
   ],
   garantias: [
     "Serve só para gerar a resposta. Nada disso é usado para publicidade.",

@@ -27,6 +27,7 @@ import {
 import { marcar } from "~/lib/jornada/loja";
 import { sementesDaAula } from "~/lib/jornada/momentos";
 import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
+import { AvisoMedico } from "~/componentes/aviso-medico";
 
 /**
  * A AULA DO DIA — "a professora do app".
@@ -237,6 +238,7 @@ export default function Aula() {
           corFundo={corJornada.roxo}
           aoTocar={() => setE(comecarPerguntas(e))}
         />
+        <AvisoMedico curto />
       </Tela>
     );
   }

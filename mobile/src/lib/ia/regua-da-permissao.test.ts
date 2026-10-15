@@ -15,21 +15,38 @@ describe("a régua da permissão de IA", () => {
 
   test("o registro gravado vale", () => {
     const r = registroDaPermissao(new Date("2026-10-02T12:00:00Z"));
-    expect(r).toEqual({ versao: 1, em: "2026-10-02T12:00:00.000Z" });
+    expect(r).toEqual({ versao: VERSAO_DA_PERMISSAO, em: "2026-10-02T12:00:00.000Z" });
     expect(permissaoVale(r)).toBe(true);
     expect(permissaoVale(JSON.parse(JSON.stringify(r)))).toBe(true);
   });
 
   test("nada guardado, lixo ou data ilegível = ainda não perguntamos", () => {
-    for (const b of [null, undefined, "", "sim", true, 1, {}, { versao: 1 }, { versao: 1, em: "" }, { versao: 1, em: "ontem" }]) {
+    for (const b of [
+      null,
+      undefined,
+      "",
+      "sim",
+      true,
+      1,
+      {},
+      { versao: 1 },
+      { versao: 1, em: "" },
+      { versao: 1, em: "ontem" },
+    ]) {
       expect(permissaoVale(b)).toBe(false);
     }
   });
 
   test("versão diferente da atual NÃO vale — um sim antigo não cobre o que mudou", () => {
-    expect(permissaoVale({ versao: VERSAO_DA_PERMISSAO - 1, em: new Date().toISOString() })).toBe(false);
-    expect(permissaoVale({ versao: VERSAO_DA_PERMISSAO + 1, em: new Date().toISOString() })).toBe(false);
-    expect(permissaoVale({ versao: String(VERSAO_DA_PERMISSAO), em: new Date().toISOString() })).toBe(false);
+    expect(permissaoVale({ versao: VERSAO_DA_PERMISSAO - 1, em: new Date().toISOString() })).toBe(
+      false,
+    );
+    expect(permissaoVale({ versao: VERSAO_DA_PERMISSAO + 1, em: new Date().toISOString() })).toBe(
+      false,
+    );
+    expect(
+      permissaoVale({ versao: String(VERSAO_DA_PERMISSAO), em: new Date().toISOString() }),
+    ).toBe(false);
   });
 });
 
@@ -45,10 +62,18 @@ describe("o texto da folha diz o que a diretriz 5.1.2(i) exige", () => {
     expect(tudo).toContain("Google");
   });
 
+  test("a triagem de sintomas também está dita (v2), e a versão subiu com ela", () => {
+    const tudo = FOLHA_DA_PERMISSAO.vai.join(" ");
+    expect(tudo).toContain("triagem de sintomas");
+    expect(tudo).toContain("semana da gestação");
+    expect(VERSAO_DA_PERMISSAO).toBeGreaterThanOrEqual(2);
+  });
+
   test("diz QUE dados vão: conversa, foto e medidas do perfil", () => {
     expect(tudo).toMatch(/escrever na conversa/);
     expect(tudo).toMatch(/foto/);
-    for (const dado of ["semana", "alergias", "medicações", "peso", "pressão"]) expect(tudo).toContain(dado);
+    for (const dado of ["semana", "alergias", "medicações", "peso", "pressão"])
+      expect(tudo).toContain(dado);
   });
 
   test("promete o que é verdade: sem publicidade, foto não guardada, não substitui atendimento", () => {

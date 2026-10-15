@@ -20,6 +20,8 @@ import { guardarMedicoLocal, lerMedicoLocal } from "~/lib/medico-local";
 import { celularE164, emailValido } from "@/lib/medico-da-gestante";
 import { CartaoDaPermissaoDeIA } from "~/lib/ia/PermissaoDeIA";
 import { abrir, PRIVACIDADE, TERMOS } from "~/lib/links";
+import { AvisoMedico } from "~/componentes/aviso-medico";
+import { CONTATO_EMAIL } from "~/config";
 import { CabecalhoDaPilha } from "~/componentes/cabecalho";
 import { useSessao } from "~/lib/sessao";
 import { excluirMinhaConta, ligarModoCuidado, PALAVRA_DE_CONFIRMACAO } from "~/servidor/conta";
@@ -333,6 +335,23 @@ function FormularioDoPerfil() {
         </Cartao>
 
         <CartaoDaPermissaoDeIA />
+
+        <AvisoMedico />
+
+        {/* O contato publicado (Apple 1.2: app com conteúdo de usuárias precisa
+            de um jeito fácil de falar com quem cuida dele). */}
+        <Cartao>
+          <T tipo="rotulo">Fale com a gente</T>
+          <T tipo="apagado">
+            Dúvidas sobre o app, a sua conta ou a Comunidade: {CONTATO_EMAIL}. Assuntos de saúde são
+            com o seu médico — em emergência, ligue 192.
+          </T>
+          <Botao
+            rotulo="Escrever um e-mail"
+            tipo="texto"
+            aoTocar={() => abrir(`mailto:${CONTATO_EMAIL}`)}
+          />
+        </Cartao>
 
         <Cartao>
           <Botao rotulo="Termos de uso" tipo="texto" aoTocar={() => abrir(TERMOS)} />

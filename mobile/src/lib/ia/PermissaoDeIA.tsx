@@ -4,11 +4,7 @@ import { Modal, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Botao, Cartao, T } from "~/componentes/base";
 import { ehBancada } from "~/lib/bancada";
-import {
-  concederPermissaoDeIA,
-  lerPermissaoDeIA,
-  revogarPermissaoDeIA,
-} from "~/lib/ia/permissao";
+import { concederPermissaoDeIA, lerPermissaoDeIA, revogarPermissaoDeIA } from "~/lib/ia/permissao";
 import { FOLHA_DA_PERMISSAO } from "~/lib/ia/regua-da-permissao";
 import { useSessao } from "~/lib/sessao";
 import { cor, espaco, raio } from "~/tema";
@@ -200,13 +196,15 @@ export function CartaoDaPermissaoDeIA({
       <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
         <ShieldCheck size={22} color={permitida ? cor.nutricao : cor.textoApagado} />
         <T tipo="rotulo" estilo={{ flex: 1 }}>
-          Nutricionista com IA
+          Inteligência artificial (IA)
         </T>
       </View>
+      {/* O mesmo "sim" vale para os dois lugares que usam IA — e o cartão diz
+          os dois, como a folha (`FOLHA_DA_PERMISSAO`, versão 2). */}
       <T tipo="apagado">
         {permitida
-          ? `Permitida${desde ? ` desde ${desde}` : ""}. O que você escreve, a foto que você manda e algumas informações do seu perfil vão para o Gemini, a IA do Google, só para gerar a resposta.`
-          : "Não permitida. Nada é enviado para a IA. Para usar, abra a Nutrição e toque em Permitir."}
+          ? `Permitida${desde ? ` desde ${desde}` : ""}. Na nutricionista, o que você escreve, a foto que você manda e algumas informações do seu perfil; na triagem de sintomas, os sintomas marcados e a semana da gestação. Tudo vai para o Gemini, a IA do Google, só para gerar a resposta.`
+          : "Não permitida. Nada é enviado para a IA: a triagem de sintomas usa só a régua do app. Para conversar com a nutricionista, abra a Nutrição e toque em Permitir."}
       </T>
       {permitida ? (
         <Botao

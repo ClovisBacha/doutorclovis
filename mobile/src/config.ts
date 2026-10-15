@@ -17,3 +17,11 @@ export const SUPABASE_PUBLISHABLE_KEY =
 export const SAMU = "192";
 export const BOMBEIROS = "193";
 export const CVV = "188";
+
+/**
+ * O contato publicado do app — a Apple exige um, à vista, em app com conteúdo
+ * de usuárias (diretriz 1.2). É o e-mail do consultório (`DOCTOR.email` em
+ * src/lib/doctor.config.ts, que o app não importa: ele usa `import.meta`);
+ * `contato.test.ts` confere que os dois são o mesmo.
+ */
+export const CONTATO_EMAIL = "contato@drclovisbacha.com.br";

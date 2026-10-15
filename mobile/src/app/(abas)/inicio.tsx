@@ -41,6 +41,7 @@ import { BolhaViva, Entrada, Flutuar, Inclinacao3D } from "~/componentes/movimen
 import { Medida } from "~/componentes/medida";
 import { useSessao } from "~/lib/sessao";
 import { ALVO_MINIMO, cor, espaco, raio } from "~/tema";
+import { AvisoMedico } from "~/componentes/aviso-medico";
 
 function saudacao(h: number) {
   if (h < 5) return "Boa madrugada";
@@ -244,6 +245,7 @@ export default function Inicio() {
           </T>
         </Cartao>
       ) : null}
+      <AvisoMedico curto />
     </Tela>
   );
 }

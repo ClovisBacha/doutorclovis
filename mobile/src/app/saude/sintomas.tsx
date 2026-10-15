@@ -6,6 +6,7 @@ import { Pressable, Text, View } from "react-native";
 import { Botao, Campo, Cartao, Linha, T, Tela, toque } from "~/componentes/base";
 import { BotaoLigar192, Cabecalho } from "~/componentes/saude/pecas";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
+import { lerPermissaoDeIA } from "~/lib/ia/permissao";
 import { gestacaoDoPerfil } from "~/lib/gestacao";
 import { numeroDoCampo } from "~/lib/saude/registros";
 import { orientacaoLocal, piorNivel, sintomasParaMarcar } from "~/lib/saude/triagem-local";
@@ -24,12 +25,14 @@ const EXEMPLOS: Record<string, string[]> = {
 
 /**
  * A TRIAGEM DE SINTOMAS. A orientação aparece SEMPRE: primeiro a local (a
- * régua do site, sem rede), depois a do servidor, que só pode SUBIR o nível.
+ * régua do site, sem rede), depois a do servidor (só com a permissão de IA),
+ * que só pode SUBIR o nível.
  * Guardar no histórico é o último passo — se falhar, a tela diz que não ficou
  * salvo, e a orientação continua valendo.
  */
 export default function Sintomas() {
-  const { perfil, cuidado } = useSessao();
+  const { perfil, cuidado, sessao } = useSessao();
+  const uid = sessao?.user.id ?? null;
   const semanas = cuidado ? null : (gestacaoDoPerfil(perfil)?.weeks ?? null);
   const lista = sintomasParaMarcar(cuidado);
   const [marcados, setMarcados] = useState<string[]>([]);
@@ -76,9 +79,15 @@ export default function Sintomas() {
     }
     setGravacao("guardando");
     /* 2. A do servidor (a IA reescreve a mensagem). No Modo Cuidado fica a
-       local: a mensagem gerada fala com uma gestante. */
+       local: a mensagem gerada fala com uma gestante.
+       ⚠️ E SÓ COM A PERMISSÃO DE IA (Apple 5.1.2): o servidor manda os
+       sintomas e a semana ao Gemini. Sem o "sim" dela, nada sai para o
+       Google — e a orientação local, que já está na tela, é completa: o
+       nível sai da régua do app, a IA só reescreve as palavras. Nunca se
+       pergunta AQUI: quem marcou um sintoma não pode ser parada por uma folha. */
     let final = local;
-    if (!cuidado) {
+    const podeIA = !!uid && (await lerPermissaoDeIA(uid)) !== null;
+    if (!cuidado && podeIA) {
       try {
         const r = await avaliarSintomas({
           symptoms: marcados,
@@ -206,9 +215,7 @@ export default function Sintomas() {
       ) : null}
       <Botao rotulo="Ver o que fazer" aoTocar={() => void avaliar()} />
       {resultado ? <CartaoDoResultado resultado={resultado} gravacao={gravacao} /> : null}
-      <T tipo="apagado">
-        Isto não substitui uma avaliação. Em dúvida, ou se piorar, ligue 192.
-      </T>
+      <T tipo="apagado">Isto não substitui uma avaliação. Em dúvida, ou se piorar, ligue 192.</T>
     </Tela>
   );
 }
@@ -224,7 +231,11 @@ function CartaoDoResultado({ resultado, gravacao }: { resultado: Resultado; grav
   return (
     <Cartao
       fundo={e.fundo}
-      estilo={resultado.level === "vermelho" ? { borderWidth: 1.5, borderColor: cor.urgente, gap: espaco.md } : { gap: espaco.md }}
+      estilo={
+        resultado.level === "vermelho"
+          ? { borderWidth: 1.5, borderColor: cor.urgente, gap: espaco.md }
+          : { gap: espaco.md }
+      }
     >
       <T tipo="subtitulo" cor={e.tinta}>
         {e.titulo}

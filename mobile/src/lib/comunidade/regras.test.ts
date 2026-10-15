@@ -28,7 +28,12 @@ import {
   seguro,
   tamanhoReduzido,
   temMais,
+  ehOfensivo,
+  recadoDaOfensa,
+  REGUA_DE_OFENSA,
 } from "./regras";
+import { REDUZ_OFENSA } from "@/lib/comentarios";
+import { CONTATO_EMAIL } from "~/config";
 
 const site = resolve(import.meta.dir, "../../../../src/lib");
 
@@ -115,7 +120,11 @@ describe("reações", () => {
   });
 });
 
-const c = (id: string, criadoEm: string, extra: Partial<ComentarioNaTela> = {}): ComentarioNaTela => ({
+const c = (
+  id: string,
+  criadoEm: string,
+  extra: Partial<ComentarioNaTela> = {},
+): ComentarioNaTela => ({
   id,
   autorId: "u",
   autorNome: "U",
@@ -174,7 +183,12 @@ describe("fotos", () => {
     expect(tamanhoReduzido(0, 600)).toBe(null);
   });
   test("recorte quadrado central", () => {
-    expect(recorteQuadrado(1200, 800)).toEqual({ originX: 200, originY: 0, width: 800, height: 800 });
+    expect(recorteQuadrado(1200, 800)).toEqual({
+      originX: 200,
+      originY: 0,
+      width: 800,
+      height: 800,
+    });
     expect(recorteQuadrado(500, 500)).toBe(null);
   });
   test("a 1ª foto vai em imagem, as outras em extras, no máximo 4", () => {
@@ -221,6 +235,8 @@ describe("regras e boas-vindas", () => {
     expect(/Denunciar/.test(tudo)).toBe(true);
     expect(/Bloquear/.test(tudo)).toBe(true);
     expect(/removid/.test(tudo)).toBe(true);
+    // o contato publicado, que a 1.2 também pede
+    expect(tudo).toContain(CONTATO_EMAIL);
   });
   test("os cartões não prometem médico nem apontam para o que o app não tem", () => {
     const cartoes = cartoesDoApp();
@@ -234,7 +250,11 @@ describe("regras e boas-vindas", () => {
 });
 
 describe("catracas das telas da Comunidade", () => {
-  const raizes = [resolve(import.meta.dir, "../../app/comunidade"), resolve(import.meta.dir, "../../componentes/comunidade"), resolve(import.meta.dir, ".")];
+  const raizes = [
+    resolve(import.meta.dir, "../../app/comunidade"),
+    resolve(import.meta.dir, "../../componentes/comunidade"),
+    resolve(import.meta.dir, "."),
+  ];
   const arquivos: string[] = [resolve(import.meta.dir, "../../app/(abas)/comunidade.tsx")];
   const andar = (d: string) => {
     for (const n of readdirSync(d)) {
@@ -255,11 +275,42 @@ describe("catracas das telas da Comunidade", () => {
   test("nada de *.functions, *.server, pergunta-clinica", () => {
     for (const a of arquivos) {
       const fonte = readFileSync(a, "utf8");
-      expect(/from\s+["']@\/lib\/[^"']*(\.functions|\.server|pergunta-clinica)["']/.test(fonte)).toBe(false);
+      expect(
+        /from\s+["']@\/lib\/[^"']*(\.functions|\.server|pergunta-clinica)["']/.test(fonte),
+      ).toBe(false);
     }
   });
   test("nenhuma URL de imagem externa na bancada", () => {
     const fonte = readFileSync(resolve(import.meta.dir, "bancada.ts"), "utf8");
     expect(/https?:\/\//.test(fonte)).toBe(false);
+  });
+});
+
+describe("o filtro de ofensa (Apple 1.2)", () => {
+  test("é a MESMA régua que o servidor aplica nos comentários", () => {
+    expect(REGUA_DE_OFENSA.source).toBe(REDUZ_OFENSA.source);
+    expect(REGUA_DE_OFENSA.flags).toBe(REDUZ_OFENSA.flags);
+  });
+  test("barra o ataque e deixa passar a conversa comum", () => {
+    expect(ehOfensivo("Você é uma idiota")).toBe(true);
+    expect(ehOfensivo("tá muito gorda nessa foto")).toBe(true);
+    expect(ehOfensivo("tomara que perca")).toBe(true);
+    expect(ehOfensivo("Hoje senti o bebê mexer pela primeira vez 💛")).toBe(false);
+    expect(ehOfensivo("Fiz o ultrassom morfológico, deu tudo certo")).toBe(false);
+    expect(ehOfensivo("")).toBe(false);
+    expect(ehOfensivo(null)).toBe(false);
+  });
+  test("a recusa explica sem acusar", () => {
+    for (const r of [recadoDaOfensa("post"), recadoDaOfensa("bio")]) {
+      expect(r).toContain("regras da Comunidade");
+      expect(/você é|agressiv|ofendeu/i.test(r)).toBe(false);
+    }
+  });
+});
+
+describe("o contato publicado", () => {
+  test("é o e-mail do consultório (`DOCTOR.email` do site)", () => {
+    const fonte = readFileSync(join(site, "doctor.config.ts"), "utf8");
+    expect(fonte).toContain(`email: "${CONTATO_EMAIL}"`);
   });
 });

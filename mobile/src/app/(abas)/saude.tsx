@@ -25,6 +25,7 @@ import { Entrada, Flutuar, Inclinacao3D } from "~/componentes/movimento";
 import { useSessao } from "~/lib/sessao";
 import { supabase } from "~/servidor/supabase";
 import { ALVO_MINIMO, cor, espaco, fonte, raio, sombra } from "~/tema";
+import { AvisoMedico } from "~/componentes/aviso-medico";
 
 /**
  * O HUB DA SAÚDE: blocos grandes com a peça 3D e o dado de cada um.
@@ -169,6 +170,7 @@ export default function HubDaSaude() {
           <BlocoDaGrade key={b.chave} bloco={b} ordem={i} />
         ))}
       </View>
+      <AvisoMedico />
     </Tela>
   );
 }

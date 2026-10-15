@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
-import { Botao, Campo, Carregando, Cartao, Linha, NaoConsegueLer, T, Tela, toque } from "~/componentes/base";
+import {
+  Botao,
+  Campo,
+  Carregando,
+  Cartao,
+  Linha,
+  NaoConsegueLer,
+  T,
+  Tela,
+  toque,
+} from "~/componentes/base";
 import { GraficoDeLinha } from "~/componentes/saude/grafico";
 import {
   Cabecalho,
@@ -29,6 +39,7 @@ import {
 import { useSessao } from "~/lib/sessao";
 import { supabase } from "~/servidor/supabase";
 import { cor, espaco, fonte, raio } from "~/tema";
+import { AvisoMedico } from "~/componentes/aviso-medico";
 
 type Estado = "carregando" | "pronto" | "falhou";
 
@@ -200,7 +211,12 @@ export default function Registros() {
             {erro}
           </T>
         ) : null}
-        <Botao rotulo="Salvar registro" aoTocar={salvar} carregando={salvando} corFundo={cor.saude} />
+        <Botao
+          rotulo="Salvar registro"
+          aoTocar={salvar}
+          carregando={salvando}
+          corFundo={cor.saude}
+        />
       </Cartao>
 
       {salvo ? <ResultadoDoSalvo registro={salvo} /> : null}
@@ -219,7 +235,9 @@ export default function Registros() {
       {estado === "pronto" && sPressao.length >= 2 ? (
         <Cartao>
           <T tipo="subtitulo">Pressão</T>
-          <T tipo="apagado">Cada traço vai da de baixo à de cima. A cor marca o que pede atenção.</T>
+          <T tipo="apagado">
+            Cada traço vai da de baixo à de cima. A cor marca o que pede atenção.
+          </T>
           <GraficoDeLinha
             pontos={sPressao}
             corDaSerie={cor.saude}
@@ -274,6 +292,7 @@ export default function Registros() {
           )}
         </View>
       ) : null}
+      <AvisoMedico />
     </Tela>
   );
 }
@@ -301,8 +320,14 @@ function ResultadoDoSalvo({ registro }: { registro: RegistroDeSaude }) {
     l.pressao && l.pressao.gravidade !== "normal"
       ? { g: l.pressao.gravidade, rotulo: l.pressao.rotulo, orientacao: l.pressao.orientacao }
       : null,
-    l.glicemia ? { g: l.glicemia.gravidade, rotulo: l.glicemia.rotulo, orientacao: l.glicemia.orientacao } : null,
-  ].filter(Boolean) as { g: "normal" | "atencao" | "grave"; rotulo: string; orientacao: string | null }[];
+    l.glicemia
+      ? { g: l.glicemia.gravidade, rotulo: l.glicemia.rotulo, orientacao: l.glicemia.orientacao }
+      : null,
+  ].filter(Boolean) as {
+    g: "normal" | "atencao" | "grave";
+    rotulo: string;
+    orientacao: string | null;
+  }[];
   return (
     <Cartao fundo={cor.saudeFundo}>
       <T tipo="rotulo" cor={cor.saude}>
@@ -320,7 +345,13 @@ function ResultadoDoSalvo({ registro }: { registro: RegistroDeSaude }) {
   );
 }
 
-function LinhaDoRegistro({ registro: r, aoTocar }: { registro: RegistroDeSaude; aoTocar: () => void }) {
+function LinhaDoRegistro({
+  registro: r,
+  aoTocar,
+}: {
+  registro: RegistroDeSaude;
+  aoTocar: () => void;
+}) {
   const l = lerRegistro(r);
   return (
     <Pressable
@@ -358,7 +389,9 @@ function LinhaDoRegistro({ registro: r, aoTocar }: { registro: RegistroDeSaude; 
       {r.glucose_mg_dl != null ? (
         <View style={{ gap: 4 }}>
           <T>Glicemia {r.glucose_mg_dl} mg/dL</T>
-          {l.glicemia ? <SeloDeGravidade gravidade={l.glicemia.gravidade} texto={l.glicemia.rotulo} /> : null}
+          {l.glicemia ? (
+            <SeloDeGravidade gravidade={l.glicemia.gravidade} texto={l.glicemia.rotulo} />
+          ) : null}
           {l.glicemia?.orientacao ? <T tipo="apagado">{l.glicemia.orientacao}</T> : null}
         </View>
       ) : null}
