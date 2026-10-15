@@ -7,15 +7,20 @@
  */
 
 import {
+  DURACOES_EXERCICIO,
+  elegiveis,
+  fasePara,
   sessaoDoDia,
   type Movimento,
   type NotasDoCorpo,
   type Sintoma,
 } from "@/lib/exercicios";
 
-/** As durações da atividade do dia: curtas, para caber em qualquer dia. */
-export const DURACOES_MEXER = [3, 5] as const;
+/** As durações do app antigo (`DURACOES_EXERCICIO`): 2, 5 ou 10 minutos. */
+export const DURACOES_MEXER = DURACOES_EXERCICIO;
 export type DuracaoMexer = (typeof DURACOES_MEXER)[number];
+/** O tempo que já vem marcado, como no app antigo. */
+export const DURACAO_PADRAO: DuracaoMexer = 5;
 
 /** O respiro entre um movimento e o seguinte, para trocar de posição. */
 export const TROCA_SEGUNDOS = 6;
@@ -29,6 +34,8 @@ export function montarSessao(o: {
    *  do pós-parto (sem chão, sem preparação para o parto) é a que serve. */
   cuidado: boolean;
   sintoma: Sintoma | null;
+  /** "Hoje eu não desço ao chão": cama, sofá ou de pé, sem tapete. */
+  semChao?: boolean;
   notas?: NotasDoCorpo;
 }): Movimento[] {
   return sessaoDoDia({
@@ -37,8 +44,24 @@ export function montarSessao(o: {
     semana: o.cuidado ? null : o.semana,
     posParto: o.posParto || o.cuidado,
     sintoma: o.sintoma,
+    semChao: o.semChao ?? false,
     notas: o.notas ?? {},
   });
+}
+
+/**
+ * Há movimento de chão para tirar nesta fase? A partir da 37ª semana, no
+ * pós-parto e no Modo Cuidado a régua já tirou o chão sozinha — e um botão que
+ * não muda nada ensina que os botões da tela não valem. Então ele some.
+ */
+export function temChaoParaTirar(o: {
+  semana: number | null;
+  posParto: boolean;
+  cuidado: boolean;
+}): boolean {
+  const semana = o.cuidado ? null : o.semana;
+  const posParto = o.posParto || o.cuidado;
+  return elegiveis(fasePara(semana, posParto), semana, posParto).some((m) => m.chao);
 }
 
 export type Trecho = {

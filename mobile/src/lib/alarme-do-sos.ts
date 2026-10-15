@@ -2,7 +2,8 @@ import { createAudioPlayer, setAudioModeAsync } from "expo-audio";
 import { Platform } from "react-native";
 
 /**
- * O ALARME DO SOS — o único som do app, e ele não é som de interface.
+ * O ALARME DO SOS — o único som de INTERFACE do app (as vozes das sessões são
+ * conteúdo que ela abriu para ouvir, e moram em ~/lib/audio).
  *
  * É a régua do site (`tocarSomDeUI("sos" | "sos-falhou")` em
  * src/lib/som-da-interface.ts): a confirmação é CLÍNICA e quem a recebe pode

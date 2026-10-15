@@ -1,11 +1,12 @@
 import * as Haptics from "expo-haptics";
 import { useKeepAwake } from "expo-keep-awake";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { Pause, Play, SkipForward, TriangleAlert } from "lucide-react-native";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Platform, ScrollView, Text, View } from "react-native";
+import { Pause, Play, TriangleAlert, X } from "lucide-react-native";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Svg, { Circle } from "react-native-svg";
+import Svg, { Circle, Defs, Ellipse, RadialGradient, Stop } from "react-native-svg";
 import {
   ajustarNotas,
   SINAIS_DE_PARADA,
@@ -14,47 +15,66 @@ import {
   type NotasDoCorpo,
   type Sintoma,
 } from "@/lib/exercicios";
-import { Botao, Cartao, Carregando, T, Tela } from "~/componentes/base";
-import { corJornada } from "~/componentes/jornada/cores";
+import { Botao, Cartao, Carregando, T, Tela, toque } from "~/componentes/base";
+import { corMovimento } from "~/componentes/jornada/cores";
+import { FiguraMovimento } from "~/componentes/jornada/figura-movimento";
 import { concluirMomento, FimDoMomento, type Desfecho } from "~/componentes/jornada/fim";
-import { BarraDoTopo, BolhaFalando, BotaoRedondo, Ficha } from "~/componentes/jornada/pecas";
+import { BarraDoTopo, Ficha } from "~/componentes/jornada/pecas";
+import { BolhaViva } from "~/componentes/movimento";
 import { useAtividade } from "~/componentes/jornada/usarJornada";
+import { pararVozes, tocarVoz } from "~/lib/audio/voz";
+import { VOZ_DO_MOVIMENTO } from "~/lib/audio/vozes";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { estadoAtual, gravarChave } from "~/lib/jornada/loja";
 import {
+  DURACAO_PADRAO,
   DURACOES_MEXER,
   inicioDoProximo,
   linhaDoTempo,
   minutosAproximados,
   montarSessao,
   posicaoNoTempo,
+  temChaoParaTirar,
   type DuracaoMexer,
 } from "~/lib/jornada/mexer";
 import { CHAVE_NOTAS_EXERCICIO } from "~/lib/jornada/momentos";
-import { relogio } from "~/lib/jornada/respiracao";
-import { cor, espaco, fonte } from "~/tema";
+import { ALVO_MINIMO, cor, espaco, fonte } from "~/tema";
 
 /**
- * MEXER — uma sessão curta (2 ou 5 minutos) montada pela régua do site
- * (`sessaoDoDia`): pela fase da gestação, pelo que está incomodando hoje e
- * numa descida só de posições. Os sinais de parada vêm ANTES de começar, com
- * o SOS a um toque. Passo a passo e relógio em cada movimento.
+ * MEXER — a sessão montada pela régua do site (`sessaoDoDia`): pela fase da
+ * gestação, pelo que está incomodando hoje e numa descida só de posições. Os
+ * sinais de parada vêm ANTES de começar, com o SOS a um toque.
  *
- * Bancada: /jornada/mexer?bancada=1 [&etapa=sinais|sessao|fim|feita] [&luto=1] [&semana=38]
+ * A sessão é a do app antigo: a FIGURA demonstrando cada movimento dentro do
+ * anel que conta o tempo, e a VOZ gravada lendo o nome e a dica ao entrar em
+ * cada um — ela olha para o próprio corpo, não para o celular. Movimento sem
+ * gravação anda em silêncio (os passos estão escritos), nunca com a voz errada.
+ *
+ * Bancada: /jornada/mexer?bancada=1 [&etapa=sinais|sessao|fim|feita] [&luto=1]
+ *          [&semana=38] [&sintoma=lombar] [&minutos=2|5|10] [&semchao=1] [&t=<segundos da sessão>]
  */
 
 /* No luto, os sinais que só existem numa gestação em curso saem da lista. */
 const SO_NA_GESTACAO = new Set(["Perda de líquido", "Contrações que se repetem"]);
 
+const ehUmaDuracao = (n: number): n is DuracaoMexer =>
+  (DURACOES_MEXER as readonly number[]).includes(n);
+
 export default function Mexer() {
   const at = useAtividade("movement");
-  const [minutos, setMinutos] = useState<DuracaoMexer>(3);
+  const [minutos, setMinutos] = useState<DuracaoMexer>(DURACAO_PADRAO);
   const [sintoma, setSintoma] = useState<Sintoma | null>(null);
+  const [semChao, setSemChao] = useState(false);
   const [etapa, setEtapa] = useState<"escolha" | "sinais" | "sessao" | "fim">("escolha");
   const [desfecho, setDesfecho] = useState<Desfecho | null>(null);
   const [avaliou, setAvaliou] = useState<string | null>(null);
   const [aplicouBancada, setAplicouBancada] = useState(false);
+  const [inicioDaBancada, setInicioDaBancada] = useState(0);
   const notas = (estadoAtual().blob[CHAVE_NOTAS_EXERCICIO] ?? {}) as NotasDoCorpo;
+
+  const temChao = at.pronto
+    ? temChaoParaTirar({ semana: at.semana, posParto: at.pos, cuidado: at.cuidado })
+    : false;
 
   const seq = useMemo(
     () =>
@@ -66,17 +86,24 @@ export default function Mexer() {
             posParto: at.pos,
             cuidado: at.cuidado,
             sintoma,
+            semChao: temChao && semChao,
             notas,
           })
         : [],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [at.pronto, at.D, minutos, at.semana, at.pos, at.cuidado, sintoma],
+    [at.pronto, at.D, minutos, at.semana, at.pos, at.cuidado, sintoma, semChao, temChao],
   );
   const { total } = linhaDoTempo(seq);
 
   useEffect(() => {
     if (aplicouBancada || !at.pronto || !ehBancada()) return;
     setAplicouBancada(true);
+    const s = parametroDaBancada("sintoma");
+    if (s && SINTOMAS.some((x) => x.chave === s)) setSintoma(s as Sintoma);
+    const m = Number(parametroDaBancada("minutos"));
+    if (ehUmaDuracao(m)) setMinutos(m);
+    if (parametroDaBancada("semchao") === "1") setSemChao(true);
+    setInicioDaBancada(Math.max(0, Number(parametroDaBancada("t") ?? 0) || 0));
     const e = parametroDaBancada("etapa");
     if (e === "sinais" || e === "sessao") setEtapa(e);
     if (e === "fim") {
@@ -115,7 +142,12 @@ export default function Mexer() {
 
   if (etapa === "sessao")
     return (
-      <Sessao seq={seq} aoTerminar={() => void terminar()} aoSair={() => setEtapa("escolha")} />
+      <Sessao
+        seq={seq}
+        inicio={inicioDaBancada}
+        aoTerminar={() => void terminar()}
+        aoSair={() => setEtapa("escolha")}
+      />
     );
 
   if (etapa === "fim") {
@@ -149,6 +181,9 @@ export default function Mexer() {
                       <Ficha
                         key={d}
                         rotulo={d}
+                        corAtiva={corMovimento.forte}
+                        fundoAtivo={corMovimento.forteFundo}
+                        textoAtivo={corMovimento.titulo}
                         aoTocar={() => {
                           gravarChave(CHAVE_NOTAS_EXERCICIO, ajustarNotas(notas, seq, sintoma, d));
                           setAvaliou(d);
@@ -176,115 +211,374 @@ export default function Mexer() {
       ? SINAIS_DE_PARADA.filter((s) => !SO_NA_GESTACAO.has(s))
       : SINAIS_DE_PARADA;
     return (
-      <Tela bordas={["top", "bottom"]}>
-        <BarraDoTopo titulo="Antes de começar" aoSair={() => setEtapa("escolha")} />
-        <Cartao fundo={cor.atencaoFundo}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
-            <TriangleAlert size={22} color={cor.atencao} />
-            <T tipo="subtitulo" cor={cor.atencao}>
-              Hoje não é dia de exercício se você tiver:
+      <FundoVerde>
+        <View style={{ paddingHorizontal: espaco.lg }}>
+          <BarraDoTopo titulo="Antes de começar" aoSair={() => setEtapa("escolha")} />
+        </View>
+        <ScrollView
+          contentContainerStyle={{ padding: espaco.lg, paddingBottom: 120, gap: espaco.md }}
+        >
+          <Cartao fundo={cor.atencaoFundo}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
+              <TriangleAlert size={22} color={cor.atencao} />
+              <T tipo="subtitulo" cor={cor.atencao}>
+                Hoje não é dia de exercício se você tiver:
+              </T>
+            </View>
+            <View style={{ gap: 6, marginTop: 4 }}>
+              {sinais.map((s) => (
+                <View
+                  key={s}
+                  style={{ flexDirection: "row", gap: espaco.sm, alignItems: "flex-start" }}
+                >
+                  <Text style={{ fontFamily: fonte.titulo, fontSize: 16, color: cor.atencao }}>
+                    •
+                  </Text>
+                  <T estilo={{ flex: 1 }}>{s}</T>
+                </View>
+              ))}
+            </View>
+            <T tipo="apagado">
+              Nesses casos, procure atendimento. E se algo assim aparecer no meio, pare na hora.
             </T>
-          </View>
-          <View style={{ gap: 6, marginTop: 4 }}>
-            {sinais.map((s) => (
-              <View
-                key={s}
-                style={{ flexDirection: "row", gap: espaco.sm, alignItems: "flex-start" }}
-              >
-                <Text style={{ fontFamily: fonte.titulo, fontSize: 16, color: cor.atencao }}>
-                  •
-                </Text>
-                <T estilo={{ flex: 1 }}>{s}</T>
-              </View>
-            ))}
-          </View>
-          <T tipo="apagado">
-            Nesses casos, procure atendimento. E se algo assim aparecer no meio, pare na hora.
-          </T>
-        </Cartao>
-        <Botao
-          rotulo="Estou com um desses — abrir o SOS"
-          tipo="perigo"
-          aoTocar={() => router.push("/sos")}
-        />
-        <Botao
-          rotulo="Estou bem, começar"
-          corFundo={corJornada.roxo}
-          aoTocar={() => setEtapa("sessao")}
-        />
-      </Tela>
+          </Cartao>
+          <Botao
+            rotulo="Estou com um desses — abrir o SOS"
+            tipo="perigo"
+            aoTocar={() => router.push("/sos")}
+          />
+          <Botao
+            rotulo={`Estou bem, começar · ${minutos} min`}
+            corFundo={corMovimento.forte}
+            aoTocar={() => setEtapa("sessao")}
+          />
+        </ScrollView>
+      </FundoVerde>
     );
   }
 
+  const fala = at.jaFeita
+    ? "Você já se mexeu hoje! Pode fazer de novo, se o corpo pedir."
+    : at.cuidado
+      ? "Movimentos leves, sem ir ao chão. No seu ritmo."
+      : "Diga o que está incomodando, que eu monto a sequência pra você.";
+
   return (
-    <Tela bordas={["top", "bottom"]}>
-      <BarraDoTopo titulo={at.cuidado ? "Mexer devagar" : "Mexer"} />
-      <BolhaFalando
-        humor="exercicio"
-        fala={
-          at.jaFeita
-            ? "Você já se mexeu hoje! Pode fazer de novo, se o corpo pedir."
-            : at.cuidado
-              ? "Movimentos leves, sem ir ao chão. No seu ritmo."
-              : "Bora mexer um pouquinho? É curto, e o corpo agradece."
-        }
-      />
-      <T tipo="rotulo">Algo incomodando hoje?</T>
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: espaco.sm }}>
-        {SINTOMAS.map((s) => (
-          <Ficha
-            key={s.chave}
-            rotulo={`${s.emoji} ${s.rotulo}`}
-            ativa={sintoma === s.chave}
-            aoTocar={() => setSintoma((x) => (x === s.chave ? null : s.chave))}
-          />
-        ))}
+    <FundoVerde>
+      <View style={{ paddingHorizontal: espaco.lg }}>
+        <BarraDoTopo />
       </View>
-      <T tipo="rotulo" estilo={{ marginTop: espaco.sm }}>
-        Quanto tempo?
-      </T>
-      <View style={{ flexDirection: "row", gap: espaco.sm }}>
-        {DURACOES_MEXER.map((m) => (
-          <Ficha key={m} rotulo={`${m} min`} ativa={minutos === m} aoTocar={() => setMinutos(m)} />
-        ))}
-      </View>
-      <Cartao>
-        <T tipo="rotulo">
-          Sua sessão: {seq.length} {seq.length === 1 ? "movimento" : "movimentos"} ·{" "}
-          {minutosAproximados(total)}
-        </T>
-        {seq.map((m, i) => (
-          <View
-            key={m.id}
-            style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm, minHeight: 32 }}
+      <ScrollView
+        contentContainerStyle={{ paddingHorizontal: espaco.xl, paddingBottom: espaco.xxl }}
+      >
+        {/* O porta-voz, GRANDE e falando num balão — "ele que vai interagir
+            com as pessoas", nas palavras do dono no app antigo. */}
+        <View style={{ alignItems: "center" }}>
+          <BolhaViva humor="exercicio" tamanho={168} moldura={false} />
+          <SombraDoChao />
+          <Text
+            style={{
+              marginTop: espaco.sm,
+              maxWidth: 272,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: corMovimento.balaoBorda,
+              backgroundColor: corMovimento.balaoFundo,
+              paddingHorizontal: 14,
+              paddingVertical: espaco.sm,
+              overflow: "hidden",
+              fontFamily: fonte.normal,
+              fontSize: 13,
+              lineHeight: 18,
+              color: corMovimento.balaoTexto,
+            }}
           >
-            <Text
-              style={{
-                fontFamily: fonte.forte,
-                fontSize: 14,
-                color: corJornada.roxoClaro,
-                width: 18,
-              }}
+            {fala}
+          </Text>
+        </View>
+        <Text
+          style={{
+            marginTop: espaco.lg,
+            textAlign: "center",
+            fontFamily: fonte.media,
+            fontSize: 26,
+            lineHeight: 32,
+            color: corMovimento.titulo,
+          }}
+        >
+          {at.cuidado ? "Mexer devagar" : "Mexer o corpo"}
+        </Text>
+
+        <Secao>O que está incomodando?</Secao>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: espaco.sm }}>
+          {SINTOMAS.map((s) => (
+            <Escolha
+              key={s.chave}
+              ativa={sintoma === s.chave}
+              aoTocar={() => setSintoma((x) => (x === s.chave ? null : s.chave))}
+              rotulo={s.rotulo}
+              estilo={{ width: "48.7%" }}
             >
-              {i + 1}
-            </Text>
-            <Text style={{ fontSize: 20 }}>{m.emoji}</Text>
-            <Text style={{ flex: 1, fontFamily: fonte.media, fontSize: 15, color: cor.texto }}>
-              {m.name}
-            </Text>
-            <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: cor.textoApagado }}>
-              {m.secs}s
-            </Text>
-          </View>
-        ))}
-      </Cartao>
-      <Botao
-        rotulo="Continuar"
-        corFundo={corJornada.roxo}
-        aoTocar={() => setEtapa("sinais")}
-        desabilitado={!seq.length}
-      />
-    </Tela>
+              <Text style={{ fontSize: 18 }}>{s.emoji}</Text>
+            </Escolha>
+          ))}
+        </View>
+
+        <Secao>De quanto tempo você tem?</Secao>
+        <View style={{ flexDirection: "row", gap: espaco.sm }}>
+          {DURACOES_MEXER.map((m) => (
+            <Escolha
+              key={m}
+              ativa={minutos === m}
+              aoTocar={() => setMinutos(m)}
+              rotulo={`${m} min`}
+              centro
+              estilo={{ flex: 1 }}
+            />
+          ))}
+        </View>
+        {/* Só aparece quando há chão a tirar: a partir da 37ª semana, no
+            pós-parto e no Modo Cuidado a régua já o tirou sozinha. */}
+        {temChao ? <SemChao ligado={semChao} aoTocar={() => setSemChao((v) => !v)} /> : null}
+
+        <View
+          style={{
+            marginTop: espaco.xl,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: corMovimento.borda,
+            backgroundColor: corMovimento.vidro,
+            paddingHorizontal: espaco.lg,
+            paddingVertical: espaco.md,
+            gap: 2,
+          }}
+        >
+          <Text style={{ fontFamily: fonte.titulo, fontSize: 13, color: corMovimento.titulo }}>
+            Sua sessão: {seq.length} {seq.length === 1 ? "movimento" : "movimentos"} ·{" "}
+            {minutosAproximados(total)}
+          </Text>
+          {seq.map((m, i) => (
+            <View
+              key={m.id}
+              style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm, minHeight: 30 }}
+            >
+              <Text
+                style={{
+                  fontFamily: fonte.titulo,
+                  fontSize: 13,
+                  color: corMovimento.contagem,
+                  width: 16,
+                }}
+              >
+                {i + 1}
+              </Text>
+              <Text style={{ fontSize: 17 }}>{m.emoji}</Text>
+              <Text
+                style={{
+                  flex: 1,
+                  fontFamily: fonte.media,
+                  fontSize: 14,
+                  color: corMovimento.titulo,
+                }}
+              >
+                {m.name}
+              </Text>
+              <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: corMovimento.aviso }}>
+                {m.secs}s
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        <Text
+          style={{
+            marginTop: espaco.lg,
+            fontFamily: fonte.normal,
+            fontSize: 13,
+            lineHeight: 21,
+            color: corMovimento.discreto,
+          }}
+        >
+          Nada aqui substitui a orientação do seu obstetra. Se ele já disse que algum movimento não
+          serve pra você, pule esse.
+        </Text>
+      </ScrollView>
+      <View
+        style={{
+          borderTopWidth: 1,
+          borderTopColor: corMovimento.borda,
+          backgroundColor: corMovimento.vidro,
+          paddingHorizontal: espaco.xl,
+          paddingTop: espaco.md,
+          paddingBottom: espaco.md,
+        }}
+      >
+        <Botao
+          rotulo={`Começar · ${minutos} min`}
+          corFundo={corMovimento.forte}
+          aoTocar={() => setEtapa("sinais")}
+          desabilitado={!seq.length}
+        />
+      </View>
+    </FundoVerde>
+  );
+}
+
+/** O degradê verde do app antigo, atrás de todas as telas do Movimento. */
+function FundoVerde({ children }: { children: ReactNode }) {
+  return (
+    <LinearGradient
+      colors={[corMovimento.fundoTopo, corMovimento.fundoMeio, corMovimento.fundoBase]}
+      style={{ flex: 1 }}
+    >
+      <SafeAreaView edges={["top", "bottom"]} style={{ flex: 1 }}>
+        {children}
+      </SafeAreaView>
+    </LinearGradient>
+  );
+}
+
+/** A sombra no chão, embaixo da bolha: sem ela, a bolha parece um adesivo. */
+function SombraDoChao() {
+  return (
+    <Svg width={150} height={18} style={{ marginTop: -6 }}>
+      <Defs>
+        <RadialGradient id="sombra-do-chao" cx="50%" cy="50%" rx="50%" ry="50%">
+          <Stop offset="0" stopColor="#000000" stopOpacity={0.16} />
+          <Stop offset="1" stopColor="#000000" stopOpacity={0} />
+        </RadialGradient>
+      </Defs>
+      <Ellipse cx={75} cy={9} rx={75} ry={9} fill="url(#sombra-do-chao)" />
+    </Svg>
+  );
+}
+
+function Secao({ children }: { children: string }) {
+  return (
+    <Text
+      accessibilityRole="header"
+      style={{
+        marginTop: espaco.xl,
+        marginBottom: espaco.sm,
+        fontFamily: fonte.forte,
+        fontSize: 13,
+        letterSpacing: 0.65,
+        textTransform: "uppercase",
+        color: corMovimento.secao,
+      }}
+    >
+      {children}
+    </Text>
+  );
+}
+
+/** Os botões de escolha do app antigo: verde cheio quando escolhido. */
+function Escolha({
+  rotulo,
+  ativa,
+  aoTocar,
+  centro,
+  estilo,
+  children,
+}: {
+  rotulo: string;
+  ativa: boolean;
+  aoTocar: () => void;
+  centro?: boolean;
+  estilo?: { width?: `${number}%`; flex?: number };
+  children?: ReactNode;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: ativa }}
+      accessibilityLabel={rotulo}
+      onPress={() => {
+        toque();
+        aoTocar();
+      }}
+      style={({ pressed }) => ({
+        ...estilo,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: centro ? "center" : "flex-start",
+        gap: espaco.sm,
+        minHeight: centro ? 48 : ALVO_MINIMO + 8,
+        paddingHorizontal: espaco.md,
+        paddingVertical: 10,
+        borderRadius: 16,
+        borderWidth: ativa ? 0 : 1,
+        borderColor: corMovimento.borda,
+        backgroundColor: ativa ? corMovimento.forte : corMovimento.vidro,
+        opacity: pressed ? 0.8 : 1,
+      })}
+    >
+      {children}
+      <Text
+        style={{
+          flexShrink: 1,
+          fontFamily: centro ? fonte.titulo : fonte.forte,
+          fontSize: centro ? 14 : 13,
+          lineHeight: centro ? 20 : 17,
+          color: ativa ? cor.branco : centro ? corMovimento.forte : corMovimento.titulo,
+        }}
+      >
+        {rotulo}
+      </Text>
+    </Pressable>
+  );
+}
+
+/** "Hoje eu não desço ao chão" — cama de hospital, repouso, o tapete que não existe. */
+function SemChao({ ligado, aoTocar }: { ligado: boolean; aoTocar: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="switch"
+      accessibilityState={{ checked: ligado }}
+      accessibilityLabel="Hoje eu não desço ao chão"
+      onPress={() => {
+        toque();
+        aoTocar();
+      }}
+      style={({ pressed }) => ({
+        flexDirection: "row",
+        alignItems: "center",
+        gap: espaco.md,
+        minHeight: ALVO_MINIMO + 8,
+        paddingHorizontal: espaco.lg,
+        paddingVertical: espaco.sm,
+        borderRadius: 16,
+        marginTop: espaco.md,
+        borderWidth: ligado ? 0 : 1,
+        borderColor: corMovimento.borda,
+        backgroundColor: ligado ? corMovimento.forte : corMovimento.vidro,
+        opacity: pressed ? 0.8 : 1,
+      })}
+    >
+      <Text style={{ fontSize: 18 }}>🛏️</Text>
+      <View style={{ flex: 1 }}>
+        <Text
+          style={{
+            fontFamily: fonte.forte,
+            fontSize: 13,
+            lineHeight: 17,
+            color: ligado ? cor.branco : corMovimento.titulo,
+          }}
+        >
+          Hoje eu não desço ao chão
+        </Text>
+        <Text
+          style={{
+            fontFamily: fonte.normal,
+            fontSize: 13,
+            lineHeight: 18,
+            color: ligado ? corMovimento.branco80 : corMovimento.discreto,
+          }}
+        >
+          Cama, sofá ou de pé — sem tapete
+        </Text>
+      </View>
+    </Pressable>
   );
 }
 
@@ -293,48 +587,97 @@ function MantemAcesa() {
   return null;
 }
 
-function Anel({ fracao, tamanho = 120 }: { fracao: number; tamanho?: number }) {
-  const r = tamanho / 2 - 8;
-  const c = 2 * Math.PI * r;
+const ANEL = 208;
+const RAIO = 45;
+const VOLTA = 2 * Math.PI * RAIO;
+
+/** O anel do app antigo: começa cheio e esvazia com o tempo do movimento. */
+function Anel({ resta }: { resta: number }) {
   return (
-    <Svg width={tamanho} height={tamanho}>
+    <Svg
+      width={ANEL}
+      height={ANEL}
+      viewBox="0 0 100 100"
+      style={{ position: "absolute", transform: [{ rotate: "-90deg" }] }}
+    >
       <Circle
-        cx={tamanho / 2}
-        cy={tamanho / 2}
-        r={r}
-        stroke={corJornada.estrelaApagada}
-        strokeWidth={10}
+        cx={50}
+        cy={50}
+        r={RAIO}
         fill="none"
+        stroke={corMovimento.anelTrilho}
+        strokeWidth={6}
       />
       <Circle
-        cx={tamanho / 2}
-        cy={tamanho / 2}
-        r={r}
-        stroke={corJornada.roxoMedio}
-        strokeWidth={10}
+        cx={50}
+        cy={50}
+        r={RAIO}
         fill="none"
+        stroke={corMovimento.anel}
+        strokeWidth={6}
         strokeLinecap="round"
-        strokeDasharray={`${c} ${c}`}
-        strokeDashoffset={c * (1 - Math.min(1, Math.max(0, fracao)))}
-        transform={`rotate(-90 ${tamanho / 2} ${tamanho / 2})`}
+        strokeDasharray={`${VOLTA} ${VOLTA}`}
+        strokeDashoffset={(1 - Math.min(1, Math.max(0, resta))) * VOLTA}
       />
     </Svg>
   );
 }
 
+/** Os botões redondos do cabeçalho (pausa, voz): 36 de desenho, 44 de dedo. */
+function BotaoDoTopo({
+  rotulo,
+  aoTocar,
+  children,
+}: {
+  rotulo: string;
+  aoTocar: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={rotulo}
+      hitSlop={4}
+      onPress={() => {
+        toque();
+        aoTocar();
+      }}
+      style={({ pressed }) => ({
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: corMovimento.borda,
+        backgroundColor: corMovimento.vidro,
+        alignItems: "center",
+        justifyContent: "center",
+        opacity: pressed ? 0.7 : 1,
+      })}
+    >
+      {children}
+    </Pressable>
+  );
+}
+
 function Sessao({
   seq,
+  inicio,
   aoTerminar,
   aoSair,
 }: {
   seq: Movimento[];
+  /** Na bancada, o segundo da sessão em que ela abre. */
+  inicio: number;
   aoTerminar: () => void;
   aoSair: () => void;
 }) {
-  const { trechos, total } = useMemo(() => linhaDoTempo(seq), [seq]);
-  const [t, setT] = useState(0);
+  const { trechos } = useMemo(() => linhaDoTempo(seq), [seq]);
+  const [t, setT] = useState(inicio);
   const [pausada, setPausada] = useState(false);
-  const base = useRef({ inicio: Date.now(), acumulado: 0 });
+  /* A voz desta tela é gravação nossa, então o botão aparece sempre — e ela
+     começa ligada, como no app antigo. */
+  const [voz, setVoz] = useState(true);
+  const base = useRef({ inicio: Date.now(), acumulado: inicio });
   const terminou = useRef(false);
   const ultimoIndice = useRef(-1);
 
@@ -351,6 +694,9 @@ function Sessao({
   }, [pausada]);
 
   const pos = posicaoNoTempo(trechos, t);
+  /* O movimento que está NA TELA: na troca, já é o próximo. */
+  const indice =
+    pos.tipo === "movimento" ? pos.trecho.indice : pos.tipo === "troca" ? pos.proximo.indice : -1;
 
   useEffect(() => {
     if (pos.tipo === "movimento" && pos.trecho.indice !== ultimoIndice.current) {
@@ -366,157 +712,318 @@ function Sessao({
     }
   }, [pos, aoTerminar]);
 
+  /* A voz lê o nome e a dica quando o movimento ENTRA na tela — na troca, para
+     ela ouvir o que vem enquanto muda de posição. Pausar cala; continuar lê de
+     novo do começo; desligar cala na hora. */
+  useEffect(() => {
+    if (pausada || !voz || indice < 0) {
+      pararVozes();
+      return;
+    }
+    tocarVoz(VOZ_DO_MOVIMENTO[seq[indice]!.id], { canal: "guia" });
+  }, [indice, voz, pausada, seq]);
+  useEffect(() => () => pararVozes(), []);
+
   function pular() {
     const alvo = inicioDoProximo(trechos, t);
     base.current.acumulado += alvo - t;
     setT(alvo);
   }
 
-  const m =
-    pos.tipo === "movimento"
-      ? pos.trecho.movimento
-      : pos.tipo === "troca"
-        ? pos.proximo.movimento
-        : null;
-  const indice =
-    pos.tipo === "movimento"
-      ? pos.trecho.indice
-      : pos.tipo === "troca"
-        ? pos.proximo.indice
-        : seq.length - 1;
+  const m = indice >= 0 ? seq[indice]! : null;
+  const troca = pos.tipo === "troca";
+  const resta = pos.tipo === "movimento" || pos.tipo === "troca" ? pos.restante : 0;
 
   return (
-    <SafeAreaView edges={["top", "bottom"]} style={{ flex: 1, backgroundColor: cor.fundo }}>
-      {Platform.OS !== "web" ? <MantemAcesa /> : null}
-      <View style={{ paddingHorizontal: espaco.lg, paddingTop: espaco.sm }}>
-        <BarraDoTopo fechar progresso={t / Math.max(1, total)} aoSair={aoSair} />
-      </View>
-      <ScrollView contentContainerStyle={{ padding: espaco.lg, gap: espaco.md }}>
+    <LinearGradient
+      colors={[corMovimento.fundoTopo, corMovimento.fundoMeio, corMovimento.fundoBase]}
+      style={{ flex: 1 }}
+    >
+      <SafeAreaView edges={["top", "bottom"]} style={{ flex: 1 }}>
+        {Platform.OS !== "web" ? <MantemAcesa /> : null}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            paddingHorizontal: espaco.lg,
+            paddingVertical: espaco.sm,
+          }}
+        >
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Fechar"
+            onPress={aoSair}
+            style={({ pressed }) => ({
+              width: ALVO_MINIMO,
+              height: ALVO_MINIMO,
+              marginLeft: -espaco.sm,
+              alignItems: "center",
+              justifyContent: "center",
+              opacity: pressed ? 0.6 : 1,
+            })}
+          >
+            <X size={24} color={corMovimento.fechar} />
+          </Pressable>
+          <Text
+            style={{
+              flex: 1,
+              textAlign: "center",
+              fontFamily: fonte.forte,
+              fontSize: 13,
+              letterSpacing: 0.8,
+              textTransform: "uppercase",
+              color: corMovimento.contagem,
+            }}
+          >
+            {m ? `${troca ? "Prepare-se · " : ""}${indice + 1} de ${seq.length}` : ""}
+          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.md }}>
+            {/* ⏸ desenhado, e não emoji: emoji tem cor própria em cada sistema. */}
+            <BotaoDoTopo
+              rotulo={pausada ? "Continuar" : "Pausar"}
+              aoTocar={() => setPausada((p) => !p)}
+            >
+              {pausada ? (
+                <Play size={15} color={corMovimento.forte} fill={corMovimento.forte} />
+              ) : (
+                <Pause size={15} color={corMovimento.forte} fill={corMovimento.forte} />
+              )}
+            </BotaoDoTopo>
+            {/* A voz é o 🗣️ do app antigo — apagado quando desligada. */}
+            <Pressable
+              accessibilityRole="switch"
+              accessibilityLabel="Voz"
+              accessibilityState={{ checked: voz }}
+              hitSlop={8}
+              onPress={() => {
+                toque();
+                setVoz((v) => !v);
+              }}
+              style={({ pressed }) => ({
+                minWidth: 28,
+                minHeight: 36,
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: (voz ? 1 : 0.4) * (pressed ? 0.7 : 1),
+              })}
+            >
+              <Text style={{ fontSize: 18, lineHeight: 24 }}>🗣️</Text>
+            </Pressable>
+          </View>
+        </View>
+        {/* O aviso médico fica fixo, discreto, na tela do exercício. */}
+        <Text
+          style={{
+            paddingHorizontal: espaco.xl,
+            paddingBottom: 4,
+            textAlign: "center",
+            fontFamily: fonte.normal,
+            fontSize: 13,
+            lineHeight: 18,
+            color: corMovimento.aviso,
+          }}
+        >
+          Vá no seu ritmo. Confirme com seu médico se algum movimento não é indicado pra você.
+        </Text>
         {m ? (
-          <>
-            <Text
+          <ScrollView
+            contentContainerStyle={{
+              paddingHorizontal: espaco.xl,
+              paddingBottom: espaco.xxl,
+              alignItems: "center",
+            }}
+          >
+            {/* A figura DEMONSTRANDO, dentro do anel que conta o tempo. */}
+            <View
               style={{
-                fontFamily: fonte.forte,
-                fontSize: 14,
-                color: corJornada.roxo,
-                letterSpacing: 0.4,
+                width: ANEL,
+                height: ANEL,
+                alignItems: "center",
+                justifyContent: "center",
               }}
             >
-              {pos.tipo === "troca" ? "PREPARE-SE · " : ""}MOVIMENTO {indice + 1} DE {seq.length}
-            </Text>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.lg }}>
+              <Anel resta={troca ? 1 : resta / m.secs} />
+              <FiguraMovimento pose={m.pose} anim={m.id} tinta={corMovimento.forte} />
+              {/* O relógio fica no TOPO do anel: embaixo ele cobria os pés, e o
+                  pé é justamente o que se mexe em metade dos exercícios. */}
               <View
-                style={{ width: 120, height: 120, alignItems: "center", justifyContent: "center" }}
+                style={{
+                  position: "absolute",
+                  top: -4,
+                  borderRadius: 999,
+                  backgroundColor: troca ? corMovimento.contagem : corMovimento.forte,
+                  paddingHorizontal: 10,
+                  paddingVertical: 2,
+                }}
               >
-                <Anel
-                  fracao={
-                    pos.tipo === "movimento" ? 1 - pos.restante / pos.trecho.movimento.secs : 0
-                  }
-                />
-                <View style={{ position: "absolute", alignItems: "center" }}>
-                  <Text style={{ fontSize: 30 }}>{m.emoji}</Text>
-                  <Text
-                    style={{
-                      fontFamily: fonte.titulo,
-                      fontSize: 20,
-                      color: corJornada.roxoEscuro,
-                      fontVariant: ["tabular-nums"],
-                    }}
-                  >
-                    {pos.tipo === "movimento" || pos.tipo === "troca" ? `${pos.restante}s` : ""}
-                  </Text>
-                </View>
-              </View>
-              <View style={{ flex: 1, gap: 4 }}>
-                <T tipo="subtitulo" estilo={{ fontSize: 21 }}>
-                  {m.name}
-                </T>
-                <T tipo="apagado">{m.cue}</T>
+                <Text
+                  accessibilityLabel={troca ? `Prepare-se, ${resta} segundos` : `${resta} segundos`}
+                  style={{
+                    fontFamily: fonte.titulo,
+                    fontSize: 14,
+                    lineHeight: 20,
+                    color: cor.branco,
+                    fontVariant: ["tabular-nums"],
+                  }}
+                >
+                  {troca ? `Prepare-se ${resta}s` : `${resta}s`}
+                </Text>
               </View>
             </View>
-            <Cartao>
-              <T tipo="rotulo">Passo a passo</T>
+            <Text
+              style={{
+                marginTop: espaco.lg,
+                textAlign: "center",
+                fontFamily: fonte.titulo,
+                fontSize: 24,
+                lineHeight: 30,
+                color: corMovimento.titulo,
+              }}
+            >
+              {m.name}
+            </Text>
+            <Text
+              style={{
+                marginTop: 4,
+                maxWidth: 320,
+                textAlign: "center",
+                fontFamily: fonte.normal,
+                fontSize: 14,
+                lineHeight: 22,
+                color: corMovimento.dica,
+              }}
+            >
+              {m.cue}
+            </Text>
+            {/* Como montar a posição, na ordem em que o corpo entra nela. */}
+            <View style={{ marginTop: espaco.lg, width: "100%", maxWidth: 384, gap: espaco.sm }}>
               {m.passos.map((p, i) => (
-                <View
-                  key={i}
-                  style={{ flexDirection: "row", gap: espaco.sm, alignItems: "flex-start" }}
-                >
+                <View key={i} style={{ flexDirection: "row", gap: 10 }}>
                   <View
                     style={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: 12,
-                      backgroundColor: corJornada.roxoFundo,
+                      marginTop: 1,
+                      width: 20,
+                      height: 20,
+                      borderRadius: 10,
+                      backgroundColor: corMovimento.passoFundo,
                       alignItems: "center",
                       justifyContent: "center",
-                      marginTop: 1,
                     }}
                   >
-                    <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: corJornada.roxo }}>
+                    <Text
+                      style={{ fontFamily: fonte.titulo, fontSize: 12, color: corMovimento.forte }}
+                    >
                       {i + 1}
                     </Text>
                   </View>
-                  <T estilo={{ flex: 1 }}>{p}</T>
+                  <Text
+                    style={{
+                      flex: 1,
+                      fontFamily: fonte.normal,
+                      fontSize: 13,
+                      lineHeight: 18,
+                      color: corMovimento.passoTexto,
+                    }}
+                  >
+                    {p}
+                  </Text>
                 </View>
               ))}
-            </Cartao>
-            <View style={{ flexDirection: "row", gap: espaco.sm }}>
-              <Cartao estilo={{ flex: 1 }} fundo={corJornada.feitoFundo}>
-                <T tipo="rotulo" cor={cor.sementinha}>
-                  O que sentir
-                </T>
-                <T tipo="apagado">{m.sentir}</T>
-              </Cartao>
-              <Cartao estilo={{ flex: 1 }} fundo={cor.atencaoFundo}>
-                <T tipo="rotulo" cor={cor.atencao}>
-                  Pare se
-                </T>
-                <T tipo="apagado">{m.parar}</T>
-              </Cartao>
             </View>
-          </>
+            <View style={{ marginTop: espaco.lg, width: "100%", maxWidth: 384, gap: espaco.sm }}>
+              <Caixa
+                fundo={corMovimento.sentirFundo}
+                tinta={corMovimento.sentirTexto}
+                titulo="Você deve sentir:"
+              >
+                {m.sentir}
+              </Caixa>
+              <Caixa
+                fundo={corMovimento.pararFundo}
+                tinta={corMovimento.pararTexto}
+                titulo="Pare se:"
+              >
+                {m.parar}
+              </Caixa>
+            </View>
+            <View
+              accessibilityLabel={`Movimento ${indice + 1} de ${seq.length}`}
+              style={{ marginTop: 20, flexDirection: "row", justifyContent: "center", gap: 6 }}
+            >
+              {seq.map((_, i) => (
+                <View
+                  key={i}
+                  style={{
+                    width: 24,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor:
+                      i < indice
+                        ? corMovimento.feito
+                        : i === indice
+                          ? corMovimento.atual
+                          : corMovimento.porVir,
+                  }}
+                />
+              ))}
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Pular para o próximo"
+              hitSlop={4}
+              onPress={() => {
+                toque();
+                pular();
+              }}
+              style={({ pressed }) => ({
+                marginTop: espaco.lg,
+                minHeight: 36,
+                paddingHorizontal: espaco.xl,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: corMovimento.bordaForte,
+                backgroundColor: corMovimento.vidro,
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: pressed ? 0.7 : 1,
+              })}
+            >
+              <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: corMovimento.forte }}>
+                Próximo →
+              </Text>
+            </Pressable>
+          </ScrollView>
         ) : (
           <Carregando texto="Terminando…" />
         )}
-      </ScrollView>
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          paddingHorizontal: espaco.lg,
-          paddingVertical: espaco.md,
-          borderTopWidth: 1,
-          borderTopColor: cor.borda,
-        }}
-      >
-        <Text
-          style={{
-            fontFamily: fonte.forte,
-            fontSize: 16,
-            color: cor.textoApagado,
-            fontVariant: ["tabular-nums"],
-          }}
-        >
-          faltam {relogio(total - t)}
-        </Text>
-        <View style={{ flexDirection: "row", gap: espaco.md }}>
-          <BotaoRedondo
-            rotulo={pausada ? "Continuar" : "Pausar"}
-            aoTocar={() => setPausada((p) => !p)}
-            fundo={corJornada.roxoFundo}
-          >
-            {pausada ? (
-              <Play size={20} color={corJornada.roxo} />
-            ) : (
-              <Pause size={20} color={corJornada.roxo} />
-            )}
-          </BotaoRedondo>
-          <BotaoRedondo rotulo="Pular para o próximo" aoTocar={pular} fundo={corJornada.roxoFundo}>
-            <SkipForward size={20} color={corJornada.roxo} />
-          </BotaoRedondo>
-        </View>
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </LinearGradient>
+  );
+}
+
+function Caixa({
+  fundo,
+  tinta,
+  titulo,
+  children,
+}: {
+  fundo: string;
+  tinta: string;
+  titulo: string;
+  children: ReactNode;
+}) {
+  return (
+    <View
+      style={{
+        borderRadius: 16,
+        backgroundColor: fundo,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+      }}
+    >
+      <Text style={{ fontFamily: fonte.normal, fontSize: 13, lineHeight: 18, color: tinta }}>
+        <Text style={{ fontFamily: fonte.titulo }}>{titulo}</Text> {children}
+      </Text>
+    </View>
   );
 }

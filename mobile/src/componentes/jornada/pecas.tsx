@@ -376,11 +376,15 @@ export function Ficha({
   ativa,
   aoTocar,
   corAtiva = corJornada.roxo,
+  fundoAtivo = corJornada.roxoFundo,
+  textoAtivo = corJornada.roxoEscuro,
 }: {
   rotulo: string;
   ativa?: boolean;
   aoTocar: () => void;
   corAtiva?: string;
+  fundoAtivo?: string;
+  textoAtivo?: string;
 }) {
   return (
     <Pressable
@@ -397,7 +401,7 @@ export function Ficha({
         borderRadius: raio.pilula,
         borderWidth: 1.5,
         borderColor: ativa ? corAtiva : cor.borda,
-        backgroundColor: ativa ? corJornada.roxoFundo : cor.cartao,
+        backgroundColor: ativa ? fundoAtivo : cor.cartao,
         justifyContent: "center",
         opacity: pressed ? 0.75 : 1,
       })}
@@ -406,7 +410,7 @@ export function Ficha({
         style={{
           fontFamily: ativa ? fonte.forte : fonte.media,
           fontSize: 15,
-          color: ativa ? corJornada.roxoEscuro : cor.texto,
+          color: ativa ? textoAtivo : cor.texto,
         }}
       >
         {rotulo}

@@ -12,7 +12,15 @@ import {
   verificar,
 } from "./aula";
 import { contaComoFeita, instanteNoTempo, relogio, segundosDaSessao } from "./respiracao";
-import { inicioDoProximo, linhaDoTempo, montarSessao, posicaoNoTempo } from "./mexer";
+import {
+  DURACAO_PADRAO,
+  DURACOES_MEXER,
+  inicioDoProximo,
+  linhaDoTempo,
+  montarSessao,
+  posicaoNoTempo,
+  temChaoParaTirar,
+} from "./mexer";
 import { planoDoDia, temasDisponiveis } from "./meditacao";
 import { montarGrade, paraResgatar, placar, resumo, secoes } from "./conquistas";
 
@@ -125,20 +133,49 @@ describe("a respiração 4-4-8", () => {
 });
 
 describe("mexer", () => {
-  test("a sessão de 3 minutos cabe em ~3 minutos, com mais de um movimento e tem passo a passo", () => {
-    const seq = montarSessao({
+  test("os tempos do app antigo: 2, 5 e 10 minutos, com 5 marcado", () => {
+    expect([...DURACOES_MEXER]).toEqual([2, 5, 10]);
+    expect(DURACAO_PADRAO).toBe(5);
+  });
+  test("cada sessão cabe no tempo escolhido e tem passo a passo", () => {
+    for (const minutos of DURACOES_MEXER) {
+      const seq = montarSessao({
+        D: 171,
+        minutos,
+        semana: 24,
+        posParto: false,
+        cuidado: false,
+        sintoma: null,
+      });
+      expect(seq.length).toBeGreaterThan(0);
+      expect(seq.reduce((s, m) => s + m.secs, 0)).toBeLessThanOrEqual(minutos * 60);
+      for (const m of seq) expect(m.passos.length).toBeGreaterThan(0);
+    }
+    const dez = montarSessao({
       D: 171,
-      minutos: 3,
+      minutos: 10,
       semana: 24,
       posParto: false,
       cuidado: false,
       sintoma: null,
     });
-    expect(seq.length).toBeGreaterThan(0);
-    const { total } = linhaDoTempo(seq);
-    expect(total).toBeLessThanOrEqual(200);
-    expect(seq.length).toBeGreaterThan(1);
-    for (const m of seq) expect(m.passos.length).toBeGreaterThan(0);
+    expect(dez.length).toBeGreaterThan(5);
+  });
+  test('"Hoje eu não desço ao chão" tira o chão — e só aparece quando há chão a tirar', () => {
+    const base = {
+      D: 171,
+      minutos: 10 as const,
+      semana: 24,
+      posParto: false,
+      cuidado: false,
+      sintoma: null,
+    };
+    expect(montarSessao(base).some((m) => m.chao)).toBe(true);
+    for (const m of montarSessao({ ...base, semChao: true })) expect(m.chao).toBe(false);
+    expect(temChaoParaTirar({ semana: 24, posParto: false, cuidado: false })).toBe(true);
+    expect(temChaoParaTirar({ semana: 38, posParto: false, cuidado: false })).toBe(false);
+    expect(temChaoParaTirar({ semana: null, posParto: true, cuidado: false })).toBe(false);
+    expect(temChaoParaTirar({ semana: 24, posParto: false, cuidado: true })).toBe(false);
   });
   test("com 38 semanas, nada de chão", () => {
     const seq = montarSessao({
@@ -168,7 +205,7 @@ describe("mexer", () => {
   test("a queixa dela vem primeiro", () => {
     const seq = montarSessao({
       D: 171,
-      minutos: 3,
+      minutos: 2,
       semana: 24,
       posParto: false,
       cuidado: false,
