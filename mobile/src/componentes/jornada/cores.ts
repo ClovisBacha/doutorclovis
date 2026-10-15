@@ -129,3 +129,32 @@ export const corMeditacao = {
   branco85: "rgba(255,255,255,0.85)",
   fechar: "#45556c",
 } as const;
+
+/**
+ * O MOMENTO COM O BEBÊ é rosa, como no app antigo (`BondingBlock` do site): o
+ * degradê rose-100 → pink-50 → branco, os corações subindo e a carta lida
+ * linha a linha. Tailwind 4, como o site.
+ */
+export const corBebe = {
+  fundoTopo: "#ffe4e6",
+  fundoMeio: "#fdf2f8",
+  fundoBase: "#ffffff",
+  forte: "#c70036",
+  titulo: "#8b0836",
+  texto: "rgba(165,0,54,0.8)",
+  rotulo: "#ff637e",
+  link: "#ec003f",
+  sublinhado: "#ffa1ad",
+  secao: "#ff2056",
+  borda: "#ffccd3",
+  bordaSuave: "rgba(255,204,211,0.7)",
+  vidro: "rgba(255,255,255,0.7)",
+  vidroForte: "rgba(255,255,255,0.8)",
+  discreto: "rgba(199,0,54,0.7)",
+  lida: "rgba(236,0,63,0.7)",
+  leiaEmVoz: "#ffa1ad",
+  brancoSuave: "rgba(255,255,255,0.7)",
+  veu: "rgba(139,8,54,0.3)",
+  sombraDoBotao: "#f43f5e",
+  fechar: "#45556c",
+} as const;
