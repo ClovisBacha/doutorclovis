@@ -130,16 +130,16 @@ export function EscolherHorario({
                 ativo ? "border-primary bg-primary/10 text-primary" : "border-border"
               }`}
             >
-              <span className="text-[10px] uppercase tracking-wide">
+              <span className="text-xs uppercase tracking-wide">
                 {data.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "")}
               </span>
               <span className="text-lg font-semibold leading-tight tabular-nums">
                 {data.getDate()}
               </span>
-              <span className="text-[10px] text-muted-foreground">
+              <span className="text-xs text-muted-foreground">
                 {data.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "")}
               </span>
-              <span className="mt-0.5 text-[10px] text-muted-foreground">
+              <span className="mt-0.5 text-xs text-muted-foreground">
                 {d.horas.length} {d.horas.length === 1 ? "vaga" : "vagas"}
               </span>
             </button>

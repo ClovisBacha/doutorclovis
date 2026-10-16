@@ -428,32 +428,15 @@ export function ehDiaDificil(humoresDeHoje: (string | null | undefined)[]): bool
 
 const DIA = 86_400_000;
 
-/** Quantos dias inteiros separam duas datas, pelo calendário local. */
-export function diasEntre(quando: string, agora: Date): number {
-  const d = new Date(quando);
-  if (Number.isNaN(d.getTime())) return 0;
-  const a = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
-  const b = Date.UTC(agora.getFullYear(), agora.getMonth(), agora.getDate());
-  return Math.round((b - a) / DIA);
-}
-
-/**
- * "há um mês", "há uma semana", "ontem".
- *
- * Aproximado de propósito: a frase existe para dar a DISTÂNCIA, e "há 37 dias"
- * faz a paciente contar em vez de lembrar.
- */
-export function haQuantoTempo(quando: string, agora: Date): string {
-  const d = diasEntre(quando, agora);
-  if (d <= 0) return "hoje";
-  if (d === 1) return "ontem";
-  if (d < 7) return `há ${d} dias`;
-  if (d < 14) return "há uma semana";
-  if (d < 30) return `há ${Math.round(d / 7)} semanas`;
-  if (d < 45) return "há um mês";
-  if (d < 365) return `há ${Math.round(d / 30)} meses`;
-  return "há mais de um ano";
-}
+/* ⚠️ `diasEntre` e `haQuantoTempo` mudaram-se para `src/lib/quando-foi.ts`
+   (set/2026): elas são réguas de TEMPO, e a grade da Saúde passou a precisar
+   delas para dizer "há uma semana" ao lado de uma pressão antiga. Continuam
+   re-exportadas aqui para não quebrar quem já as importava — a mesma decisão
+   de `lsGet`/`lsSet` em `gestacao-path`. */
+export { diasEntre, haQuantoTempo } from "./quando-foi";
+/* E importadas para os usos DENTRO deste arquivo — a re-exportação acima não
+   traz o nome para o escopo local. */
+import { diasEntre } from "./quando-foi";
 
 /**
  * A gratidão que volta para ela na tela de guardado.

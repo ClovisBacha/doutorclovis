@@ -1112,12 +1112,19 @@ export const convidarAmiga = createServerFn({ method: "POST" })
          que elas não conhecem. Vinte é muito mais do que qualquer paciente
          convida num dia e pouco para servir a um roteiro. */
       const desde = new Date(Date.now() - 86400000).toISOString();
-      const { count } = await sb
+      /* ⚠️ **NÃO CONSEGUIR CONTAR RECUSA.** O `error` era descartado e
+         `count ?? 0` virava 0 — o teto que o parágrafo acima descreve deixava
+         de existir numa falha de leitura, e é justamente sob carga (um roteiro
+         disparando) que a leitura falha. O canal que isso gasta é o mesmo por
+         onde chega o aviso de emergência. */
+      const { count, error: erroDaContagem } = await sb
         .from("amizades")
         .select("id", { count: "exact", head: true })
         .eq("quem_convidou", eu)
         .gte("criada_em", desde);
-      if ((count ?? 0) >= CONVITES_POR_DIA) {
+      if (erroDaContagem || count === null)
+        return { ok: false as const, error: "instavel" as const };
+      if (count >= CONVITES_POR_DIA) {
         return { ok: false as const, error: "muitos_convites" as const };
       }
 

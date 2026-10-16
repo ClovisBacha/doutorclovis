@@ -240,12 +240,15 @@ export const getMyAlbumPosts = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: u, error: authErr } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (authErr || !u.user) return { ok: false as const, error: "Não autenticado" };
-    const { data: posts } = await supabaseAdmin
+    const { data: posts, error } = await supabaseAdmin
       .from("family_album_posts")
       .select("*")
       .eq("patient_user_id", u.user.id)
       .order("created_at", { ascending: false });
-    return { ok: true as const, posts: (await comUrlDeImagem(posts ?? [])) as AlbumPost[] };
+    /* ⚠️ Falha virava "Álbum (0 memórias)" — um vazio AUTENTICADO como
+       verdade, sobre as fotos da gestação dela. */
+    if (error || !posts) return { ok: false as const, error: "instavel" };
+    return { ok: true as const, posts: (await comUrlDeImagem(posts)) as AlbumPost[] };
   });
 
 // ─── Baby Name Voting ─────────────────────────────────────────────────────────

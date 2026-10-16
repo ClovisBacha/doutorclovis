@@ -74,7 +74,7 @@ export const RARIDADES: Record<Raridade, RaridadeInfo> = {
     sementinhas: 15,
     /* Cinza, como o dono pediu. Anel visível mas quieto: comum é a maioria, e
        a maioria não pode brilhar ou o brilho perde o sentido. */
-    anel: "border-slate-300 bg-slate-50",
+    anel: "border-slate-300 bg-slate-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.95),var(--shadow-card)]",
     texto: "text-slate-500",
   },
   raro: {
@@ -82,7 +82,7 @@ export const RARIDADES: Record<Raridade, RaridadeInfo> = {
     label: "Raro",
     criterio: "Repetição sustentada — ela voltou N vezes. É hábito, e hábito custa semanas.",
     sementinhas: 40,
-    anel: "border-sky-400 bg-sky-50",
+    anel: "border-sky-400 bg-sky-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.95),var(--shadow-card)]",
     texto: "text-sky-600",
   },
   epico: {
@@ -93,7 +93,7 @@ export const RARIDADES: Record<Raridade, RaridadeInfo> = {
     sementinhas: 120,
     /* Dourado. `shadow` entra só aqui: é a única raridade que pode chamar
        atenção de longe numa grade de 34 cartões. */
-    anel: "border-amber-400 bg-amber-50 shadow-[0_0_0_1px_rgba(251,191,36,0.35)]",
+    anel: "border-amber-400 bg-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_0_0_1px_rgba(251,191,36,0.35),var(--shadow-card)]",
     texto: "text-amber-600",
   },
 };

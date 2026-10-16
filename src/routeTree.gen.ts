@@ -9,160 +9,439 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as TermosRouteImport } from './routes/termos'
-import { Route as TamanhoRealRouteImport } from './routes/tamanho-real'
-import { Route as SobreRouteImport } from './routes/sobre'
-import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
-import { Route as PrivacidadeRouteImport } from './routes/privacidade'
-import { Route as PrimeiraConsultaRouteImport } from './routes/primeira-consulta'
-import { Route as PreviewTutorialRouteImport } from './routes/preview-tutorial'
-import { Route as PreviewSosMedicoRouteImport } from './routes/preview-sos-medico'
-import { Route as PreviewSosRouteImport } from './routes/preview-sos'
-import { Route as PreviewSonsRouteImport } from './routes/preview-sons'
-import { Route as PreviewSomRouteImport } from './routes/preview-som'
-import { Route as PreviewSaudeRouteImport } from './routes/preview-saude'
-import { Route as PreviewReguaRouteImport } from './routes/preview-regua'
-import { Route as PreviewRegistrarConsultaRouteImport } from './routes/preview-registrar-consulta'
-import { Route as PreviewRedeRouteImport } from './routes/preview-rede'
-import { Route as PreviewProntuarioRouteImport } from './routes/preview-prontuario'
-import { Route as PreviewPresentesRouteImport } from './routes/preview-presentes'
-import { Route as PreviewOnboardingRouteImport } from './routes/preview-onboarding'
-import { Route as PreviewOfertaRouteImport } from './routes/preview-oferta'
-import { Route as PreviewNotificacoesRouteImport } from './routes/preview-notificacoes'
-import { Route as PreviewMomentoRouteImport } from './routes/preview-momento'
-import { Route as PreviewMeditacaoRouteImport } from './routes/preview-meditacao'
-import { Route as PreviewLojaSementinhasRouteImport } from './routes/preview-loja-sementinhas'
-import { Route as PreviewJogoRouteImport } from './routes/preview-jogo'
-import { Route as PreviewInstagramRouteImport } from './routes/preview-instagram'
-import { Route as PreviewHomeRouteImport } from './routes/preview-home'
-import { Route as PreviewGratidaoRouteImport } from './routes/preview-gratidao'
-import { Route as PreviewGradesRouteImport } from './routes/preview-grades'
-import { Route as PreviewExercicioRouteImport } from './routes/preview-exercicio'
-import { Route as PreviewConviteRouteImport } from './routes/preview-convite'
-import { Route as PreviewContaRouteImport } from './routes/preview-conta'
-import { Route as PreviewConquistasRouteImport } from './routes/preview-conquistas'
-import { Route as PreviewComunidadeRouteImport } from './routes/preview-comunidade'
-import { Route as PreviewChatRouteImport } from './routes/preview-chat'
-import { Route as PreviewCasalRouteImport } from './routes/preview-casal'
-import { Route as PreviewBolhaRouteImport } from './routes/preview-bolha'
-import { Route as PreviewBebeRouteImport } from './routes/preview-bebe'
-import { Route as PreviewAssinaturaRouteImport } from './routes/preview-assinatura'
-import { Route as PreviewAmigasRouteImport } from './routes/preview-amigas'
-import { Route as PreviewAgendaRouteImport } from './routes/preview-agenda'
-import { Route as MuralRouteImport } from './routes/mural'
-import { Route as ModoAcompanhanteRouteImport } from './routes/modo-acompanhante'
-import { Route as MitosRouteImport } from './routes/mitos'
-import { Route as MedicosRouteImport } from './routes/medicos'
-import { Route as LivesRouteImport } from './routes/lives'
-import { Route as InfluenciadoraRouteImport } from './routes/influenciadora'
-import { Route as HospitaisRouteImport } from './routes/hospitais'
-import { Route as GestacaoRouteImport } from './routes/gestacao'
-import { Route as ExperienciaRouteImport } from './routes/experiencia'
-import { Route as EpdsRouteImport } from './routes/epds'
-import { Route as EncontrarMedicoRouteImport } from './routes/encontrar-medico'
-import { Route as EmpresasRouteImport } from './routes/empresas'
-import { Route as DppRouteImport } from './routes/dpp'
-import { Route as DiabetesGestacionalRouteImport } from './routes/diabetes-gestacional'
-import { Route as DepoimentosRouteImport } from './routes/depoimentos'
-import { Route as CardsRouteImport } from './routes/cards'
-import { Route as CalculadoraRouteImport } from './routes/calculadora'
-import { Route as BatimentosRouteImport } from './routes/batimentos'
-import { Route as BastidoresRouteImport } from './routes/bastidores'
-import { Route as AuthRouteImport } from './routes/auth'
-import { Route as AgendamentoRouteImport } from './routes/agendamento'
-import { Route as AcompanhanteRouteImport } from './routes/acompanhante'
-import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as VotarNomeTokenRouteImport } from './routes/votar-nome.$token'
-import { Route as PresenteTokenRouteImport } from './routes/presente.$token'
-import { Route as PCodigoRouteImport } from './routes/p.$codigo'
-import { Route as MedicosGoogleCallbackRouteImport } from './routes/medicos_.google-callback'
-import { Route as MedicosCadastroRouteImport } from './routes/medicos_.cadastro'
-import { Route as ApiWhatsappRouteImport } from './routes/api/whatsapp'
-import { Route as ApiWaitlistTickRouteImport } from './routes/api/waitlist-tick'
-import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
-import { Route as ApiTranscreverDiarioRouteImport } from './routes/api/transcrever-diario'
-import { Route as ApiStripeWebhookRouteImport } from './routes/api/stripe-webhook'
-import { Route as ApiPushWeeklyTickRouteImport } from './routes/api/push-weekly-tick'
-import { Route as ApiNutritionRouteImport } from './routes/api/nutrition'
-import { Route as ApiMpWebhookRouteImport } from './routes/api/mp-webhook'
-import { Route as ApiMeditacaoTickRouteImport } from './routes/api/meditacao-tick'
-import { Route as ApiLembretesTickRouteImport } from './routes/api/lembretes-tick'
-import { Route as ApiLegendaDaFotoRouteImport } from './routes/api/legenda-da-foto'
-import { Route as ApiInstagramWebhookRouteImport } from './routes/api/instagram-webhook'
-import { Route as ApiChatRouteImport } from './routes/api/chat'
-import { Route as ApiCartaSemanalRouteImport } from './routes/api/carta-semanal'
-import { Route as AlbumTokenRouteImport } from './routes/album.$token'
-import { Route as AcompanharTokenRouteImport } from './routes/acompanhar.$token'
-import { Route as AuthenticatedPainelRouteImport } from './routes/_authenticated/painel'
-import { Route as AuthenticatedMinhaContaRouteImport } from './routes/_authenticated/minha-conta'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AcompanhanteRouteImport } from './routes/acompanhante'
+import { Route as AgendamentoRouteImport } from './routes/agendamento'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as BastidoresRouteImport } from './routes/bastidores'
+import { Route as BatimentosRouteImport } from './routes/batimentos'
+import { Route as CalculadoraRouteImport } from './routes/calculadora'
+import { Route as CardsRouteImport } from './routes/cards'
+import { Route as DepoimentosRouteImport } from './routes/depoimentos'
+import { Route as DiabetesGestacionalRouteImport } from './routes/diabetes-gestacional'
+import { Route as DppRouteImport } from './routes/dpp'
+import { Route as EmpresasRouteImport } from './routes/empresas'
+import { Route as EncontrarMedicoRouteImport } from './routes/encontrar-medico'
+import { Route as EpdsRouteImport } from './routes/epds'
+import { Route as ExperienciaRouteImport } from './routes/experiencia'
+import { Route as GestacaoRouteImport } from './routes/gestacao'
+import { Route as HospitaisRouteImport } from './routes/hospitais'
+import { Route as InfluenciadoraRouteImport } from './routes/influenciadora'
+import { Route as LivesRouteImport } from './routes/lives'
+import { Route as MedicosRouteImport } from './routes/medicos'
+import { Route as MitosRouteImport } from './routes/mitos'
+import { Route as ModoAcompanhanteRouteImport } from './routes/modo-acompanhante'
+import { Route as MuralRouteImport } from './routes/mural'
+import { Route as PreviewAberturaRouteImport } from './routes/preview-abertura'
+import { Route as PreviewAgendaRouteImport } from './routes/preview-agenda'
+import { Route as PreviewAmigasRouteImport } from './routes/preview-amigas'
+import { Route as PreviewAssinaturaRouteImport } from './routes/preview-assinatura'
+import { Route as PreviewAvisosRouteImport } from './routes/preview-avisos'
+import { Route as PreviewBancoRouteImport } from './routes/preview-banco'
+import { Route as PreviewBebeRouteImport } from './routes/preview-bebe'
+import { Route as PreviewBebeTabRouteImport } from './routes/preview-bebe-tab'
+import { Route as PreviewBolhaRouteImport } from './routes/preview-bolha'
+import { Route as PreviewCantinhoRouteImport } from './routes/preview-cantinho'
+import { Route as PreviewCasalRouteImport } from './routes/preview-casal'
+import { Route as PreviewChatRouteImport } from './routes/preview-chat'
+import { Route as PreviewChutesRouteImport } from './routes/preview-chutes'
+import { Route as PreviewComunidadeRouteImport } from './routes/preview-comunidade'
+import { Route as PreviewConquistasRouteImport } from './routes/preview-conquistas'
+import { Route as PreviewConsultoriosRouteImport } from './routes/preview-consultorios'
+import { Route as PreviewContaRouteImport } from './routes/preview-conta'
+import { Route as PreviewContracoesRouteImport } from './routes/preview-contracoes'
+import { Route as PreviewConviteRouteImport } from './routes/preview-convite'
+import { Route as PreviewConvitesRouteImport } from './routes/preview-convites'
+import { Route as PreviewCustoRouteImport } from './routes/preview-custo'
+import { Route as PreviewEmissoesRouteImport } from './routes/preview-emissoes'
+import { Route as PreviewExercicioRouteImport } from './routes/preview-exercicio'
+import { Route as PreviewGradesRouteImport } from './routes/preview-grades'
+import { Route as PreviewGratidaoRouteImport } from './routes/preview-gratidao'
+import { Route as PreviewHomeRouteImport } from './routes/preview-home'
+import { Route as PreviewInstagramRouteImport } from './routes/preview-instagram'
+import { Route as PreviewJogoRouteImport } from './routes/preview-jogo'
+import { Route as PreviewLojaSementinhasRouteImport } from './routes/preview-loja-sementinhas'
+import { Route as PreviewMapaRouteImport } from './routes/preview-mapa'
+import { Route as PreviewMeditacaoRouteImport } from './routes/preview-meditacao'
+import { Route as PreviewModeracaoRouteImport } from './routes/preview-moderacao'
+import { Route as PreviewMomentoRouteImport } from './routes/preview-momento'
+import { Route as PreviewNotificacoesRouteImport } from './routes/preview-notificacoes'
+import { Route as PreviewNpsRouteImport } from './routes/preview-nps'
+import { Route as PreviewNutricaoRouteImport } from './routes/preview-nutricao'
+import { Route as PreviewOfertaRouteImport } from './routes/preview-oferta'
+import { Route as PreviewOnboardingRouteImport } from './routes/preview-onboarding'
+import { Route as PreviewPresentesRouteImport } from './routes/preview-presentes'
+import { Route as PreviewProntuarioRouteImport } from './routes/preview-prontuario'
+import { Route as PreviewRedeRouteImport } from './routes/preview-rede'
+import { Route as PreviewRegistrarConsultaRouteImport } from './routes/preview-registrar-consulta'
+import { Route as PreviewReguaRouteImport } from './routes/preview-regua'
+import { Route as PreviewSaudeRouteImport } from './routes/preview-saude'
+import { Route as PreviewSaudeClinicaRouteImport } from './routes/preview-saude-clinica'
+import { Route as PreviewSaudeMulherRouteImport } from './routes/preview-saude-mulher'
+import { Route as PreviewSaudeRegistrosRouteImport } from './routes/preview-saude-registros'
+import { Route as PreviewSomRouteImport } from './routes/preview-som'
+import { Route as PreviewSonsRouteImport } from './routes/preview-sons'
+import { Route as PreviewSosRouteImport } from './routes/preview-sos'
+import { Route as PreviewSosMedicoRouteImport } from './routes/preview-sos-medico'
+import { Route as PreviewTutorialRouteImport } from './routes/preview-tutorial'
+import { Route as PrimeiraConsultaRouteImport } from './routes/primeira-consulta'
+import { Route as PrivacidadeRouteImport } from './routes/privacidade'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as SobreRouteImport } from './routes/sobre'
+import { Route as TamanhoRealRouteImport } from './routes/tamanho-real'
+import { Route as TermosRouteImport } from './routes/termos'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
-import { Route as ApiDoctorthinkTrainRouteImport } from './routes/api/doctorthink/train'
+import { Route as AuthenticatedMinhaContaRouteImport } from './routes/_authenticated/minha-conta'
+import { Route as AuthenticatedPainelRouteImport } from './routes/_authenticated/painel'
+import { Route as AcompanharTokenRouteImport } from './routes/acompanhar.$token'
+import { Route as AlbumTokenRouteImport } from './routes/album.$token'
+import { Route as ApiCartaSemanalRouteImport } from './routes/api/carta-semanal'
+import { Route as ApiChatRouteImport } from './routes/api/chat'
+import { Route as ApiInstagramWebhookRouteImport } from './routes/api/instagram-webhook'
+import { Route as ApiLegendaDaFotoRouteImport } from './routes/api/legenda-da-foto'
+import { Route as ApiLembretesTickRouteImport } from './routes/api/lembretes-tick'
+import { Route as ApiMeditacaoTickRouteImport } from './routes/api/meditacao-tick'
+import { Route as ApiMpWebhookRouteImport } from './routes/api/mp-webhook'
+import { Route as ApiNutritionRouteImport } from './routes/api/nutrition'
+import { Route as ApiPratoRouteImport } from './routes/api/prato'
+import { Route as ApiPushWeeklyTickRouteImport } from './routes/api/push-weekly-tick'
+import { Route as ApiStripeWebhookRouteImport } from './routes/api/stripe-webhook'
+import { Route as ApiTranscreverDiarioRouteImport } from './routes/api/transcrever-diario'
+import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
+import { Route as ApiWaitlistTickRouteImport } from './routes/api/waitlist-tick'
+import { Route as ApiWhatsappRouteImport } from './routes/api/whatsapp'
+import { Route as MedicosCadastroRouteImport } from './routes/medicos_.cadastro'
+import { Route as MedicosGoogleCallbackRouteImport } from './routes/medicos_.google-callback'
+import { Route as PCodigoRouteImport } from './routes/p.$codigo'
+import { Route as PresenteTokenRouteImport } from './routes/presente.$token'
+import { Route as PubCodigoRouteImport } from './routes/pub.$codigo'
+import { Route as VotarNomeTokenRouteImport } from './routes/votar-nome.$token'
 import { Route as ApiDoctorthinkAskRouteImport } from './routes/api/doctorthink/ask'
+import { Route as ApiDoctorthinkTrainRouteImport } from './routes/api/doctorthink/train'
 
-const TermosRoute = TermosRouteImport.update({
-  id: '/termos',
-  path: '/termos',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TamanhoRealRoute = TamanhoRealRouteImport.update({
-  id: '/tamanho-real',
-  path: '/tamanho-real',
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SobreRoute = SobreRouteImport.update({
-  id: '/sobre',
-  path: '/sobre',
+const AcompanhanteRoute = AcompanhanteRouteImport.update({
+  id: '/acompanhante',
+  path: '/acompanhante',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
-  id: '/sitemap.xml',
-  path: '/sitemap.xml',
+const AgendamentoRoute = AgendamentoRouteImport.update({
+  id: '/agendamento',
+  path: '/agendamento',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PrivacidadeRoute = PrivacidadeRouteImport.update({
-  id: '/privacidade',
-  path: '/privacidade',
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PrimeiraConsultaRoute = PrimeiraConsultaRouteImport.update({
-  id: '/primeira-consulta',
-  path: '/primeira-consulta',
+const BastidoresRoute = BastidoresRouteImport.update({
+  id: '/bastidores',
+  path: '/bastidores',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PreviewTutorialRoute = PreviewTutorialRouteImport.update({
-  id: '/preview-tutorial',
-  path: '/preview-tutorial',
+const BatimentosRoute = BatimentosRouteImport.update({
+  id: '/batimentos',
+  path: '/batimentos',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PreviewSosMedicoRoute = PreviewSosMedicoRouteImport.update({
-  id: '/preview-sos-medico',
-  path: '/preview-sos-medico',
+const CalculadoraRoute = CalculadoraRouteImport.update({
+  id: '/calculadora',
+  path: '/calculadora',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PreviewSosRoute = PreviewSosRouteImport.update({
-  id: '/preview-sos',
-  path: '/preview-sos',
+const CardsRoute = CardsRouteImport.update({
+  id: '/cards',
+  path: '/cards',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PreviewSonsRoute = PreviewSonsRouteImport.update({
-  id: '/preview-sons',
-  path: '/preview-sons',
+const DepoimentosRoute = DepoimentosRouteImport.update({
+  id: '/depoimentos',
+  path: '/depoimentos',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PreviewSomRoute = PreviewSomRouteImport.update({
-  id: '/preview-som',
-  path: '/preview-som',
+const DiabetesGestacionalRoute = DiabetesGestacionalRouteImport.update({
+  id: '/diabetes-gestacional',
+  path: '/diabetes-gestacional',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PreviewSaudeRoute = PreviewSaudeRouteImport.update({
-  id: '/preview-saude',
-  path: '/preview-saude',
+const DppRoute = DppRouteImport.update({
+  id: '/dpp',
+  path: '/dpp',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PreviewReguaRoute = PreviewReguaRouteImport.update({
-  id: '/preview-regua',
-  path: '/preview-regua',
+const EmpresasRoute = EmpresasRouteImport.update({
+  id: '/empresas',
+  path: '/empresas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EncontrarMedicoRoute = EncontrarMedicoRouteImport.update({
+  id: '/encontrar-medico',
+  path: '/encontrar-medico',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EpdsRoute = EpdsRouteImport.update({
+  id: '/epds',
+  path: '/epds',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ExperienciaRoute = ExperienciaRouteImport.update({
+  id: '/experiencia',
+  path: '/experiencia',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GestacaoRoute = GestacaoRouteImport.update({
+  id: '/gestacao',
+  path: '/gestacao',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HospitaisRoute = HospitaisRouteImport.update({
+  id: '/hospitais',
+  path: '/hospitais',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InfluenciadoraRoute = InfluenciadoraRouteImport.update({
+  id: '/influenciadora',
+  path: '/influenciadora',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LivesRoute = LivesRouteImport.update({
+  id: '/lives',
+  path: '/lives',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MedicosRoute = MedicosRouteImport.update({
+  id: '/medicos',
+  path: '/medicos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MitosRoute = MitosRouteImport.update({
+  id: '/mitos',
+  path: '/mitos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ModoAcompanhanteRoute = ModoAcompanhanteRouteImport.update({
+  id: '/modo-acompanhante',
+  path: '/modo-acompanhante',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MuralRoute = MuralRouteImport.update({
+  id: '/mural',
+  path: '/mural',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewAberturaRoute = PreviewAberturaRouteImport.update({
+  id: '/preview-abertura',
+  path: '/preview-abertura',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewAgendaRoute = PreviewAgendaRouteImport.update({
+  id: '/preview-agenda',
+  path: '/preview-agenda',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewAmigasRoute = PreviewAmigasRouteImport.update({
+  id: '/preview-amigas',
+  path: '/preview-amigas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewAssinaturaRoute = PreviewAssinaturaRouteImport.update({
+  id: '/preview-assinatura',
+  path: '/preview-assinatura',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewAvisosRoute = PreviewAvisosRouteImport.update({
+  id: '/preview-avisos',
+  path: '/preview-avisos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewBancoRoute = PreviewBancoRouteImport.update({
+  id: '/preview-banco',
+  path: '/preview-banco',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewBebeRoute = PreviewBebeRouteImport.update({
+  id: '/preview-bebe',
+  path: '/preview-bebe',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewBebeTabRoute = PreviewBebeTabRouteImport.update({
+  id: '/preview-bebe-tab',
+  path: '/preview-bebe-tab',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewBolhaRoute = PreviewBolhaRouteImport.update({
+  id: '/preview-bolha',
+  path: '/preview-bolha',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewCantinhoRoute = PreviewCantinhoRouteImport.update({
+  id: '/preview-cantinho',
+  path: '/preview-cantinho',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewCasalRoute = PreviewCasalRouteImport.update({
+  id: '/preview-casal',
+  path: '/preview-casal',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewChatRoute = PreviewChatRouteImport.update({
+  id: '/preview-chat',
+  path: '/preview-chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewChutesRoute = PreviewChutesRouteImport.update({
+  id: '/preview-chutes',
+  path: '/preview-chutes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewComunidadeRoute = PreviewComunidadeRouteImport.update({
+  id: '/preview-comunidade',
+  path: '/preview-comunidade',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewConquistasRoute = PreviewConquistasRouteImport.update({
+  id: '/preview-conquistas',
+  path: '/preview-conquistas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewConsultoriosRoute = PreviewConsultoriosRouteImport.update({
+  id: '/preview-consultorios',
+  path: '/preview-consultorios',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewContaRoute = PreviewContaRouteImport.update({
+  id: '/preview-conta',
+  path: '/preview-conta',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewContracoesRoute = PreviewContracoesRouteImport.update({
+  id: '/preview-contracoes',
+  path: '/preview-contracoes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewConviteRoute = PreviewConviteRouteImport.update({
+  id: '/preview-convite',
+  path: '/preview-convite',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewConvitesRoute = PreviewConvitesRouteImport.update({
+  id: '/preview-convites',
+  path: '/preview-convites',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewCustoRoute = PreviewCustoRouteImport.update({
+  id: '/preview-custo',
+  path: '/preview-custo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewEmissoesRoute = PreviewEmissoesRouteImport.update({
+  id: '/preview-emissoes',
+  path: '/preview-emissoes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewExercicioRoute = PreviewExercicioRouteImport.update({
+  id: '/preview-exercicio',
+  path: '/preview-exercicio',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewGradesRoute = PreviewGradesRouteImport.update({
+  id: '/preview-grades',
+  path: '/preview-grades',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewGratidaoRoute = PreviewGratidaoRouteImport.update({
+  id: '/preview-gratidao',
+  path: '/preview-gratidao',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewHomeRoute = PreviewHomeRouteImport.update({
+  id: '/preview-home',
+  path: '/preview-home',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewInstagramRoute = PreviewInstagramRouteImport.update({
+  id: '/preview-instagram',
+  path: '/preview-instagram',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewJogoRoute = PreviewJogoRouteImport.update({
+  id: '/preview-jogo',
+  path: '/preview-jogo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewLojaSementinhasRoute = PreviewLojaSementinhasRouteImport.update({
+  id: '/preview-loja-sementinhas',
+  path: '/preview-loja-sementinhas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewMapaRoute = PreviewMapaRouteImport.update({
+  id: '/preview-mapa',
+  path: '/preview-mapa',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewMeditacaoRoute = PreviewMeditacaoRouteImport.update({
+  id: '/preview-meditacao',
+  path: '/preview-meditacao',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewModeracaoRoute = PreviewModeracaoRouteImport.update({
+  id: '/preview-moderacao',
+  path: '/preview-moderacao',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewMomentoRoute = PreviewMomentoRouteImport.update({
+  id: '/preview-momento',
+  path: '/preview-momento',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewNotificacoesRoute = PreviewNotificacoesRouteImport.update({
+  id: '/preview-notificacoes',
+  path: '/preview-notificacoes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewNpsRoute = PreviewNpsRouteImport.update({
+  id: '/preview-nps',
+  path: '/preview-nps',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewNutricaoRoute = PreviewNutricaoRouteImport.update({
+  id: '/preview-nutricao',
+  path: '/preview-nutricao',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewOfertaRoute = PreviewOfertaRouteImport.update({
+  id: '/preview-oferta',
+  path: '/preview-oferta',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewOnboardingRoute = PreviewOnboardingRouteImport.update({
+  id: '/preview-onboarding',
+  path: '/preview-onboarding',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewPresentesRoute = PreviewPresentesRouteImport.update({
+  id: '/preview-presentes',
+  path: '/preview-presentes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewProntuarioRoute = PreviewProntuarioRouteImport.update({
+  id: '/preview-prontuario',
+  path: '/preview-prontuario',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewRedeRoute = PreviewRedeRouteImport.update({
+  id: '/preview-rede',
+  path: '/preview-rede',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewRegistrarConsultaRoute =
@@ -171,363 +450,89 @@ const PreviewRegistrarConsultaRoute =
     path: '/preview-registrar-consulta',
     getParentRoute: () => rootRouteImport,
   } as any)
-const PreviewRedeRoute = PreviewRedeRouteImport.update({
-  id: '/preview-rede',
-  path: '/preview-rede',
+const PreviewReguaRoute = PreviewReguaRouteImport.update({
+  id: '/preview-regua',
+  path: '/preview-regua',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PreviewProntuarioRoute = PreviewProntuarioRouteImport.update({
-  id: '/preview-prontuario',
-  path: '/preview-prontuario',
+const PreviewSaudeRoute = PreviewSaudeRouteImport.update({
+  id: '/preview-saude',
+  path: '/preview-saude',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PreviewPresentesRoute = PreviewPresentesRouteImport.update({
-  id: '/preview-presentes',
-  path: '/preview-presentes',
+const PreviewSaudeClinicaRoute = PreviewSaudeClinicaRouteImport.update({
+  id: '/preview-saude-clinica',
+  path: '/preview-saude-clinica',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PreviewOnboardingRoute = PreviewOnboardingRouteImport.update({
-  id: '/preview-onboarding',
-  path: '/preview-onboarding',
+const PreviewSaudeMulherRoute = PreviewSaudeMulherRouteImport.update({
+  id: '/preview-saude-mulher',
+  path: '/preview-saude-mulher',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PreviewOfertaRoute = PreviewOfertaRouteImport.update({
-  id: '/preview-oferta',
-  path: '/preview-oferta',
+const PreviewSaudeRegistrosRoute = PreviewSaudeRegistrosRouteImport.update({
+  id: '/preview-saude-registros',
+  path: '/preview-saude-registros',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PreviewNotificacoesRoute = PreviewNotificacoesRouteImport.update({
-  id: '/preview-notificacoes',
-  path: '/preview-notificacoes',
+const PreviewSomRoute = PreviewSomRouteImport.update({
+  id: '/preview-som',
+  path: '/preview-som',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PreviewMomentoRoute = PreviewMomentoRouteImport.update({
-  id: '/preview-momento',
-  path: '/preview-momento',
+const PreviewSonsRoute = PreviewSonsRouteImport.update({
+  id: '/preview-sons',
+  path: '/preview-sons',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PreviewMeditacaoRoute = PreviewMeditacaoRouteImport.update({
-  id: '/preview-meditacao',
-  path: '/preview-meditacao',
+const PreviewSosRoute = PreviewSosRouteImport.update({
+  id: '/preview-sos',
+  path: '/preview-sos',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PreviewLojaSementinhasRoute = PreviewLojaSementinhasRouteImport.update({
-  id: '/preview-loja-sementinhas',
-  path: '/preview-loja-sementinhas',
+const PreviewSosMedicoRoute = PreviewSosMedicoRouteImport.update({
+  id: '/preview-sos-medico',
+  path: '/preview-sos-medico',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PreviewJogoRoute = PreviewJogoRouteImport.update({
-  id: '/preview-jogo',
-  path: '/preview-jogo',
+const PreviewTutorialRoute = PreviewTutorialRouteImport.update({
+  id: '/preview-tutorial',
+  path: '/preview-tutorial',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PreviewInstagramRoute = PreviewInstagramRouteImport.update({
-  id: '/preview-instagram',
-  path: '/preview-instagram',
+const PrimeiraConsultaRoute = PrimeiraConsultaRouteImport.update({
+  id: '/primeira-consulta',
+  path: '/primeira-consulta',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PreviewHomeRoute = PreviewHomeRouteImport.update({
-  id: '/preview-home',
-  path: '/preview-home',
+const PrivacidadeRoute = PrivacidadeRouteImport.update({
+  id: '/privacidade',
+  path: '/privacidade',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PreviewGratidaoRoute = PreviewGratidaoRouteImport.update({
-  id: '/preview-gratidao',
-  path: '/preview-gratidao',
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PreviewGradesRoute = PreviewGradesRouteImport.update({
-  id: '/preview-grades',
-  path: '/preview-grades',
+const SobreRoute = SobreRouteImport.update({
+  id: '/sobre',
+  path: '/sobre',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PreviewExercicioRoute = PreviewExercicioRouteImport.update({
-  id: '/preview-exercicio',
-  path: '/preview-exercicio',
+const TamanhoRealRoute = TamanhoRealRouteImport.update({
+  id: '/tamanho-real',
+  path: '/tamanho-real',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PreviewConviteRoute = PreviewConviteRouteImport.update({
-  id: '/preview-convite',
-  path: '/preview-convite',
+const TermosRoute = TermosRouteImport.update({
+  id: '/termos',
+  path: '/termos',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PreviewContaRoute = PreviewContaRouteImport.update({
-  id: '/preview-conta',
-  path: '/preview-conta',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PreviewConquistasRoute = PreviewConquistasRouteImport.update({
-  id: '/preview-conquistas',
-  path: '/preview-conquistas',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PreviewComunidadeRoute = PreviewComunidadeRouteImport.update({
-  id: '/preview-comunidade',
-  path: '/preview-comunidade',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PreviewChatRoute = PreviewChatRouteImport.update({
-  id: '/preview-chat',
-  path: '/preview-chat',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PreviewCasalRoute = PreviewCasalRouteImport.update({
-  id: '/preview-casal',
-  path: '/preview-casal',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PreviewBolhaRoute = PreviewBolhaRouteImport.update({
-  id: '/preview-bolha',
-  path: '/preview-bolha',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PreviewBebeRoute = PreviewBebeRouteImport.update({
-  id: '/preview-bebe',
-  path: '/preview-bebe',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PreviewAssinaturaRoute = PreviewAssinaturaRouteImport.update({
-  id: '/preview-assinatura',
-  path: '/preview-assinatura',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PreviewAmigasRoute = PreviewAmigasRouteImport.update({
-  id: '/preview-amigas',
-  path: '/preview-amigas',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PreviewAgendaRoute = PreviewAgendaRouteImport.update({
-  id: '/preview-agenda',
-  path: '/preview-agenda',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MuralRoute = MuralRouteImport.update({
-  id: '/mural',
-  path: '/mural',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ModoAcompanhanteRoute = ModoAcompanhanteRouteImport.update({
-  id: '/modo-acompanhante',
-  path: '/modo-acompanhante',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MitosRoute = MitosRouteImport.update({
-  id: '/mitos',
-  path: '/mitos',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MedicosRoute = MedicosRouteImport.update({
-  id: '/medicos',
-  path: '/medicos',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LivesRoute = LivesRouteImport.update({
-  id: '/lives',
-  path: '/lives',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const InfluenciadoraRoute = InfluenciadoraRouteImport.update({
-  id: '/influenciadora',
-  path: '/influenciadora',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const HospitaisRoute = HospitaisRouteImport.update({
-  id: '/hospitais',
-  path: '/hospitais',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const GestacaoRoute = GestacaoRouteImport.update({
-  id: '/gestacao',
-  path: '/gestacao',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ExperienciaRoute = ExperienciaRouteImport.update({
-  id: '/experiencia',
-  path: '/experiencia',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const EpdsRoute = EpdsRouteImport.update({
-  id: '/epds',
-  path: '/epds',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const EncontrarMedicoRoute = EncontrarMedicoRouteImport.update({
-  id: '/encontrar-medico',
-  path: '/encontrar-medico',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const EmpresasRoute = EmpresasRouteImport.update({
-  id: '/empresas',
-  path: '/empresas',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DppRoute = DppRouteImport.update({
-  id: '/dpp',
-  path: '/dpp',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DiabetesGestacionalRoute = DiabetesGestacionalRouteImport.update({
-  id: '/diabetes-gestacional',
-  path: '/diabetes-gestacional',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DepoimentosRoute = DepoimentosRouteImport.update({
-  id: '/depoimentos',
-  path: '/depoimentos',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CardsRoute = CardsRouteImport.update({
-  id: '/cards',
-  path: '/cards',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CalculadoraRoute = CalculadoraRouteImport.update({
-  id: '/calculadora',
-  path: '/calculadora',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BatimentosRoute = BatimentosRouteImport.update({
-  id: '/batimentos',
-  path: '/batimentos',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BastidoresRoute = BastidoresRouteImport.update({
-  id: '/bastidores',
-  path: '/bastidores',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthRoute = AuthRouteImport.update({
-  id: '/auth',
-  path: '/auth',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AgendamentoRoute = AgendamentoRouteImport.update({
-  id: '/agendamento',
-  path: '/agendamento',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AcompanhanteRoute = AcompanhanteRouteImport.update({
-  id: '/acompanhante',
-  path: '/acompanhante',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
-  id: '/_authenticated',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const VotarNomeTokenRoute = VotarNomeTokenRouteImport.update({
-  id: '/votar-nome/$token',
-  path: '/votar-nome/$token',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PresenteTokenRoute = PresenteTokenRouteImport.update({
-  id: '/presente/$token',
-  path: '/presente/$token',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PCodigoRoute = PCodigoRouteImport.update({
-  id: '/p/$codigo',
-  path: '/p/$codigo',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MedicosGoogleCallbackRoute = MedicosGoogleCallbackRouteImport.update({
-  id: '/medicos_/google-callback',
-  path: '/medicos/google-callback',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MedicosCadastroRoute = MedicosCadastroRouteImport.update({
-  id: '/medicos_/cadastro',
-  path: '/medicos/cadastro',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiWhatsappRoute = ApiWhatsappRouteImport.update({
-  id: '/api/whatsapp',
-  path: '/api/whatsapp',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiWaitlistTickRoute = ApiWaitlistTickRouteImport.update({
-  id: '/api/waitlist-tick',
-  path: '/api/waitlist-tick',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
-  id: '/api/transcribe',
-  path: '/api/transcribe',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiTranscreverDiarioRoute = ApiTranscreverDiarioRouteImport.update({
-  id: '/api/transcrever-diario',
-  path: '/api/transcrever-diario',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiStripeWebhookRoute = ApiStripeWebhookRouteImport.update({
-  id: '/api/stripe-webhook',
-  path: '/api/stripe-webhook',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPushWeeklyTickRoute = ApiPushWeeklyTickRouteImport.update({
-  id: '/api/push-weekly-tick',
-  path: '/api/push-weekly-tick',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiNutritionRoute = ApiNutritionRouteImport.update({
-  id: '/api/nutrition',
-  path: '/api/nutrition',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiMpWebhookRoute = ApiMpWebhookRouteImport.update({
-  id: '/api/mp-webhook',
-  path: '/api/mp-webhook',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiMeditacaoTickRoute = ApiMeditacaoTickRouteImport.update({
-  id: '/api/meditacao-tick',
-  path: '/api/meditacao-tick',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiLembretesTickRoute = ApiLembretesTickRouteImport.update({
-  id: '/api/lembretes-tick',
-  path: '/api/lembretes-tick',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiLegendaDaFotoRoute = ApiLegendaDaFotoRouteImport.update({
-  id: '/api/legenda-da-foto',
-  path: '/api/legenda-da-foto',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiInstagramWebhookRoute = ApiInstagramWebhookRouteImport.update({
-  id: '/api/instagram-webhook',
-  path: '/api/instagram-webhook',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiChatRoute = ApiChatRouteImport.update({
-  id: '/api/chat',
-  path: '/api/chat',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiCartaSemanalRoute = ApiCartaSemanalRouteImport.update({
-  id: '/api/carta-semanal',
-  path: '/api/carta-semanal',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AlbumTokenRoute = AlbumTokenRouteImport.update({
-  id: '/album/$token',
-  path: '/album/$token',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AcompanharTokenRoute = AcompanharTokenRouteImport.update({
-  id: '/acompanhar/$token',
-  path: '/acompanhar/$token',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthenticatedPainelRoute = AuthenticatedPainelRouteImport.update({
-  id: '/painel',
-  path: '/painel',
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedMinhaContaRoute = AuthenticatedMinhaContaRouteImport.update({
@@ -535,19 +540,134 @@ const AuthenticatedMinhaContaRoute = AuthenticatedMinhaContaRouteImport.update({
   path: '/minha-conta',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
+const AuthenticatedPainelRoute = AuthenticatedPainelRouteImport.update({
+  id: '/painel',
+  path: '/painel',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const ApiDoctorthinkTrainRoute = ApiDoctorthinkTrainRouteImport.update({
-  id: '/api/doctorthink/train',
-  path: '/api/doctorthink/train',
+const AcompanharTokenRoute = AcompanharTokenRouteImport.update({
+  id: '/acompanhar/$token',
+  path: '/acompanhar/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AlbumTokenRoute = AlbumTokenRouteImport.update({
+  id: '/album/$token',
+  path: '/album/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCartaSemanalRoute = ApiCartaSemanalRouteImport.update({
+  id: '/api/carta-semanal',
+  path: '/api/carta-semanal',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiChatRoute = ApiChatRouteImport.update({
+  id: '/api/chat',
+  path: '/api/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiInstagramWebhookRoute = ApiInstagramWebhookRouteImport.update({
+  id: '/api/instagram-webhook',
+  path: '/api/instagram-webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiLegendaDaFotoRoute = ApiLegendaDaFotoRouteImport.update({
+  id: '/api/legenda-da-foto',
+  path: '/api/legenda-da-foto',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiLembretesTickRoute = ApiLembretesTickRouteImport.update({
+  id: '/api/lembretes-tick',
+  path: '/api/lembretes-tick',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMeditacaoTickRoute = ApiMeditacaoTickRouteImport.update({
+  id: '/api/meditacao-tick',
+  path: '/api/meditacao-tick',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMpWebhookRoute = ApiMpWebhookRouteImport.update({
+  id: '/api/mp-webhook',
+  path: '/api/mp-webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiNutritionRoute = ApiNutritionRouteImport.update({
+  id: '/api/nutrition',
+  path: '/api/nutrition',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPratoRoute = ApiPratoRouteImport.update({
+  id: '/api/prato',
+  path: '/api/prato',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPushWeeklyTickRoute = ApiPushWeeklyTickRouteImport.update({
+  id: '/api/push-weekly-tick',
+  path: '/api/push-weekly-tick',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiStripeWebhookRoute = ApiStripeWebhookRouteImport.update({
+  id: '/api/stripe-webhook',
+  path: '/api/stripe-webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTranscreverDiarioRoute = ApiTranscreverDiarioRouteImport.update({
+  id: '/api/transcrever-diario',
+  path: '/api/transcrever-diario',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
+  id: '/api/transcribe',
+  path: '/api/transcribe',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWaitlistTickRoute = ApiWaitlistTickRouteImport.update({
+  id: '/api/waitlist-tick',
+  path: '/api/waitlist-tick',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWhatsappRoute = ApiWhatsappRouteImport.update({
+  id: '/api/whatsapp',
+  path: '/api/whatsapp',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MedicosCadastroRoute = MedicosCadastroRouteImport.update({
+  id: '/medicos_/cadastro',
+  path: '/medicos/cadastro',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MedicosGoogleCallbackRoute = MedicosGoogleCallbackRouteImport.update({
+  id: '/medicos_/google-callback',
+  path: '/medicos/google-callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PCodigoRoute = PCodigoRouteImport.update({
+  id: '/p/$codigo',
+  path: '/p/$codigo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PresenteTokenRoute = PresenteTokenRouteImport.update({
+  id: '/presente/$token',
+  path: '/presente/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PubCodigoRoute = PubCodigoRouteImport.update({
+  id: '/pub/$codigo',
+  path: '/pub/$codigo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VotarNomeTokenRoute = VotarNomeTokenRouteImport.update({
+  id: '/votar-nome/$token',
+  path: '/votar-nome/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiDoctorthinkAskRoute = ApiDoctorthinkAskRouteImport.update({
   id: '/api/doctorthink/ask',
   path: '/api/doctorthink/ask',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDoctorthinkTrainRoute = ApiDoctorthinkTrainRouteImport.update({
+  id: '/api/doctorthink/train',
+  path: '/api/doctorthink/train',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -575,17 +695,28 @@ export interface FileRoutesByFullPath {
   '/mitos': typeof MitosRoute
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
+  '/preview-abertura': typeof PreviewAberturaRoute
   '/preview-agenda': typeof PreviewAgendaRoute
   '/preview-amigas': typeof PreviewAmigasRoute
   '/preview-assinatura': typeof PreviewAssinaturaRoute
+  '/preview-avisos': typeof PreviewAvisosRoute
+  '/preview-banco': typeof PreviewBancoRoute
   '/preview-bebe': typeof PreviewBebeRoute
+  '/preview-bebe-tab': typeof PreviewBebeTabRoute
   '/preview-bolha': typeof PreviewBolhaRoute
+  '/preview-cantinho': typeof PreviewCantinhoRoute
   '/preview-casal': typeof PreviewCasalRoute
   '/preview-chat': typeof PreviewChatRoute
+  '/preview-chutes': typeof PreviewChutesRoute
   '/preview-comunidade': typeof PreviewComunidadeRoute
   '/preview-conquistas': typeof PreviewConquistasRoute
+  '/preview-consultorios': typeof PreviewConsultoriosRoute
   '/preview-conta': typeof PreviewContaRoute
+  '/preview-contracoes': typeof PreviewContracoesRoute
   '/preview-convite': typeof PreviewConviteRoute
+  '/preview-convites': typeof PreviewConvitesRoute
+  '/preview-custo': typeof PreviewCustoRoute
+  '/preview-emissoes': typeof PreviewEmissoesRoute
   '/preview-exercicio': typeof PreviewExercicioRoute
   '/preview-grades': typeof PreviewGradesRoute
   '/preview-gratidao': typeof PreviewGratidaoRoute
@@ -593,9 +724,13 @@ export interface FileRoutesByFullPath {
   '/preview-instagram': typeof PreviewInstagramRoute
   '/preview-jogo': typeof PreviewJogoRoute
   '/preview-loja-sementinhas': typeof PreviewLojaSementinhasRoute
+  '/preview-mapa': typeof PreviewMapaRoute
   '/preview-meditacao': typeof PreviewMeditacaoRoute
+  '/preview-moderacao': typeof PreviewModeracaoRoute
   '/preview-momento': typeof PreviewMomentoRoute
   '/preview-notificacoes': typeof PreviewNotificacoesRoute
+  '/preview-nps': typeof PreviewNpsRoute
+  '/preview-nutricao': typeof PreviewNutricaoRoute
   '/preview-oferta': typeof PreviewOfertaRoute
   '/preview-onboarding': typeof PreviewOnboardingRoute
   '/preview-presentes': typeof PreviewPresentesRoute
@@ -604,6 +739,9 @@ export interface FileRoutesByFullPath {
   '/preview-registrar-consulta': typeof PreviewRegistrarConsultaRoute
   '/preview-regua': typeof PreviewReguaRoute
   '/preview-saude': typeof PreviewSaudeRoute
+  '/preview-saude-clinica': typeof PreviewSaudeClinicaRoute
+  '/preview-saude-mulher': typeof PreviewSaudeMulherRoute
+  '/preview-saude-registros': typeof PreviewSaudeRegistrosRoute
   '/preview-som': typeof PreviewSomRoute
   '/preview-sons': typeof PreviewSonsRoute
   '/preview-sos': typeof PreviewSosRoute
@@ -628,6 +766,7 @@ export interface FileRoutesByFullPath {
   '/api/meditacao-tick': typeof ApiMeditacaoTickRoute
   '/api/mp-webhook': typeof ApiMpWebhookRoute
   '/api/nutrition': typeof ApiNutritionRoute
+  '/api/prato': typeof ApiPratoRoute
   '/api/push-weekly-tick': typeof ApiPushWeeklyTickRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/api/transcrever-diario': typeof ApiTranscreverDiarioRoute
@@ -638,6 +777,7 @@ export interface FileRoutesByFullPath {
   '/medicos/google-callback': typeof MedicosGoogleCallbackRoute
   '/p/$codigo': typeof PCodigoRoute
   '/presente/$token': typeof PresenteTokenRoute
+  '/pub/$codigo': typeof PubCodigoRoute
   '/votar-nome/$token': typeof VotarNomeTokenRoute
   '/api/doctorthink/ask': typeof ApiDoctorthinkAskRoute
   '/api/doctorthink/train': typeof ApiDoctorthinkTrainRoute
@@ -666,17 +806,28 @@ export interface FileRoutesByTo {
   '/mitos': typeof MitosRoute
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
+  '/preview-abertura': typeof PreviewAberturaRoute
   '/preview-agenda': typeof PreviewAgendaRoute
   '/preview-amigas': typeof PreviewAmigasRoute
   '/preview-assinatura': typeof PreviewAssinaturaRoute
+  '/preview-avisos': typeof PreviewAvisosRoute
+  '/preview-banco': typeof PreviewBancoRoute
   '/preview-bebe': typeof PreviewBebeRoute
+  '/preview-bebe-tab': typeof PreviewBebeTabRoute
   '/preview-bolha': typeof PreviewBolhaRoute
+  '/preview-cantinho': typeof PreviewCantinhoRoute
   '/preview-casal': typeof PreviewCasalRoute
   '/preview-chat': typeof PreviewChatRoute
+  '/preview-chutes': typeof PreviewChutesRoute
   '/preview-comunidade': typeof PreviewComunidadeRoute
   '/preview-conquistas': typeof PreviewConquistasRoute
+  '/preview-consultorios': typeof PreviewConsultoriosRoute
   '/preview-conta': typeof PreviewContaRoute
+  '/preview-contracoes': typeof PreviewContracoesRoute
   '/preview-convite': typeof PreviewConviteRoute
+  '/preview-convites': typeof PreviewConvitesRoute
+  '/preview-custo': typeof PreviewCustoRoute
+  '/preview-emissoes': typeof PreviewEmissoesRoute
   '/preview-exercicio': typeof PreviewExercicioRoute
   '/preview-grades': typeof PreviewGradesRoute
   '/preview-gratidao': typeof PreviewGratidaoRoute
@@ -684,9 +835,13 @@ export interface FileRoutesByTo {
   '/preview-instagram': typeof PreviewInstagramRoute
   '/preview-jogo': typeof PreviewJogoRoute
   '/preview-loja-sementinhas': typeof PreviewLojaSementinhasRoute
+  '/preview-mapa': typeof PreviewMapaRoute
   '/preview-meditacao': typeof PreviewMeditacaoRoute
+  '/preview-moderacao': typeof PreviewModeracaoRoute
   '/preview-momento': typeof PreviewMomentoRoute
   '/preview-notificacoes': typeof PreviewNotificacoesRoute
+  '/preview-nps': typeof PreviewNpsRoute
+  '/preview-nutricao': typeof PreviewNutricaoRoute
   '/preview-oferta': typeof PreviewOfertaRoute
   '/preview-onboarding': typeof PreviewOnboardingRoute
   '/preview-presentes': typeof PreviewPresentesRoute
@@ -695,6 +850,9 @@ export interface FileRoutesByTo {
   '/preview-registrar-consulta': typeof PreviewRegistrarConsultaRoute
   '/preview-regua': typeof PreviewReguaRoute
   '/preview-saude': typeof PreviewSaudeRoute
+  '/preview-saude-clinica': typeof PreviewSaudeClinicaRoute
+  '/preview-saude-mulher': typeof PreviewSaudeMulherRoute
+  '/preview-saude-registros': typeof PreviewSaudeRegistrosRoute
   '/preview-som': typeof PreviewSomRoute
   '/preview-sons': typeof PreviewSonsRoute
   '/preview-sos': typeof PreviewSosRoute
@@ -719,6 +877,7 @@ export interface FileRoutesByTo {
   '/api/meditacao-tick': typeof ApiMeditacaoTickRoute
   '/api/mp-webhook': typeof ApiMpWebhookRoute
   '/api/nutrition': typeof ApiNutritionRoute
+  '/api/prato': typeof ApiPratoRoute
   '/api/push-weekly-tick': typeof ApiPushWeeklyTickRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/api/transcrever-diario': typeof ApiTranscreverDiarioRoute
@@ -729,6 +888,7 @@ export interface FileRoutesByTo {
   '/medicos/google-callback': typeof MedicosGoogleCallbackRoute
   '/p/$codigo': typeof PCodigoRoute
   '/presente/$token': typeof PresenteTokenRoute
+  '/pub/$codigo': typeof PubCodigoRoute
   '/votar-nome/$token': typeof VotarNomeTokenRoute
   '/api/doctorthink/ask': typeof ApiDoctorthinkAskRoute
   '/api/doctorthink/train': typeof ApiDoctorthinkTrainRoute
@@ -759,17 +919,28 @@ export interface FileRoutesById {
   '/mitos': typeof MitosRoute
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
+  '/preview-abertura': typeof PreviewAberturaRoute
   '/preview-agenda': typeof PreviewAgendaRoute
   '/preview-amigas': typeof PreviewAmigasRoute
   '/preview-assinatura': typeof PreviewAssinaturaRoute
+  '/preview-avisos': typeof PreviewAvisosRoute
+  '/preview-banco': typeof PreviewBancoRoute
   '/preview-bebe': typeof PreviewBebeRoute
+  '/preview-bebe-tab': typeof PreviewBebeTabRoute
   '/preview-bolha': typeof PreviewBolhaRoute
+  '/preview-cantinho': typeof PreviewCantinhoRoute
   '/preview-casal': typeof PreviewCasalRoute
   '/preview-chat': typeof PreviewChatRoute
+  '/preview-chutes': typeof PreviewChutesRoute
   '/preview-comunidade': typeof PreviewComunidadeRoute
   '/preview-conquistas': typeof PreviewConquistasRoute
+  '/preview-consultorios': typeof PreviewConsultoriosRoute
   '/preview-conta': typeof PreviewContaRoute
+  '/preview-contracoes': typeof PreviewContracoesRoute
   '/preview-convite': typeof PreviewConviteRoute
+  '/preview-convites': typeof PreviewConvitesRoute
+  '/preview-custo': typeof PreviewCustoRoute
+  '/preview-emissoes': typeof PreviewEmissoesRoute
   '/preview-exercicio': typeof PreviewExercicioRoute
   '/preview-grades': typeof PreviewGradesRoute
   '/preview-gratidao': typeof PreviewGratidaoRoute
@@ -777,9 +948,13 @@ export interface FileRoutesById {
   '/preview-instagram': typeof PreviewInstagramRoute
   '/preview-jogo': typeof PreviewJogoRoute
   '/preview-loja-sementinhas': typeof PreviewLojaSementinhasRoute
+  '/preview-mapa': typeof PreviewMapaRoute
   '/preview-meditacao': typeof PreviewMeditacaoRoute
+  '/preview-moderacao': typeof PreviewModeracaoRoute
   '/preview-momento': typeof PreviewMomentoRoute
   '/preview-notificacoes': typeof PreviewNotificacoesRoute
+  '/preview-nps': typeof PreviewNpsRoute
+  '/preview-nutricao': typeof PreviewNutricaoRoute
   '/preview-oferta': typeof PreviewOfertaRoute
   '/preview-onboarding': typeof PreviewOnboardingRoute
   '/preview-presentes': typeof PreviewPresentesRoute
@@ -788,6 +963,9 @@ export interface FileRoutesById {
   '/preview-registrar-consulta': typeof PreviewRegistrarConsultaRoute
   '/preview-regua': typeof PreviewReguaRoute
   '/preview-saude': typeof PreviewSaudeRoute
+  '/preview-saude-clinica': typeof PreviewSaudeClinicaRoute
+  '/preview-saude-mulher': typeof PreviewSaudeMulherRoute
+  '/preview-saude-registros': typeof PreviewSaudeRegistrosRoute
   '/preview-som': typeof PreviewSomRoute
   '/preview-sons': typeof PreviewSonsRoute
   '/preview-sos': typeof PreviewSosRoute
@@ -812,6 +990,7 @@ export interface FileRoutesById {
   '/api/meditacao-tick': typeof ApiMeditacaoTickRoute
   '/api/mp-webhook': typeof ApiMpWebhookRoute
   '/api/nutrition': typeof ApiNutritionRoute
+  '/api/prato': typeof ApiPratoRoute
   '/api/push-weekly-tick': typeof ApiPushWeeklyTickRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/api/transcrever-diario': typeof ApiTranscreverDiarioRoute
@@ -822,6 +1001,7 @@ export interface FileRoutesById {
   '/medicos_/google-callback': typeof MedicosGoogleCallbackRoute
   '/p/$codigo': typeof PCodigoRoute
   '/presente/$token': typeof PresenteTokenRoute
+  '/pub/$codigo': typeof PubCodigoRoute
   '/votar-nome/$token': typeof VotarNomeTokenRoute
   '/api/doctorthink/ask': typeof ApiDoctorthinkAskRoute
   '/api/doctorthink/train': typeof ApiDoctorthinkTrainRoute
@@ -852,17 +1032,28 @@ export interface FileRouteTypes {
     | '/mitos'
     | '/modo-acompanhante'
     | '/mural'
+    | '/preview-abertura'
     | '/preview-agenda'
     | '/preview-amigas'
     | '/preview-assinatura'
+    | '/preview-avisos'
+    | '/preview-banco'
     | '/preview-bebe'
+    | '/preview-bebe-tab'
     | '/preview-bolha'
+    | '/preview-cantinho'
     | '/preview-casal'
     | '/preview-chat'
+    | '/preview-chutes'
     | '/preview-comunidade'
     | '/preview-conquistas'
+    | '/preview-consultorios'
     | '/preview-conta'
+    | '/preview-contracoes'
     | '/preview-convite'
+    | '/preview-convites'
+    | '/preview-custo'
+    | '/preview-emissoes'
     | '/preview-exercicio'
     | '/preview-grades'
     | '/preview-gratidao'
@@ -870,9 +1061,13 @@ export interface FileRouteTypes {
     | '/preview-instagram'
     | '/preview-jogo'
     | '/preview-loja-sementinhas'
+    | '/preview-mapa'
     | '/preview-meditacao'
+    | '/preview-moderacao'
     | '/preview-momento'
     | '/preview-notificacoes'
+    | '/preview-nps'
+    | '/preview-nutricao'
     | '/preview-oferta'
     | '/preview-onboarding'
     | '/preview-presentes'
@@ -881,6 +1076,9 @@ export interface FileRouteTypes {
     | '/preview-registrar-consulta'
     | '/preview-regua'
     | '/preview-saude'
+    | '/preview-saude-clinica'
+    | '/preview-saude-mulher'
+    | '/preview-saude-registros'
     | '/preview-som'
     | '/preview-sons'
     | '/preview-sos'
@@ -905,6 +1103,7 @@ export interface FileRouteTypes {
     | '/api/meditacao-tick'
     | '/api/mp-webhook'
     | '/api/nutrition'
+    | '/api/prato'
     | '/api/push-weekly-tick'
     | '/api/stripe-webhook'
     | '/api/transcrever-diario'
@@ -915,6 +1114,7 @@ export interface FileRouteTypes {
     | '/medicos/google-callback'
     | '/p/$codigo'
     | '/presente/$token'
+    | '/pub/$codigo'
     | '/votar-nome/$token'
     | '/api/doctorthink/ask'
     | '/api/doctorthink/train'
@@ -943,17 +1143,28 @@ export interface FileRouteTypes {
     | '/mitos'
     | '/modo-acompanhante'
     | '/mural'
+    | '/preview-abertura'
     | '/preview-agenda'
     | '/preview-amigas'
     | '/preview-assinatura'
+    | '/preview-avisos'
+    | '/preview-banco'
     | '/preview-bebe'
+    | '/preview-bebe-tab'
     | '/preview-bolha'
+    | '/preview-cantinho'
     | '/preview-casal'
     | '/preview-chat'
+    | '/preview-chutes'
     | '/preview-comunidade'
     | '/preview-conquistas'
+    | '/preview-consultorios'
     | '/preview-conta'
+    | '/preview-contracoes'
     | '/preview-convite'
+    | '/preview-convites'
+    | '/preview-custo'
+    | '/preview-emissoes'
     | '/preview-exercicio'
     | '/preview-grades'
     | '/preview-gratidao'
@@ -961,9 +1172,13 @@ export interface FileRouteTypes {
     | '/preview-instagram'
     | '/preview-jogo'
     | '/preview-loja-sementinhas'
+    | '/preview-mapa'
     | '/preview-meditacao'
+    | '/preview-moderacao'
     | '/preview-momento'
     | '/preview-notificacoes'
+    | '/preview-nps'
+    | '/preview-nutricao'
     | '/preview-oferta'
     | '/preview-onboarding'
     | '/preview-presentes'
@@ -972,6 +1187,9 @@ export interface FileRouteTypes {
     | '/preview-registrar-consulta'
     | '/preview-regua'
     | '/preview-saude'
+    | '/preview-saude-clinica'
+    | '/preview-saude-mulher'
+    | '/preview-saude-registros'
     | '/preview-som'
     | '/preview-sons'
     | '/preview-sos'
@@ -996,6 +1214,7 @@ export interface FileRouteTypes {
     | '/api/meditacao-tick'
     | '/api/mp-webhook'
     | '/api/nutrition'
+    | '/api/prato'
     | '/api/push-weekly-tick'
     | '/api/stripe-webhook'
     | '/api/transcrever-diario'
@@ -1006,6 +1225,7 @@ export interface FileRouteTypes {
     | '/medicos/google-callback'
     | '/p/$codigo'
     | '/presente/$token'
+    | '/pub/$codigo'
     | '/votar-nome/$token'
     | '/api/doctorthink/ask'
     | '/api/doctorthink/train'
@@ -1035,17 +1255,28 @@ export interface FileRouteTypes {
     | '/mitos'
     | '/modo-acompanhante'
     | '/mural'
+    | '/preview-abertura'
     | '/preview-agenda'
     | '/preview-amigas'
     | '/preview-assinatura'
+    | '/preview-avisos'
+    | '/preview-banco'
     | '/preview-bebe'
+    | '/preview-bebe-tab'
     | '/preview-bolha'
+    | '/preview-cantinho'
     | '/preview-casal'
     | '/preview-chat'
+    | '/preview-chutes'
     | '/preview-comunidade'
     | '/preview-conquistas'
+    | '/preview-consultorios'
     | '/preview-conta'
+    | '/preview-contracoes'
     | '/preview-convite'
+    | '/preview-convites'
+    | '/preview-custo'
+    | '/preview-emissoes'
     | '/preview-exercicio'
     | '/preview-grades'
     | '/preview-gratidao'
@@ -1053,9 +1284,13 @@ export interface FileRouteTypes {
     | '/preview-instagram'
     | '/preview-jogo'
     | '/preview-loja-sementinhas'
+    | '/preview-mapa'
     | '/preview-meditacao'
+    | '/preview-moderacao'
     | '/preview-momento'
     | '/preview-notificacoes'
+    | '/preview-nps'
+    | '/preview-nutricao'
     | '/preview-oferta'
     | '/preview-onboarding'
     | '/preview-presentes'
@@ -1064,6 +1299,9 @@ export interface FileRouteTypes {
     | '/preview-registrar-consulta'
     | '/preview-regua'
     | '/preview-saude'
+    | '/preview-saude-clinica'
+    | '/preview-saude-mulher'
+    | '/preview-saude-registros'
     | '/preview-som'
     | '/preview-sons'
     | '/preview-sos'
@@ -1088,6 +1326,7 @@ export interface FileRouteTypes {
     | '/api/meditacao-tick'
     | '/api/mp-webhook'
     | '/api/nutrition'
+    | '/api/prato'
     | '/api/push-weekly-tick'
     | '/api/stripe-webhook'
     | '/api/transcrever-diario'
@@ -1098,6 +1337,7 @@ export interface FileRouteTypes {
     | '/medicos_/google-callback'
     | '/p/$codigo'
     | '/presente/$token'
+    | '/pub/$codigo'
     | '/votar-nome/$token'
     | '/api/doctorthink/ask'
     | '/api/doctorthink/train'
@@ -1128,17 +1368,28 @@ export interface RootRouteChildren {
   MitosRoute: typeof MitosRoute
   ModoAcompanhanteRoute: typeof ModoAcompanhanteRoute
   MuralRoute: typeof MuralRoute
+  PreviewAberturaRoute: typeof PreviewAberturaRoute
   PreviewAgendaRoute: typeof PreviewAgendaRoute
   PreviewAmigasRoute: typeof PreviewAmigasRoute
   PreviewAssinaturaRoute: typeof PreviewAssinaturaRoute
+  PreviewAvisosRoute: typeof PreviewAvisosRoute
+  PreviewBancoRoute: typeof PreviewBancoRoute
   PreviewBebeRoute: typeof PreviewBebeRoute
+  PreviewBebeTabRoute: typeof PreviewBebeTabRoute
   PreviewBolhaRoute: typeof PreviewBolhaRoute
+  PreviewCantinhoRoute: typeof PreviewCantinhoRoute
   PreviewCasalRoute: typeof PreviewCasalRoute
   PreviewChatRoute: typeof PreviewChatRoute
+  PreviewChutesRoute: typeof PreviewChutesRoute
   PreviewComunidadeRoute: typeof PreviewComunidadeRoute
   PreviewConquistasRoute: typeof PreviewConquistasRoute
+  PreviewConsultoriosRoute: typeof PreviewConsultoriosRoute
   PreviewContaRoute: typeof PreviewContaRoute
+  PreviewContracoesRoute: typeof PreviewContracoesRoute
   PreviewConviteRoute: typeof PreviewConviteRoute
+  PreviewConvitesRoute: typeof PreviewConvitesRoute
+  PreviewCustoRoute: typeof PreviewCustoRoute
+  PreviewEmissoesRoute: typeof PreviewEmissoesRoute
   PreviewExercicioRoute: typeof PreviewExercicioRoute
   PreviewGradesRoute: typeof PreviewGradesRoute
   PreviewGratidaoRoute: typeof PreviewGratidaoRoute
@@ -1146,9 +1397,13 @@ export interface RootRouteChildren {
   PreviewInstagramRoute: typeof PreviewInstagramRoute
   PreviewJogoRoute: typeof PreviewJogoRoute
   PreviewLojaSementinhasRoute: typeof PreviewLojaSementinhasRoute
+  PreviewMapaRoute: typeof PreviewMapaRoute
   PreviewMeditacaoRoute: typeof PreviewMeditacaoRoute
+  PreviewModeracaoRoute: typeof PreviewModeracaoRoute
   PreviewMomentoRoute: typeof PreviewMomentoRoute
   PreviewNotificacoesRoute: typeof PreviewNotificacoesRoute
+  PreviewNpsRoute: typeof PreviewNpsRoute
+  PreviewNutricaoRoute: typeof PreviewNutricaoRoute
   PreviewOfertaRoute: typeof PreviewOfertaRoute
   PreviewOnboardingRoute: typeof PreviewOnboardingRoute
   PreviewPresentesRoute: typeof PreviewPresentesRoute
@@ -1157,6 +1412,9 @@ export interface RootRouteChildren {
   PreviewRegistrarConsultaRoute: typeof PreviewRegistrarConsultaRoute
   PreviewReguaRoute: typeof PreviewReguaRoute
   PreviewSaudeRoute: typeof PreviewSaudeRoute
+  PreviewSaudeClinicaRoute: typeof PreviewSaudeClinicaRoute
+  PreviewSaudeMulherRoute: typeof PreviewSaudeMulherRoute
+  PreviewSaudeRegistrosRoute: typeof PreviewSaudeRegistrosRoute
   PreviewSomRoute: typeof PreviewSomRoute
   PreviewSonsRoute: typeof PreviewSonsRoute
   PreviewSosRoute: typeof PreviewSosRoute
@@ -1178,6 +1436,7 @@ export interface RootRouteChildren {
   ApiMeditacaoTickRoute: typeof ApiMeditacaoTickRoute
   ApiMpWebhookRoute: typeof ApiMpWebhookRoute
   ApiNutritionRoute: typeof ApiNutritionRoute
+  ApiPratoRoute: typeof ApiPratoRoute
   ApiPushWeeklyTickRoute: typeof ApiPushWeeklyTickRoute
   ApiStripeWebhookRoute: typeof ApiStripeWebhookRoute
   ApiTranscreverDiarioRoute: typeof ApiTranscreverDiarioRoute
@@ -1188,6 +1447,7 @@ export interface RootRouteChildren {
   MedicosGoogleCallbackRoute: typeof MedicosGoogleCallbackRoute
   PCodigoRoute: typeof PCodigoRoute
   PresenteTokenRoute: typeof PresenteTokenRoute
+  PubCodigoRoute: typeof PubCodigoRoute
   VotarNomeTokenRoute: typeof VotarNomeTokenRoute
   ApiDoctorthinkAskRoute: typeof ApiDoctorthinkAskRoute
   ApiDoctorthinkTrainRoute: typeof ApiDoctorthinkTrainRoute
@@ -1195,438 +1455,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/termos': {
-      id: '/termos'
-      path: '/termos'
-      fullPath: '/termos'
-      preLoaderRoute: typeof TermosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/tamanho-real': {
-      id: '/tamanho-real'
-      path: '/tamanho-real'
-      fullPath: '/tamanho-real'
-      preLoaderRoute: typeof TamanhoRealRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/sobre': {
-      id: '/sobre'
-      path: '/sobre'
-      fullPath: '/sobre'
-      preLoaderRoute: typeof SobreRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/sitemap.xml': {
-      id: '/sitemap.xml'
-      path: '/sitemap.xml'
-      fullPath: '/sitemap.xml'
-      preLoaderRoute: typeof SitemapDotxmlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/privacidade': {
-      id: '/privacidade'
-      path: '/privacidade'
-      fullPath: '/privacidade'
-      preLoaderRoute: typeof PrivacidadeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/primeira-consulta': {
-      id: '/primeira-consulta'
-      path: '/primeira-consulta'
-      fullPath: '/primeira-consulta'
-      preLoaderRoute: typeof PrimeiraConsultaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-tutorial': {
-      id: '/preview-tutorial'
-      path: '/preview-tutorial'
-      fullPath: '/preview-tutorial'
-      preLoaderRoute: typeof PreviewTutorialRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-sos-medico': {
-      id: '/preview-sos-medico'
-      path: '/preview-sos-medico'
-      fullPath: '/preview-sos-medico'
-      preLoaderRoute: typeof PreviewSosMedicoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-sos': {
-      id: '/preview-sos'
-      path: '/preview-sos'
-      fullPath: '/preview-sos'
-      preLoaderRoute: typeof PreviewSosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-sons': {
-      id: '/preview-sons'
-      path: '/preview-sons'
-      fullPath: '/preview-sons'
-      preLoaderRoute: typeof PreviewSonsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-som': {
-      id: '/preview-som'
-      path: '/preview-som'
-      fullPath: '/preview-som'
-      preLoaderRoute: typeof PreviewSomRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-saude': {
-      id: '/preview-saude'
-      path: '/preview-saude'
-      fullPath: '/preview-saude'
-      preLoaderRoute: typeof PreviewSaudeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-regua': {
-      id: '/preview-regua'
-      path: '/preview-regua'
-      fullPath: '/preview-regua'
-      preLoaderRoute: typeof PreviewReguaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-registrar-consulta': {
-      id: '/preview-registrar-consulta'
-      path: '/preview-registrar-consulta'
-      fullPath: '/preview-registrar-consulta'
-      preLoaderRoute: typeof PreviewRegistrarConsultaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-rede': {
-      id: '/preview-rede'
-      path: '/preview-rede'
-      fullPath: '/preview-rede'
-      preLoaderRoute: typeof PreviewRedeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-prontuario': {
-      id: '/preview-prontuario'
-      path: '/preview-prontuario'
-      fullPath: '/preview-prontuario'
-      preLoaderRoute: typeof PreviewProntuarioRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-presentes': {
-      id: '/preview-presentes'
-      path: '/preview-presentes'
-      fullPath: '/preview-presentes'
-      preLoaderRoute: typeof PreviewPresentesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-onboarding': {
-      id: '/preview-onboarding'
-      path: '/preview-onboarding'
-      fullPath: '/preview-onboarding'
-      preLoaderRoute: typeof PreviewOnboardingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-oferta': {
-      id: '/preview-oferta'
-      path: '/preview-oferta'
-      fullPath: '/preview-oferta'
-      preLoaderRoute: typeof PreviewOfertaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-notificacoes': {
-      id: '/preview-notificacoes'
-      path: '/preview-notificacoes'
-      fullPath: '/preview-notificacoes'
-      preLoaderRoute: typeof PreviewNotificacoesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-momento': {
-      id: '/preview-momento'
-      path: '/preview-momento'
-      fullPath: '/preview-momento'
-      preLoaderRoute: typeof PreviewMomentoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-meditacao': {
-      id: '/preview-meditacao'
-      path: '/preview-meditacao'
-      fullPath: '/preview-meditacao'
-      preLoaderRoute: typeof PreviewMeditacaoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-loja-sementinhas': {
-      id: '/preview-loja-sementinhas'
-      path: '/preview-loja-sementinhas'
-      fullPath: '/preview-loja-sementinhas'
-      preLoaderRoute: typeof PreviewLojaSementinhasRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-jogo': {
-      id: '/preview-jogo'
-      path: '/preview-jogo'
-      fullPath: '/preview-jogo'
-      preLoaderRoute: typeof PreviewJogoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-instagram': {
-      id: '/preview-instagram'
-      path: '/preview-instagram'
-      fullPath: '/preview-instagram'
-      preLoaderRoute: typeof PreviewInstagramRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-home': {
-      id: '/preview-home'
-      path: '/preview-home'
-      fullPath: '/preview-home'
-      preLoaderRoute: typeof PreviewHomeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-gratidao': {
-      id: '/preview-gratidao'
-      path: '/preview-gratidao'
-      fullPath: '/preview-gratidao'
-      preLoaderRoute: typeof PreviewGratidaoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-grades': {
-      id: '/preview-grades'
-      path: '/preview-grades'
-      fullPath: '/preview-grades'
-      preLoaderRoute: typeof PreviewGradesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-exercicio': {
-      id: '/preview-exercicio'
-      path: '/preview-exercicio'
-      fullPath: '/preview-exercicio'
-      preLoaderRoute: typeof PreviewExercicioRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-convite': {
-      id: '/preview-convite'
-      path: '/preview-convite'
-      fullPath: '/preview-convite'
-      preLoaderRoute: typeof PreviewConviteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-conta': {
-      id: '/preview-conta'
-      path: '/preview-conta'
-      fullPath: '/preview-conta'
-      preLoaderRoute: typeof PreviewContaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-conquistas': {
-      id: '/preview-conquistas'
-      path: '/preview-conquistas'
-      fullPath: '/preview-conquistas'
-      preLoaderRoute: typeof PreviewConquistasRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-comunidade': {
-      id: '/preview-comunidade'
-      path: '/preview-comunidade'
-      fullPath: '/preview-comunidade'
-      preLoaderRoute: typeof PreviewComunidadeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-chat': {
-      id: '/preview-chat'
-      path: '/preview-chat'
-      fullPath: '/preview-chat'
-      preLoaderRoute: typeof PreviewChatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-casal': {
-      id: '/preview-casal'
-      path: '/preview-casal'
-      fullPath: '/preview-casal'
-      preLoaderRoute: typeof PreviewCasalRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-bolha': {
-      id: '/preview-bolha'
-      path: '/preview-bolha'
-      fullPath: '/preview-bolha'
-      preLoaderRoute: typeof PreviewBolhaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-bebe': {
-      id: '/preview-bebe'
-      path: '/preview-bebe'
-      fullPath: '/preview-bebe'
-      preLoaderRoute: typeof PreviewBebeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-assinatura': {
-      id: '/preview-assinatura'
-      path: '/preview-assinatura'
-      fullPath: '/preview-assinatura'
-      preLoaderRoute: typeof PreviewAssinaturaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-amigas': {
-      id: '/preview-amigas'
-      path: '/preview-amigas'
-      fullPath: '/preview-amigas'
-      preLoaderRoute: typeof PreviewAmigasRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-agenda': {
-      id: '/preview-agenda'
-      path: '/preview-agenda'
-      fullPath: '/preview-agenda'
-      preLoaderRoute: typeof PreviewAgendaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/mural': {
-      id: '/mural'
-      path: '/mural'
-      fullPath: '/mural'
-      preLoaderRoute: typeof MuralRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/modo-acompanhante': {
-      id: '/modo-acompanhante'
-      path: '/modo-acompanhante'
-      fullPath: '/modo-acompanhante'
-      preLoaderRoute: typeof ModoAcompanhanteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/mitos': {
-      id: '/mitos'
-      path: '/mitos'
-      fullPath: '/mitos'
-      preLoaderRoute: typeof MitosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/medicos': {
-      id: '/medicos'
-      path: '/medicos'
-      fullPath: '/medicos'
-      preLoaderRoute: typeof MedicosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/lives': {
-      id: '/lives'
-      path: '/lives'
-      fullPath: '/lives'
-      preLoaderRoute: typeof LivesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/influenciadora': {
-      id: '/influenciadora'
-      path: '/influenciadora'
-      fullPath: '/influenciadora'
-      preLoaderRoute: typeof InfluenciadoraRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/hospitais': {
-      id: '/hospitais'
-      path: '/hospitais'
-      fullPath: '/hospitais'
-      preLoaderRoute: typeof HospitaisRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/gestacao': {
-      id: '/gestacao'
-      path: '/gestacao'
-      fullPath: '/gestacao'
-      preLoaderRoute: typeof GestacaoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/experiencia': {
-      id: '/experiencia'
-      path: '/experiencia'
-      fullPath: '/experiencia'
-      preLoaderRoute: typeof ExperienciaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/epds': {
-      id: '/epds'
-      path: '/epds'
-      fullPath: '/epds'
-      preLoaderRoute: typeof EpdsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/encontrar-medico': {
-      id: '/encontrar-medico'
-      path: '/encontrar-medico'
-      fullPath: '/encontrar-medico'
-      preLoaderRoute: typeof EncontrarMedicoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/empresas': {
-      id: '/empresas'
-      path: '/empresas'
-      fullPath: '/empresas'
-      preLoaderRoute: typeof EmpresasRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/dpp': {
-      id: '/dpp'
-      path: '/dpp'
-      fullPath: '/dpp'
-      preLoaderRoute: typeof DppRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/diabetes-gestacional': {
-      id: '/diabetes-gestacional'
-      path: '/diabetes-gestacional'
-      fullPath: '/diabetes-gestacional'
-      preLoaderRoute: typeof DiabetesGestacionalRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/depoimentos': {
-      id: '/depoimentos'
-      path: '/depoimentos'
-      fullPath: '/depoimentos'
-      preLoaderRoute: typeof DepoimentosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/cards': {
-      id: '/cards'
-      path: '/cards'
-      fullPath: '/cards'
-      preLoaderRoute: typeof CardsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/calculadora': {
-      id: '/calculadora'
-      path: '/calculadora'
-      fullPath: '/calculadora'
-      preLoaderRoute: typeof CalculadoraRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/batimentos': {
-      id: '/batimentos'
-      path: '/batimentos'
-      fullPath: '/batimentos'
-      preLoaderRoute: typeof BatimentosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/bastidores': {
-      id: '/bastidores'
-      path: '/bastidores'
-      fullPath: '/bastidores'
-      preLoaderRoute: typeof BastidoresRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/agendamento': {
-      id: '/agendamento'
-      path: '/agendamento'
-      fullPath: '/agendamento'
-      preLoaderRoute: typeof AgendamentoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/acompanhante': {
-      id: '/acompanhante'
-      path: '/acompanhante'
-      fullPath: '/acompanhante'
-      preLoaderRoute: typeof AcompanhanteRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -1636,165 +1469,571 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/acompanhante': {
+      id: '/acompanhante'
+      path: '/acompanhante'
+      fullPath: '/acompanhante'
+      preLoaderRoute: typeof AcompanhanteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/votar-nome/$token': {
-      id: '/votar-nome/$token'
-      path: '/votar-nome/$token'
-      fullPath: '/votar-nome/$token'
-      preLoaderRoute: typeof VotarNomeTokenRouteImport
+    '/agendamento': {
+      id: '/agendamento'
+      path: '/agendamento'
+      fullPath: '/agendamento'
+      preLoaderRoute: typeof AgendamentoRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/presente/$token': {
-      id: '/presente/$token'
-      path: '/presente/$token'
-      fullPath: '/presente/$token'
-      preLoaderRoute: typeof PresenteTokenRouteImport
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/p/$codigo': {
-      id: '/p/$codigo'
-      path: '/p/$codigo'
-      fullPath: '/p/$codigo'
-      preLoaderRoute: typeof PCodigoRouteImport
+    '/bastidores': {
+      id: '/bastidores'
+      path: '/bastidores'
+      fullPath: '/bastidores'
+      preLoaderRoute: typeof BastidoresRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/medicos_/google-callback': {
-      id: '/medicos_/google-callback'
-      path: '/medicos/google-callback'
-      fullPath: '/medicos/google-callback'
-      preLoaderRoute: typeof MedicosGoogleCallbackRouteImport
+    '/batimentos': {
+      id: '/batimentos'
+      path: '/batimentos'
+      fullPath: '/batimentos'
+      preLoaderRoute: typeof BatimentosRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/medicos_/cadastro': {
-      id: '/medicos_/cadastro'
-      path: '/medicos/cadastro'
-      fullPath: '/medicos/cadastro'
-      preLoaderRoute: typeof MedicosCadastroRouteImport
+    '/calculadora': {
+      id: '/calculadora'
+      path: '/calculadora'
+      fullPath: '/calculadora'
+      preLoaderRoute: typeof CalculadoraRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/whatsapp': {
-      id: '/api/whatsapp'
-      path: '/api/whatsapp'
-      fullPath: '/api/whatsapp'
-      preLoaderRoute: typeof ApiWhatsappRouteImport
+    '/cards': {
+      id: '/cards'
+      path: '/cards'
+      fullPath: '/cards'
+      preLoaderRoute: typeof CardsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/waitlist-tick': {
-      id: '/api/waitlist-tick'
-      path: '/api/waitlist-tick'
-      fullPath: '/api/waitlist-tick'
-      preLoaderRoute: typeof ApiWaitlistTickRouteImport
+    '/depoimentos': {
+      id: '/depoimentos'
+      path: '/depoimentos'
+      fullPath: '/depoimentos'
+      preLoaderRoute: typeof DepoimentosRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/transcribe': {
-      id: '/api/transcribe'
-      path: '/api/transcribe'
-      fullPath: '/api/transcribe'
-      preLoaderRoute: typeof ApiTranscribeRouteImport
+    '/diabetes-gestacional': {
+      id: '/diabetes-gestacional'
+      path: '/diabetes-gestacional'
+      fullPath: '/diabetes-gestacional'
+      preLoaderRoute: typeof DiabetesGestacionalRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/transcrever-diario': {
-      id: '/api/transcrever-diario'
-      path: '/api/transcrever-diario'
-      fullPath: '/api/transcrever-diario'
-      preLoaderRoute: typeof ApiTranscreverDiarioRouteImport
+    '/dpp': {
+      id: '/dpp'
+      path: '/dpp'
+      fullPath: '/dpp'
+      preLoaderRoute: typeof DppRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/stripe-webhook': {
-      id: '/api/stripe-webhook'
-      path: '/api/stripe-webhook'
-      fullPath: '/api/stripe-webhook'
-      preLoaderRoute: typeof ApiStripeWebhookRouteImport
+    '/empresas': {
+      id: '/empresas'
+      path: '/empresas'
+      fullPath: '/empresas'
+      preLoaderRoute: typeof EmpresasRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/push-weekly-tick': {
-      id: '/api/push-weekly-tick'
-      path: '/api/push-weekly-tick'
-      fullPath: '/api/push-weekly-tick'
-      preLoaderRoute: typeof ApiPushWeeklyTickRouteImport
+    '/encontrar-medico': {
+      id: '/encontrar-medico'
+      path: '/encontrar-medico'
+      fullPath: '/encontrar-medico'
+      preLoaderRoute: typeof EncontrarMedicoRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/nutrition': {
-      id: '/api/nutrition'
-      path: '/api/nutrition'
-      fullPath: '/api/nutrition'
-      preLoaderRoute: typeof ApiNutritionRouteImport
+    '/epds': {
+      id: '/epds'
+      path: '/epds'
+      fullPath: '/epds'
+      preLoaderRoute: typeof EpdsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/mp-webhook': {
-      id: '/api/mp-webhook'
-      path: '/api/mp-webhook'
-      fullPath: '/api/mp-webhook'
-      preLoaderRoute: typeof ApiMpWebhookRouteImport
+    '/experiencia': {
+      id: '/experiencia'
+      path: '/experiencia'
+      fullPath: '/experiencia'
+      preLoaderRoute: typeof ExperienciaRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/meditacao-tick': {
-      id: '/api/meditacao-tick'
-      path: '/api/meditacao-tick'
-      fullPath: '/api/meditacao-tick'
-      preLoaderRoute: typeof ApiMeditacaoTickRouteImport
+    '/gestacao': {
+      id: '/gestacao'
+      path: '/gestacao'
+      fullPath: '/gestacao'
+      preLoaderRoute: typeof GestacaoRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/lembretes-tick': {
-      id: '/api/lembretes-tick'
-      path: '/api/lembretes-tick'
-      fullPath: '/api/lembretes-tick'
-      preLoaderRoute: typeof ApiLembretesTickRouteImport
+    '/hospitais': {
+      id: '/hospitais'
+      path: '/hospitais'
+      fullPath: '/hospitais'
+      preLoaderRoute: typeof HospitaisRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/legenda-da-foto': {
-      id: '/api/legenda-da-foto'
-      path: '/api/legenda-da-foto'
-      fullPath: '/api/legenda-da-foto'
-      preLoaderRoute: typeof ApiLegendaDaFotoRouteImport
+    '/influenciadora': {
+      id: '/influenciadora'
+      path: '/influenciadora'
+      fullPath: '/influenciadora'
+      preLoaderRoute: typeof InfluenciadoraRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/instagram-webhook': {
-      id: '/api/instagram-webhook'
-      path: '/api/instagram-webhook'
-      fullPath: '/api/instagram-webhook'
-      preLoaderRoute: typeof ApiInstagramWebhookRouteImport
+    '/lives': {
+      id: '/lives'
+      path: '/lives'
+      fullPath: '/lives'
+      preLoaderRoute: typeof LivesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/chat': {
-      id: '/api/chat'
-      path: '/api/chat'
-      fullPath: '/api/chat'
-      preLoaderRoute: typeof ApiChatRouteImport
+    '/medicos': {
+      id: '/medicos'
+      path: '/medicos'
+      fullPath: '/medicos'
+      preLoaderRoute: typeof MedicosRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/carta-semanal': {
-      id: '/api/carta-semanal'
-      path: '/api/carta-semanal'
-      fullPath: '/api/carta-semanal'
-      preLoaderRoute: typeof ApiCartaSemanalRouteImport
+    '/mitos': {
+      id: '/mitos'
+      path: '/mitos'
+      fullPath: '/mitos'
+      preLoaderRoute: typeof MitosRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/album/$token': {
-      id: '/album/$token'
-      path: '/album/$token'
-      fullPath: '/album/$token'
-      preLoaderRoute: typeof AlbumTokenRouteImport
+    '/modo-acompanhante': {
+      id: '/modo-acompanhante'
+      path: '/modo-acompanhante'
+      fullPath: '/modo-acompanhante'
+      preLoaderRoute: typeof ModoAcompanhanteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/acompanhar/$token': {
-      id: '/acompanhar/$token'
-      path: '/acompanhar/$token'
-      fullPath: '/acompanhar/$token'
-      preLoaderRoute: typeof AcompanharTokenRouteImport
+    '/mural': {
+      id: '/mural'
+      path: '/mural'
+      fullPath: '/mural'
+      preLoaderRoute: typeof MuralRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/painel': {
-      id: '/_authenticated/painel'
-      path: '/painel'
-      fullPath: '/painel'
-      preLoaderRoute: typeof AuthenticatedPainelRouteImport
+    '/preview-abertura': {
+      id: '/preview-abertura'
+      path: '/preview-abertura'
+      fullPath: '/preview-abertura'
+      preLoaderRoute: typeof PreviewAberturaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-agenda': {
+      id: '/preview-agenda'
+      path: '/preview-agenda'
+      fullPath: '/preview-agenda'
+      preLoaderRoute: typeof PreviewAgendaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-amigas': {
+      id: '/preview-amigas'
+      path: '/preview-amigas'
+      fullPath: '/preview-amigas'
+      preLoaderRoute: typeof PreviewAmigasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-assinatura': {
+      id: '/preview-assinatura'
+      path: '/preview-assinatura'
+      fullPath: '/preview-assinatura'
+      preLoaderRoute: typeof PreviewAssinaturaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-avisos': {
+      id: '/preview-avisos'
+      path: '/preview-avisos'
+      fullPath: '/preview-avisos'
+      preLoaderRoute: typeof PreviewAvisosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-banco': {
+      id: '/preview-banco'
+      path: '/preview-banco'
+      fullPath: '/preview-banco'
+      preLoaderRoute: typeof PreviewBancoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-bebe': {
+      id: '/preview-bebe'
+      path: '/preview-bebe'
+      fullPath: '/preview-bebe'
+      preLoaderRoute: typeof PreviewBebeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-bebe-tab': {
+      id: '/preview-bebe-tab'
+      path: '/preview-bebe-tab'
+      fullPath: '/preview-bebe-tab'
+      preLoaderRoute: typeof PreviewBebeTabRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-bolha': {
+      id: '/preview-bolha'
+      path: '/preview-bolha'
+      fullPath: '/preview-bolha'
+      preLoaderRoute: typeof PreviewBolhaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-cantinho': {
+      id: '/preview-cantinho'
+      path: '/preview-cantinho'
+      fullPath: '/preview-cantinho'
+      preLoaderRoute: typeof PreviewCantinhoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-casal': {
+      id: '/preview-casal'
+      path: '/preview-casal'
+      fullPath: '/preview-casal'
+      preLoaderRoute: typeof PreviewCasalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-chat': {
+      id: '/preview-chat'
+      path: '/preview-chat'
+      fullPath: '/preview-chat'
+      preLoaderRoute: typeof PreviewChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-chutes': {
+      id: '/preview-chutes'
+      path: '/preview-chutes'
+      fullPath: '/preview-chutes'
+      preLoaderRoute: typeof PreviewChutesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-comunidade': {
+      id: '/preview-comunidade'
+      path: '/preview-comunidade'
+      fullPath: '/preview-comunidade'
+      preLoaderRoute: typeof PreviewComunidadeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-conquistas': {
+      id: '/preview-conquistas'
+      path: '/preview-conquistas'
+      fullPath: '/preview-conquistas'
+      preLoaderRoute: typeof PreviewConquistasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-consultorios': {
+      id: '/preview-consultorios'
+      path: '/preview-consultorios'
+      fullPath: '/preview-consultorios'
+      preLoaderRoute: typeof PreviewConsultoriosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-conta': {
+      id: '/preview-conta'
+      path: '/preview-conta'
+      fullPath: '/preview-conta'
+      preLoaderRoute: typeof PreviewContaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-contracoes': {
+      id: '/preview-contracoes'
+      path: '/preview-contracoes'
+      fullPath: '/preview-contracoes'
+      preLoaderRoute: typeof PreviewContracoesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-convite': {
+      id: '/preview-convite'
+      path: '/preview-convite'
+      fullPath: '/preview-convite'
+      preLoaderRoute: typeof PreviewConviteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-convites': {
+      id: '/preview-convites'
+      path: '/preview-convites'
+      fullPath: '/preview-convites'
+      preLoaderRoute: typeof PreviewConvitesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-custo': {
+      id: '/preview-custo'
+      path: '/preview-custo'
+      fullPath: '/preview-custo'
+      preLoaderRoute: typeof PreviewCustoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-emissoes': {
+      id: '/preview-emissoes'
+      path: '/preview-emissoes'
+      fullPath: '/preview-emissoes'
+      preLoaderRoute: typeof PreviewEmissoesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-exercicio': {
+      id: '/preview-exercicio'
+      path: '/preview-exercicio'
+      fullPath: '/preview-exercicio'
+      preLoaderRoute: typeof PreviewExercicioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-grades': {
+      id: '/preview-grades'
+      path: '/preview-grades'
+      fullPath: '/preview-grades'
+      preLoaderRoute: typeof PreviewGradesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-gratidao': {
+      id: '/preview-gratidao'
+      path: '/preview-gratidao'
+      fullPath: '/preview-gratidao'
+      preLoaderRoute: typeof PreviewGratidaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-home': {
+      id: '/preview-home'
+      path: '/preview-home'
+      fullPath: '/preview-home'
+      preLoaderRoute: typeof PreviewHomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-instagram': {
+      id: '/preview-instagram'
+      path: '/preview-instagram'
+      fullPath: '/preview-instagram'
+      preLoaderRoute: typeof PreviewInstagramRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-jogo': {
+      id: '/preview-jogo'
+      path: '/preview-jogo'
+      fullPath: '/preview-jogo'
+      preLoaderRoute: typeof PreviewJogoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-loja-sementinhas': {
+      id: '/preview-loja-sementinhas'
+      path: '/preview-loja-sementinhas'
+      fullPath: '/preview-loja-sementinhas'
+      preLoaderRoute: typeof PreviewLojaSementinhasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-mapa': {
+      id: '/preview-mapa'
+      path: '/preview-mapa'
+      fullPath: '/preview-mapa'
+      preLoaderRoute: typeof PreviewMapaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-meditacao': {
+      id: '/preview-meditacao'
+      path: '/preview-meditacao'
+      fullPath: '/preview-meditacao'
+      preLoaderRoute: typeof PreviewMeditacaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-moderacao': {
+      id: '/preview-moderacao'
+      path: '/preview-moderacao'
+      fullPath: '/preview-moderacao'
+      preLoaderRoute: typeof PreviewModeracaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-momento': {
+      id: '/preview-momento'
+      path: '/preview-momento'
+      fullPath: '/preview-momento'
+      preLoaderRoute: typeof PreviewMomentoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-notificacoes': {
+      id: '/preview-notificacoes'
+      path: '/preview-notificacoes'
+      fullPath: '/preview-notificacoes'
+      preLoaderRoute: typeof PreviewNotificacoesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-nps': {
+      id: '/preview-nps'
+      path: '/preview-nps'
+      fullPath: '/preview-nps'
+      preLoaderRoute: typeof PreviewNpsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-nutricao': {
+      id: '/preview-nutricao'
+      path: '/preview-nutricao'
+      fullPath: '/preview-nutricao'
+      preLoaderRoute: typeof PreviewNutricaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-oferta': {
+      id: '/preview-oferta'
+      path: '/preview-oferta'
+      fullPath: '/preview-oferta'
+      preLoaderRoute: typeof PreviewOfertaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-onboarding': {
+      id: '/preview-onboarding'
+      path: '/preview-onboarding'
+      fullPath: '/preview-onboarding'
+      preLoaderRoute: typeof PreviewOnboardingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-presentes': {
+      id: '/preview-presentes'
+      path: '/preview-presentes'
+      fullPath: '/preview-presentes'
+      preLoaderRoute: typeof PreviewPresentesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-prontuario': {
+      id: '/preview-prontuario'
+      path: '/preview-prontuario'
+      fullPath: '/preview-prontuario'
+      preLoaderRoute: typeof PreviewProntuarioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-rede': {
+      id: '/preview-rede'
+      path: '/preview-rede'
+      fullPath: '/preview-rede'
+      preLoaderRoute: typeof PreviewRedeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-registrar-consulta': {
+      id: '/preview-registrar-consulta'
+      path: '/preview-registrar-consulta'
+      fullPath: '/preview-registrar-consulta'
+      preLoaderRoute: typeof PreviewRegistrarConsultaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-regua': {
+      id: '/preview-regua'
+      path: '/preview-regua'
+      fullPath: '/preview-regua'
+      preLoaderRoute: typeof PreviewReguaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-saude': {
+      id: '/preview-saude'
+      path: '/preview-saude'
+      fullPath: '/preview-saude'
+      preLoaderRoute: typeof PreviewSaudeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-saude-clinica': {
+      id: '/preview-saude-clinica'
+      path: '/preview-saude-clinica'
+      fullPath: '/preview-saude-clinica'
+      preLoaderRoute: typeof PreviewSaudeClinicaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-saude-mulher': {
+      id: '/preview-saude-mulher'
+      path: '/preview-saude-mulher'
+      fullPath: '/preview-saude-mulher'
+      preLoaderRoute: typeof PreviewSaudeMulherRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-saude-registros': {
+      id: '/preview-saude-registros'
+      path: '/preview-saude-registros'
+      fullPath: '/preview-saude-registros'
+      preLoaderRoute: typeof PreviewSaudeRegistrosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-som': {
+      id: '/preview-som'
+      path: '/preview-som'
+      fullPath: '/preview-som'
+      preLoaderRoute: typeof PreviewSomRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-sons': {
+      id: '/preview-sons'
+      path: '/preview-sons'
+      fullPath: '/preview-sons'
+      preLoaderRoute: typeof PreviewSonsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-sos': {
+      id: '/preview-sos'
+      path: '/preview-sos'
+      fullPath: '/preview-sos'
+      preLoaderRoute: typeof PreviewSosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-sos-medico': {
+      id: '/preview-sos-medico'
+      path: '/preview-sos-medico'
+      fullPath: '/preview-sos-medico'
+      preLoaderRoute: typeof PreviewSosMedicoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-tutorial': {
+      id: '/preview-tutorial'
+      path: '/preview-tutorial'
+      fullPath: '/preview-tutorial'
+      preLoaderRoute: typeof PreviewTutorialRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/primeira-consulta': {
+      id: '/primeira-consulta'
+      path: '/primeira-consulta'
+      fullPath: '/primeira-consulta'
+      preLoaderRoute: typeof PrimeiraConsultaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacidade': {
+      id: '/privacidade'
+      path: '/privacidade'
+      fullPath: '/privacidade'
+      preLoaderRoute: typeof PrivacidadeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sobre': {
+      id: '/sobre'
+      path: '/sobre'
+      fullPath: '/sobre'
+      preLoaderRoute: typeof SobreRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tamanho-real': {
+      id: '/tamanho-real'
+      path: '/tamanho-real'
+      fullPath: '/tamanho-real'
+      preLoaderRoute: typeof TamanhoRealRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/termos': {
+      id: '/termos'
+      path: '/termos'
+      fullPath: '/termos'
+      preLoaderRoute: typeof TermosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/minha-conta': {
@@ -1804,18 +2043,172 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMinhaContaRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/admin': {
-      id: '/_authenticated/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+    '/_authenticated/painel': {
+      id: '/_authenticated/painel'
+      path: '/painel'
+      fullPath: '/painel'
+      preLoaderRoute: typeof AuthenticatedPainelRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/api/doctorthink/train': {
-      id: '/api/doctorthink/train'
-      path: '/api/doctorthink/train'
-      fullPath: '/api/doctorthink/train'
-      preLoaderRoute: typeof ApiDoctorthinkTrainRouteImport
+    '/acompanhar/$token': {
+      id: '/acompanhar/$token'
+      path: '/acompanhar/$token'
+      fullPath: '/acompanhar/$token'
+      preLoaderRoute: typeof AcompanharTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/album/$token': {
+      id: '/album/$token'
+      path: '/album/$token'
+      fullPath: '/album/$token'
+      preLoaderRoute: typeof AlbumTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/carta-semanal': {
+      id: '/api/carta-semanal'
+      path: '/api/carta-semanal'
+      fullPath: '/api/carta-semanal'
+      preLoaderRoute: typeof ApiCartaSemanalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/chat': {
+      id: '/api/chat'
+      path: '/api/chat'
+      fullPath: '/api/chat'
+      preLoaderRoute: typeof ApiChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/instagram-webhook': {
+      id: '/api/instagram-webhook'
+      path: '/api/instagram-webhook'
+      fullPath: '/api/instagram-webhook'
+      preLoaderRoute: typeof ApiInstagramWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/legenda-da-foto': {
+      id: '/api/legenda-da-foto'
+      path: '/api/legenda-da-foto'
+      fullPath: '/api/legenda-da-foto'
+      preLoaderRoute: typeof ApiLegendaDaFotoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/lembretes-tick': {
+      id: '/api/lembretes-tick'
+      path: '/api/lembretes-tick'
+      fullPath: '/api/lembretes-tick'
+      preLoaderRoute: typeof ApiLembretesTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/meditacao-tick': {
+      id: '/api/meditacao-tick'
+      path: '/api/meditacao-tick'
+      fullPath: '/api/meditacao-tick'
+      preLoaderRoute: typeof ApiMeditacaoTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/mp-webhook': {
+      id: '/api/mp-webhook'
+      path: '/api/mp-webhook'
+      fullPath: '/api/mp-webhook'
+      preLoaderRoute: typeof ApiMpWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/nutrition': {
+      id: '/api/nutrition'
+      path: '/api/nutrition'
+      fullPath: '/api/nutrition'
+      preLoaderRoute: typeof ApiNutritionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/prato': {
+      id: '/api/prato'
+      path: '/api/prato'
+      fullPath: '/api/prato'
+      preLoaderRoute: typeof ApiPratoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/push-weekly-tick': {
+      id: '/api/push-weekly-tick'
+      path: '/api/push-weekly-tick'
+      fullPath: '/api/push-weekly-tick'
+      preLoaderRoute: typeof ApiPushWeeklyTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/stripe-webhook': {
+      id: '/api/stripe-webhook'
+      path: '/api/stripe-webhook'
+      fullPath: '/api/stripe-webhook'
+      preLoaderRoute: typeof ApiStripeWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/transcrever-diario': {
+      id: '/api/transcrever-diario'
+      path: '/api/transcrever-diario'
+      fullPath: '/api/transcrever-diario'
+      preLoaderRoute: typeof ApiTranscreverDiarioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/transcribe': {
+      id: '/api/transcribe'
+      path: '/api/transcribe'
+      fullPath: '/api/transcribe'
+      preLoaderRoute: typeof ApiTranscribeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/waitlist-tick': {
+      id: '/api/waitlist-tick'
+      path: '/api/waitlist-tick'
+      fullPath: '/api/waitlist-tick'
+      preLoaderRoute: typeof ApiWaitlistTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/whatsapp': {
+      id: '/api/whatsapp'
+      path: '/api/whatsapp'
+      fullPath: '/api/whatsapp'
+      preLoaderRoute: typeof ApiWhatsappRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/medicos_/cadastro': {
+      id: '/medicos_/cadastro'
+      path: '/medicos/cadastro'
+      fullPath: '/medicos/cadastro'
+      preLoaderRoute: typeof MedicosCadastroRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/medicos_/google-callback': {
+      id: '/medicos_/google-callback'
+      path: '/medicos/google-callback'
+      fullPath: '/medicos/google-callback'
+      preLoaderRoute: typeof MedicosGoogleCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/p/$codigo': {
+      id: '/p/$codigo'
+      path: '/p/$codigo'
+      fullPath: '/p/$codigo'
+      preLoaderRoute: typeof PCodigoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/presente/$token': {
+      id: '/presente/$token'
+      path: '/presente/$token'
+      fullPath: '/presente/$token'
+      preLoaderRoute: typeof PresenteTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pub/$codigo': {
+      id: '/pub/$codigo'
+      path: '/pub/$codigo'
+      fullPath: '/pub/$codigo'
+      preLoaderRoute: typeof PubCodigoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/votar-nome/$token': {
+      id: '/votar-nome/$token'
+      path: '/votar-nome/$token'
+      fullPath: '/votar-nome/$token'
+      preLoaderRoute: typeof VotarNomeTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/doctorthink/ask': {
@@ -1823,6 +2216,13 @@ declare module '@tanstack/react-router' {
       path: '/api/doctorthink/ask'
       fullPath: '/api/doctorthink/ask'
       preLoaderRoute: typeof ApiDoctorthinkAskRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/doctorthink/train': {
+      id: '/api/doctorthink/train'
+      path: '/api/doctorthink/train'
+      fullPath: '/api/doctorthink/train'
+      preLoaderRoute: typeof ApiDoctorthinkTrainRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -1868,17 +2268,28 @@ const rootRouteChildren: RootRouteChildren = {
   MitosRoute: MitosRoute,
   ModoAcompanhanteRoute: ModoAcompanhanteRoute,
   MuralRoute: MuralRoute,
+  PreviewAberturaRoute: PreviewAberturaRoute,
   PreviewAgendaRoute: PreviewAgendaRoute,
   PreviewAmigasRoute: PreviewAmigasRoute,
   PreviewAssinaturaRoute: PreviewAssinaturaRoute,
+  PreviewAvisosRoute: PreviewAvisosRoute,
+  PreviewBancoRoute: PreviewBancoRoute,
   PreviewBebeRoute: PreviewBebeRoute,
+  PreviewBebeTabRoute: PreviewBebeTabRoute,
   PreviewBolhaRoute: PreviewBolhaRoute,
+  PreviewCantinhoRoute: PreviewCantinhoRoute,
   PreviewCasalRoute: PreviewCasalRoute,
   PreviewChatRoute: PreviewChatRoute,
+  PreviewChutesRoute: PreviewChutesRoute,
   PreviewComunidadeRoute: PreviewComunidadeRoute,
   PreviewConquistasRoute: PreviewConquistasRoute,
+  PreviewConsultoriosRoute: PreviewConsultoriosRoute,
   PreviewContaRoute: PreviewContaRoute,
+  PreviewContracoesRoute: PreviewContracoesRoute,
   PreviewConviteRoute: PreviewConviteRoute,
+  PreviewConvitesRoute: PreviewConvitesRoute,
+  PreviewCustoRoute: PreviewCustoRoute,
+  PreviewEmissoesRoute: PreviewEmissoesRoute,
   PreviewExercicioRoute: PreviewExercicioRoute,
   PreviewGradesRoute: PreviewGradesRoute,
   PreviewGratidaoRoute: PreviewGratidaoRoute,
@@ -1886,9 +2297,13 @@ const rootRouteChildren: RootRouteChildren = {
   PreviewInstagramRoute: PreviewInstagramRoute,
   PreviewJogoRoute: PreviewJogoRoute,
   PreviewLojaSementinhasRoute: PreviewLojaSementinhasRoute,
+  PreviewMapaRoute: PreviewMapaRoute,
   PreviewMeditacaoRoute: PreviewMeditacaoRoute,
+  PreviewModeracaoRoute: PreviewModeracaoRoute,
   PreviewMomentoRoute: PreviewMomentoRoute,
   PreviewNotificacoesRoute: PreviewNotificacoesRoute,
+  PreviewNpsRoute: PreviewNpsRoute,
+  PreviewNutricaoRoute: PreviewNutricaoRoute,
   PreviewOfertaRoute: PreviewOfertaRoute,
   PreviewOnboardingRoute: PreviewOnboardingRoute,
   PreviewPresentesRoute: PreviewPresentesRoute,
@@ -1897,6 +2312,9 @@ const rootRouteChildren: RootRouteChildren = {
   PreviewRegistrarConsultaRoute: PreviewRegistrarConsultaRoute,
   PreviewReguaRoute: PreviewReguaRoute,
   PreviewSaudeRoute: PreviewSaudeRoute,
+  PreviewSaudeClinicaRoute: PreviewSaudeClinicaRoute,
+  PreviewSaudeMulherRoute: PreviewSaudeMulherRoute,
+  PreviewSaudeRegistrosRoute: PreviewSaudeRegistrosRoute,
   PreviewSomRoute: PreviewSomRoute,
   PreviewSonsRoute: PreviewSonsRoute,
   PreviewSosRoute: PreviewSosRoute,
@@ -1918,6 +2336,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMeditacaoTickRoute: ApiMeditacaoTickRoute,
   ApiMpWebhookRoute: ApiMpWebhookRoute,
   ApiNutritionRoute: ApiNutritionRoute,
+  ApiPratoRoute: ApiPratoRoute,
   ApiPushWeeklyTickRoute: ApiPushWeeklyTickRoute,
   ApiStripeWebhookRoute: ApiStripeWebhookRoute,
   ApiTranscreverDiarioRoute: ApiTranscreverDiarioRoute,
@@ -1928,6 +2347,7 @@ const rootRouteChildren: RootRouteChildren = {
   MedicosGoogleCallbackRoute: MedicosGoogleCallbackRoute,
   PCodigoRoute: PCodigoRoute,
   PresenteTokenRoute: PresenteTokenRoute,
+  PubCodigoRoute: PubCodigoRoute,
   VotarNomeTokenRoute: VotarNomeTokenRoute,
   ApiDoctorthinkAskRoute: ApiDoctorthinkAskRoute,
   ApiDoctorthinkTrainRoute: ApiDoctorthinkTrainRoute,

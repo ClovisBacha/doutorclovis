@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ConquistasTab } from "@/routes/_authenticated/minha-conta";
+import { ConquistasTab } from "@/components/conquistas-tab";
 import { CONQUISTAS } from "@/lib/conquistas";
 
 /**

@@ -346,7 +346,12 @@ function PresenteParaAsIndicadas() {
         setErro(
           r.motivo === "sem_bolso"
             ? "O seu bolso deste mês acabou. Ele volta no dia 1º."
-            : "Não deu para enviar agora.",
+            : /* ⚠️ Texto PRÓPRIO: dizer que o bolso acabou sobre uma leitura
+                 que falhou faria a criadora concluir, no dia 3 do mês, que a
+                 mesada dela terminou — e parar de presentear até o mês virar. */
+              r.motivo === "instavel"
+              ? "Não consegui conferir o seu bolso agora — tente de novo."
+              : "Não deu para enviar agora.",
         );
     } catch {
       setErro("Não deu para enviar agora.");

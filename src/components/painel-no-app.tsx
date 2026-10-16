@@ -37,14 +37,20 @@ export type ResumoDoDia = {
   agendamentosPendentes: number;
   preConsultasNovas: number;
   /**
-   * Exames enviados e ainda não vistos.
+   * ⚠️ TODO CAMPO DAQUI É OBRIGATÓRIO, E ISSO É A REGRA — não uma coincidência.
    *
-   * `undefined` quando o painel não carregou essa lista — e aí o cartão NÃO
-   * aparece, em vez de mostrar "0". Zero falso é pior que ausência: ele diz ao
-   * médico que não há nada esperando, e é exatamente por acreditar nisso que
-   * ele não vai olhar.
+   * Esta tela é de TRIAGEM: o médico olha e decide se precisa abrir o
+   * computador. Um contador que mostra "0" sobre uma lista que o shell não
+   * carregou diz a ele que não há ninguém esperando, e é exatamente por
+   * acreditar nisso que ele não vai olhar. Zero falso é pior que ausência.
+   *
+   * Enquanto houver campo OPCIONAL aqui, há um contador que pode nascer
+   * mostrando zero sem ter olhado. `examesNovos` era um: declarado, lido em
+   * três lugares e passado por NINGUÉM desde que o envio de exame saiu do
+   * produto (ago/2026) — campo morto com cartão pronto, que é como o defeito
+   * volta. Campo novo entra obrigatório, ou o cartão dele é gateado e o teste
+   * ao lado cobra o gate.
    */
-  examesNovos?: number;
   salasAbertas: number;
   proxima: { dateLabel: string; patientName: string } | null;
 };
@@ -114,7 +120,6 @@ export function PainelNoApp({
     resumo.perguntasPendentes === 0 &&
     resumo.agendamentosPendentes === 0 &&
     resumo.preConsultasNovas === 0 &&
-    (resumo.examesNovos ?? 0) === 0 &&
     resumo.salasAbertas === 0;
 
   return (
@@ -187,16 +192,9 @@ export function PainelNoApp({
         <Contador
           n={resumo.preConsultasNovas}
           rotulo="pré-consultas novas"
-          /* Pré-consultas e exames viraram seções da aba Pacientes. */
+          /* Pré-consultas viraram seção da aba Pacientes. */
           onClick={() => onIr("Pacientes 👩‍🍼")}
         />
-        {resumo.examesNovos !== undefined && (
-          <Contador
-            n={resumo.examesNovos}
-            rotulo="exames enviados"
-            onClick={() => onIr("Pacientes 👩‍🍼")}
-          />
-        )}
       </div>
 
       {resumo.proxima && (

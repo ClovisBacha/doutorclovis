@@ -14,6 +14,8 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
+import { MOOD_LABEL } from "@/lib/humor-e-saudacao";
+
 const path = readFileSync("src/components/gestacao-path.tsx", "utf8");
 const bolha = readFileSync("src/components/bolha.tsx", "utf8");
 const css = readFileSync("src/styles.css", "utf8");
@@ -145,18 +147,22 @@ describe("o humor do fechamento sai do aparelho", () => {
   });
 
   test("os cinco emojis do fechamento têm valor no gráfico dela", () => {
-    /* Sem isto, três dos cinco entram como "normal" e somem na média. */
+    /* Sem isto, três dos cinco entram como "normal" e somem na média.
+       ⚠️ O RÓTULO É CONFERIDO NO OBJETO, e não no texto do arquivo. Esta
+       asserção lia `const MOOD_LABEL` de `minha-conta.tsx` e ficou VERMELHA no
+       dia em que a tabela mudou de casa para `lib/humor-e-saudacao.ts` —
+       reprovando uma mudança que não tocou a garantia. Travar ONDE a constante
+       mora é a mesma armadilha de travar como ela é escrita. Importada, a
+       asserção passa a ser mais forte: ela cobra a CHAVE de verdade, e não que
+       o arquivo contenha aquele pedaço de texto.
+       `MOOD_VALUE` segue lido do fonte porque continua privado ao componente
+       que o usa; se um dia ele sair de lá, este teste segue o mesmo caminho. */
     const i = conta.indexOf("const MOOD_VALUE");
+    expect(i).toBeGreaterThan(-1);
     const tabela = conta.slice(i, conta.indexOf("};", i));
     for (const e of ["😌", "🥱", "💛", "😐", "😟"]) {
       expect(tabela).toContain(`"${e}"`);
-    }
-    const rot = conta.slice(
-      conta.indexOf("const MOOD_LABEL"),
-      conta.indexOf("};", conta.indexOf("const MOOD_LABEL")),
-    );
-    for (const e of ["😌", "🥱", "💛", "😐", "😟"]) {
-      expect(rot).toContain(`"${e}"`);
+      expect(MOOD_LABEL[e]).toBeTruthy();
     }
   });
 });
