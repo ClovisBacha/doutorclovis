@@ -33,12 +33,20 @@ const MUDO: SomDeFundo = { pausar: () => {}, retomar: () => {}, parar: () => {} 
 
 export function tocarSomDeFundo(
   som: SomKey | "silencio",
-  o: { entradaMs?: number } = {},
+  o: {
+    entradaMs?: number;
+    /** O nível (0 a 1). Sem ele, o que o som tinha ao vivo na meditação do site. */
+    volume?: number;
+    /** Continua com a tela apagada (os sons para dormir). */
+    fundo?: boolean;
+    /** Quantas cópias na fila: a fila se refaz depois da última, com um soluço. */
+    copias?: number;
+  } = {},
 ): SomDeFundo {
   if (som === "silencio" || Platform.OS === "web") return MUDO;
   const fonte = SONS_DE_FUNDO[som];
   if (!fonte) return MUDO;
-  const alvo = fonte.volume;
+  const alvo = o.volume ?? fonte.volume;
   let fila: AudioPlaylist | null = null;
   let nivel = 0;
   let rampa: ReturnType<typeof setInterval> | null = null;
@@ -87,11 +95,11 @@ export function tocarSomDeFundo(
     }
   }
 
-  void prepararModo().then(() => {
+  void prepararModo({ fundo: o.fundo }).then(() => {
     if (acabou) return;
     try {
       fila = createAudioPlaylist({
-        sources: Array.from({ length: COPIAS }, () => fonte.arquivo),
+        sources: Array.from({ length: o.copias ?? COPIAS }, () => fonte.arquivo),
         loop: "all",
       });
       fila.volume = 0;

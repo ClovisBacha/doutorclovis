@@ -2,7 +2,8 @@ import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { useKeepAwake } from "expo-keep-awake";
 import { LinearGradient } from "expo-linear-gradient";
-import { X } from "lucide-react-native";
+import { router } from "expo-router";
+import { ChevronRight, X } from "lucide-react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
@@ -554,6 +555,38 @@ export default function Meditar() {
             </View>
           </>
         ) : null}
+
+        {/* Coisas que ela pode querer EM VEZ da sessão de hoje — não são
+            escolhas desta meditação. "Para vocês dois" é preparação para o
+            parto: some no Modo Cuidado e no pós-parto. */}
+        <View style={{ marginTop: espaco.xxl, gap: espaco.md }}>
+          {!at.cuidado && !at.pos ? (
+            <EscolhaComLegenda
+              paleta={PALETA}
+              titulo="Para vocês dois"
+              legenda="10 min com quem vai estar com você no parto"
+              ativa={false}
+              aoTocar={() => {
+                pararAmostra();
+                router.push("/jornada/casal");
+              }}
+              antes={<Text style={{ fontSize: 24 }}>🤲</Text>}
+              depois={<ChevronRight size={18} color={corMeditacao.familia} />}
+            />
+          ) : null}
+          <EscolhaComLegenda
+            paleta={PALETA}
+            titulo="Só sons, para dormir"
+            legenda="Chuva, mar ou o coração — com a tela apagada"
+            ativa={false}
+            aoTocar={() => {
+              pararAmostra();
+              router.push("/jornada/dormir");
+            }}
+            antes={<Text style={{ fontSize: 24 }}>🌙</Text>}
+            depois={<ChevronRight size={18} color={corMeditacao.familia} />}
+          />
+        </View>
       </ScrollView>
       {mostrarMenu ? (
         <RodapeDaAtividade paleta={PALETA}>

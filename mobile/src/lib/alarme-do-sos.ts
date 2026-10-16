@@ -1,5 +1,6 @@
 import { createAudioPlayer, setAudioModeAsync } from "expo-audio";
 import { Platform } from "react-native";
+import { esquecerModo } from "~/lib/audio/voz";
 
 /**
  * O ALARME DO SOS — o único som de INTERFACE do app (as vozes das sessões são
@@ -33,6 +34,8 @@ export async function tocarAlarmeDoSos(tipo: keyof typeof SONS): Promise<void> {
       shouldPlayInBackground: false,
       allowsRecording: false,
     });
+    /* O modo do alarme não é o das sessões: o próximo som reaplica o seu. */
+    esquecerModo();
     const tocador = createAudioPlayer(SONS[tipo]);
     tocador.play();
     const duracao = tipo === "enviado" ? 650 : 1050;

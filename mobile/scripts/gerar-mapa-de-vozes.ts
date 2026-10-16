@@ -25,6 +25,13 @@ const mov = readdirSync(AUDIO)
 const med = readdirSync(join(AUDIO, "med"))
   .filter((f) => f.endsWith(".mp3"))
   .sort();
+/* A noite: as duas histórias para dormir (mar-*, trem-*) e a sessão do casal. */
+const noite = ["dormir", "casal"].flatMap((pasta) =>
+  readdirSync(join(AUDIO, pasta))
+    .filter((f) => f.endsWith(".mp3"))
+    .sort()
+    .map((f) => `${pasta}/${f}`),
+);
 
 const linhas: string[] = [];
 linhas.push("/* eslint-disable */");
@@ -55,9 +62,21 @@ for (const f of med)
   );
 linhas.push("};");
 linhas.push("");
+linhas.push(
+  "/** A voz da noite, pela id do bloco: as histórias para dormir e a sessão do casal. */",
+);
+linhas.push("export const VOZ_DA_NOITE: Record<string, number> = {");
+for (const f of noite)
+  linhas.push(
+    `  ${JSON.stringify(f.slice(f.indexOf("/") + 1, -4))}: require(${JSON.stringify(`${DE_LA}/${f}`)}),`,
+  );
+linhas.push("};");
+linhas.push("");
 writeFileSync(SAIDA, linhas.join("\n"));
 /* Sai já formatado: sem isto, cada geração brigaria com o formatador do commit. */
 execFileSync(join(RAIZ, "node_modules", ".bin", "prettier"), ["--write", SAIDA], {
   stdio: "ignore",
 });
-console.log(`vozes.ts: ${mov.length} movimentos, 3 da respiração, ${med.length} da meditação`);
+console.log(
+  `vozes.ts: ${mov.length} movimentos, 3 da respiração, ${med.length} da meditação, ${noite.length} da noite`,
+);

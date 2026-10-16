@@ -158,3 +158,41 @@ export const corBebe = {
   sombraDoBotao: "#f43f5e",
   fechar: "#45556c",
 } as const;
+
+/**
+ * A NOITE: "Para vocês dois" (violeta-noite), "Só sons, para dormir" (azul-
+ * noite) e a história (quase preto), como no app antigo — telas escuras, para
+ * a luz não acordar ninguém. O texto é branco em transparências.
+ */
+export const corNoite = {
+  casal: ["#1d1430", "#241a3d", "#140e24"] as const,
+  dormir: ["#141a34", "#1b2140", "#0e1226"] as const,
+  historia: "#0b0f21",
+  estrela: "#dfe6ff",
+  branco: "#ffffff",
+  branco90: "rgba(255,255,255,0.9)",
+  branco80: "rgba(255,255,255,0.8)",
+  branco70: "rgba(255,255,255,0.7)",
+  branco60: "rgba(255,255,255,0.6)",
+  branco50: "rgba(255,255,255,0.5)",
+  branco45: "rgba(255,255,255,0.45)",
+  branco40: "rgba(255,255,255,0.4)",
+  branco35: "rgba(255,255,255,0.35)",
+  branco30: "rgba(255,255,255,0.3)",
+  branco15: "rgba(255,255,255,0.15)",
+  branco10: "rgba(255,255,255,0.1)",
+  branco6: "rgba(255,255,255,0.06)",
+  /* o botão claro da sessão do casal (`text-[#241a3d]`) */
+  tintaDoBotao: "#241a3d",
+  /* quem é o alvo da fala: rosa ela, azul quem acompanha, âmbar os dois */
+  ela: { fundo: "rgba(255,32,86,0.2)", texto: "#ffccd3", borda: "rgba(255,99,126,0.3)" },
+  par: { fundo: "rgba(0,166,244,0.2)", texto: "#b8e6fe", borda: "rgba(0,188,255,0.3)" },
+  dois: { fundo: "rgba(254,154,0,0.2)", texto: "#fef3c6", borda: "rgba(255,185,0,0.3)" },
+  alvoDaFigura: "#ffd230",
+  /* os sons para dormir: o cartão escolhido e o tempo escolhido (índigo) */
+  escolhidoBorda: "rgba(163,179,255,0.6)",
+  escolhidoFundo: "rgba(124,134,255,0.25)",
+  onda: "#c6d2ff",
+  tempo: "rgba(124,134,255,0.9)",
+  tempoTexto: "#141a34",
+} as const;

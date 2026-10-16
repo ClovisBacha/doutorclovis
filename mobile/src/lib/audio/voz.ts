@@ -23,16 +23,31 @@ const tocando: Partial<Record<Canal, AudioPlayer>> = {};
    vez, a voz começaria a falar com a sessão já pausada ou fechada. */
 const vez: Record<Canal, number> = { guia: 0, pulso: 0 };
 let modo: Promise<unknown> | null = null;
+let modoComFundo: boolean | null = null;
 
-/** O modo de áudio das sessões guiadas: toca no silencioso e mistura com o resto. */
-export function prepararModo() {
-  if (!modo)
+/**
+ * O modo de áudio: toca no silencioso e mistura com o resto. `fundo` é só para
+ * a noite (os sons e as histórias para dormir), que continuam com a tela
+ * apagada; as sessões guiadas param quando o app sai da tela. O modo só é
+ * reaplicado quando muda.
+ */
+export function prepararModo(o: { fundo?: boolean } = {}) {
+  const fundo = !!o.fundo;
+  if (!modo || modoComFundo !== fundo) {
+    modoComFundo = fundo;
     modo = setAudioModeAsync({
       playsInSilentMode: true,
       interruptionMode: "mixWithOthers",
-      shouldPlayInBackground: false,
+      shouldPlayInBackground: fundo,
     }).catch(() => {});
+  }
   return modo;
+}
+
+/** Outro módulo trocou o modo (o alarme do SOS): o próximo som reaplica o seu. */
+export function esquecerModo() {
+  modo = null;
+  modoComFundo = null;
 }
 
 export function pararCanal(canal: Canal) {
@@ -53,34 +68,58 @@ export function pararVozes() {
   pararCanal("pulso");
 }
 
-/** Toca uma voz num canal (para o que estava nele). `fonte` ausente = silêncio. */
+/**
+ * Toca uma voz num canal (para o que estava nele). `fonte` ausente = silêncio.
+ *
+ * `aoAcabar` é chamado quando a fala chega ao fim — nunca quando ela é parada
+ * (pausa, saída, outra fala no mesmo canal): quem encadeia falas (as histórias,
+ * a sessão do casal) só segue quando a voz terminou de verdade. `velocidade`
+ * mantém o tom (as histórias tocam a 0,92×, mais arrastadas, como no site).
+ */
 export function tocarVoz(
   fonte: number | undefined | null,
-  o: { canal?: Canal; volume?: number } = {},
+  o: {
+    canal?: Canal;
+    volume?: number;
+    fundo?: boolean;
+    velocidade?: number;
+    aoAcabar?: () => void;
+  } = {},
 ) {
   if (!fonte || Platform.OS === "web") return;
   const canal = o.canal ?? "guia";
   pararCanal(canal);
   const minha = vez[canal];
-  void prepararModo().then(() => {
+  void prepararModo({ fundo: o.fundo }).then(() => {
     if (vez[canal] !== minha) return;
     let p: AudioPlayer;
     try {
       p = createAudioPlayer(fonte);
     } catch {
+      o.aoAcabar?.();
       return;
     }
     p.volume = o.volume ?? 1;
+    if (o.velocidade && o.velocidade !== 1) {
+      try {
+        p.shouldCorrectPitch = true;
+        p.setPlaybackRate(o.velocidade, "high");
+      } catch {
+        /* sem ajuste de velocidade: toca no ritmo gravado */
+      }
+    }
     tocando[canal] = p;
     const sub = p.addListener("playbackStatusUpdate", (s) => {
       if (!s.didJustFinish) return;
       sub.remove();
-      if (tocando[canal] === p) delete tocando[canal];
+      const aindaEra = tocando[canal] === p;
+      if (aindaEra) delete tocando[canal];
       try {
         p.remove();
       } catch {
         /* já liberado */
       }
+      if (aindaEra && vez[canal] === minha) o.aoAcabar?.();
     });
     p.play();
   });
