@@ -1,11 +1,10 @@
-import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
-import { X } from "lucide-react-native";
+import { Volume2, VolumeX, X } from "lucide-react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Easing,
-  Platform,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -33,10 +32,14 @@ import {
 } from "@/lib/gratidao";
 import { paraLike } from "@/lib/like-seguro";
 import { haQuantoTempo } from "@/lib/quando-foi";
-import { Botao, Carregando, T, Tela, toque } from "~/componentes/base";
+import { Carregando, T, Tela, toque } from "~/componentes/base";
 import {
   BolhaComBalao,
+  BotaoDaAtividade,
+  Brilho,
   FundoDaAtividade,
+  sombraDe,
+  Superficie,
   type PaletaDaAtividade,
 } from "~/componentes/jornada/atividade";
 import { corBebe, corJornada } from "~/componentes/jornada/cores";
@@ -51,7 +54,7 @@ import { cartaDoDiaNoApp } from "~/lib/jornada/cartas";
 import { gravarChave, useLoja } from "~/lib/jornada/loja";
 import { CHAVE_CARTAS_LIDAS } from "~/lib/jornada/momentos";
 import { supabase } from "~/servidor/supabase";
-import { ALVO_MINIMO, espaco, fonte } from "~/tema";
+import { ALVO_MINIMO, cor, espaco, fonte } from "~/tema";
 
 /**
  * A CARTA PARA O BEBÊ — o `BondingBlock` do app antigo: ela lê em voz alta,
@@ -82,6 +85,9 @@ const PALETA: PaletaDaAtividade = {
   discreto: corBebe.discreto,
   brancoSuave: corBebe.brancoSuave,
 };
+
+/** O envelope com coração, nas artes 3D do app: a carta é um objeto, e não um texto solto. */
+const ARTE_DA_CARTA = require("../../../../src/assets/bebe/carta.webp");
 
 /* As gratidões de exemplo da bancada: o bastante para a carta delas existir. */
 const GRATIDOES_DA_BANCADA: Gratidao[] = [
@@ -264,7 +270,7 @@ export default function Bebe() {
         <T>
           Hoje a jornada é sobre cuidar de você. Respirar, mexer devagar e escrever continuam aqui.
         </T>
-        <Botao rotulo="Voltar" aoTocar={voltarParaJornada} corFundo={corJornada.roxo} />
+        <BotaoDaAtividade cor={corJornada.roxo} rotulo="Voltar" aoTocar={voltarParaJornada} />
       </Tela>
     );
   }
@@ -288,7 +294,16 @@ export default function Bebe() {
             /* O fim do site: o 💋 grande, o confete a cada carta e a bolha
                acompanhando ("Guardei esse minuto com você") — ela é o
                acompanhamento, não o clímax. */
-            arte={<Text style={{ fontSize: 60, lineHeight: 72 }}>💋</Text>}
+            arte={
+              <View style={{ alignItems: "center", justifyContent: "center" }}>
+                <Brilho tamanho={200} />
+                <Image
+                  source={ARTE_DA_CARTA}
+                  accessibilityIgnoresInvertColors
+                  style={{ width: 128, height: 128 }}
+                />
+              </View>
+            }
             confete
             balao={falaDaBolhaNaCarta({ tela: "done" })}
           />
@@ -353,13 +368,29 @@ export default function Bebe() {
             style={({ pressed }) => ({
               width: ALVO_MINIMO,
               height: ALVO_MINIMO,
-              marginRight: -espaco.sm,
+              marginRight: -espaco.xs,
               alignItems: "center",
               justifyContent: "center",
               opacity: pressed ? 0.6 : 1,
             })}
           >
-            <Text style={{ fontSize: 20 }}>{som === "silencio" ? "🔇" : "🔊"}</Text>
+            <View
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 19,
+                backgroundColor: cor.branco,
+                alignItems: "center",
+                justifyContent: "center",
+                ...sombraDe(corBebe.forte, 0.6),
+              }}
+            >
+              {som === "silencio" ? (
+                <VolumeX size={18} color={corBebe.secao} strokeWidth={2.3} />
+              ) : (
+                <Volume2 size={18} color={corBebe.forte} strokeWidth={2.3} />
+              )}
+            </View>
           </Pressable>
         </View>
         <View
@@ -383,33 +414,19 @@ export default function Bebe() {
           >
             leia em voz alta, no seu ritmo
           </Text>
-          <Pressable
-            accessibilityRole="button"
-            hitSlop={4}
-            onPress={() => {
-              if (Platform.OS !== "web")
-                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-              if (ultima) void terminar();
-              else setLinha((l) => l + 1);
-            }}
-            style={({ pressed }) => ({
-              marginTop: espaco.lg,
-              minHeight: 36,
-              paddingHorizontal: espaco.xl,
-              borderRadius: 999,
-              borderWidth: 1,
-              borderColor: corBebe.borda,
-              backgroundColor: corBebe.vidro,
-              alignItems: "center",
-              justifyContent: "center",
-              opacity: pressed ? 0.7 : 1,
-            })}
-          >
-            {/* A última linha não é "próxima": é o fim da carta. */}
-            <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: corBebe.secao }}>
-              {ultima ? "Terminei de ler 💛" : "Próxima linha →"}
-            </Text>
-          </Pressable>
+          {/* A última linha não é "próxima": é o fim da carta — e vira o botão
+              cheio, porque é ali que a leitura termina. */}
+          <View style={{ marginTop: espaco.lg, width: "100%", maxWidth: 300 }}>
+            <BotaoDaAtividade
+              claro={!ultima}
+              cor={corBebe.forte}
+              rotulo={ultima ? "Terminei de ler 💛" : "Próxima linha"}
+              aoTocar={() => {
+                if (ultima) void terminar();
+                else setLinha((l) => l + 1);
+              }}
+            />
+          </View>
         </View>
         <FolhaDeSons
           aberta={folha}
@@ -472,7 +489,7 @@ export default function Bebe() {
               Toque numa carta pra ler de novo, no seu ritmo. 💛
             </Text>
           </View>
-          <View style={{ marginTop: 20, gap: espaco.sm }}>
+          <View style={{ marginTop: 20, gap: espaco.md }}>
             {album.map((c) => {
               const quando = ultimaLeitura(leituras, c.id);
               return (
@@ -487,14 +504,13 @@ export default function Bebe() {
                     flexDirection: "row",
                     alignItems: "center",
                     gap: espaco.md,
-                    minHeight: ALVO_MINIMO + 12,
+                    minHeight: ALVO_MINIMO + 16,
                     paddingHorizontal: espaco.lg,
                     paddingVertical: espaco.md,
-                    borderRadius: 16,
-                    borderWidth: 1,
-                    borderColor: corBebe.bordaSuave,
-                    backgroundColor: corBebe.vidroForte,
+                    borderRadius: 20,
+                    backgroundColor: cor.branco,
                     opacity: pressed ? 0.8 : 1,
+                    ...sombraDe(corBebe.forte, 0.7),
                   })}
                 >
                   <Text style={{ fontSize: 24 }}>{c.emoji}</Text>
@@ -538,6 +554,7 @@ export default function Bebe() {
       >
         <BolhaComBalao
           humor="apaixonado"
+          paleta={PALETA}
           fala={falaDaBolhaNaCarta({
             tela: "intro",
             fraseDeLeitura,
@@ -545,74 +562,78 @@ export default function Bebe() {
             periodo: periodoDaHora(new Date().getHours()),
           })}
         />
-        <Text style={[estilos.rotulo, { marginTop: espaco.lg }]}>
-          {lendoAsDelas ? "Escrita por você" : "Carta de hoje"}
-        </Text>
-        <Text
-          accessibilityRole="header"
-          style={{
-            marginTop: 4,
-            textAlign: "center",
-            fontFamily: fonte.titulo,
-            fontSize: 30,
-            lineHeight: 36,
-            letterSpacing: -0.3,
-            color: corBebe.titulo,
-          }}
-        >
-          {carta.title} {carta.emoji}
-        </Text>
-        <Text
-          style={{
-            marginTop: espaco.lg,
-            maxWidth: 320,
-            textAlign: "center",
-            fontFamily: fonte.normal,
-            fontSize: 14,
-            lineHeight: 23,
-            color: corBebe.texto,
-          }}
-        >
-          {lendoAsDelas ? (
-            <>
-              Esta carta é feita das coisas boas que{" "}
-              <Text style={{ fontFamily: fonte.titulo }}>você mesma anotou</Text> na Gratidão, na
-              ordem em que aconteceram. Leia em voz alta, devagar. 💛
-            </>
-          ) : (
-            <>
-              Encontre um lugar calmo, mão na barriga… e leia{" "}
-              <Text style={{ fontFamily: fonte.titulo }}>em voz alta</Text>, devagar. A sua voz é o
-              som preferido do bebê. 💛
-            </>
-          )}
-        </Text>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => {
-            toque();
-            comecar();
-          }}
-          style={({ pressed }) => ({
-            marginTop: espaco.xxl,
-            minHeight: 48,
-            paddingHorizontal: 40,
-            borderRadius: 999,
-            backgroundColor: corBebe.forte,
+        {/* A CARTA, como objeto: o papel branco com o envelope 3D por cima. Era
+            um título solto no degradê — e uma carta é algo que se segura. */}
+        <Superficie
+          tinta={corBebe.forte}
+          estilo={{
+            marginTop: 52,
+            width: "100%",
+            maxWidth: 360,
             alignItems: "center",
-            justifyContent: "center",
-            shadowColor: corBebe.sombraDoBotao,
-            shadowOpacity: 0.6,
-            shadowRadius: 12,
-            shadowOffset: { width: 0, height: 10 },
-            elevation: 6,
-            opacity: pressed ? 0.85 : 1,
-          })}
+            paddingTop: 50,
+            paddingBottom: espaco.xl,
+            paddingHorizontal: espaco.xl,
+          }}
         >
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: "#ffffff" }}>
-            Começar a ler 💗
+          <View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              top: -42,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Image
+              source={ARTE_DA_CARTA}
+              accessibilityIgnoresInvertColors
+              style={{ width: 84, height: 84 }}
+            />
+          </View>
+          <Text style={estilos.rotulo}>{lendoAsDelas ? "Escrita por você" : "Carta de hoje"}</Text>
+          <Text
+            accessibilityRole="header"
+            style={{
+              marginTop: 4,
+              textAlign: "center",
+              fontFamily: fonte.titulo,
+              fontSize: 28,
+              lineHeight: 34,
+              letterSpacing: -0.3,
+              color: corBebe.titulo,
+            }}
+          >
+            {carta.title} {carta.emoji}
           </Text>
-        </Pressable>
+          <Text
+            style={{
+              marginTop: espaco.md,
+              textAlign: "center",
+              fontFamily: fonte.normal,
+              fontSize: 15,
+              lineHeight: 23,
+              color: corBebe.texto,
+            }}
+          >
+            {lendoAsDelas ? (
+              <>
+                Esta carta é feita das coisas boas que{" "}
+                <Text style={{ fontFamily: fonte.titulo }}>você mesma anotou</Text> na Gratidão, na
+                ordem em que aconteceram. Leia em voz alta, devagar. 💛
+              </>
+            ) : (
+              <>
+                Encontre um lugar calmo, mão na barriga… e leia{" "}
+                <Text style={{ fontFamily: fonte.titulo }}>em voz alta</Text>, devagar. A sua voz é
+                o som preferido do bebê. 💛
+              </>
+            )}
+          </Text>
+        </Superficie>
+        <View style={{ marginTop: espaco.xl, width: "100%", maxWidth: 360 }}>
+          <BotaoDaAtividade cor={corBebe.forte} rotulo="Começar a ler 💗" aoTocar={comecar} />
+        </View>
         {/* Só existe com oito ou mais gratidões: uma carta de três linhas seria
             pior que não ter. */}
         {cartaDelas ? (

@@ -1,10 +1,11 @@
 import { LinearGradient } from "expo-linear-gradient";
 import type { ReactNode } from "react";
-import { Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, View, type ViewStyle } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Svg, { Defs, Ellipse, Path, RadialGradient, Rect, Stop } from "react-native-svg";
+import Svg, { Circle, Defs, Ellipse, Path, RadialGradient, Rect, Stop } from "react-native-svg";
 import { toque } from "~/componentes/base";
 import { BolhaViva, type HumorDaBolha } from "~/componentes/movimento";
+import { clarear, comAlfa, escurecer, misturar } from "~/lib/cor";
 import { ALVO_MINIMO, cor, espaco, fonte } from "~/tema";
 
 /**
@@ -13,6 +14,12 @@ import { ALVO_MINIMO, cor, espaco, fonte } from "~/tema";
  * tela inteira, a bolha GRANDE falando num balão, os rótulos de seção em
  * maiúsculas, os botões que enchem de cor quando escolhidos e o rodapé fixo
  * com o botão de começar. Aqui o esqueleto é um só e a cor vem da paleta.
+ *
+ * O MATERIAL (out/2026, "o design ainda está muito básico"): os botões e as
+ * escolhas têm RELEVO — a face em cima de um "lábio" mais escuro, que afunda
+ * quando o dedo aperta. É a linguagem da trilha da Jornada, e é ela que tira
+ * a cara de formulário de site (borda de 1 px em vidro claro). As superfícies
+ * brancas levam sombra na cor da atividade, nunca cinza.
  */
 
 export type PaletaDaAtividade = {
@@ -33,6 +40,32 @@ export type PaletaDaAtividade = {
   /** O texto secundário sobre o botão cheio (`text-white/75`). */
   brancoSuave: string;
 };
+
+/** A altura do lábio: o quanto o botão afunda quando o dedo aperta. */
+const LABIO = 4;
+
+/** As cores do material, tiradas da cor forte da atividade. */
+export function materialDe(p: PaletaDaAtividade) {
+  return {
+    /** Embaixo da face cheia (a escolhida, o botão de começar). */
+    labioCheio: escurecer(p.forte, 0.28),
+    /** Embaixo da face branca. */
+    labioClaro: misturar(p.borda, p.forte, 0.16),
+    /** O círculo claro atrás de um ícone. */
+    ficha: clarear(p.forte, 0.88),
+  };
+}
+
+/** A sombra das superfícies brancas: na cor da atividade, e não cinza. */
+export function sombraDe(tinta: string, forca = 1) {
+  return {
+    shadowColor: tinta,
+    shadowOpacity: 0.12 * forca,
+    shadowRadius: 14 * forca,
+    shadowOffset: { width: 0, height: 5 * forca },
+    elevation: Math.round(2 * forca),
+  } as const;
+}
 
 /** O degradê da atividade, atrás de todas as telas dela. */
 export function FundoDaAtividade({
@@ -66,45 +99,101 @@ function SombraDoChao() {
   );
 }
 
-/* O balão da bolha (`BolhaComBalao` do site): âmbar, como a fala do porta-voz. */
-const BALAO = { fundo: "rgba(255,255,255,0.85)", borda: "#fee685", texto: "#7b3306" } as const;
+/**
+ * O BRILHO atrás da arte: a luz de estúdio em que as artes 3D foram pintadas.
+ * Sem ele, a arte flutua num degradê chapado e parece recortada.
+ */
+export function Brilho({ tamanho, tinta = "#ffffff" }: { tamanho: number; tinta?: string }) {
+  return (
+    <Svg
+      width={tamanho}
+      height={tamanho}
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        left: "50%",
+        top: "50%",
+        marginLeft: -tamanho / 2,
+        marginTop: -tamanho / 2,
+      }}
+    >
+      <Defs>
+        <RadialGradient id="brilho-da-arte" cx="50%" cy="50%" rx="50%" ry="50%">
+          <Stop offset="0" stopColor={tinta} stopOpacity={0.95} />
+          <Stop offset="0.55" stopColor={tinta} stopOpacity={0.5} />
+          <Stop offset="1" stopColor={tinta} stopOpacity={0} />
+        </RadialGradient>
+      </Defs>
+      <Circle cx={tamanho / 2} cy={tamanho / 2} r={tamanho / 2} fill="url(#brilho-da-arte)" />
+    </Svg>
+  );
+}
+
+/* O balão sem paleta (o fim do Bebê): âmbar, como a fala do porta-voz no site. */
+const BALAO = { texto: "#7b3306", sombra: "#bb4d00" } as const;
 
 /**
  * O porta-voz, GRANDE e falando num balão — "ele que vai interagir com as
- * pessoas", nas palavras do dono no app antigo.
+ * pessoas", nas palavras do dono no app antigo. O balão é branco, com a ponta
+ * virada para a bolha: é ela quem fala, e não uma etiqueta embaixo dela.
  */
 export function BolhaComBalao({
   humor,
   fala,
   tamanho = 168,
+  paleta,
 }: {
   humor: HumorDaBolha;
   fala: string;
   tamanho?: number;
+  paleta?: PaletaDaAtividade;
 }) {
+  const grande = tamanho >= 120;
   return (
     <View style={{ alignItems: "center" }}>
-      <BolhaViva humor={humor} tamanho={tamanho} moldura={false} />
-      {tamanho >= 120 ? <SombraDoChao /> : null}
-      <Text
-        style={{
-          marginTop: espaco.sm,
-          maxWidth: 272,
-          borderRadius: 16,
-          borderWidth: 1,
-          borderColor: BALAO.borda,
-          backgroundColor: BALAO.fundo,
-          paddingHorizontal: 14,
-          paddingVertical: espaco.sm,
-          overflow: "hidden",
-          fontFamily: fonte.normal,
-          fontSize: 13,
-          lineHeight: 18,
-          color: BALAO.texto,
-        }}
+      <View style={{ alignItems: "center", justifyContent: "center" }}>
+        {grande ? <Brilho tamanho={tamanho * 1.45} /> : null}
+        <BolhaViva humor={humor} tamanho={tamanho} moldura={false} />
+      </View>
+      {grande ? <SombraDoChao /> : null}
+      <View
+        style={{ marginTop: grande ? espaco.sm : espaco.md, maxWidth: 296, alignItems: "center" }}
       >
-        {fala}
-      </Text>
+        <View
+          style={{
+            borderRadius: 18,
+            backgroundColor: cor.branco,
+            paddingHorizontal: espaco.lg,
+            paddingVertical: 10,
+            ...sombraDe(paleta?.forte ?? BALAO.sombra),
+          }}
+        >
+          <Text
+            style={{
+              textAlign: "center",
+              fontFamily: fonte.media,
+              fontSize: 14,
+              lineHeight: 20,
+              color: paleta?.titulo ?? BALAO.texto,
+            }}
+          >
+            {fala}
+          </Text>
+        </View>
+        {/* A ponta, por CIMA do balão: assim a sombra dele não a corta. */}
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            top: -6,
+            width: 14,
+            height: 14,
+            borderRadius: 3,
+            backgroundColor: cor.branco,
+            transform: [{ rotate: "45deg" }],
+          }}
+        />
+      </View>
     </View>
   );
 }
@@ -123,9 +212,10 @@ export function TituloDaAtividade({
       style={{
         marginTop: espaco.lg,
         textAlign: "center",
-        fontFamily: fonte.media,
-        fontSize: 26,
-        lineHeight: 32,
+        fontFamily: fonte.titulo,
+        fontSize: 30,
+        lineHeight: 36,
+        letterSpacing: -0.3,
         color: paleta.titulo,
       }}
     >
@@ -134,12 +224,16 @@ export function TituloDaAtividade({
   );
 }
 
-/** O rótulo de seção, em maiúsculas espaçadas. */
+/**
+ * O título de seção. Era em maiúsculas espaçadas, na cor clara — o rótulo de
+ * formulário do site. Agora é frase, forte e escura: é a pergunta que a tela
+ * faz a ela, e pergunta se lê, não se soletra.
+ */
 export function Secao({
   paleta,
   children,
   cor: tinta,
-  topo = espaco.xl,
+  topo = 28,
 }: {
   paleta: PaletaDaAtividade;
   children: string;
@@ -151,12 +245,11 @@ export function Secao({
       accessibilityRole="header"
       style={{
         marginTop: topo,
-        marginBottom: espaco.sm,
-        fontFamily: fonte.forte,
-        fontSize: 13,
-        letterSpacing: 0.65,
-        textTransform: "uppercase",
-        color: tinta ?? paleta.secao,
+        marginBottom: espaco.md,
+        fontFamily: fonte.titulo,
+        fontSize: 17,
+        lineHeight: 22,
+        color: tinta ?? paleta.titulo,
       }}
     >
       {children}
@@ -164,10 +257,141 @@ export function Secao({
   );
 }
 
+/** O círculo claro atrás de um ícone (o emoji de uma escolha, um ícone desenhado). */
+export function Ficha({
+  fundo,
+  tamanho = 36,
+  children,
+}: {
+  fundo: string;
+  tamanho?: number;
+  children: ReactNode;
+}) {
+  return (
+    <View
+      style={{
+        width: tamanho,
+        height: tamanho,
+        borderRadius: tamanho / 2,
+        backgroundColor: fundo,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      {children}
+    </View>
+  );
+}
+
+/** A superfície branca: o cartão do material, com a sombra na cor da atividade. */
+export function Superficie({
+  tinta,
+  fundo = cor.branco,
+  estilo,
+  children,
+}: {
+  /** A cor da sombra (a forte da atividade). */
+  tinta: string;
+  fundo?: string;
+  estilo?: ViewStyle;
+  children: ReactNode;
+}) {
+  return (
+    <View
+      style={{
+        borderRadius: 22,
+        backgroundColor: fundo,
+        padding: espaco.lg,
+        ...sombraDe(tinta),
+        ...estilo,
+      }}
+    >
+      {children}
+    </View>
+  );
+}
+
 /**
- * Os botões de escolha do app antigo: cor cheia quando escolhido, vidro claro
- * com borda quando não. `centro` é o botão de tempo (texto no meio, mais
- * forte); sem ele, o conteúdo encosta à esquerda.
+ * O BOTÃO COM RELEVO: a face em cima do lábio, que afunda quando o dedo aperta
+ * (a altura total não muda, então nada embaixo dele pula). `claro` é o botão
+ * secundário: face branca, letra na cor.
+ */
+export function BotaoDaAtividade({
+  cor: tinta,
+  rotulo,
+  aoTocar,
+  desabilitado,
+  claro,
+  icone,
+  rotuloAcessivel,
+  carregando,
+  vibrar = true,
+}: {
+  cor: string;
+  rotulo: string;
+  aoTocar: () => void;
+  desabilitado?: boolean;
+  claro?: boolean;
+  icone?: ReactNode;
+  rotuloAcessivel?: string;
+  /** Gravando: a roda gira no lugar do ícone e o botão não aceita outro toque. */
+  carregando?: boolean;
+  /** `false` quando a própria ação vibra do seu jeito (o acerto e o erro da aula). */
+  vibrar?: boolean;
+}) {
+  const labio = claro ? clarear(tinta, 0.72) : escurecer(tinta, 0.28);
+  const off = desabilitado || carregando;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={rotuloAcessivel ?? rotulo}
+      accessibilityState={{ disabled: !!off, busy: !!carregando }}
+      disabled={off}
+      onPress={() => {
+        if (vibrar) toque();
+        aoTocar();
+      }}
+      style={({ pressed }) => ({
+        borderRadius: 20,
+        backgroundColor: labio,
+        paddingBottom: pressed ? 1 : LABIO + 1,
+        marginTop: pressed ? LABIO : 0,
+        opacity: desabilitado ? 0.45 : 1,
+      })}
+    >
+      <View
+        style={{
+          minHeight: claro ? 48 : 54,
+          borderRadius: 20,
+          backgroundColor: claro ? cor.branco : tinta,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: espaco.sm,
+          paddingHorizontal: espaco.xl,
+        }}
+      >
+        {carregando ? <ActivityIndicator color={claro ? tinta : cor.branco} /> : icone}
+        <Text
+          style={{
+            fontFamily: fonte.titulo,
+            fontSize: claro ? 15 : 17,
+            lineHeight: 22,
+            letterSpacing: 0.2,
+            color: claro ? tinta : cor.branco,
+          }}
+        >
+          {rotulo}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+/**
+ * As escolhas, com relevo: face branca sobre o lábio claro; escolhida, a face
+ * enche de cor sobre o lábio escuro. `centro` é o botão de tempo (texto no
+ * meio, mais forte); sem ele, o ícone vai numa ficha à esquerda.
  */
 export function Escolha({
   paleta,
@@ -186,6 +410,7 @@ export function Escolha({
   estilo?: { width?: `${number}%`; flex?: number };
   children?: ReactNode;
 }) {
+  const m = materialDe(paleta);
   return (
     <Pressable
       accessibilityRole="button"
@@ -197,32 +422,40 @@ export function Escolha({
       }}
       style={({ pressed }) => ({
         ...estilo,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: centro ? "center" : "flex-start",
-        gap: espaco.sm,
-        minHeight: centro ? 48 : ALVO_MINIMO + 8,
-        paddingHorizontal: espaco.md,
-        paddingVertical: 10,
-        borderRadius: 16,
-        borderWidth: ativa ? 0 : 1,
-        borderColor: paleta.borda,
-        backgroundColor: ativa ? paleta.forte : paleta.vidro,
-        opacity: pressed ? 0.8 : 1,
+        borderRadius: 18,
+        backgroundColor: ativa ? m.labioCheio : m.labioClaro,
+        paddingBottom: pressed ? 1 : LABIO,
+        marginTop: pressed ? LABIO - 1 : 0,
       })}
     >
-      {children}
-      <Text
+      <View
         style={{
-          flexShrink: 1,
-          fontFamily: centro ? fonte.titulo : fonte.forte,
-          fontSize: centro ? 14 : 13,
-          lineHeight: centro ? 20 : 17,
-          color: ativa ? cor.branco : centro ? paleta.forte : paleta.titulo,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: centro ? "center" : "flex-start",
+          gap: 10,
+          minHeight: centro ? 48 : 58,
+          paddingHorizontal: centro ? espaco.md : 10,
+          paddingVertical: espaco.sm,
+          borderRadius: 18,
+          backgroundColor: ativa ? paleta.forte : cor.branco,
         }}
       >
-        {rotulo}
-      </Text>
+        {children ? (
+          <Ficha fundo={ativa ? "rgba(255,255,255,0.22)" : m.ficha}>{children}</Ficha>
+        ) : null}
+        <Text
+          style={{
+            flexShrink: 1,
+            fontFamily: centro ? fonte.titulo : fonte.forte,
+            fontSize: centro ? 16 : 14,
+            lineHeight: centro ? 20 : 18,
+            color: ativa ? cor.branco : centro ? paleta.forte : paleta.titulo,
+          }}
+        >
+          {rotulo}
+        </Text>
+      </View>
     </Pressable>
   );
 }
@@ -248,6 +481,7 @@ export function EscolhaComLegenda({
   antes?: ReactNode;
   depois?: ReactNode;
 }) {
+  const m = materialDe(paleta);
   return (
     <Pressable
       accessibilityRole="button"
@@ -258,48 +492,57 @@ export function EscolhaComLegenda({
         aoTocar();
       }}
       style={({ pressed }) => ({
-        flexDirection: "row",
-        alignItems: "center",
-        gap: espaco.md,
-        minHeight: ALVO_MINIMO + 12,
-        paddingHorizontal: espaco.lg,
-        paddingVertical: espaco.md,
-        borderRadius: 16,
-        borderWidth: ativa ? 0 : 1,
-        borderColor: paleta.borda,
-        backgroundColor: ativa ? paleta.forte : paleta.vidro,
-        opacity: pressed ? 0.8 : 1,
+        borderRadius: 20,
+        backgroundColor: ativa ? m.labioCheio : m.labioClaro,
+        paddingBottom: pressed ? 1 : LABIO,
+        marginTop: pressed ? LABIO - 1 : 0,
       })}
     >
-      {antes}
-      <View style={{ flex: 1 }}>
-        <Text
-          style={{
-            fontFamily: fonte.titulo,
-            fontSize: 14,
-            lineHeight: 19,
-            color: ativa ? cor.branco : paleta.titulo,
-          }}
-        >
-          {titulo}
-        </Text>
-        <Text
-          style={{
-            fontFamily: fonte.normal,
-            fontSize: 13,
-            lineHeight: 17,
-            color: ativa ? paleta.brancoSuave : paleta.discreto,
-          }}
-        >
-          {legenda}
-        </Text>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: espaco.md,
+          minHeight: ALVO_MINIMO + 12,
+          paddingHorizontal: espaco.lg,
+          paddingVertical: espaco.md,
+          borderRadius: 20,
+          backgroundColor: ativa ? paleta.forte : cor.branco,
+        }}
+      >
+        {antes}
+        <View style={{ flex: 1 }}>
+          <Text
+            style={{
+              fontFamily: fonte.titulo,
+              fontSize: 14,
+              lineHeight: 19,
+              color: ativa ? cor.branco : paleta.titulo,
+            }}
+          >
+            {titulo}
+          </Text>
+          <Text
+            style={{
+              fontFamily: fonte.normal,
+              fontSize: 13,
+              lineHeight: 17,
+              color: ativa ? paleta.brancoSuave : paleta.discreto,
+            }}
+          >
+            {legenda}
+          </Text>
+        </View>
+        {depois}
       </View>
-      {depois}
     </Pressable>
   );
 }
 
-/** O rodapé fixo com o botão de começar: a lista não empurra o botão para fora da tela. */
+/**
+ * O rodapé fixo com o botão de começar: a lista não empurra o botão para fora
+ * da tela. Sem linha divisória: a lista some num esfumado em cima dele.
+ */
 export function RodapeDaAtividade({
   paleta,
   children,
@@ -307,16 +550,21 @@ export function RodapeDaAtividade({
   paleta: PaletaDaAtividade;
   children: ReactNode;
 }) {
+  const base = paleta.fundo[2];
   return (
     <View
       style={{
-        borderTopWidth: 1,
-        borderTopColor: paleta.borda,
-        backgroundColor: paleta.vidro,
+        backgroundColor: base,
         paddingHorizontal: espaco.xl,
-        paddingVertical: espaco.md,
+        paddingTop: espaco.sm,
+        paddingBottom: espaco.md,
       }}
     >
+      <LinearGradient
+        pointerEvents="none"
+        colors={[comAlfa(base, 0), base]}
+        style={{ position: "absolute", left: 0, right: 0, top: -28, height: 28 }}
+      />
       {children}
     </View>
   );

@@ -5,7 +5,8 @@ import { Animated, Platform, Pressable, ScrollView, Text, View } from "react-nat
 import { SafeAreaView } from "react-native-safe-area-context";
 import { gestChallenge } from "@/lib/daily-challenges";
 import { carregarQuizDoDia, isMultiQuestion, type DailyQuiz } from "@/lib/daily-quizzes";
-import { Botao, Cartao, Carregando, NaoConsegueLer, T, Tela, toque } from "~/componentes/base";
+import { Cartao, Carregando, NaoConsegueLer, T, Tela, toque } from "~/componentes/base";
+import { BotaoDaAtividade } from "~/componentes/jornada/atividade";
 import { corJornada } from "~/componentes/jornada/cores";
 import { concluirMomento, FimDoMomento, type Desfecho } from "~/componentes/jornada/fim";
 import { pagarAula } from "~/componentes/jornada/economia";
@@ -28,7 +29,7 @@ import {
 import { tocarConquista } from "~/lib/audio/som-de-conquista";
 import { marcar } from "~/lib/jornada/loja";
 import { sementesDaAula } from "~/lib/jornada/momentos";
-import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
+import { ALVO_MINIMO, cor, espaco, fonte } from "~/tema";
 import { AvisoMedico } from "~/componentes/aviso-medico";
 
 /**
@@ -147,10 +148,10 @@ export default function Aula() {
           A aula do dia acompanha as semanas da gestação. Os outros momentos da jornada continuam
           aqui para você.
         </T>
-        <Botao
+        <BotaoDaAtividade
           rotulo="Voltar para a jornada"
           aoTocar={voltarParaJornada}
-          corFundo={corJornada.roxo}
+          cor={corJornada.roxo}
         />
       </Tela>
     );
@@ -167,20 +168,20 @@ export default function Aula() {
         />
         {quiz && quiz !== "carregando" ? <Licao quiz={quiz} /> : null}
         {qs && qs.length ? (
-          <Botao
+          <BotaoDaAtividade
             rotulo="Revisar as respostas"
-            corFundo={corJornada.roxo}
+            cor={corJornada.roxo}
             aoTocar={() => {
               setRevisando(true);
               setE(revisao(qs[0], 0));
             }}
           />
         ) : null}
-        <Botao
-          tipo="secundario"
+        <BotaoDaAtividade
+          claro
           rotulo="Voltar para a jornada"
           aoTocar={voltarParaJornada}
-          corFundo={corJornada.roxo}
+          cor={corJornada.roxo}
         />
       </Tela>
     );
@@ -208,9 +209,9 @@ export default function Aula() {
           <Cartao>
             <T tipo="rotulo">Desafio do dia {desafio.emoji}</T>
             <T>{desafio.label}</T>
-            <Botao
+            <BotaoDaAtividade
               rotulo="Fiz o desafio"
-              corFundo={corJornada.roxo}
+              cor={corJornada.roxo}
               aoTocar={() => {
                 marcar(D, "aula");
                 voltarParaJornada();
@@ -270,9 +271,9 @@ export default function Aula() {
           fala={`Leia a lição com calma. Depois vêm ${total} perguntas, com uma tentativa em cada.`}
         />
         <Licao quiz={quiz} />
-        <Botao
+        <BotaoDaAtividade
           rotulo={`Vamos às perguntas (${total})`}
-          corFundo={corJornada.roxo}
+          cor={corJornada.roxo}
           aoTocar={() => setE(comecarPerguntas(e))}
         />
         <AvisoMedico curto />
@@ -355,11 +356,11 @@ export default function Aula() {
           </View>
         ) : null}
         {e.verificada ? (
-          <Botao
+          <BotaoDaAtividade
             rotulo={
               e.indice + 1 >= total ? (revisando ? "Terminar a revisão" : "Terminar") : "Continuar"
             }
-            corFundo={e.acertou ? corJornada.feito : corJornada.roxo}
+            cor={e.acertou ? corJornada.feito : corJornada.roxo}
             aoTocar={() => {
               if (!revisando) return setE(continuar(e, total));
               /* Na revisão não há fim nem pagamento: volta para a aula feita. */
@@ -372,9 +373,10 @@ export default function Aula() {
             }}
           />
         ) : (
-          <Botao
+          <BotaoDaAtividade
             rotulo="Verificar"
-            corFundo={corJornada.roxo}
+            cor={corJornada.roxo}
+            vibrar={false}
             desabilitado={!podeVerificar(e)}
             aoTocar={() => {
               const x = verificar(e, q);
@@ -494,20 +496,29 @@ function Opcao({
           toque();
           aoTocar();
         }}
-        style={({ pressed }) => ({
-          flexDirection: "row",
-          alignItems: "center",
-          gap: espaco.md,
-          minHeight: ALVO_MINIMO + 12,
-          paddingVertical: espaco.md,
-          paddingHorizontal: espaco.md,
-          borderRadius: raio.md,
-          borderWidth: 2,
-          borderStyle: estado === "faltou" ? "dashed" : "solid",
-          borderColor: visual.borda,
-          backgroundColor: visual.fundo,
-          opacity: pressed ? 0.8 : 1,
-        })}
+        /* O relevo da opção é a borda de baixo mais grossa, na cor da borda —
+           afunda quando o dedo aperta. A que faltou fica tracejada e plana:
+           ela não foi tocada, e o relevo diria que foi. */
+        style={({ pressed }) => {
+          const plana = estado === "faltou" || travada;
+          const funda = pressed && !plana;
+          return {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: espaco.md,
+            minHeight: ALVO_MINIMO + 12,
+            paddingVertical: espaco.md,
+            paddingHorizontal: espaco.md,
+            borderRadius: 18,
+            borderWidth: 2,
+            borderBottomWidth: plana || funda ? 2 : 5,
+            marginTop: funda ? 3 : 0,
+            marginBottom: plana ? 3 : 0,
+            borderStyle: estado === "faltou" ? "dashed" : "solid",
+            borderColor: visual.borda,
+            backgroundColor: visual.fundo,
+          };
+        }}
       >
         <View
           style={{

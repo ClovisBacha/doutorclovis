@@ -6,7 +6,7 @@ import { pagarAula, pagarDiaFechado, pagarMomento } from "~/componentes/jornada/
 import { corJornada } from "~/componentes/jornada/cores";
 import { marcarLivre } from "~/componentes/jornada/livres";
 import { Constelacao, SementesSubindo } from "~/componentes/jornada/efeitos";
-import { BolhaComBalao } from "~/componentes/jornada/atividade";
+import { BolhaComBalao, BotaoDaAtividade, Brilho } from "~/componentes/jornada/atividade";
 import { Bolha, Confete, Estrela, Estrelas, voltarParaJornada } from "~/componentes/jornada/pecas";
 import { contarMomentos, flagsDoDia, type Momento } from "~/lib/jornada/momentos";
 import { marcar, useLoja } from "~/lib/jornada/loja";
@@ -140,7 +140,12 @@ export function FimDoMomento({
             <Bolha humor="estrelas" tamanho={210} />
           )
         ) : (
-          (arte ?? <Bolha humor={cuidado ? "feliz" : "comemorando"} tamanho={150} />)
+          (arte ?? (
+            <View style={{ alignItems: "center", justifyContent: "center" }}>
+              <Brilho tamanho={210} />
+              <Bolha humor={cuidado ? "feliz" : "comemorando"} tamanho={150} />
+            </View>
+          ))
         )}
         <T tipo="titulo" centro>
           {festa ? "Cinco estrelas!" : titulo}
@@ -199,10 +204,10 @@ export function FimDoMomento({
             </T>
           </View>
         ) : null}
-        <Botao
+        <BotaoDaAtividade
+          cor={corJornada.roxo}
           rotulo="Voltar para a jornada"
           aoTocar={voltarParaJornada}
-          corFundo={corJornada.roxo}
         />
       </View>
       {mostrarConfete ? <Confete pecas={confete === "grande" && !festa ? 72 : 36} /> : null}

@@ -3,7 +3,7 @@ import { Image } from "expo-image";
 import { useKeepAwake } from "expo-keep-awake";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { ChevronRight, X } from "lucide-react-native";
+import { Bell, ChevronDown, ChevronRight, Play, X } from "lucide-react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
@@ -26,18 +26,24 @@ import {
 import { DENSIDADES, falaNoCiclo, type Densidade, type Plano } from "@/lib/meditacao-sessao";
 import { sequenciaDeDatas } from "@/lib/sequencia";
 import { familiasDeSom, ROTULO_DO_SOM, type SomKey } from "@/lib/som-receitas";
-import { Botao, Carregando, Tela, toque } from "~/componentes/base";
+import { Carregando, Tela, toque } from "~/componentes/base";
 import {
   BolhaComBalao,
+  BotaoDaAtividade,
   BotaoDaVoz,
+  Brilho,
   Escolha,
   EscolhaComLegenda,
+  Ficha,
   FundoDaAtividade,
+  materialDe,
   RodapeDaAtividade,
   Secao,
+  sombraDe,
   TituloDaAtividade,
   type PaletaDaAtividade,
 } from "~/componentes/jornada/atividade";
+import { clarear, escurecer } from "~/lib/cor";
 import { corMeditacao } from "~/componentes/jornada/cores";
 import { concluirMomento, FimDoMomento, type Desfecho } from "~/componentes/jornada/fim";
 import { FolhaDeSons } from "~/componentes/jornada/folha-de-sons";
@@ -107,6 +113,11 @@ const PALETA: PaletaDaAtividade = {
 };
 
 const BOLHA_DORMINDO = require("../../../../src/assets/bolha/dormindo.webp");
+
+const MATERIAL = materialDe(PALETA);
+
+/** A flor de lótus, nas artes 3D do app: no cartão do programa e no fim da sessão. */
+const ARTE_LOTUS = require("../../../../src/assets/grades/meditacoes.webp");
 
 type Som = SomKey | "silencio";
 type Etapa = "escolha" | "sessao" | "reflexo" | "fim";
@@ -351,7 +362,15 @@ export default function Meditar() {
             paddingVertical: espaco.xl,
           }}
         >
-          <Text style={{ fontSize: 48 }}>🧘</Text>
+          <View style={{ alignItems: "center", justifyContent: "center" }}>
+            <Brilho tamanho={180} />
+            <Image
+              source={ARTE_LOTUS}
+              style={{ width: 112, height: 112 }}
+              contentFit="contain"
+              accessibilityIgnoresInvertColors
+            />
+          </View>
           <Text
             accessibilityRole="header"
             style={{
@@ -377,33 +396,17 @@ export default function Meditar() {
           >
             Sem resposta certa — é só pra você notar a diferença.
           </Text>
-          <View style={{ marginTop: espaco.xl, width: "100%", maxWidth: 320, gap: espaco.sm }}>
+          <View style={{ marginTop: espaco.xl, width: "100%", maxWidth: 340, gap: espaco.md }}>
             {comoEstouPara(at.cuidado).map((c) => (
-              <Pressable
+              <Escolha
                 key={c.label}
-                accessibilityRole="button"
-                onPress={() => {
-                  toque();
-                  responder(c);
-                }}
-                style={({ pressed }) => ({
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: espaco.md,
-                  minHeight: ALVO_MINIMO + 4,
-                  paddingHorizontal: espaco.lg,
-                  borderRadius: 16,
-                  borderWidth: 1,
-                  borderColor: corMeditacao.borda,
-                  backgroundColor: corMeditacao.vidroForte,
-                  opacity: pressed ? 0.75 : 1,
-                })}
+                paleta={PALETA}
+                rotulo={c.label}
+                ativa={false}
+                aoTocar={() => responder(c)}
               >
                 <Text style={{ fontSize: 20 }}>{c.emoji}</Text>
-                <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: corMeditacao.titulo }}>
-                  {c.label}
-                </Text>
-              </Pressable>
+              </Escolha>
             ))}
           </View>
           <Pressable
@@ -424,36 +427,52 @@ export default function Meditar() {
   if (etapa === "fim") {
     const m = minutosFeitos || minutos;
     const seqDepois = sequenciaDeDatas(lerRegistro(loja.blob[CHAVE_LOG_MEDITACAO]).dias);
+    /* O fim fica no degradê da meditação, como o do Movimento e o do Bebê:
+       num creme genérico ele parecia outra tela, de outro app. */
     return (
-      <Tela bordas={["top", "bottom"]}>
-        <FimDoMomento
-          titulo={`${m} ${m === 1 ? "minuto" : "minutos"} só seus 💜`}
-          fala={
-            (humor && FECHAMENTO[humor]) ||
-            "Você tirou um tempinho só pra você. Leve essa calma com você."
-          }
-          desfecho={desfecho}
-          D={at.D}
-          cuidado={at.cuidado}
-          pos={at.pos}
-          arte={<Text style={{ fontSize: 60, lineHeight: 72 }}>🧘</Text>}
-          confete
-          extra={
-            seqDepois > 0 ? (
-              <Text
-                style={{
-                  textAlign: "center",
-                  fontFamily: fonte.forte,
-                  fontSize: 13,
-                  color: corMeditacao.icone,
-                }}
-              >
-                🔥 {seqDepois} {seqDepois === 1 ? "dia seguido" : "dias seguidos"}
-              </Text>
-            ) : null
-          }
-        />
-      </Tela>
+      <FundoDaAtividade paleta={PALETA}>
+        <ScrollView
+          contentContainerStyle={{ padding: espaco.lg, paddingBottom: 120, gap: espaco.md }}
+        >
+          <FimDoMomento
+            titulo={`${m} ${m === 1 ? "minuto" : "minutos"} só seus 💜`}
+            fala={
+              (humor && FECHAMENTO[humor]) ||
+              "Você tirou um tempinho só pra você. Leve essa calma com você."
+            }
+            desfecho={desfecho}
+            D={at.D}
+            cuidado={at.cuidado}
+            pos={at.pos}
+            arte={
+              <View style={{ alignItems: "center", justifyContent: "center" }}>
+                <Brilho tamanho={200} />
+                <Image
+                  source={ARTE_LOTUS}
+                  style={{ width: 132, height: 132 }}
+                  contentFit="contain"
+                  accessibilityIgnoresInvertColors
+                />
+              </View>
+            }
+            confete
+            extra={
+              seqDepois > 0 ? (
+                <Text
+                  style={{
+                    textAlign: "center",
+                    fontFamily: fonte.forte,
+                    fontSize: 13,
+                    color: corMeditacao.icone,
+                  }}
+                >
+                  🔥 {seqDepois} {seqDepois === 1 ? "dia seguido" : "dias seguidos"}
+                </Text>
+              ) : null
+            }
+          />
+        </ScrollView>
+      </FundoDaAtividade>
     );
   }
 
@@ -466,7 +485,7 @@ export default function Meditar() {
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: espaco.xl, paddingBottom: espaco.xxl }}
       >
-        <BolhaComBalao humor="feliz" fala={falaDoBalao(registro)} />
+        <BolhaComBalao humor="feliz" fala={falaDoBalao(registro)} paleta={PALETA} />
         <TituloDaAtividade paleta={PALETA}>Meditar</TituloDaAtividade>
 
         {/* O lembrete fica colado na sequência: a chama diz quantos dias ela
@@ -614,9 +633,10 @@ export default function Meditar() {
       </ScrollView>
       {mostrarMenu ? (
         <RodapeDaAtividade paleta={PALETA}>
-          <Botao
+          <BotaoDaAtividade
+            cor={corMeditacao.forte}
             rotulo={`Começar · ${minutos} min`}
-            corFundo={corMeditacao.forte}
+            icone={<Play size={18} color={cor.branco} fill={cor.branco} />}
             aoTocar={() => comecar()}
           />
         </RodapeDaAtividade>
@@ -672,18 +692,19 @@ function LembreteDiario({ uid, dias }: { uid: string; dias: readonly string[] })
           flexDirection: "row",
           alignItems: "center",
           gap: espaco.md,
-          minHeight: ALVO_MINIMO + 12,
-          paddingHorizontal: espaco.lg,
-          paddingVertical: 10,
-          borderRadius: 16,
-          borderWidth: 1,
-          borderColor: corMeditacao.borda,
-          backgroundColor: corMeditacao.vidro,
+          minHeight: ALVO_MINIMO + 20,
+          paddingHorizontal: espaco.md,
+          paddingVertical: espaco.md,
+          borderRadius: 20,
+          backgroundColor: cor.branco,
+          ...sombraDe(corMeditacao.forte, 0.8),
         }}
       >
-        <Text style={{ fontSize: 18 }}>🔔</Text>
+        <Ficha fundo={MATERIAL.ficha}>
+          <Bell size={18} color={corMeditacao.forte} strokeWidth={2.3} />
+        </Ficha>
         <View style={{ flex: 1 }}>
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 13, color: corMeditacao.titulo }}>
+          <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: corMeditacao.titulo }}>
             Lembrar todo dia
           </Text>
           <Text
@@ -710,13 +731,13 @@ function LembreteDiario({ uid, dias }: { uid: string; dias: readonly string[] })
               }}
               style={({ pressed }) => ({
                 minHeight: 36,
-                paddingHorizontal: 10,
+                paddingHorizontal: 12,
                 borderRadius: 12,
-                borderWidth: 1,
-                borderColor: corMeditacao.borda,
-                backgroundColor: cor.branco,
+                backgroundColor: MATERIAL.ficha,
+                borderBottomWidth: pressed ? 1 : 3,
+                borderBottomColor: MATERIAL.labioClaro,
+                marginTop: pressed ? 2 : 0,
                 justifyContent: "center",
-                opacity: pressed ? 0.7 : 1,
               })}
               hitSlop={4}
             >
@@ -758,16 +779,18 @@ function LembreteDiario({ uid, dias }: { uid: string; dias: readonly string[] })
               void definir(HORA_PADRAO);
             }}
             style={({ pressed }) => ({
-              minHeight: 34,
+              minHeight: 36,
               paddingHorizontal: espaco.lg,
-              borderRadius: 999,
+              borderRadius: 12,
               backgroundColor: corMeditacao.forte,
+              borderBottomWidth: pressed ? 1 : 3,
+              borderBottomColor: MATERIAL.labioCheio,
+              marginTop: pressed ? 2 : 0,
               justifyContent: "center",
-              opacity: pressed ? 0.8 : 1,
             })}
             hitSlop={5}
           >
-            <Text style={{ fontFamily: fonte.titulo, fontSize: 13, color: cor.branco }}>
+            <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: cor.branco }}>
               Ativar
             </Text>
           </Pressable>
@@ -874,14 +897,32 @@ function CartaoDoPrograma({
 }) {
   return (
     <>
+      {/* O cartão do programa é a porta principal da tela: cor cheia, relevo
+          e a flor de lótus 3D espiando no canto — a mesma arte do fim. */}
       <View
         style={{
           marginTop: espaco.xl,
-          borderRadius: 24,
+          borderRadius: 26,
           backgroundColor: corMeditacao.forte,
+          borderBottomWidth: 6,
+          borderBottomColor: MATERIAL.labioCheio,
           padding: 20,
+          overflow: "hidden",
+          ...sombraDe(corMeditacao.forte, 1.3),
         }}
       >
+        <View
+          pointerEvents="none"
+          style={{ position: "absolute", right: -18, top: -14, opacity: 0.95 }}
+        >
+          <Brilho tamanho={170} tinta={clarear(corMeditacao.forte, 0.35)} />
+          <Image
+            source={ARTE_LOTUS}
+            style={{ width: 112, height: 112 }}
+            contentFit="contain"
+            accessibilityIgnoresInvertColors
+          />
+        </View>
         <Text
           style={{
             fontFamily: fonte.titulo,
@@ -896,10 +937,11 @@ function CartaoDoPrograma({
         <Text
           style={{
             marginTop: 6,
+            maxWidth: "68%",
             fontFamily: fonte.titulo,
-            fontSize: 21,
-            lineHeight: 26,
-            letterSpacing: -0.21,
+            fontSize: 24,
+            lineHeight: 29,
+            letterSpacing: -0.3,
             color: cor.branco,
           }}
         >
@@ -908,9 +950,10 @@ function CartaoDoPrograma({
         <Text
           style={{
             marginTop: 4,
-            fontFamily: fonte.normal,
-            fontSize: 13,
-            lineHeight: 18,
+            maxWidth: "68%",
+            fontFamily: fonte.media,
+            fontSize: 14,
+            lineHeight: 19,
             color: corMeditacao.branco85,
           }}
         >
@@ -934,23 +977,35 @@ function CartaoDoPrograma({
         </View>
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel="Começar"
           onPress={() => {
             toque();
             aoComecar();
           }}
           style={({ pressed }) => ({
             marginTop: espaco.lg,
-            minHeight: 48,
-            borderRadius: 999,
-            backgroundColor: cor.branco,
-            alignItems: "center",
-            justifyContent: "center",
-            opacity: pressed ? 0.85 : 1,
+            borderRadius: 18,
+            backgroundColor: escurecer(corMeditacao.forte, 0.42),
+            paddingBottom: pressed ? 1 : 5,
+            transform: [{ translateY: pressed ? 4 : 0 }],
           })}
         >
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: corMeditacao.icone }}>
-            Começar
-          </Text>
+          <View
+            style={{
+              minHeight: 50,
+              borderRadius: 18,
+              backgroundColor: cor.branco,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: espaco.sm,
+            }}
+          >
+            <Play size={16} color={corMeditacao.icone} fill={corMeditacao.icone} />
+            <Text style={{ fontFamily: fonte.titulo, fontSize: 16, color: corMeditacao.icone }}>
+              Começar
+            </Text>
+          </View>
         </Pressable>
       </View>
       <Pressable
@@ -968,12 +1023,10 @@ function CartaoDoPrograma({
           opacity: pressed ? 0.6 : 1,
         })}
       >
-        <Text style={{ fontFamily: fonte.normal, fontSize: 13, color: corMeditacao.discreto }}>
+        <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: corMeditacao.discreto }}>
           Ou escolha você mesma
         </Text>
-        <Text style={{ fontFamily: fonte.forte, fontSize: 15, color: corMeditacao.discreto }}>
-          ⌄
-        </Text>
+        <ChevronDown size={18} color={corMeditacao.discreto} />
       </Pressable>
     </>
   );
@@ -1561,7 +1614,7 @@ function VeuDaPausa({ motivo, aoContinuar }: { motivo: Pausa; aoContinuar: () =>
           : "Sem pressa. Sua respiração espera por você."}
       </Text>
       <View style={{ marginTop: 28, width: "100%", maxWidth: 320 }}>
-        <Botao rotulo="Continuar" corFundo={corMeditacao.forte} aoTocar={aoContinuar} />
+        <BotaoDaAtividade cor={corMeditacao.forte} rotulo="Continuar" aoTocar={aoContinuar} />
       </View>
     </View>
   );

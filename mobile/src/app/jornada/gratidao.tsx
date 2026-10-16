@@ -28,10 +28,13 @@ import {
   type Gratidao,
 } from "@/lib/gratidao";
 import { paraLike } from "@/lib/like-seguro";
-import { Botao, Cartao, Carregando, T, Tela, toque } from "~/componentes/base";
+import { Cartao, Carregando, T, Tela, toque } from "~/componentes/base";
 import {
   BolhaComBalao,
+  BotaoDaAtividade,
   FundoDaAtividade,
+  materialDe,
+  sombraDe,
   type PaletaDaAtividade,
 } from "~/componentes/jornada/atividade";
 import { corGratidao } from "~/componentes/jornada/cores";
@@ -67,6 +70,18 @@ const PALETA: PaletaDaAtividade = {
   discreto: corGratidao.discreto,
   brancoSuave: corGratidao.brancoSuave,
 };
+
+const MATERIAL = materialDe(PALETA);
+
+/** O cartão branco de uma gratidão guardada (a releitura, a lista, o resumo). */
+const CARTAO_DA_GRATIDAO = {
+  width: "100%",
+  borderRadius: 20,
+  backgroundColor: cor.branco,
+  paddingHorizontal: espaco.lg,
+  paddingVertical: espaco.md,
+  ...sombraDe(corGratidao.forte, 0.7),
+} as const;
 
 /** O limite do site: uma coisa boa, não um diário inteiro. */
 const LIMITE = 300;
@@ -286,17 +301,7 @@ export default function GratidaoTela() {
                   </Text>
                 ) : null}
                 {releitura ? (
-                  <View
-                    style={{
-                      width: "100%",
-                      borderRadius: 16,
-                      borderWidth: 1,
-                      borderColor: corGratidao.borda,
-                      backgroundColor: corGratidao.vidroForte,
-                      paddingHorizontal: espaco.lg,
-                      paddingVertical: espaco.md,
-                    }}
-                  >
+                  <View style={CARTAO_DA_GRATIDAO}>
                     <Text
                       style={{
                         fontFamily: fonte.normal,
@@ -318,13 +323,11 @@ export default function GratidaoTela() {
                   <View
                     style={{
                       width: "100%",
-                      borderRadius: 16,
-                      borderWidth: 1,
-                      borderColor: corGratidao.cartaBorda,
+                      borderRadius: 22,
                       backgroundColor: corGratidao.cartaFundo,
-                      paddingHorizontal: espaco.lg,
-                      paddingVertical: espaco.md,
-                      gap: 10,
+                      padding: espaco.lg,
+                      gap: espaco.md,
+                      ...sombraDe(corGratidao.cartaBotao, 0.7),
                     }}
                   >
                     <Text
@@ -338,9 +341,9 @@ export default function GratidaoTela() {
                     >
                       Agora já dá pra fazer uma carta pro bebê com tudo isso que você me contou.
                     </Text>
-                    <Botao
+                    <BotaoDaAtividade
+                      cor={corGratidao.cartaBotao}
                       rotulo="Ver carta 💌"
-                      corFundo={corGratidao.cartaBotao}
                       aoTocar={irParaCarta}
                     />
                   </View>
@@ -394,19 +397,9 @@ export default function GratidaoTela() {
           >
             {total} {total === 1 ? "guardada" : "guardadas"} até aqui 💛
           </Text>
-          <View style={{ marginTop: 20, gap: espaco.sm }}>
+          <View style={{ marginTop: 20, gap: espaco.md }}>
             {(gratidoes ?? []).map((g) => (
-              <View
-                key={`${g.quando}-${g.texto.slice(0, 12)}`}
-                style={{
-                  borderRadius: 16,
-                  borderWidth: 1,
-                  borderColor: corGratidao.bordaSuave,
-                  backgroundColor: corGratidao.vidroForte,
-                  paddingHorizontal: espaco.lg,
-                  paddingVertical: espaco.md,
-                }}
-              >
+              <View key={`${g.quando}-${g.texto.slice(0, 12)}`} style={CARTAO_DA_GRATIDAO}>
                 <Text
                   style={{
                     fontFamily: fonte.normal,
@@ -422,9 +415,9 @@ export default function GratidaoTela() {
             ))}
           </View>
           <View style={{ marginTop: espaco.xl }}>
-            <Botao
+            <BotaoDaAtividade
+              cor={corGratidao.forte}
               rotulo="Escrever uma nova"
-              corFundo={corGratidao.forte}
               aoTocar={() => setEtapa("escrever")}
             />
           </View>
@@ -450,6 +443,7 @@ export default function GratidaoTela() {
           <BolhaComBalao
             humor="feliz"
             fala={falaDaBolha({ tela: "resumo", total: semana.length })}
+            paleta={PALETA}
           />
           <Text
             accessibilityRole="header"
@@ -492,15 +486,14 @@ export default function GratidaoTela() {
                   style={({ pressed }) => ({
                     minHeight: ALVO_MINIMO,
                     justifyContent: "center",
-                    borderRadius: 16,
-                    borderWidth: 1,
-                    borderColor: escolhida ? corGratidao.escolhidaBorda : corGratidao.borda,
-                    backgroundColor: escolhida
-                      ? corGratidao.escolhidaFundo
-                      : corGratidao.vidroForte,
+                    borderRadius: 20,
+                    borderWidth: escolhida ? 2 : 0,
+                    borderColor: corGratidao.escolhidaBorda,
+                    backgroundColor: escolhida ? corGratidao.escolhidaFundo : cor.branco,
                     paddingHorizontal: espaco.lg,
                     paddingVertical: espaco.md,
                     opacity: pressed ? 0.8 : 1,
+                    ...sombraDe(corGratidao.forte, 0.7),
                   })}
                 >
                   <Text
@@ -530,9 +523,9 @@ export default function GratidaoTela() {
             </Text>
           ) : null}
           <View style={{ marginTop: espaco.xl, width: "100%" }}>
-            <Botao
+            <BotaoDaAtividade
+              cor={corGratidao.forte}
               rotulo={at.jaFeita ? "Fechar" : "Escrever a de hoje"}
-              corFundo={corGratidao.forte}
               aoTocar={() => (at.jaFeita ? router.back() : setEtapa("escrever"))}
             />
           </View>
@@ -562,7 +555,7 @@ export default function GratidaoTela() {
             alignItems: "center",
           }}
         >
-          <BolhaComBalao humor="feliz" fala={fala} />
+          <BolhaComBalao humor="feliz" fala={fala} paleta={PALETA} />
           {/* A pergunta do dia é o título — a bolha não a repete. */}
           <Text
             accessibilityRole="header"
@@ -570,8 +563,9 @@ export default function GratidaoTela() {
               marginTop: espaco.lg,
               textAlign: "center",
               fontFamily: fonte.titulo,
-              fontSize: 24,
-              lineHeight: 30,
+              fontSize: 26,
+              lineHeight: 32,
+              letterSpacing: -0.3,
               color: corGratidao.titulo,
             }}
           >
@@ -599,7 +593,7 @@ export default function GratidaoTela() {
               flexDirection: "row",
               flexWrap: "wrap",
               justifyContent: "center",
-              gap: 6,
+              gap: espaco.sm,
             }}
           >
             {pergunta.fichas.map((f) => (
@@ -612,17 +606,17 @@ export default function GratidaoTela() {
                 }}
                 hitSlop={{ top: 4, bottom: 4 }}
                 style={({ pressed }) => ({
-                  minHeight: 36,
-                  paddingHorizontal: espaco.md,
+                  minHeight: 38,
+                  paddingHorizontal: 14,
                   borderRadius: 999,
-                  borderWidth: 1,
-                  borderColor: corGratidao.borda,
-                  backgroundColor: corGratidao.vidroForte,
+                  backgroundColor: cor.branco,
+                  borderBottomWidth: pressed ? 1 : 3,
+                  borderBottomColor: MATERIAL.labioClaro,
+                  marginTop: pressed ? 2 : 0,
                   justifyContent: "center",
-                  opacity: pressed ? 0.75 : 1,
                 })}
               >
-                <Text style={{ fontFamily: fonte.media, fontSize: 13, color: corGratidao.forte }}>
+                <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: corGratidao.forte }}>
                   {f}
                 </Text>
               </Pressable>
@@ -641,14 +635,13 @@ export default function GratidaoTela() {
             maxLength={LIMITE}
             textAlignVertical="top"
             style={{
-              marginTop: espaco.md,
+              marginTop: espaco.lg,
               width: "100%",
-              minHeight: 110,
-              borderRadius: 16,
-              borderWidth: 1,
-              borderColor: corGratidao.borda,
+              minHeight: 120,
+              borderRadius: 22,
               backgroundColor: cor.branco,
-              padding: espaco.md,
+              padding: espaco.lg,
+              ...sombraDe(corGratidao.forte, 0.8),
               fontFamily: fonte.normal,
               fontSize: 15,
               lineHeight: 21,
@@ -666,9 +659,9 @@ export default function GratidaoTela() {
             </View>
           ) : null}
           <View style={{ marginTop: espaco.lg, width: "100%" }}>
-            <Botao
+            <BotaoDaAtividade
+              cor={corGratidao.forte}
               rotulo={erro ? "Tentar guardar de novo" : "Guardar"}
-              corFundo={corGratidao.forte}
               carregando={salvando}
               desabilitado={texto.trim().length < 2}
               aoTocar={() => void guardar()}

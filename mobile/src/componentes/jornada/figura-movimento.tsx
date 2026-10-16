@@ -2,6 +2,7 @@ import { memo, useEffect, useState } from "react";
 import Svg, { Circle, Ellipse, G, Path } from "react-native-svg";
 import type { PoseKey } from "@/lib/exercicios";
 import { useMovimentoReduzido } from "~/componentes/movimento";
+import { clarear } from "~/lib/cor";
 import { parteNoTempo, type Parte } from "~/lib/jornada/figura";
 
 /**
@@ -46,6 +47,13 @@ const TRACO = {
 } as const;
 
 type Desenho = { anim: string; t: number; tinta: string };
+
+/**
+ * O recheio da cabeça e da barriga: o traço sozinho era um boneco de palito, e
+ * com o tom claro por dentro a figura ganha corpo — sem mudar uma coordenada
+ * nem um movimento. Braços e pernas são desenhados DEPOIS, por cima dele.
+ */
+const recheio = (tinta: string) => clarear(tinta, 0.86);
 
 export const FiguraMovimento = memo(function FiguraMovimento({
   pose,
@@ -104,7 +112,7 @@ function Chao({ tinta, d = "M24 144 L96 144" }: { tinta: string; d?: string }) {
 function Cabeca({ tinta, g = {} }: { tinta: string; g?: ReturnType<typeof em> }) {
   return (
     <G {...g}>
-      <Circle cx={60} cy={24} r={12} stroke={tinta} {...TRACO} />
+      <Circle cx={60} cy={24} r={12} stroke={tinta} {...TRACO} fill={recheio(tinta)} />
       <Linha d="M60 36 L60 46" tinta={tinta} />
     </G>
   );
@@ -114,7 +122,7 @@ function TroncoFrente({ tinta }: { tinta: string }) {
   return (
     <>
       <Linha d="M60 46 L60 68" tinta={tinta} />
-      <Ellipse cx={60} cy={78} rx={20} ry={17} stroke={tinta} {...TRACO} />
+      <Ellipse cx={60} cy={78} rx={20} ry={17} stroke={tinta} {...TRACO} fill={recheio(tinta)} />
     </>
   );
 }
@@ -209,7 +217,7 @@ function Quatro(d: Desenho) {
       {/* O gato-camelo é a única troca de FORMA da coluna: duas colunas
           desenhadas, uma neutra e outra arredondada, cruzando a opacidade. */}
       <G {...em(d, "colunaNeutra")}>
-        <Circle cx={30} cy={46} r={13} stroke={tinta} {...TRACO} />
+        <Circle cx={30} cy={46} r={13} stroke={tinta} {...TRACO} fill={recheio(tinta)} />
         <Linha d="M43 43 L50 42" tinta={tinta} />
         <Linha d="M50 42 C70 34 92 36 110 44" tinta={tinta} />
         <Linha d="M62 46 C68 76 96 76 104 50" tinta={tinta} />
@@ -217,7 +225,7 @@ function Quatro(d: Desenho) {
       {gato ? (
         <G opacity={0} {...em(d, "colunaRedonda")}>
           {/* Coluna arredondada: o queixo desce, o dorso sobe. */}
-          <Circle cx={32} cy={60} r={13} stroke={tinta} {...TRACO} />
+          <Circle cx={32} cy={60} r={13} stroke={tinta} {...TRACO} fill={recheio(tinta)} />
           <Linha d="M45 55 L52 51" tinta={tinta} />
           <Linha d="M52 51 C70 24 94 26 110 44" tinta={tinta} />
           <Linha d="M62 54 C70 82 96 80 104 52" tinta={tinta} />
@@ -241,11 +249,11 @@ function Deitada(d: Desenho) {
     <G>
       {/* O travesseiro sob a cabeça: ela está apoiada, não caída. */}
       <Linha d="M18 52 L38 52" tinta={tinta} strokeWidth={2.4} opacity={0.35} />
-      <Circle cx={30} cy={44} r={11} stroke={tinta} {...TRACO} />
+      <Circle cx={30} cy={44} r={11} stroke={tinta} {...TRACO} fill={recheio(tinta)} />
       <Linha d="M41 46 L52 48" tinta={tinta} />
       <G {...em(d, "barriga")}>
         <Linha d="M52 48 C68 44 88 46 100 52" tinta={tinta} />
-        <Ellipse cx={74} cy={64} rx={19} ry={13} stroke={tinta} {...TRACO} />
+        <Ellipse cx={74} cy={64} rx={19} ry={13} stroke={tinta} {...TRACO} fill={recheio(tinta)} />
       </G>
       {/* As pernas dobradas, uma sobre a outra. */}
       <G {...em(d, "pernaDeCima")}>

@@ -1,9 +1,9 @@
 import * as Haptics from "expo-haptics";
 import { useKeepAwake } from "expo-keep-awake";
 import { router } from "expo-router";
-import { Pause, Play, X } from "lucide-react-native";
+import { Hand, Pause, Play, Sparkles, TriangleAlert, X } from "lucide-react-native";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AppState, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { AppState, Image, Platform, Pressable, ScrollView, Switch, Text, View } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 import {
   ajustarNotas,
@@ -13,14 +13,20 @@ import {
   type NotasDoCorpo,
   type Sintoma,
 } from "@/lib/exercicios";
-import { Botao, Carregando, Tela, toque } from "~/componentes/base";
+import { Carregando, Tela, toque } from "~/componentes/base";
 import {
   BolhaComBalao,
+  BotaoDaAtividade,
   BotaoDaVoz,
+  Brilho,
   Escolha,
+  Ficha,
   FundoDaAtividade,
+  materialDe,
   RodapeDaAtividade,
   Secao,
+  sombraDe,
+  Superficie,
   TituloDaAtividade,
   type PaletaDaAtividade,
 } from "~/componentes/jornada/atividade";
@@ -28,6 +34,7 @@ import { corMovimento } from "~/componentes/jornada/cores";
 import { FiguraMovimento } from "~/componentes/jornada/figura-movimento";
 import { concluirMomento, FimDoMomento, type Desfecho } from "~/componentes/jornada/fim";
 import { BarraDoTopo, voltarParaJornada } from "~/componentes/jornada/pecas";
+import { BolhaViva } from "~/componentes/movimento";
 import { useAtividade } from "~/componentes/jornada/usarJornada";
 import { pararVozes, tocarVoz } from "~/lib/audio/voz";
 import { VOZ_DO_MOVIMENTO } from "~/lib/audio/vozes";
@@ -71,6 +78,11 @@ const PALETA: PaletaDaAtividade = {
   discreto: corMovimento.discreto,
   brancoSuave: corMovimento.branco80,
 };
+
+const MATERIAL = materialDe(PALETA);
+
+/** O tapete de yoga, nas artes 3D do app — no lugar do 💪 no fim da sessão. */
+const ARTE_DO_FIM = require("../../../../src/assets/grades/exercicios.webp");
 
 /* No luto, os sinais que só existem numa gestação em curso saem da lista. */
 const SO_NA_GESTACAO = new Set(["Perda de líquido", "Contrações que se repetem"]);
@@ -211,15 +223,21 @@ export default function Mexer() {
             paddingVertical: espaco.xl,
           }}
         >
-          <Text style={{ fontSize: 48 }}>🤸</Text>
+          {/* A bolha de faixa e halteres, e não o 🤸: a arte que já abre a
+              tela de escolha, agora perguntando. */}
+          <View style={{ alignItems: "center", justifyContent: "center" }}>
+            <Brilho tamanho={190} />
+            <BolhaViva humor="exercicio" tamanho={132} moldura={false} />
+          </View>
           <Text
             accessibilityRole="header"
             style={{
               marginTop: espaco.lg,
               textAlign: "center",
-              fontFamily: fonte.media,
-              fontSize: 24,
-              lineHeight: 30,
+              fontFamily: fonte.titulo,
+              fontSize: 28,
+              lineHeight: 34,
+              letterSpacing: -0.3,
               color: corMovimento.titulo,
             }}
           >
@@ -231,14 +249,15 @@ export default function Mexer() {
                 style={{
                   marginTop: 6,
                   textAlign: "center",
-                  fontFamily: fonte.normal,
-                  fontSize: 13,
+                  fontFamily: fonte.media,
+                  fontSize: 15,
+                  lineHeight: 21,
                   color: corMovimento.dica,
                 }}
               >
                 Sobre o que você marcou no começo.
               </Text>
-              <View style={{ marginTop: espaco.xl, width: "100%", maxWidth: 320, gap: espaco.sm }}>
+              <View style={{ marginTop: espaco.xl, width: "100%", maxWidth: 340, gap: espaco.md }}>
                 {(
                   [
                     { e: "😌", r: "Melhorou" },
@@ -246,33 +265,15 @@ export default function Mexer() {
                     { e: "😖", r: "Piorou" },
                   ] as const
                 ).map((o) => (
-                  <Pressable
+                  <Escolha
                     key={o.r}
-                    accessibilityRole="button"
-                    onPress={() => {
-                      toque();
-                      responder(o.r);
-                    }}
-                    style={({ pressed }) => ({
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: espaco.md,
-                      minHeight: ALVO_MINIMO + 4,
-                      paddingHorizontal: espaco.lg,
-                      borderRadius: 16,
-                      borderWidth: 1,
-                      borderColor: corMovimento.borda,
-                      backgroundColor: corMovimento.vidro,
-                      opacity: pressed ? 0.75 : 1,
-                    })}
+                    paleta={PALETA}
+                    rotulo={o.r}
+                    ativa={false}
+                    aoTocar={() => responder(o.r)}
                   >
                     <Text style={{ fontSize: 20 }}>{o.e}</Text>
-                    <Text
-                      style={{ fontFamily: fonte.forte, fontSize: 14, color: corMovimento.titulo }}
-                    >
-                      {o.r}
-                    </Text>
-                  </Pressable>
+                  </Escolha>
                 ))}
               </View>
               <Pressable
@@ -281,16 +282,16 @@ export default function Mexer() {
                 hitSlop={8}
                 style={{ marginTop: espaco.lg, minHeight: ALVO_MINIMO, justifyContent: "center" }}
               >
-                <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: corMovimento.secao }}>
+                <Text style={{ fontFamily: fonte.forte, fontSize: 15, color: corMovimento.secao }}>
                   Pular
                 </Text>
               </Pressable>
             </>
           ) : (
-            <View style={{ marginTop: espaco.xxl, width: "100%", maxWidth: 320 }}>
-              <Botao
+            <View style={{ marginTop: espaco.xxl, width: "100%", maxWidth: 340 }}>
+              <BotaoDaAtividade
+                cor={corMovimento.forte}
                 rotulo="Continuar"
-                corFundo={corMovimento.forte}
                 aoTocar={() => setEtapa("fim")}
               />
             </View>
@@ -324,7 +325,16 @@ export default function Mexer() {
             D={at.D}
             cuidado={at.cuidado}
             pos={at.pos}
-            arte={<Text style={{ fontSize: 60, lineHeight: 72 }}>💪</Text>}
+            arte={
+              <View style={{ alignItems: "center", justifyContent: "center" }}>
+                <Brilho tamanho={200} />
+                <Image
+                  source={ARTE_DO_FIM}
+                  accessibilityIgnoresInvertColors
+                  style={{ width: 132, height: 132 }}
+                />
+              </View>
+            }
             confete={melhorou !== "Piorou"}
           />
         </ScrollView>
@@ -349,7 +359,7 @@ export default function Mexer() {
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: espaco.xl, paddingBottom: espaco.xxl }}
       >
-        <BolhaComBalao humor="exercicio" fala={fala} />
+        <BolhaComBalao humor="exercicio" fala={fala} paleta={PALETA} />
         <TituloDaAtividade paleta={PALETA}>
           {at.cuidado ? "Mexer devagar" : "Mexer o corpo"}
         </TituloDaAtividade>
@@ -394,38 +404,62 @@ export default function Mexer() {
         <View
           style={{
             marginTop: 28,
-            borderRadius: 16,
-            borderWidth: 1,
-            borderColor: corMovimento.alertaBorda,
-            backgroundColor: corMovimento.alertaFundo,
-            paddingHorizontal: espaco.lg,
-            paddingVertical: espaco.md,
-            gap: 4,
+            borderRadius: 22,
+            backgroundColor: corMovimento.pararFundo,
+            padding: espaco.lg,
+            gap: espaco.sm,
           }}
         >
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 13, color: corMovimento.alertaTexto }}>
-            Hoje não é dia de exercício se você tiver:
-          </Text>
-          {sinais.map((sinal) => (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.md }}>
+            <Ficha fundo={corMovimento.alertaBorda} tamanho={34}>
+              <TriangleAlert size={17} color={corMovimento.alertaTexto} strokeWidth={2.4} />
+            </Ficha>
             <Text
-              key={sinal}
+              accessibilityRole="header"
               style={{
-                fontFamily: fonte.normal,
-                fontSize: 13,
-                lineHeight: 18,
-                color: corMovimento.alertaTexto85,
+                flex: 1,
+                fontFamily: fonte.titulo,
+                fontSize: 15,
+                lineHeight: 20,
+                color: corMovimento.alertaTexto,
               }}
             >
-              · {sinal}
+              Hoje não é dia de exercício se você tiver:
             </Text>
-          ))}
+          </View>
+          <View style={{ gap: 6, paddingLeft: 46 }}>
+            {sinais.map((sinal) => (
+              <View key={sinal} style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                <View
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: 3,
+                    backgroundColor: corMovimento.alertaTexto70,
+                  }}
+                />
+                <Text
+                  style={{
+                    flex: 1,
+                    fontFamily: fonte.media,
+                    fontSize: 14,
+                    lineHeight: 19,
+                    color: corMovimento.alertaTexto85,
+                  }}
+                >
+                  {sinal}
+                </Text>
+              </View>
+            ))}
+          </View>
           <Text
             style={{
               marginTop: 4,
-              fontFamily: fonte.normal,
-              fontSize: 13,
-              lineHeight: 18,
-              color: corMovimento.alertaTexto70,
+              paddingLeft: 46,
+              fontFamily: fonte.forte,
+              fontSize: 14,
+              lineHeight: 19,
+              color: corMovimento.alertaTexto,
             }}
           >
             Qualquer um deles: fale com seu médico agora, pelo SOS.
@@ -446,9 +480,10 @@ export default function Mexer() {
         </Text>
       </ScrollView>
       <RodapeDaAtividade paleta={PALETA}>
-        <Botao
+        <BotaoDaAtividade
+          cor={corMovimento.forte}
           rotulo={`Começar · ${minutos} min`}
-          corFundo={corMovimento.forte}
+          icone={<Play size={18} color={cor.branco} fill={cor.branco} />}
           aoTocar={comecar}
           desabilitado={!seq.length}
         />
@@ -457,7 +492,11 @@ export default function Mexer() {
   );
 }
 
-/** "Hoje eu não desço ao chão" — cama de hospital, repouso, o tapete que não existe. */
+/**
+ * "Hoje eu não desço ao chão" — cama de hospital, repouso, o tapete que não
+ * existe. É um liga-desliga, e por isso tem a cara de um: o interruptor do
+ * iPhone, e não um botão que muda de cor.
+ */
 function SemChao({ ligado, aoTocar }: { ligado: boolean; aoTocar: () => void }) {
   return (
     <Pressable
@@ -469,28 +508,29 @@ function SemChao({ ligado, aoTocar }: { ligado: boolean; aoTocar: () => void }) 
         aoTocar();
       }}
       style={({ pressed }) => ({
+        marginTop: espaco.md,
         flexDirection: "row",
         alignItems: "center",
         gap: espaco.md,
-        minHeight: ALVO_MINIMO + 8,
-        paddingHorizontal: espaco.lg,
+        minHeight: 64,
+        paddingHorizontal: espaco.md,
         paddingVertical: espaco.sm,
-        borderRadius: 16,
-        marginTop: espaco.md,
-        borderWidth: ligado ? 0 : 1,
-        borderColor: corMovimento.borda,
-        backgroundColor: ligado ? corMovimento.forte : corMovimento.vidro,
-        opacity: pressed ? 0.8 : 1,
+        borderRadius: 20,
+        backgroundColor: cor.branco,
+        opacity: pressed ? 0.85 : 1,
+        ...sombraDe(corMovimento.forte, 0.8),
       })}
     >
-      <Text style={{ fontSize: 18 }}>🛏️</Text>
+      <Ficha fundo={MATERIAL.ficha}>
+        <Text style={{ fontSize: 18 }}>🛏️</Text>
+      </Ficha>
       <View style={{ flex: 1 }}>
         <Text
           style={{
-            fontFamily: fonte.forte,
-            fontSize: 13,
-            lineHeight: 17,
-            color: ligado ? cor.branco : corMovimento.titulo,
+            fontFamily: fonte.titulo,
+            fontSize: 14,
+            lineHeight: 19,
+            color: corMovimento.titulo,
           }}
         >
           Hoje eu não desço ao chão
@@ -500,11 +540,24 @@ function SemChao({ ligado, aoTocar }: { ligado: boolean; aoTocar: () => void }) 
             fontFamily: fonte.normal,
             fontSize: 13,
             lineHeight: 18,
-            color: ligado ? corMovimento.branco80 : corMovimento.discreto,
+            color: corMovimento.discreto,
           }}
         >
           Cama, sofá ou de pé — sem tapete
         </Text>
+      </View>
+      {/* O toque é da linha inteira; o interruptor só mostra o estado. */}
+      <View
+        pointerEvents="none"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
+        <Switch
+          value={ligado}
+          trackColor={{ false: "#e2e8f0", true: corMovimento.forte }}
+          thumbColor={cor.branco}
+          ios_backgroundColor="#e2e8f0"
+        />
       </View>
     </Pressable>
   );
@@ -516,6 +569,8 @@ function MantemAcesa() {
 }
 
 const ANEL = 208;
+/** O palco branco em volta do anel. */
+const PALCO = 240;
 const RAIO = 45;
 const VOLTA = 2 * Math.PI * RAIO;
 
@@ -571,15 +626,14 @@ function BotaoDoTopo({
         aoTocar();
       }}
       style={({ pressed }) => ({
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        borderWidth: 1,
-        borderColor: corMovimento.borda,
-        backgroundColor: corMovimento.vidro,
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        backgroundColor: cor.branco,
         alignItems: "center",
         justifyContent: "center",
         opacity: pressed ? 0.7 : 1,
+        ...sombraDe(corMovimento.forte, 0.6),
       })}
     >
       {children}
@@ -731,6 +785,34 @@ function Sessao({
             />
           </View>
         </View>
+        {/* O caminho da sessão, de ponta a ponta: um trecho por movimento. */}
+        <View
+          accessibilityLabel={m ? `Movimento ${indice + 1} de ${seq.length}` : undefined}
+          style={{
+            flexDirection: "row",
+            gap: 4,
+            paddingHorizontal: espaco.xl,
+            paddingTop: 2,
+            paddingBottom: espaco.sm,
+          }}
+        >
+          {seq.map((_, i) => (
+            <View
+              key={i}
+              style={{
+                flex: 1,
+                height: 6,
+                borderRadius: 3,
+                backgroundColor:
+                  i < indice
+                    ? corMovimento.feito
+                    : i === indice
+                      ? corMovimento.atual
+                      : corMovimento.porVir,
+              }}
+            />
+          ))}
+        </View>
         {/* O aviso médico fica fixo, discreto, na tela do exercício. */}
         <Text
           style={{
@@ -753,13 +835,19 @@ function Sessao({
               alignItems: "center",
             }}
           >
-            {/* A figura DEMONSTRANDO, dentro do anel que conta o tempo. */}
+            {/* A figura DEMONSTRANDO, dentro do anel que conta o tempo, num
+                palco branco: a figura de traço precisa de chão claro, e o
+                degradê atrás dela a apagava. */}
             <View
               style={{
-                width: ANEL,
-                height: ANEL,
+                marginTop: espaco.md,
+                width: PALCO,
+                height: PALCO,
+                borderRadius: PALCO / 2,
+                backgroundColor: cor.branco,
                 alignItems: "center",
                 justifyContent: "center",
+                ...sombraDe(corMovimento.forte, 1.4),
               }}
             >
               <Anel resta={troca ? 1 : resta / m.secs} />
@@ -769,19 +857,21 @@ function Sessao({
               <View
                 style={{
                   position: "absolute",
-                  top: -4,
+                  top: -10,
                   borderRadius: 999,
                   backgroundColor: troca ? corMovimento.contagem : corMovimento.forte,
-                  paddingHorizontal: 10,
-                  paddingVertical: 2,
+                  borderBottomWidth: 3,
+                  borderBottomColor: MATERIAL.labioCheio,
+                  paddingHorizontal: 14,
+                  paddingVertical: 3,
                 }}
               >
                 <Text
                   accessibilityLabel={troca ? `Prepare-se, ${resta} segundos` : `${resta} segundos`}
                   style={{
                     fontFamily: fonte.titulo,
-                    fontSize: 14,
-                    lineHeight: 20,
+                    fontSize: 16,
+                    lineHeight: 22,
                     color: cor.branco,
                     fontVariant: ["tabular-nums"],
                   }}
@@ -792,11 +882,12 @@ function Sessao({
             </View>
             <Text
               style={{
-                marginTop: espaco.lg,
+                marginTop: espaco.xl,
                 textAlign: "center",
                 fontFamily: fonte.titulo,
-                fontSize: 24,
-                lineHeight: 30,
+                fontSize: 26,
+                lineHeight: 32,
+                letterSpacing: -0.3,
                 color: corMovimento.titulo,
               }}
             >
@@ -804,11 +895,11 @@ function Sessao({
             </Text>
             <Text
               style={{
-                marginTop: 4,
+                marginTop: 6,
                 maxWidth: 320,
                 textAlign: "center",
-                fontFamily: fonte.normal,
-                fontSize: 14,
+                fontFamily: fonte.media,
+                fontSize: 15,
                 lineHeight: 22,
                 color: corMovimento.dica,
               }}
@@ -816,32 +907,32 @@ function Sessao({
               {m.cue}
             </Text>
             {/* Como montar a posição, na ordem em que o corpo entra nela. */}
-            <View style={{ marginTop: espaco.lg, width: "100%", maxWidth: 384, gap: espaco.sm }}>
+            <Superficie
+              tinta={corMovimento.forte}
+              estilo={{ marginTop: espaco.xl, width: "100%", maxWidth: 384, gap: espaco.md }}
+            >
+              <Text
+                accessibilityRole="header"
+                style={{ fontFamily: fonte.titulo, fontSize: 15, color: corMovimento.titulo }}
+              >
+                Como fazer
+              </Text>
               {m.passos.map((p, i) => (
-                <View key={i} style={{ flexDirection: "row", gap: 10 }}>
-                  <View
-                    style={{
-                      marginTop: 1,
-                      width: 20,
-                      height: 20,
-                      borderRadius: 10,
-                      backgroundColor: corMovimento.passoFundo,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
+                <View key={i} style={{ flexDirection: "row", gap: espaco.md }}>
+                  <Ficha fundo={MATERIAL.ficha} tamanho={26}>
                     <Text
-                      style={{ fontFamily: fonte.titulo, fontSize: 12, color: corMovimento.forte }}
+                      style={{ fontFamily: fonte.titulo, fontSize: 13, color: corMovimento.forte }}
                     >
                       {i + 1}
                     </Text>
-                  </View>
+                  </Ficha>
                   <Text
                     style={{
                       flex: 1,
+                      paddingTop: 3,
                       fontFamily: fonte.normal,
-                      fontSize: 13,
-                      lineHeight: 18,
+                      fontSize: 14,
+                      lineHeight: 20,
                       color: corMovimento.passoTexto,
                     }}
                   >
@@ -849,69 +940,36 @@ function Sessao({
                   </Text>
                 </View>
               ))}
-            </View>
-            <View style={{ marginTop: espaco.lg, width: "100%", maxWidth: 384, gap: espaco.sm }}>
+            </Superficie>
+            <View style={{ marginTop: espaco.md, width: "100%", maxWidth: 384, gap: espaco.md }}>
               <Caixa
                 fundo={corMovimento.sentirFundo}
                 tinta={corMovimento.sentirTexto}
-                titulo="Você deve sentir:"
+                titulo="Você deve sentir"
+                icone={<Sparkles size={16} color={corMovimento.forte} strokeWidth={2.4} />}
+                ficha={corMovimento.passoFundo}
               >
                 {m.sentir}
               </Caixa>
               <Caixa
                 fundo={corMovimento.pararFundo}
                 tinta={corMovimento.pararTexto}
-                titulo="Pare se:"
+                titulo="Pare se"
+                icone={<Hand size={16} color={corMovimento.alertaTexto} strokeWidth={2.4} />}
+                ficha={corMovimento.alertaBorda}
               >
                 {m.parar}
               </Caixa>
             </View>
-            <View
-              accessibilityLabel={`Movimento ${indice + 1} de ${seq.length}`}
-              style={{ marginTop: 20, flexDirection: "row", justifyContent: "center", gap: 6 }}
-            >
-              {seq.map((_, i) => (
-                <View
-                  key={i}
-                  style={{
-                    width: 24,
-                    height: 8,
-                    borderRadius: 4,
-                    backgroundColor:
-                      i < indice
-                        ? corMovimento.feito
-                        : i === indice
-                          ? corMovimento.atual
-                          : corMovimento.porVir,
-                  }}
-                />
-              ))}
+            <View style={{ marginTop: espaco.xl, width: "100%", maxWidth: 384 }}>
+              <BotaoDaAtividade
+                claro
+                cor={corMovimento.forte}
+                rotulo={indice + 1 >= seq.length ? "Terminar" : "Próximo movimento"}
+                rotuloAcessivel="Pular para o próximo"
+                aoTocar={pular}
+              />
             </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Pular para o próximo"
-              hitSlop={4}
-              onPress={() => {
-                toque();
-                pular();
-              }}
-              style={({ pressed }) => ({
-                marginTop: espaco.lg,
-                minHeight: 36,
-                paddingHorizontal: espaco.xl,
-                borderRadius: 999,
-                borderWidth: 1,
-                borderColor: corMovimento.bordaForte,
-                backgroundColor: corMovimento.vidro,
-                alignItems: "center",
-                justifyContent: "center",
-                opacity: pressed ? 0.7 : 1,
-              })}
-            >
-              <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: corMovimento.forte }}>
-                Próximo →
-              </Text>
-            </Pressable>
           </ScrollView>
         ) : (
           <Carregando texto="Terminando…" />
@@ -925,25 +983,38 @@ function Caixa({
   fundo,
   tinta,
   titulo,
+  icone,
+  ficha,
   children,
 }: {
   fundo: string;
   tinta: string;
   titulo: string;
+  icone: ReactNode;
+  ficha: string;
   children: ReactNode;
 }) {
   return (
     <View
       style={{
-        borderRadius: 16,
+        flexDirection: "row",
+        gap: espaco.md,
+        borderRadius: 20,
         backgroundColor: fundo,
-        paddingHorizontal: 14,
-        paddingVertical: 10,
+        padding: 14,
       }}
     >
-      <Text style={{ fontFamily: fonte.normal, fontSize: 13, lineHeight: 18, color: tinta }}>
-        <Text style={{ fontFamily: fonte.titulo }}>{titulo}</Text> {children}
-      </Text>
+      <Ficha fundo={ficha} tamanho={30}>
+        {icone}
+      </Ficha>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={{ fontFamily: fonte.titulo, fontSize: 14, lineHeight: 19, color: tinta }}>
+          {titulo}
+        </Text>
+        <Text style={{ fontFamily: fonte.normal, fontSize: 14, lineHeight: 20, color: tinta }}>
+          {children}
+        </Text>
+      </View>
     </View>
   );
 }
