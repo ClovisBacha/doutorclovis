@@ -77,6 +77,12 @@ export const corMovimento = {
   bordaForte: "#5ee9b5",
   vidro: "rgba(255,255,255,0.7)",
   fechar: "#45556c",
+  /* os sinais de parada (`border-amber-200 bg-amber-50/80 text-amber-900`) */
+  alertaBorda: "#fee685",
+  alertaFundo: "rgba(255,251,235,0.8)",
+  alertaTexto: "#7b3306",
+  alertaTexto85: "rgba(123,51,6,0.85)",
+  alertaTexto70: "rgba(123,51,6,0.7)",
   secao: "#009966",
   discreto: "rgba(0,122,85,0.6)",
   branco80: "rgba(255,255,255,0.8)",
@@ -195,4 +201,36 @@ export const corNoite = {
   onda: "#c6d2ff",
   tempo: "rgba(124,134,255,0.9)",
   tempoTexto: "#141a34",
+} as const;
+
+/**
+ * A GRATIDÃO é âmbar, como no app antigo (`GratitudeBlock` do site): o
+ * degradê yellow-100 → amber-50 → branco, o número grande do marco e, quando
+ * a carta do bebê nasce, o cartão na cor rosa de quem recebe a visita.
+ */
+export const corGratidao = {
+  fundoTopo: "#fef9c2",
+  fundoMeio: "#fffbeb",
+  fundoBase: "#ffffff",
+  forte: "#bb4d00",
+  titulo: "#7b3306",
+  texto: "rgba(151,60,0,0.8)",
+  secao: "#e17100",
+  borda: "#fee685",
+  bordaSuave: "rgba(254,230,133,0.7)",
+  escolhidaBorda: "#ffb900",
+  escolhidaFundo: "#fef3c6",
+  vidro: "rgba(255,255,255,0.7)",
+  vidroForte: "rgba(255,255,255,0.8)",
+  discreto: "rgba(187,77,0,0.6)",
+  quando: "rgba(225,113,0,0.8)",
+  marco: "#fe9a00",
+  sublinhado: "#ffd230",
+  brancoSuave: "rgba(255,255,255,0.75)",
+  cartaBorda: "#ffccd3",
+  cartaFundo: "rgba(255,241,242,0.8)",
+  cartaTexto: "#8b0836",
+  cartaBotao: "#c70036",
+  cartaLink: "#ec003f",
+  cartaSublinhado: "#ffa1ad",
 } as const;

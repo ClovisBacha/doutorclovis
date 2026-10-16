@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   AppState,
+  Modal,
   Easing,
   Platform,
   Pressable,
@@ -40,12 +41,18 @@ import {
 import { corMeditacao } from "~/componentes/jornada/cores";
 import { concluirMomento, FimDoMomento, type Desfecho } from "~/componentes/jornada/fim";
 import { FolhaDeSons } from "~/componentes/jornada/folha-de-sons";
-import { BarraDoTopo } from "~/componentes/jornada/pecas";
+import { BarraDoTopo, voltarParaJornada } from "~/componentes/jornada/pecas";
 import { useAtividade } from "~/componentes/jornada/usarJornada";
 import { useMovimentoReduzido } from "~/componentes/movimento";
 import { tocarAmostra, tocarSomDeFundo, type SomDeFundo } from "~/lib/audio/som-de-fundo";
 import { ARTE_DO_SOM } from "~/lib/audio/sons-de-fundo";
 import { pararVozes, tocarVoz } from "~/lib/audio/voz";
+import {
+  definirLembreteDaMeditacao,
+  lerLembreteDaMeditacao,
+  reagendarLembreteDaMeditacao,
+} from "~/lib/lembrete-da-meditacao";
+import { HORA_PADRAO, HORARIOS, horaValida } from "~/lib/jornada/lembrete";
 import { VOZ_DA_MEDITACAO, VOZ_DA_RESPIRACAO } from "~/lib/audio/vozes";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { ymdLocal } from "~/lib/gestacao";
@@ -240,7 +247,11 @@ export default function Meditar() {
   async function concluir(mins: number, completa: boolean) {
     setMinutosFeitos(mins);
     setEtapa("reflexo");
-    gravarChave(CHAVE_LOG_MEDITACAO, registrar(registro, { hoje: ymdLocal(), minutos: mins }));
+    const novoRegistro = registrar(registro, { hoje: ymdLocal(), minutos: mins });
+    gravarChave(CHAVE_LOG_MEDITACAO, novoRegistro);
+    /* Meditou hoje: o lembrete de hoje fica quieto ("e fico quieto se você já
+       tiver meditado", como no site). */
+    if (at.uid) void reagendarLembreteDaMeditacao(at.uid, novoRegistro.dias);
     if (completa && sessao?.programa) {
       const novo = Math.max(feitosDoPrograma, sessao.programa.dia);
       setProgFeitos(novo);
@@ -277,11 +288,13 @@ export default function Meditar() {
     setEtapa("fim");
   }
 
+  /* Antes de um minuto não houve sessão para guardar: o ✕ fecha a atividade, como no site. */
   function sairDaSessao() {
     fundo.current?.parar();
     fundo.current = null;
     pararVozes();
-    setEtapa("escolha");
+    if (router.canGoBack()) router.back();
+    else voltarParaJornada();
   }
 
   /* A pausa vive na sessão; o som de fundo, aqui (ele atravessa as etapas). */
@@ -314,6 +327,11 @@ export default function Meditar() {
         aoPausar={aoPausar}
         aoTerminar={(mins) => void concluir(mins, true)}
         aoEncerrar={(ciclo) => {
+          /* O ✕ cala tudo (o som e a fala) — e a partir de um minuto ele GUARDA a
+             sessão, que é o que o dedo quer dizer quando decide que já basta. */
+          fundo.current?.parar();
+          fundo.current = null;
+          pararVozes();
           if (ciclo >= CICLOS_DE_UM_MINUTO) void concluir(minutosAoEncerrar(ciclo), false);
           else sairDaSessao();
         }}
@@ -418,6 +436,8 @@ export default function Meditar() {
           D={at.D}
           cuidado={at.cuidado}
           pos={at.pos}
+          arte={<Text style={{ fontSize: 60, lineHeight: 72 }}>🧘</Text>}
+          confete
           extra={
             seqDepois > 0 ? (
               <Text
@@ -448,6 +468,10 @@ export default function Meditar() {
       >
         <BolhaComBalao humor="feliz" fala={falaDoBalao(registro)} />
         <TituloDaAtividade paleta={PALETA}>Meditar</TituloDaAtividade>
+
+        {/* O lembrete fica colado na sequência: a chama diz quantos dias ela
+            veio, e isto é o que a traz. Fora do Modo Cuidado, como no site. */}
+        {at.uid && !at.cuidado ? <LembreteDiario uid={at.uid} dias={registro.dias} /> : null}
 
         {diaAtual && !menuAberto ? (
           <CartaoDoPrograma
@@ -598,6 +622,240 @@ export default function Meditar() {
         </RodapeDaAtividade>
       ) : null}
     </FundoDaAtividade>
+  );
+}
+
+/* ── O lembrete diário ────────────────────────────────────────────────────── */
+
+function LembreteDiario({ uid, dias }: { uid: string; dias: readonly string[] }) {
+  /* `undefined` enquanto lê o aparelho: o cartão não pisca "Ativar" para quem já ligou. */
+  const [hora, setHora] = useState<string | null | undefined>(undefined);
+  const [escolhendo, setEscolhendo] = useState(false);
+  const [semPermissao, setSemPermissao] = useState(false);
+  const bancada = ehBancada();
+
+  useEffect(() => {
+    let vivo = true;
+    if (bancada) {
+      const h = parametroDaBancada("lembrete");
+      setHora(h && horaValida(h) ? h : null);
+      return;
+    }
+    void lerLembreteDaMeditacao(uid).then((h) => {
+      if (vivo) setHora(h);
+    });
+    /* Ao abrir: a agenda é refeita (dias novos à frente; hoje sai se já meditou). */
+    void reagendarLembreteDaMeditacao(uid, dias);
+    return () => {
+      vivo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid]);
+
+  async function definir(nova: string | null) {
+    const antes = hora;
+    setHora(nova);
+    setSemPermissao(false);
+    if (bancada) return;
+    const r = await definirLembreteDaMeditacao(uid, nova, dias);
+    if (r === "sem-permissao") {
+      setHora(antes ?? null);
+      setSemPermissao(true);
+    }
+  }
+
+  if (hora === undefined) return null;
+  return (
+    <View style={{ marginTop: espaco.lg }}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: espaco.md,
+          minHeight: ALVO_MINIMO + 12,
+          paddingHorizontal: espaco.lg,
+          paddingVertical: 10,
+          borderRadius: 16,
+          borderWidth: 1,
+          borderColor: corMeditacao.borda,
+          backgroundColor: corMeditacao.vidro,
+        }}
+      >
+        <Text style={{ fontSize: 18 }}>🔔</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontFamily: fonte.titulo, fontSize: 13, color: corMeditacao.titulo }}>
+            Lembrar todo dia
+          </Text>
+          <Text
+            style={{
+              fontFamily: fonte.normal,
+              fontSize: 13,
+              lineHeight: 17,
+              color: corMeditacao.discreto,
+            }}
+          >
+            {hora
+              ? "E fico quieto se você já tiver meditado"
+              : "Um empurrãozinho na hora que você escolher"}
+          </Text>
+        </View>
+        {hora ? (
+          <>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Horário do lembrete: ${hora}. Toque para trocar`}
+              onPress={() => {
+                toque();
+                setEscolhendo(true);
+              }}
+              style={({ pressed }) => ({
+                minHeight: 36,
+                paddingHorizontal: 10,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: corMeditacao.borda,
+                backgroundColor: cor.branco,
+                justifyContent: "center",
+                opacity: pressed ? 0.7 : 1,
+              })}
+              hitSlop={4}
+            >
+              <Text
+                style={{
+                  fontFamily: fonte.titulo,
+                  fontSize: 14,
+                  color: corMeditacao.forte,
+                  fontVariant: ["tabular-nums"],
+                }}
+              >
+                {hora}
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Desligar lembrete"
+              onPress={() => {
+                toque();
+                void definir(null);
+              }}
+              hitSlop={8}
+              style={({ pressed }) => ({
+                minWidth: 28,
+                minHeight: 36,
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: pressed ? 0.6 : 1,
+              })}
+            >
+              <X size={18} color={corMeditacao.iconeApagado} />
+            </Pressable>
+          </>
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              toque();
+              void definir(HORA_PADRAO);
+            }}
+            style={({ pressed }) => ({
+              minHeight: 34,
+              paddingHorizontal: espaco.lg,
+              borderRadius: 999,
+              backgroundColor: corMeditacao.forte,
+              justifyContent: "center",
+              opacity: pressed ? 0.8 : 1,
+            })}
+            hitSlop={5}
+          >
+            <Text style={{ fontFamily: fonte.titulo, fontSize: 13, color: cor.branco }}>
+              Ativar
+            </Text>
+          </Pressable>
+        )}
+      </View>
+      {semPermissao ? (
+        <Text
+          style={{
+            marginTop: 6,
+            fontFamily: fonte.normal,
+            fontSize: 13,
+            lineHeight: 18,
+            color: corMeditacao.discreto,
+          }}
+        >
+          Ative as notificações do app nos Ajustes do iPhone para o lembrete chegar.
+        </Text>
+      ) : null}
+      <Modal
+        visible={escolhendo}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setEscolhendo(false)}
+      >
+        <View style={{ flex: 1, justifyContent: "flex-end" }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Fechar"
+            onPress={() => setEscolhendo(false)}
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              top: 0,
+              bottom: 0,
+              backgroundColor: corMeditacao.folhaVeu,
+            }}
+          />
+          <View
+            accessibilityViewIsModal
+            style={{
+              maxHeight: "70%",
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              backgroundColor: cor.branco,
+              paddingTop: 20,
+            }}
+          >
+            <Text
+              style={{
+                textAlign: "center",
+                fontFamily: fonte.forte,
+                fontSize: 13,
+                letterSpacing: 0.65,
+                textTransform: "uppercase",
+                color: corMeditacao.secao,
+              }}
+            >
+              Lembrar às
+            </Text>
+            <ScrollView
+              contentContainerStyle={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                gap: espaco.sm,
+                padding: espaco.xl,
+                paddingBottom: 40,
+              }}
+            >
+              {HORARIOS.map((h) => (
+                <Escolha
+                  key={h}
+                  paleta={PALETA}
+                  rotulo={h}
+                  ativa={h === hora}
+                  centro
+                  estilo={{ width: "23%" }}
+                  aoTocar={() => {
+                    setEscolhendo(false);
+                    void definir(h);
+                  }}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 }
 

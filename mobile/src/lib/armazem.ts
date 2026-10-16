@@ -37,6 +37,10 @@ export async function apagar(chave: string): Promise<void> {
 
 /** Sair da conta não pode deixar a jornada, as filas e o kit do SOS no aparelho. */
 export async function limparRastrosLocais(): Promise<void> {
+  /* E nenhum lembrete agendado continua tocando para quem saiu. */
+  await import("~/lib/lembrete-da-meditacao")
+    .then((m) => m.cancelarLembretesDaMeditacao())
+    .catch(() => {});
   try {
     const chaves = await AsyncStorage.getAllKeys();
     const nossas = chaves.filter((c) => c.startsWith("dc-"));

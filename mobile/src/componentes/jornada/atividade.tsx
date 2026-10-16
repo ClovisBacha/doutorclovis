@@ -73,11 +73,19 @@ const BALAO = { fundo: "rgba(255,255,255,0.85)", borda: "#fee685", texto: "#7b33
  * O porta-voz, GRANDE e falando num balão — "ele que vai interagir com as
  * pessoas", nas palavras do dono no app antigo.
  */
-export function BolhaComBalao({ humor, fala }: { humor: HumorDaBolha; fala: string }) {
+export function BolhaComBalao({
+  humor,
+  fala,
+  tamanho = 168,
+}: {
+  humor: HumorDaBolha;
+  fala: string;
+  tamanho?: number;
+}) {
   return (
     <View style={{ alignItems: "center" }}>
-      <BolhaViva humor={humor} tamanho={168} moldura={false} />
-      <SombraDoChao />
+      <BolhaViva humor={humor} tamanho={tamanho} moldura={false} />
+      {tamanho >= 120 ? <SombraDoChao /> : null}
       <Text
         style={{
           marginTop: espaco.sm,

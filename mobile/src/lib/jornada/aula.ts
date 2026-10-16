@@ -66,6 +66,22 @@ export function corretas(q: QuizQuestion): number[] {
   return Array.isArray(q.a) ? q.a : [q.a];
 }
 
+/**
+ * A REVISÃO da aula de hoje já feita ("Revisar as respostas", como no site):
+ * cada pergunta abre com o gabarito marcado e o porquê à vista. Não conta
+ * acerto nem paga de novo — é para reler.
+ */
+export function revisao(q: QuizQuestion, indice: number): EstadoDaAula {
+  return {
+    etapa: "pergunta",
+    indice,
+    escolha: corretas(q),
+    verificada: true,
+    acertou: true,
+    acertos: 0,
+  };
+}
+
 /** O que cada alternativa mostra depois de verificar. */
 export function estadoDaOpcao(
   e: EstadoDaAula,

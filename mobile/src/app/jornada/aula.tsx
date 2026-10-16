@@ -10,7 +10,7 @@ import { corJornada } from "~/componentes/jornada/cores";
 import { concluirMomento, FimDoMomento, type Desfecho } from "~/componentes/jornada/fim";
 import { pagarAula } from "~/componentes/jornada/economia";
 import { useBalanco, useQuique } from "~/componentes/jornada/efeitos";
-import { BarraDoTopo, BolhaFalando, voltarParaJornada } from "~/componentes/jornada/pecas";
+import { BarraDoTopo, Bolha, BolhaFalando, voltarParaJornada } from "~/componentes/jornada/pecas";
 import { useAtividade } from "~/componentes/jornada/usarJornada";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import {
@@ -21,9 +21,11 @@ import {
   INICIO_DA_AULA,
   podeVerificar,
   dividirLicao,
+  revisao,
   verificar,
   type EstadoDaAula,
 } from "~/lib/jornada/aula";
+import { tocarConquista } from "~/lib/audio/som-de-conquista";
 import { marcar } from "~/lib/jornada/loja";
 import { sementesDaAula } from "~/lib/jornada/momentos";
 import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
@@ -48,6 +50,8 @@ export default function Aula() {
   const [e, setE] = useState<EstadoDaAula>(INICIO_DA_AULA);
   const [desfecho, setDesfecho] = useState<Desfecho | null>(null);
   const [bancadaAplicada, setBancadaAplicada] = useState(false);
+  /* "Revisar as respostas": a aula de hoje já feita, de novo, com o gabarito. */
+  const [revisando, setRevisando] = useState(false);
   const D = at.D;
 
   useEffect(() => {
@@ -107,6 +111,9 @@ export default function Aula() {
     )
       return;
     let vivo = true;
+    /* A comemoração do site, para quem acertou alguma (calada no luto, à
+       noite e depois da terceira do dia). */
+    if (e.acertos > 0) void tocarConquista({ cuidado: at.cuidado });
     void concluirMomento({
       uid: at.uid,
       D,
@@ -149,7 +156,8 @@ export default function Aula() {
     );
   }
 
-  if (at.jaFeita && e.etapa !== "fim") {
+  if (at.jaFeita && !revisando && e.etapa !== "fim") {
+    const qs = quiz && quiz !== "carregando" ? quiz.questions : null;
     return (
       <Tela bordas={["top", "bottom"]}>
         <BarraDoTopo titulo="Aula de hoje" />
@@ -158,7 +166,18 @@ export default function Aula() {
           fala="A aula de hoje já está feita. Amanhã tem outra esperando por você!"
         />
         {quiz && quiz !== "carregando" ? <Licao quiz={quiz} /> : null}
+        {qs && qs.length ? (
+          <Botao
+            rotulo="Revisar as respostas"
+            corFundo={corJornada.roxo}
+            aoTocar={() => {
+              setRevisando(true);
+              setE(revisao(qs[0], 0));
+            }}
+          />
+        ) : null}
         <Botao
+          tipo="secundario"
           rotulo="Voltar para a jornada"
           aoTocar={voltarParaJornada}
           corFundo={corJornada.roxo}
@@ -206,11 +225,29 @@ export default function Aula() {
   const total = quiz.questions.length;
 
   if (e.etapa === "fim") {
+    /* Três caras para três resultados: a festa é de quem GABARITOU; no meio, a
+       piscadinha orgulhosa; zerando, ela fica feliz e parada — qualquer reação
+       ali viraria comentário sobre o desempenho dela. */
+    const perfeito = e.acertos === total;
+    const titulo = perfeito
+      ? "Acertou tudo!"
+      : e.acertos >= total - 1
+        ? "Quase perfeito!"
+        : e.acertos > 0
+          ? "Muito bem!"
+          : "Anotado!";
     return (
       <Tela bordas={["top", "bottom"]}>
         <FimDoMomento
-          titulo="Aula feita!"
-          fala={`Você acertou ${e.acertos} de ${total}. Cada pergunta é um passo a mais para chegar preparada.`}
+          titulo={titulo}
+          fala={`${e.acertos} de ${total} acertos`}
+          arte={
+            <Bolha
+              humor={perfeito ? "comemorando" : e.acertos > 0 ? "orgulhosa" : "feliz"}
+              tamanho={150}
+            />
+          }
+          confete={e.acertos > 0 ? (perfeito ? "grande" : true) : false}
           desfecho={desfecho}
           D={D}
           cuidado={false}
@@ -291,7 +328,7 @@ export default function Aula() {
             ? cor.fundo
             : e.acertou
               ? corJornada.feitoFundo
-              : cor.urgenteFundo,
+              : AMBAR.fundo,
         }}
       >
         {e.verificada ? (
@@ -300,14 +337,16 @@ export default function Aula() {
               {e.acertou ? (
                 <Check size={24} color={corJornada.feito} strokeWidth={3} />
               ) : (
-                <X size={24} color={cor.urgente} strokeWidth={3} />
+                <Text style={{ fontSize: 20 }}>💡</Text>
               )}
-              <T tipo="subtitulo" cor={e.acertou ? cor.sementinha : cor.urgente}>
-                {e.acertou
-                  ? "Isso mesmo!"
-                  : multi
-                    ? "Quase! Olhe as marcadas em verde"
-                    : "Não foi dessa vez"}
+              <T tipo="subtitulo" cor={e.acertou ? cor.sementinha : AMBAR.texto}>
+                {revisando
+                  ? "A resposta certa"
+                  : e.acertou
+                    ? "Isso mesmo!"
+                    : multi
+                      ? "Quase! Olhe as marcadas em verde"
+                      : "A certa está em verde"}
               </T>
             </View>
             <T tipo="corpo" cor={cor.texto}>
@@ -317,9 +356,20 @@ export default function Aula() {
         ) : null}
         {e.verificada ? (
           <Botao
-            rotulo={e.indice + 1 >= total ? "Terminar" : "Continuar"}
-            corFundo={e.acertou ? corJornada.feito : cor.urgente}
-            aoTocar={() => setE(continuar(e, total))}
+            rotulo={
+              e.indice + 1 >= total ? (revisando ? "Terminar a revisão" : "Terminar") : "Continuar"
+            }
+            corFundo={e.acertou ? corJornada.feito : corJornada.roxo}
+            aoTocar={() => {
+              if (!revisando) return setE(continuar(e, total));
+              /* Na revisão não há fim nem pagamento: volta para a aula feita. */
+              if (e.indice + 1 >= total) {
+                setRevisando(false);
+                setE(INICIO_DA_AULA);
+                return;
+              }
+              setE(revisao(quiz.questions[e.indice + 1], e.indice + 1));
+            }}
           />
         ) : (
           <Botao
@@ -328,11 +378,13 @@ export default function Aula() {
             desabilitado={!podeVerificar(e)}
             aoTocar={() => {
               const x = verificar(e, q);
+              /* Acerto: um toque firme. Erro: um toque curto e leve — o corpo
+                 diz "não" sem repreender (no site, 18 ms contra 10 ms). */
               if (Platform.OS !== "web") {
-                void Haptics.notificationAsync(
+                void Haptics.impactAsync(
                   x.acertou
-                    ? Haptics.NotificationFeedbackType.Success
-                    : Haptics.NotificationFeedbackType.Warning,
+                    ? Haptics.ImpactFeedbackStyle.Medium
+                    : Haptics.ImpactFeedbackStyle.Light,
                 ).catch(() => {});
               }
               setE(x);
@@ -409,7 +461,12 @@ function Opcao({
       selo: corJornada.feitoFundo,
       letra: corJornada.feito,
     },
-    errada: { borda: cor.urgente, fundo: cor.urgenteFundo, selo: cor.urgente, letra: cor.branco },
+    errada: {
+      borda: AMBAR.erradaBorda,
+      fundo: AMBAR.erradaFundo,
+      selo: AMBAR.erradaBorda,
+      letra: cor.branco,
+    },
   }[estado];
   /* A opção reage ao veredito: a certa quica, a errada balança de leve — sem
      vermelho gritando, só o "não" do corpo. */
@@ -487,3 +544,12 @@ function Opcao({
     </Animated.View>
   );
 }
+
+/* O erro da aula, como no site: âmbar e uma opção em rosa suave — o vermelho
+   do tema é reservado à gravidade clínica, e errar uma pergunta não é isso. */
+const AMBAR = {
+  fundo: "#fef3c6",
+  texto: "#973c00",
+  erradaBorda: "#ff637e",
+  erradaFundo: "#fff1f2",
+} as const;

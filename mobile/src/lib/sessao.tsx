@@ -125,6 +125,17 @@ export function ProvedorDeSessao({ children }: { children: ReactNode }) {
     void recarregarPerfil();
   }, [recarregarPerfil]);
 
+  /* Modo Cuidado ligado (aqui ou em outro aparelho): nenhum "Vamos respirar?"
+     agendado continua chegando — o servidor do site também pula quem está no
+     Modo Cuidado. */
+  const emCuidado = estadoDoPerfil === "pronto" && perfil?.care_mode === true;
+  useEffect(() => {
+    if (!emCuidado) return;
+    void import("~/lib/lembrete-da-meditacao")
+      .then((m) => m.cancelarLembretesDaMeditacao())
+      .catch(() => {});
+  }, [emCuidado]);
+
   const valor = useMemo<Valor>(
     () => ({
       sessao,

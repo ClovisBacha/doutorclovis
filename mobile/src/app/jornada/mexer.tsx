@@ -1,9 +1,9 @@
 import * as Haptics from "expo-haptics";
 import { useKeepAwake } from "expo-keep-awake";
 import { router } from "expo-router";
-import { Pause, Play, TriangleAlert, X } from "lucide-react-native";
+import { Pause, Play, X } from "lucide-react-native";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { AppState, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 import {
   ajustarNotas,
@@ -13,7 +13,7 @@ import {
   type NotasDoCorpo,
   type Sintoma,
 } from "@/lib/exercicios";
-import { Botao, Cartao, Carregando, T, Tela, toque } from "~/componentes/base";
+import { Botao, Carregando, Tela, toque } from "~/componentes/base";
 import {
   BolhaComBalao,
   BotaoDaVoz,
@@ -27,7 +27,7 @@ import {
 import { corMovimento } from "~/componentes/jornada/cores";
 import { FiguraMovimento } from "~/componentes/jornada/figura-movimento";
 import { concluirMomento, FimDoMomento, type Desfecho } from "~/componentes/jornada/fim";
-import { BarraDoTopo, Ficha } from "~/componentes/jornada/pecas";
+import { BarraDoTopo, voltarParaJornada } from "~/componentes/jornada/pecas";
 import { useAtividade } from "~/componentes/jornada/usarJornada";
 import { pararVozes, tocarVoz } from "~/lib/audio/voz";
 import { VOZ_DO_MOVIMENTO } from "~/lib/audio/vozes";
@@ -39,7 +39,6 @@ import {
   DURACOES_MEXER,
   inicioDoProximo,
   linhaDoTempo,
-  minutosAproximados,
   montarSessao,
   posicaoNoTempo,
   temChaoParaTirar,
@@ -84,9 +83,12 @@ export default function Mexer() {
   const [minutos, setMinutos] = useState<DuracaoMexer>(DURACAO_PADRAO);
   const [sintoma, setSintoma] = useState<Sintoma | null>(null);
   const [semChao, setSemChao] = useState(false);
-  const [etapa, setEtapa] = useState<"escolha" | "sinais" | "sessao" | "fim">("escolha");
+  const [etapa, setEtapa] = useState<"escolha" | "sessao" | "reflexo" | "fim">("escolha");
+  /* A sequência nasce no "Começar", e não do desenho: derivada, ela mudaria
+     debaixo dela se o dia virasse no meio da sessão. */
+  const [seqDaSessao, setSeqDaSessao] = useState<Movimento[]>([]);
   const [desfecho, setDesfecho] = useState<Desfecho | null>(null);
-  const [avaliou, setAvaliou] = useState<string | null>(null);
+  const [melhorou, setMelhorou] = useState<"Melhorou" | "Igual" | "Piorou" | null>(null);
   const [aplicouBancada, setAplicouBancada] = useState(false);
   const [inicioDaBancada, setInicioDaBancada] = useState(0);
   const notas = (estadoAtual().blob[CHAVE_NOTAS_EXERCICIO] ?? {}) as NotasDoCorpo;
@@ -112,7 +114,6 @@ export default function Mexer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [at.pronto, at.D, minutos, at.semana, at.pos, at.cuidado, sintoma, semChao, temChao],
   );
-  const { total } = linhaDoTempo(seq);
 
   useEffect(() => {
     if (aplicouBancada || !at.pronto || !ehBancada()) return;
@@ -124,9 +125,14 @@ export default function Mexer() {
     if (parametroDaBancada("semchao") === "1") setSemChao(true);
     setInicioDaBancada(Math.max(0, Number(parametroDaBancada("t") ?? 0) || 0));
     const e = parametroDaBancada("etapa");
-    if (e === "sinais" || e === "sessao") setEtapa(e);
+    if (e === "sessao") {
+      setSeqDaSessao(seq);
+      setEtapa("sessao");
+    }
+    if (e === "reflexo") setEtapa("reflexo");
     if (e === "fim") {
-      setSintoma("lombar");
+      const d = parametroDaBancada("desfecho");
+      if (d === "Melhorou" || d === "Igual" || d === "Piorou") setMelhorou(d);
       setEtapa("fim");
       setDesfecho({
         ganhou: at.cuidado ? null : 5,
@@ -135,10 +141,19 @@ export default function Mexer() {
         semPagamento: at.cuidado,
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [at.pronto, at.cuidado, aplicouBancada]);
 
+  function comecar() {
+    if (!seq.length) return;
+    setSeqDaSessao(seq);
+    setMelhorou(null);
+    setDesfecho(null);
+    setEtapa("sessao");
+  }
+
   async function terminar() {
-    setEtapa("fim");
+    setEtapa("reflexo");
     if (!at.uid) return;
     setDesfecho(
       await concluirMomento({
@@ -151,6 +166,21 @@ export default function Mexer() {
     );
   }
 
+  /* "Melhorou?" vira informação: a nota reordena a próxima sessão desta
+     queixa, e a resposta vai para o diário — o médico vê "lombar: melhorou"
+     oito vezes seguidas, ou "não mudou" oito vezes. */
+  function responder(d: "Melhorou" | "Igual" | "Piorou") {
+    setMelhorou(d);
+    if (sintoma) {
+      gravarChave(CHAVE_NOTAS_EXERCICIO, ajustarNotas(notas, seqDaSessao, sintoma, d));
+      const rotulo = SINTOMAS.find((x) => x.chave === sintoma)?.rotulo ?? sintoma;
+      void anotarNoDiario(at.uid, `Exercício de ${minutos} min · ${rotulo}: ${d.toLowerCase()}`);
+    }
+    setEtapa("fim");
+  }
+
+  const sair = () => (router.canGoBack() ? router.back() : voltarParaJornada());
+
   if (!at.pronto) {
     return (
       <Tela bordas={["top", "bottom"]}>
@@ -162,120 +192,140 @@ export default function Mexer() {
   if (etapa === "sessao")
     return (
       <Sessao
-        seq={seq}
+        seq={seqDaSessao}
         inicio={inicioDaBancada}
         aoTerminar={() => void terminar()}
-        aoSair={() => setEtapa("escolha")}
+        aoSair={sair}
       />
     );
 
-  if (etapa === "fim") {
+  if (etapa === "reflexo") {
     return (
-      <Tela bordas={["top", "bottom"]}>
-        <FimDoMomento
-          titulo="Corpo em movimento!"
-          fala={
-            at.cuidado
-              ? "Obrigada por cuidar do seu corpo hoje."
-              : "Mexer um pouco todo dia alivia o corpo e ajuda o sono."
-          }
-          desfecho={desfecho}
-          D={at.D}
-          cuidado={at.cuidado}
-          pos={at.pos}
-          extra={
-            sintoma ? (
-              <Cartao>
-                <T tipo="rotulo">
-                  E o incômodo de hoje (
-                  {SINTOMAS.find((s) => s.chave === sintoma)?.rotulo.toLowerCase()})?
-                </T>
-                {avaliou ? (
-                  <T tipo="apagado">
-                    Anotado. A próxima sessão começa pelo que funciona melhor para você.
-                  </T>
-                ) : (
-                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: espaco.sm }}>
-                    {(["Melhorou", "Igual", "Piorou"] as const).map((d) => (
-                      <Ficha
-                        key={d}
-                        rotulo={d}
-                        corAtiva={corMovimento.forte}
-                        fundoAtivo={corMovimento.forteFundo}
-                        textoAtivo={corMovimento.titulo}
-                        aoTocar={() => {
-                          gravarChave(CHAVE_NOTAS_EXERCICIO, ajustarNotas(notas, seq, sintoma, d));
-                          setAvaliou(d);
-                          const rotulo =
-                            SINTOMAS.find((x) => x.chave === sintoma)?.rotulo ?? sintoma;
-                          void anotarNoDiario(
-                            at.uid,
-                            `Exercício de ${minutos} min · ${rotulo}: ${d.toLowerCase()}`,
-                          );
-                        }}
-                      />
-                    ))}
-                  </View>
-                )}
-                {avaliou === "Piorou" ? (
-                  <T tipo="apagado">
-                    Se a dor continuar forte ou vier com algum sinal de alerta, procure atendimento
-                    — o SOS fica sempre aqui embaixo.
-                  </T>
-                ) : null}
-              </Cartao>
-            ) : null
-          }
-        />
-      </Tela>
+      <FundoDaAtividade paleta={PALETA}>
+        <ScrollView
+          contentContainerStyle={{
+            flexGrow: 1,
+            alignItems: "center",
+            justifyContent: "center",
+            paddingHorizontal: espaco.xxl,
+            paddingVertical: espaco.xl,
+          }}
+        >
+          <Text style={{ fontSize: 48 }}>🤸</Text>
+          <Text
+            accessibilityRole="header"
+            style={{
+              marginTop: espaco.lg,
+              textAlign: "center",
+              fontFamily: fonte.media,
+              fontSize: 24,
+              lineHeight: 30,
+              color: corMovimento.titulo,
+            }}
+          >
+            {sintoma ? "E agora, como está?" : "Terminou!"}
+          </Text>
+          {sintoma ? (
+            <>
+              <Text
+                style={{
+                  marginTop: 6,
+                  textAlign: "center",
+                  fontFamily: fonte.normal,
+                  fontSize: 13,
+                  color: corMovimento.dica,
+                }}
+              >
+                Sobre o que você marcou no começo.
+              </Text>
+              <View style={{ marginTop: espaco.xl, width: "100%", maxWidth: 320, gap: espaco.sm }}>
+                {(
+                  [
+                    { e: "😌", r: "Melhorou" },
+                    { e: "😐", r: "Igual" },
+                    { e: "😖", r: "Piorou" },
+                  ] as const
+                ).map((o) => (
+                  <Pressable
+                    key={o.r}
+                    accessibilityRole="button"
+                    onPress={() => {
+                      toque();
+                      responder(o.r);
+                    }}
+                    style={({ pressed }) => ({
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: espaco.md,
+                      minHeight: ALVO_MINIMO + 4,
+                      paddingHorizontal: espaco.lg,
+                      borderRadius: 16,
+                      borderWidth: 1,
+                      borderColor: corMovimento.borda,
+                      backgroundColor: corMovimento.vidro,
+                      opacity: pressed ? 0.75 : 1,
+                    })}
+                  >
+                    <Text style={{ fontSize: 20 }}>{o.e}</Text>
+                    <Text
+                      style={{ fontFamily: fonte.forte, fontSize: 14, color: corMovimento.titulo }}
+                    >
+                      {o.r}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setEtapa("fim")}
+                hitSlop={8}
+                style={{ marginTop: espaco.lg, minHeight: ALVO_MINIMO, justifyContent: "center" }}
+              >
+                <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: corMovimento.secao }}>
+                  Pular
+                </Text>
+              </Pressable>
+            </>
+          ) : (
+            <View style={{ marginTop: espaco.xxl, width: "100%", maxWidth: 320 }}>
+              <Botao
+                rotulo="Continuar"
+                corFundo={corMovimento.forte}
+                aoTocar={() => setEtapa("fim")}
+              />
+            </View>
+          )}
+        </ScrollView>
+      </FundoDaAtividade>
     );
   }
 
-  if (etapa === "sinais") {
-    const sinais = at.cuidado
-      ? SINAIS_DE_PARADA.filter((s) => !SO_NA_GESTACAO.has(s))
-      : SINAIS_DE_PARADA;
+  if (etapa === "fim") {
     return (
       <FundoDaAtividade paleta={PALETA}>
-        <View style={{ paddingHorizontal: espaco.lg }}>
-          <BarraDoTopo titulo="Antes de começar" aoSair={() => setEtapa("escolha")} />
-        </View>
         <ScrollView
           contentContainerStyle={{ padding: espaco.lg, paddingBottom: 120, gap: espaco.md }}
         >
-          <Cartao fundo={cor.atencaoFundo}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
-              <TriangleAlert size={22} color={cor.atencao} />
-              <T tipo="subtitulo" cor={cor.atencao}>
-                Hoje não é dia de exercício se você tiver:
-              </T>
-            </View>
-            <View style={{ gap: 6, marginTop: 4 }}>
-              {sinais.map((s) => (
-                <View
-                  key={s}
-                  style={{ flexDirection: "row", gap: espaco.sm, alignItems: "flex-start" }}
-                >
-                  <Text style={{ fontFamily: fonte.titulo, fontSize: 16, color: cor.atencao }}>
-                    •
-                  </Text>
-                  <T estilo={{ flex: 1 }}>{s}</T>
-                </View>
-              ))}
-            </View>
-            <T tipo="apagado">
-              Nesses casos, procure atendimento. E se algo assim aparecer no meio, pare na hora.
-            </T>
-          </Cartao>
-          <Botao
-            rotulo="Estou com um desses — abrir o SOS"
-            tipo="perigo"
-            aoTocar={() => router.push("/sos")}
-          />
-          <Botao
-            rotulo={`Estou bem, começar · ${minutos} min`}
-            corFundo={corMovimento.forte}
-            aoTocar={() => setEtapa("sessao")}
+          <FimDoMomento
+            /* O site festejava até o "Piorou". Aqui a festa é de quem melhorou
+               ou não disse: com dor pior, o fim agradece e anota — confete em
+               cima de "piorou" diz que ela não foi ouvida. */
+            titulo={melhorou === "Piorou" ? "Obrigado por contar" : "Corpo soltinho! 🎉"}
+            fala={
+              melhorou === "Piorou"
+                ? "Anotei. Se piorar de novo, conte na próxima consulta — isso é informação, não frescura."
+                : melhorou === "Melhorou"
+                  ? "Anotei que melhorou. Repetir nos próximos dias costuma segurar o alívio."
+                  : at.cuidado
+                    ? "Você cuidou de você hoje."
+                    : "Você cuidou de você e do bebê hoje."
+            }
+            desfecho={desfecho}
+            D={at.D}
+            cuidado={at.cuidado}
+            pos={at.pos}
+            arte={<Text style={{ fontSize: 60, lineHeight: 72 }}>💪</Text>}
+            confete={melhorou !== "Piorou"}
           />
         </ScrollView>
       </FundoDaAtividade>
@@ -287,6 +337,9 @@ export default function Mexer() {
     : at.cuidado
       ? "Movimentos leves, sem ir ao chão. No seu ritmo."
       : "Diga o que está incomodando, que eu monto a sequência pra você.";
+  const sinais = at.cuidado
+    ? SINAIS_DE_PARADA.filter((s) => !SO_NA_GESTACAO.has(s))
+    : SINAIS_DE_PARADA;
 
   return (
     <FundoDaAtividade paleta={PALETA}>
@@ -335,53 +388,48 @@ export default function Mexer() {
             pós-parto e no Modo Cuidado a régua já o tirou sozinha. */}
         {temChao ? <SemChao ligado={semChao} aoTocar={() => setSemChao((v) => !v)} /> : null}
 
+        {/* ⚠️ OS SINAIS DE PARADA, antes de começar — não é "li e aceito": são
+            os motivos pelos quais ela NÃO deve se exercitar hoje, e todos pedem
+            o médico em vez de alongamento. O SOS fica a um toque, no alto. */}
         <View
           style={{
-            marginTop: espaco.xl,
+            marginTop: 28,
             borderRadius: 16,
             borderWidth: 1,
-            borderColor: corMovimento.borda,
-            backgroundColor: corMovimento.vidro,
+            borderColor: corMovimento.alertaBorda,
+            backgroundColor: corMovimento.alertaFundo,
             paddingHorizontal: espaco.lg,
             paddingVertical: espaco.md,
-            gap: 2,
+            gap: 4,
           }}
         >
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 13, color: corMovimento.titulo }}>
-            Sua sessão: {seq.length} {seq.length === 1 ? "movimento" : "movimentos"} ·{" "}
-            {minutosAproximados(total)}
+          <Text style={{ fontFamily: fonte.titulo, fontSize: 13, color: corMovimento.alertaTexto }}>
+            Hoje não é dia de exercício se você tiver:
           </Text>
-          {seq.map((m, i) => (
-            <View
-              key={m.id}
-              style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm, minHeight: 30 }}
+          {sinais.map((sinal) => (
+            <Text
+              key={sinal}
+              style={{
+                fontFamily: fonte.normal,
+                fontSize: 13,
+                lineHeight: 18,
+                color: corMovimento.alertaTexto85,
+              }}
             >
-              <Text
-                style={{
-                  fontFamily: fonte.titulo,
-                  fontSize: 13,
-                  color: corMovimento.contagem,
-                  width: 16,
-                }}
-              >
-                {i + 1}
-              </Text>
-              <Text style={{ fontSize: 17 }}>{m.emoji}</Text>
-              <Text
-                style={{
-                  flex: 1,
-                  fontFamily: fonte.media,
-                  fontSize: 14,
-                  color: corMovimento.titulo,
-                }}
-              >
-                {m.name}
-              </Text>
-              <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: corMovimento.aviso }}>
-                {m.secs}s
-              </Text>
-            </View>
+              · {sinal}
+            </Text>
           ))}
+          <Text
+            style={{
+              marginTop: 4,
+              fontFamily: fonte.normal,
+              fontSize: 13,
+              lineHeight: 18,
+              color: corMovimento.alertaTexto70,
+            }}
+          >
+            Qualquer um deles: fale com seu médico agora, pelo SOS.
+          </Text>
         </View>
 
         <Text
@@ -401,7 +449,7 @@ export default function Mexer() {
         <Botao
           rotulo={`Começar · ${minutos} min`}
           corFundo={corMovimento.forte}
-          aoTocar={() => setEtapa("sinais")}
+          aoTocar={comecar}
           desabilitado={!seq.length}
         />
       </RodapeDaAtividade>
@@ -554,6 +602,15 @@ function Sessao({
   const { trechos } = useMemo(() => linhaDoTempo(seq), [seq]);
   const [t, setT] = useState(inicio);
   const [pausada, setPausada] = useState(false);
+  /* O app saiu da tela (bloqueou, atendeu o telefone): a sessão para ali. Sem
+     isto, o relógio de parede seguiria contando e ela voltaria com movimentos
+     pulados — ou com a sessão já terminada e paga sem ter acontecido. */
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (estado) => {
+      if (estado === "background") setPausada(true);
+    });
+    return () => sub.remove();
+  }, []);
   /* A voz desta tela é gravação nossa, então o botão aparece sempre — e ela
      começa ligada, como no app antigo. */
   const [voz, setVoz] = useState(true);

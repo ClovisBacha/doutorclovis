@@ -1,4 +1,5 @@
 import * as Haptics from "expo-haptics";
+import { router, useLocalSearchParams } from "expo-router";
 import { X } from "lucide-react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -132,6 +133,16 @@ export default function Bebe() {
   const cartaAtiva = cartaEscolhida ?? cartaHoje;
   const carta = lendoAsDelas && cartaDelas ? cartaDelas : cartaAtiva;
 
+  /* Vindo do "Ver carta 💌" da Gratidão: abre já na carta das gratidões dela,
+     assim que as gratidões chegam (a carta só existe com oito ou mais). */
+  const { delas } = useLocalSearchParams<{ delas?: string }>();
+  const abriuDelas = useRef(false);
+  useEffect(() => {
+    if (delas !== "1" || abriuDelas.current || !cartaDelas) return;
+    abriuDelas.current = true;
+    setLendoAsDelas(true);
+  }, [delas, cartaDelas]);
+
   const leituras = (loja.blob[CHAVE_CARTAS_LIDAS] ?? {}) as LeiturasDeCartas;
   const fraseDeLeitura = cartaHoje
     ? fraseDeUltimaLeitura(ultimaLeitura(leituras, cartaHoje.id), new Date())
@@ -205,12 +216,13 @@ export default function Bebe() {
     comecar();
   }
 
+  /* O ✕ fecha a atividade, de qualquer fase, como no site — sair da leitura
+     não pode custar dois toques. */
   function sair() {
     fundo.current?.parar();
     fundo.current = null;
-    /* A carta do álbum não fica "presa" para a próxima abertura. */
-    setCartaEscolhida(null);
-    setEtapa("intro");
+    if (router.canGoBack()) router.back();
+    else voltarParaJornada();
   }
 
   function trocarSom(k: SomEscolhido) {
@@ -267,12 +279,18 @@ export default function Bebe() {
           contentContainerStyle={{ padding: espaco.lg, paddingBottom: 120, gap: espaco.md }}
         >
           <FimDoMomento
-            titulo="Beijo entregue 💋"
+            titulo="Beijo entregue"
             fala="Ele ouviu a sua voz — e, do jeitinho dele, guardou cada palavra. 💛"
             desfecho={desfecho}
             D={at.D}
             cuidado={false}
             pos={at.pos}
+            /* O fim do site: o 💋 grande, o confete a cada carta e a bolha
+               acompanhando ("Guardei esse minuto com você") — ela é o
+               acompanhamento, não o clímax. */
+            arte={<Text style={{ fontSize: 60, lineHeight: 72 }}>💋</Text>}
+            confete
+            balao={falaDaBolhaNaCarta({ tela: "done" })}
           />
         </ScrollView>
       </FundoDaAtividade>

@@ -22,8 +22,14 @@ export type DuracaoMexer = (typeof DURACOES_MEXER)[number];
 /** O tempo que já vem marcado, como no app antigo. */
 export const DURACAO_PADRAO: DuracaoMexer = 5;
 
-/** O respiro entre um movimento e o seguinte, para trocar de posição. */
-export const TROCA_SEGUNDOS = 6;
+/**
+ * O respiro entre um movimento e o seguinte. ZERO, como no app antigo: lá a
+ * troca era imediata e a voz lia o movimento seguinte ao entrar nele. Os 6 s de
+ * "Prepare-se" que o app tinha mudavam o ritmo de toda sessão (e esticavam a de
+ * 10 min em quase um minuto) — o dono pediu as atividades como eram.
+ * O caminho da troca continua na linha do tempo para quem quiser religá-lo.
+ */
+export const TROCA_SEGUNDOS = 0;
 
 export function montarSessao(o: {
   D: number;

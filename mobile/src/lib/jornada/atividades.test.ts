@@ -239,10 +239,13 @@ describe("mexer", () => {
     const { trechos, total } = linhaDoTempo(seq);
     expect(posicaoNoTempo(trechos, 0).tipo).toBe("movimento");
     if (trechos.length > 1) {
+      /* Como no site: o seguinte começa onde o anterior acaba, sem respiro. */
+      expect(trechos[1].inicio).toBe(trechos[0].fim);
       const p = posicaoNoTempo(trechos, trechos[0].fim + 1);
-      expect(p.tipo).toBe("troca");
+      expect(p.tipo === "movimento" && p.trecho.indice).toBe(1);
       expect(inicioDoProximo(trechos, 1)).toBe(trechos[1].inicio);
     }
+    expect(total).toBe(seq.reduce((s, m) => s + m.secs, 0));
     expect(posicaoNoTempo(trechos, total).tipo).toBe("fim");
   });
 });
@@ -287,5 +290,23 @@ describe("a grade de conquistas", () => {
       [],
     );
     expect(resumo(comPos).mostrarNotaDoNascimento).toBe(false);
+  });
+});
+
+describe("a revisão da aula feita", () => {
+  test("abre com o gabarito marcado, verificada, sem contar acerto", async () => {
+    const { revisao, estadoDaOpcao } = await import("./aula");
+    const q = { q: "?", o: ["a", "b", "c", "d"], a: [0, 2], why: "porque" };
+    const e = revisao(q, 3);
+    expect(e).toEqual({
+      etapa: "pergunta",
+      indice: 3,
+      escolha: [0, 2],
+      verificada: true,
+      acertou: true,
+      acertos: 0,
+    });
+    expect(estadoDaOpcao(e, q, 0)).toBe("certa");
+    expect(estadoDaOpcao(e, q, 1)).toBe("neutra");
   });
 });

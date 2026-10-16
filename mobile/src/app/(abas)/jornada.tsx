@@ -1,7 +1,7 @@
 import { router, useFocusEffect } from "expo-router";
 import { Award, ChevronRight, Footprints, PenLine, Sparkles, Wind } from "lucide-react-native";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Linking, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { posChallenge } from "@/lib/daily-challenges";
 import { Botao, Cartao, Carregando, NaoConsegueLer, T, Tela, toque } from "~/componentes/base";
@@ -55,7 +55,7 @@ import {
   flagsDoDia,
 } from "~/lib/jornada/momentos";
 import { chama as calcularChama } from "~/lib/jornada/trilha";
-import { cor, espaco, fonte, raio, sombra } from "~/tema";
+import { ALVO_MINIMO, cor, espaco, fonte, raio, sombra } from "~/tema";
 
 /**
  * A ABA JORNADA — o coração do app: um dia de cada vez, cinco momentos por dia.
@@ -220,6 +220,9 @@ function JornadaDaGestacao({
   const skin = loja.blob[SKIN_KEY];
   const pele = typeof skin === "string" ? (TRILHA_SKINS[skin] ?? null) : null;
   const aoGravarDecoracao = useCallback((d: Decoracao) => gravarChave(CHAVE_DECOR, d), []);
+
+  /* Passou de 42 semanas: a trilha (presa no dia 300) dá lugar ao alerta. */
+  if (dia.passouDe42) return <AlertaDas42Semanas nomeDoBebe={nomeDoBebe} />;
 
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: cor.fundo }}>
@@ -684,5 +687,128 @@ function AvisoDePresente({
       <Botao rotulo="Que bom!" tipo="secundario" aoTocar={aoFechar} />
       <SementesSubindo quantidade={quantidade} disparo={quantidade} />
     </Cartao>
+  );
+}
+
+/**
+ * PASSOU DE 42 SEMANAS — o alerta do site, no lugar do Caminho: avaliação do
+ * bem-estar do bebê HOJE, e direto para a maternidade com qualquer sinal. A
+ * única ação de jornada que sobra é contar o nascimento. (O site mandava falar
+ * com o consultório pela agenda, que o app não tem; aqui o caminho é o SOS,
+ * que traz o médico e os contatos dela.)
+ */
+function AlertaDas42Semanas({ nomeDoBebe }: { nomeDoBebe: string | null }) {
+  return (
+    <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: cor.fundo }}>
+      <ScrollView
+        contentContainerStyle={{ padding: espaco.lg, gap: espaco.lg, paddingBottom: 120 }}
+      >
+        <View
+          style={{
+            borderRadius: 24,
+            borderWidth: 2,
+            borderColor: "#ffd230",
+            backgroundColor: "#fffbeb",
+            padding: espaco.xl,
+            gap: espaco.sm,
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: fonte.media,
+              fontSize: 13,
+              letterSpacing: 0.6,
+              textTransform: "uppercase",
+              color: "#bb4d00",
+            }}
+          >
+            Acompanhamento necessário
+          </Text>
+          <Text
+            accessibilityRole="header"
+            style={{ fontFamily: fonte.forte, fontSize: 18, lineHeight: 24, color: "#7b3306" }}
+          >
+            Sua gestação passou de 42 semanas
+          </Text>
+          <Text
+            style={{ fontFamily: fonte.normal, fontSize: 14, lineHeight: 22, color: "#973c00" }}
+          >
+            Entre em contato com o consultório do seu médico{" "}
+            <Text style={{ fontFamily: fonte.forte }}>hoje</Text> para avaliação do bem-estar do
+            bebê e decisão sobre o parto. Se notar diminuição dos movimentos, perda de líquido ou
+            sangramento, vá direto à maternidade.
+          </Text>
+          <View
+            style={{ marginTop: espaco.sm, flexDirection: "row", flexWrap: "wrap", gap: espaco.sm }}
+          >
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push("/sos")}
+              style={({ pressed }) => ({
+                minHeight: ALVO_MINIMO,
+                paddingHorizontal: espaco.xl,
+                borderRadius: 999,
+                backgroundColor: "#e17100",
+                justifyContent: "center",
+                opacity: pressed ? 0.85 : 1,
+              })}
+            >
+              <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: cor.branco }}>
+                Abrir o SOS
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => void Linking.openURL("tel:192")}
+              style={({ pressed }) => ({
+                minHeight: ALVO_MINIMO,
+                paddingHorizontal: espaco.xl,
+                borderRadius: 999,
+                borderWidth: 2,
+                borderColor: "#e17100",
+                justifyContent: "center",
+                opacity: pressed ? 0.85 : 1,
+              })}
+            >
+              <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: "#bb4d00" }}>
+                Emergência: 192
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+        <View
+          style={{
+            borderRadius: 24,
+            backgroundColor: cor.cartao,
+            padding: 20,
+            gap: 4,
+            borderWidth: 1,
+            borderColor: cor.borda,
+          }}
+        >
+          <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: cor.texto }}>
+            {nomeDoBebe ?? "O bebê"} já nasceu? 🎉
+          </Text>
+          <Text
+            style={{
+              fontFamily: fonte.normal,
+              fontSize: 13,
+              lineHeight: 19,
+              color: cor.textoApagado,
+            }}
+          >
+            Informe a data para celebrar e começar a jornada do 4º trimestre. Seu caminho e as
+            figurinhas continuam guardados. 💛
+          </Text>
+          <View style={{ marginTop: espaco.sm }}>
+            <Botao
+              rotulo="Contar o nascimento"
+              corFundo={corJornada.roxo}
+              aoTocar={() => router.push("/ritual?editar=1")}
+            />
+          </View>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }

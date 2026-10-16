@@ -70,3 +70,13 @@ test("data curta", () => {
   expect(dataCurta(null)).toBeNull();
   expect(dataCurta("nada")).toBeNull();
 });
+
+describe("passou de 42 semanas", () => {
+  test("o dia 300 (42s6d) ainda é a trilha; do 301 em diante, o alerta", async () => {
+    const { passouDe42Semanas } = await import("./dia");
+    expect(passouDe42Semanas(300)).toBe(false);
+    expect(passouDe42Semanas(301)).toBe(true);
+    expect(passouDe42Semanas(286)).toBe(false);
+    expect(passouDe42Semanas(Number.NaN)).toBe(false);
+  });
+});

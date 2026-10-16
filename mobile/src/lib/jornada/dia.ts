@@ -19,6 +19,15 @@ export function diaDaJornada(totalDays: number): number {
   return Math.min(D_MAXIMO, Math.max(D_MINIMO, d));
 }
 
+/**
+ * Passou de 42 semanas (o dia 300 é 42s6d)? No site, o Caminho dá lugar a um
+ * alerta médico — a trilha prende o dia em 300 e repetiria a mesma aula todo
+ * dia, sem dizer nada a quem precisa de avaliação HOJE.
+ */
+export function passouDe42Semanas(totalDays: number): boolean {
+  return Number.isFinite(totalDays) && Math.floor(totalDays) > D_MAXIMO;
+}
+
 export function semanaDoDia(D: number): number {
   return Math.min(SEMANA_MAXIMA, Math.max(SEMANA_MINIMA, Math.floor(D / 7)));
 }

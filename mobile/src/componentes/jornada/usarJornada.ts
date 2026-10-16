@@ -6,6 +6,7 @@ import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { gestacaoDoPerfil, ymdLocal } from "~/lib/gestacao";
 import {
   diaDaJornada,
+  passouDe42Semanas,
   diaDoPosParto,
   diaNaSemana,
   idadeEmDias,
@@ -36,6 +37,8 @@ export type DiaDaJornada =
       D: number;
       semana: number;
       diaNaSemana: number;
+      /** Passou de 42 semanas: a aba mostra o alerta médico no lugar da trilha. */
+      passouDe42: boolean;
     }
   | {
       modo: "pos";
@@ -79,14 +82,23 @@ export function useDiaDaJornada(): DiaDaJornada {
   const perfil = perfilDaJornada(perfilBruto);
 
   return useMemo<DiaDaJornada>(() => {
-    if (estadoDoPerfil === "falhou") return { modo: "falhou", tentar: () => void recarregarPerfil() };
+    if (estadoDoPerfil === "falhou")
+      return { modo: "falhou", tentar: () => void recarregarPerfil() };
     if (!uid || estadoDoPerfil === "carregando") return { modo: "carregando" };
     /* Sem linha de perfil ainda: a jornada não sabe a semana, mas a tela abre. */
     if (!perfil) return { modo: "sem-data", cuidado, uid, perfil: { id: uid }, hoje };
     if (perfil.birth_date) {
       const idade = idadeEmDias(perfil.birth_date, hoje);
       if (idade != null) {
-        return { modo: "pos", cuidado, uid, perfil, hoje, D: diaDoPosParto(idade), idadeDias: idade };
+        return {
+          modo: "pos",
+          cuidado,
+          uid,
+          perfil,
+          hoje,
+          D: diaDoPosParto(idade),
+          idadeDias: idade,
+        };
       }
     }
     const g = gestacaoDoPerfil(perfil, hoje);
@@ -101,9 +113,21 @@ export function useDiaDaJornada(): DiaDaJornada {
       D,
       semana: semanaDoDia(D),
       diaNaSemana: diaNaSemana(D),
+      passouDe42: passouDe42Semanas(g.totalDays),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [estadoDoPerfil, uid, perfil?.id, perfil?.birth_date, perfil?.lmp_date, perfil?.reference_date, perfil?.reference_weeks, perfil?.reference_days, cuidado, hoje]);
+  }, [
+    estadoDoPerfil,
+    uid,
+    perfil?.id,
+    perfil?.birth_date,
+    perfil?.lmp_date,
+    perfil?.reference_date,
+    perfil?.reference_weeks,
+    perfil?.reference_days,
+    cuidado,
+    hoje,
+  ]);
 }
 
 /**

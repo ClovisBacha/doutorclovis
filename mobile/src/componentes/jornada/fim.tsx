@@ -6,6 +6,7 @@ import { pagarAula, pagarDiaFechado, pagarMomento } from "~/componentes/jornada/
 import { corJornada } from "~/componentes/jornada/cores";
 import { marcarLivre } from "~/componentes/jornada/livres";
 import { Constelacao, SementesSubindo } from "~/componentes/jornada/efeitos";
+import { BolhaComBalao } from "~/componentes/jornada/atividade";
 import { Bolha, Confete, Estrela, Estrelas, voltarParaJornada } from "~/componentes/jornada/pecas";
 import { contarMomentos, flagsDoDia, type Momento } from "~/lib/jornada/momentos";
 import { marcar, useLoja } from "~/lib/jornada/loja";
@@ -82,6 +83,9 @@ export function FimDoMomento({
   pos,
   aoTentarPagar,
   extra,
+  arte,
+  confete,
+  balao,
 }: {
   titulo: string;
   fala?: string;
@@ -93,6 +97,12 @@ export function FimDoMomento({
   /** Só a aula oferece: as atividades são reconciliadas ao abrir a aba. */
   aoTentarPagar?: () => void;
   extra?: React.ReactNode;
+  /** A arte no lugar da bolha (o 💋 do Bebê). A festa das cinco estrelas continua por cima. */
+  arte?: React.ReactNode;
+  /** Confete ao abrir mesmo sem fechar o dia (a carta lida; "grande" no número redondo). */
+  confete?: boolean | "grande";
+  /** A fala da bolha, num balão com a bolha pequena (como no fim do Bebê no site). */
+  balao?: string;
 }) {
   const loja = useLoja();
   const feitos = D != null && !pos ? contarMomentos(flagsDoDia(loja.blob, D)) : 0;
@@ -109,11 +119,11 @@ export function FimDoMomento({
   }, [alvo]);
   const jaFestejou = useRef(false);
   useEffect(() => {
-    if (festa && !jaFestejou.current) {
+    if ((festa || (confete && !cuidado)) && !jaFestejou.current) {
       jaFestejou.current = true;
       setConfete(true);
     }
-  }, [festa]);
+  }, [festa, confete, cuidado]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -130,7 +140,7 @@ export function FimDoMomento({
             <Bolha humor="estrelas" tamanho={210} />
           )
         ) : (
-          <Bolha humor={cuidado ? "feliz" : "comemorando"} tamanho={150} />
+          (arte ?? <Bolha humor={cuidado ? "feliz" : "comemorando"} tamanho={150} />)
         )}
         <T tipo="titulo" centro>
           {festa ? "Cinco estrelas!" : titulo}
@@ -143,6 +153,9 @@ export function FimDoMomento({
           <T tipo="corpo" centro cor={cor.textoApagado}>
             {fala}
           </T>
+        ) : null}
+        {balao && !festa ? (
+          <BolhaComBalao humor={cuidado ? "feliz" : "comemorando"} fala={balao} tamanho={72} />
         ) : null}
         {D != null && !pos && !cuidado ? <Estrelas feitos={estrelasVisiveis} tamanho={30} /> : null}
       </View>
@@ -192,7 +205,7 @@ export function FimDoMomento({
           corFundo={corJornada.roxo}
         />
       </View>
-      {mostrarConfete ? <Confete /> : null}
+      {mostrarConfete ? <Confete pecas={confete === "grande" && !festa ? 72 : 36} /> : null}
     </View>
   );
 }

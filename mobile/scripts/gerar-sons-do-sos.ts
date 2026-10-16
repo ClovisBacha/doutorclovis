@@ -1,5 +1,5 @@
 /**
- * Gera os dois sons do SOS do app (mobile/assets/sons/*.wav) a partir do
+ * Gera os sons do site que o app toca (mobile/assets/sons/*.wav) a partir do
  * MESMO desenho do site — `DESENHOS` de src/lib/som-da-interface.ts, na grade
  * A = 432. Uma afinação só: se o site mudar o alarme, rode isto de novo.
  *
@@ -90,6 +90,9 @@ const pasta = join(import.meta.dir, "..", "assets", "sons");
 for (const [especie, arquivo] of [
   ["sos", "sos-enviado.wav"],
   ["sos-falhou", "sos-falhou.wav"],
+  /* A comemoração da aula (quatro degraus subindo): no site ela toca para quem
+     nunca escolheu silêncio — ver `tocarConquistaComPortoes`. */
+  ["conquista", "conquista.wav"],
 ] as const) {
   const b = wav(sintetizar(especie));
   writeFileSync(join(pasta, arquivo), b);
