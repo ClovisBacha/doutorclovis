@@ -130,6 +130,19 @@ export default function Semana() {
         </BotaoRedondo>
       </View>
 
+      {/* O ÁLBUM DA SEMANA (o `AlbumSheet` do site): o que acontece com o bebê
+          nesta semana, o tamanho e o peso. O app mostrava só a fruta. */}
+      <Cartao fundo={corJornada.roxoFundo}>
+        <T tipo="rotulo" cor={corJornada.roxo}>
+          Nessa semana
+        </T>
+        <T>{bebe.desc}</T>
+        <T tipo="apagado">
+          Tamanho de {bebe.fruit.toLowerCase()} · {bebe.size}
+          {bebe.weight && bebe.weight !== "—" ? ` · ${bebe.weight}` : ""}
+        </T>
+      </Cartao>
+
       <Cartao estilo={{ padding: 0, gap: 0, overflow: "hidden" }}>
         {dias.map((D, i) => {
           const no = estadoDoNo(loja.blob, D, hojeD);

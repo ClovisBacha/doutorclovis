@@ -27,11 +27,14 @@ import { SKIN_KEY, TRILHA_SKINS } from "@/lib/trilha-skins";
 import { CHAVE_DECOR, lerDecoracao, type Decoracao } from "~/lib/jornada/enfeites";
 import { Pulsando } from "~/componentes/jornada/pecas";
 import { FolhasDoPlacar, Placar, type FolhaDoPlacar } from "~/componentes/jornada/placar";
+import { FestaDoMarco } from "~/componentes/jornada/marco";
+import { CHAVE_MARCOS_VISTOS, festaDoExtrato, lerVistos, marcarVistos } from "~/lib/jornada/marcos";
 import { Caminho } from "~/componentes/caminho/caminho";
 import { useJornada, type DiaDaJornada } from "~/componentes/jornada/usarJornada";
 import { ehBancada } from "~/lib/bancada";
 import { useSessao } from "~/lib/sessao";
 import { montarGrade, paraResgatar, placar as placarDasConquistas } from "~/lib/jornada/conquistas";
+import { conquistaPorChave, type ConquistaDef } from "@/lib/conquistas";
 import { diaLongo } from "~/lib/jornada/dia";
 import {
   estadoAtual,
@@ -149,6 +152,35 @@ function useConquistas(ativa: boolean) {
   return leitura;
 }
 
+/**
+ * A festa dos marcos (`~/lib/jornada/marcos`). A conferência das conquistas é
+ * quando o servidor paga a semana nova e o trimestre: depois dela a carteira é
+ * relida, e o marco novo do extrato vira festa uma vez (os vistos sobem com a
+ * jornada, e a festa não se repete noutro aparelho).
+ */
+function useFestaDoMarco(o: {
+  carteira: EstadoDaCarteira;
+  recarregar: () => Promise<void>;
+  conquistas: LeituraDasConquistas | null | "carregando";
+  loja: EstadoDaLoja;
+  cuidado: boolean;
+}) {
+  const { carteira, recarregar, conquistas, loja, cuidado } = o;
+  useEffect(() => {
+    if (conquistas && conquistas !== "carregando" && !conquistas.careMode) void recarregar();
+  }, [conquistas, recarregar]);
+  const vistos = lerVistos(loja.blob[CHAVE_MARCOS_VISTOS]);
+  const pronta = loja.pronto && (loja.nuvem === "ok" || loja.bancada);
+  const festa =
+    !cuidado && pronta && carteira.estado === "ok" && !carteira.dados.careMode
+      ? festaDoExtrato(carteira.dados.recent, vistos, new Date())
+      : null;
+  const fechar = () => {
+    if (festa) gravarChave(CHAVE_MARCOS_VISTOS, marcarVistos(vistos, festa.chaves));
+  };
+  return { festa, fechar };
+}
+
 /** Os dias cujo bônus das cinco estrelas o servidor já resolveu, neste processo. */
 const bonusResolvidos = new Set<number>();
 
@@ -210,6 +242,8 @@ function JornadaDaGestacao({
 }) {
   const { D, semana, perfil, hoje } = dia;
   const { carteira, recarregar } = useCarteira(true);
+  /* A festa dos marcos chama a conferência das conquistas lá embaixo; os
+     hooks ficam todos antes do retorno das 42 semanas. */
   /* O servidor sabe do Modo Cuidado antes do aparelho (ligado noutro lugar):
      a carteira volta com `careMode`, e a trilha relê o perfil na hora em vez
      de seguir mostrando o bebê e as estrelas a quem acabou de perdê-lo. */
@@ -218,10 +252,25 @@ function JornadaDaGestacao({
   useEffect(() => {
     if (servidorDizCuidado) void recarregarPerfil();
   }, [servidorDizCuidado, recarregarPerfil]);
-  /* As conquistas não aparecem no Caminho (moram nas Recompensas), mas a
-     leitura delas é o que DESBLOQUEIA no servidor as que ela acabou de ganhar —
-     por isso a aba continua conferindo ao ganhar foco. */
-  useConquistas(true);
+  /* As conquistas moram nas Recompensas, mas a leitura delas é o que
+     DESBLOQUEIA no servidor as que ela acabou de ganhar — por isso a aba
+     confere ao ganhar foco. E o que a conferência traz agora aparece aqui: o
+     aviso da conquista nova e, na cestinha da loja, quantas esperam o toque
+     que paga (antes ela ganhava e não sabia). */
+  const conquistas = useConquistas(true);
+  const marco = useFestaDoMarco({ carteira, recarregar, conquistas, loja, cuidado: dia.cuidado });
+  const aResgatar = useMemo(() => {
+    if (!conquistas || conquistas === "carregando" || conquistas.careMode) return 0;
+    if (conquistas.resgatadas === null) return 0;
+    return paraResgatar(montarGrade(conquistas.unlocked, conquistas.resgatadas));
+  }, [conquistas]);
+  const [novasVistas, setNovasVistas] = useState<string | null>(null);
+  const novas = useMemo(() => {
+    if (!conquistas || conquistas === "carregando" || conquistas.careMode) return [];
+    return conquistas.novas.map((k) => conquistaPorChave(k)).filter((d): d is ConquistaDef => !!d);
+  }, [conquistas]);
+  const chaveDasNovas = novas.map((d) => d.key).join(",");
+  const mostrarNovas = novas.length > 0 && novasVistas !== chaveDasNovas;
   useReconciliacao(D, loja.pronto, recarregar);
   const amigas = useContagemDeAmigas();
   const [folha, setFolha] = useState<FolhaDoPlacar>(null);
@@ -259,6 +308,7 @@ function JornadaDaGestacao({
         trofeus={carteira.estado === "ok" ? carteira.dados.trofeus : null}
         carregandoCarteira={carteira.estado === "carregando"}
         chama={diasDeChama}
+        perdoes={perdoes}
         amigas={amigas}
         nomeDoBebe={nomeDoBebe}
         humorFeito={marcouHumorHoje(checkin, hoje)}
@@ -278,7 +328,10 @@ function JornadaDaGestacao({
             );
           ir(`/jornada/semana?semana=${s}`);
         }}
-        aoAbrirLoja={() => ir("/jornada/recompensas")}
+        aResgatar={aResgatar}
+        aoAbrirLoja={() =>
+          ir(aResgatar > 0 ? "/jornada/recompensas?aba=conquistas" : "/jornada/recompensas")
+        }
         aoAbrirAmigas={() => router.navigate("/comunidade" as never)}
         aoAbrirFolha={setFolha}
         aoContarNascimento={() => router.push("/ritual?editar=1")}
@@ -294,6 +347,16 @@ function JornadaDaGestacao({
               <NaoConsegueLer
                 sossego="Os seus momentos de hoje continuam valendo e ficam guardados neste aparelho."
                 aoTentar={() => void recarregar()}
+              />
+            ) : null}
+            {mostrarNovas ? (
+              <AvisoDeConquista
+                conquistas={novas}
+                aoPegar={() => {
+                  setNovasVistas(chaveDasNovas);
+                  ir("/jornada/recompensas?aba=conquistas");
+                }}
+                aoFechar={() => setNovasVistas(chaveDasNovas)}
               />
             ) : null}
             {presenteNovo ? (
@@ -314,6 +377,7 @@ function JornadaDaGestacao({
         perdoes={perdoes}
         trofeus={carteira.estado === "ok" ? carteira.dados.trofeus : null}
       />
+      <FestaDoMarco festa={marco.festa} nomeDoBebe={nomeDoBebe} aoFechar={marco.fechar} />
     </SafeAreaView>
   );
 }
@@ -371,6 +435,7 @@ function JornadaDoPosParto({
   const { D, idadeDias, perfil } = dia;
   const { carteira, recarregar } = useCarteira(true);
   const conquistas = useConquistas(true);
+  const marco = useFestaDoMarco({ carteira, recarregar, conquistas, loja, cuidado: dia.cuidado });
   const flags = flagsDoDia(loja.blob, D, true);
   const desafio = posChallenge(D);
   const { dias: diasDeChama, perdoes } = calcularChama(loja.blob, D, true);
@@ -450,6 +515,7 @@ function JornadaDoPosParto({
         }
       />
       <BotaoDeConquistas leitura={conquistas} posParto />
+      <FestaDoMarco festa={marco.festa} nomeDoBebe={nomeDoBebe} aoFechar={marco.fechar} />
     </Tela>
   );
 }
@@ -689,13 +755,15 @@ function AvisoDePresente({
   nome: string | null;
   aoFechar: () => void;
 }) {
-  const quem =
-    nome?.trim() ||
-    (de === "criadora"
-      ? "a equipe da Obstétrica"
+  /* Sem nome, quem deu é dito pelo papel, como no site: um presente do médico
+     dela não pode virar "da equipe da Obstétrica". */
+  const deQuem = nome?.trim()
+    ? `de ${nome.trim()}`
+    : de === "medico"
+      ? "do seu médico"
       : de === "amiga"
-        ? "uma amiga"
-        : "a equipe da Obstétrica");
+        ? "de uma amiga"
+        : "de quem te trouxe para cá";
   return (
     <Cartao fundo={corJornada.sementinhaFundo}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.md }}>
@@ -705,11 +773,54 @@ function AvisoDePresente({
           <T tipo="rotulo" cor={corJornada.sementinha}>
             Você ganhou {quantidade} sementinhas 🌱
           </T>
-          <T tipo="apagado">Um presente de {quem}.</T>
+          <T tipo="apagado">Um presente {deQuem}.</T>
         </View>
       </View>
       <Botao rotulo="Que bom!" tipo="secundario" aoTocar={aoFechar} />
       <SementesSubindo quantidade={quantidade} disparo={quantidade} />
+    </Cartao>
+  );
+}
+
+/**
+ * A CONQUISTA NOVA — a conferência da aba acabou de desbloquear. A conquista
+ * espera o toque que paga (a régua do Duolingo, decisão do dono), e sem este
+ * aviso ela nem sabia que havia o que tocar.
+ */
+function AvisoDeConquista({
+  conquistas,
+  aoPegar,
+  aoFechar,
+}: {
+  conquistas: readonly ConquistaDef[];
+  aoPegar: () => void;
+  aoFechar: () => void;
+}) {
+  const uma = conquistas.length === 1 ? conquistas[0]! : null;
+  return (
+    <Cartao fundo={corJornada.roxoFundo}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.md }}>
+        <Text style={{ fontSize: 40, lineHeight: 48 }}>{uma ? uma.emoji : "🏅"}</Text>
+        <View style={{ flex: 1 }}>
+          <T tipo="rotulo" cor={corJornada.roxo}>
+            {uma ? `Conquista nova: ${uma.title}` : `${conquistas.length} conquistas novas!`}
+          </T>
+          <T tipo="apagado">Toque nela em Conquistas para pegar as suas sementinhas 🌱</T>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Fechar o aviso"
+          hitSlop={10}
+          onPress={() => {
+            toque();
+            aoFechar();
+          }}
+          style={{ alignSelf: "flex-start", minWidth: 28, minHeight: 28, alignItems: "center" }}
+        >
+          <Text style={{ fontFamily: fonte.titulo, fontSize: 18, color: corJornada.roxo }}>×</Text>
+        </Pressable>
+      </View>
+      <Botao rotulo="Ver as conquistas" corFundo={corJornada.roxo} aoTocar={aoPegar} />
     </Cartao>
   );
 }

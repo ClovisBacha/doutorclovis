@@ -39,7 +39,8 @@ export async function lerCarteiraDoDia(): Promise<CarteiraOk | null> {
          da mesma tela precisam dizer o mesmo número. */
       balance: Number(parametroDaBancada("saldo") ?? (estadoDaBancada() === "fechado" ? 287 : 245)),
       trofeus: estadoDaBancada() === "fechado" ? 10 : 9,
-      recent: [],
+      /* `&marco=semana|trimestre|nascimento|mes` — a festa do marco, na bancada. */
+      recent: lancamentoDoMarcoDaBancada(),
       presente:
         parametroDaBancada("presente") === "1"
           ? { quantidade: 30, quando: "2026-10-01T12:00:00Z", de: "amiga", nome: "Júlia" }
@@ -51,6 +52,26 @@ export async function lerCarteiraDoDia(): Promise<CarteiraOk | null> {
     return r && r.ok ? r : null;
   } catch {
     return null;
+  }
+}
+
+function lancamentoDoMarcoDaBancada(): { amount: number; reason: string; created_at: string }[] {
+  const agora = new Date().toISOString();
+  const semana = Number(parametroDaBancada("semana") ?? 24);
+  switch (parametroDaBancada("marco")) {
+    case "semana":
+      return [{ amount: 25, reason: `Semana ${semana} 🎉`, created_at: agora }];
+    case "trimestre":
+      return [
+        { amount: 25, reason: "Semana 13 🎉", created_at: agora },
+        { amount: 100, reason: "Fim do 1º trimestre 🎊", created_at: agora },
+      ];
+    case "nascimento":
+      return [{ amount: 100, reason: "Bem-vindo ao mundo 🍼", created_at: agora }];
+    case "mes":
+      return [{ amount: 25, reason: "Bebê com 1 mês 🎉", created_at: agora }];
+    default:
+      return [];
   }
 }
 
@@ -108,6 +129,8 @@ export type LeituraDasConquistas = {
   unlocked: ConquistaDesbloqueada[];
   resgatadas: string[] | null;
   careMode: boolean;
+  /** As que ESTA conferência desbloqueou — o aviso "conquista nova" da trilha. */
+  novas: string[];
 };
 
 export async function lerConquistas(): Promise<LeituraDasConquistas | null> {
@@ -128,12 +151,19 @@ export async function lerConquistas(): Promise<LeituraDasConquistas | null> {
       resgatadas:
         estado === "neutro" ? null : ["first_login", "profile_complete", "first_health_log"],
       careMode: false,
+      /* `&novas=journal_10` — o aviso de conquista nova, na bancada. */
+      novas: (parametroDaBancada("novas") ?? "").split(",").filter(Boolean),
     };
   }
   try {
     const r = await conferirConquistas();
     if (!r.ok) return null;
-    return { unlocked: r.unlocked, resgatadas: r.resgatadas, careMode: r.careMode };
+    return {
+      unlocked: r.unlocked,
+      resgatadas: r.resgatadas,
+      careMode: r.careMode,
+      novas: Array.isArray(r.newlyAwarded) ? r.newlyAwarded : [],
+    };
   } catch {
     return null;
   }

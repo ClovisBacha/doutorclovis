@@ -452,6 +452,65 @@ export function TrofeuParado({ largura = 34 }: { largura?: number }) {
   );
 }
 
+/**
+ * O TROFÉU SE CONSTRUINDO — a folha inteira (10 × 6, 60 quadros, 12 fps), uma
+ * vez, do quadro vazio ao troféu pousado. É a animação do site
+ * (`TrofeuConquistado`): no app ficava só o último quadro, e o clímax do dia
+ * fechado passava parado. Com "Reduzir movimento", o troféu já vem pronto.
+ */
+export function TrofeuSeConstruindo({
+  largura = 200,
+  aoTerminar,
+}: {
+  largura?: number;
+  aoTerminar?: () => void;
+}) {
+  const reduzido = useMovimentoReduzido();
+  const altura = Math.round(largura * 0.8);
+  const v = useRef(new Animated.Value(reduzido ? 59 : 0)).current;
+  useEffect(() => {
+    if (reduzido) {
+      aoTerminar?.();
+      return;
+    }
+    const a = Animated.timing(v, {
+      toValue: 59,
+      duration: 5000,
+      easing: Easing.linear,
+      useNativeDriver: true,
+    });
+    a.start(({ finished }) => {
+      if (finished) aoTerminar?.();
+    });
+    return () => a.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reduzido, v]);
+  const entrada: number[] = [];
+  const colunas: number[] = [];
+  const linhas: number[] = [];
+  for (let i = 0; i < 60; i++) {
+    entrada.push(i, i + 0.999);
+    colunas.push(-(i % 10) * largura, -(i % 10) * largura);
+    linhas.push(-Math.floor(i / 10) * altura, -Math.floor(i / 10) * altura);
+  }
+  return (
+    <View style={{ width: largura, height: altura, overflow: "hidden" }}>
+      <Animated.View
+        style={{
+          width: largura * 10,
+          height: altura * 6,
+          transform: [
+            { translateX: v.interpolate({ inputRange: entrada, outputRange: colunas }) },
+            { translateY: v.interpolate({ inputRange: entrada, outputRange: linhas }) },
+          ],
+        }}
+      >
+        <Image source={TROFEU_SPRITE} style={{ width: largura * 10, height: altura * 6 }} />
+      </Animated.View>
+    </View>
+  );
+}
+
 /** Duas amigas e um "+" — sem emoji de pessoa (que imporia um tom de pele). */
 export function IconeAmigas({ cor, tamanho = 22 }: { cor: string; tamanho?: number }) {
   return (

@@ -13,11 +13,13 @@ import {
   type NativeSyntheticEvent,
 } from "react-native";
 import { Image } from "expo-image";
+import { ShieldCheck } from "lucide-react-native";
 import Svg, { Circle, Defs, RadialGradient, Stop } from "react-native-svg";
 import { estadoDoNo as estadoDaPele, type TrilhaSkin } from "@/lib/trilha-skins";
 import { useAviso } from "~/componentes/aviso";
 import { toque } from "~/componentes/base";
 import { corCaminho } from "~/componentes/caminho/cores";
+import { corJornada } from "~/componentes/jornada/cores";
 import {
   AnelDeTarefas,
   Boiar,
@@ -104,6 +106,8 @@ export type PropsDoCaminho = {
   trofeus: number | null;
   carregandoCarteira: boolean;
   chama: number;
+  /** Perdões guardados: o escudinho ao lado da chama (um dia em branco não a apaga). */
+  perdoes?: number;
   amigas: number | null;
   nomeDoBebe: string | null;
   /** O humor já foi marcado hoje (o cartão some). */
@@ -112,6 +116,8 @@ export type PropsDoCaminho = {
   aoAbrirDia: (D: number) => void;
   aoAbrirSemana: (semana: number) => void;
   aoAbrirLoja: () => void;
+  /** Conquistas desbloqueadas esperando o toque que paga: o selo da cestinha. */
+  aResgatar?: number;
   aoAbrirAmigas: () => void;
   aoAbrirFolha: (qual: "chama" | "sementes" | "trofeus") => void;
   aoContarNascimento: () => void;
@@ -343,6 +349,7 @@ export function Caminho(p: PropsDoCaminho) {
     <View style={{ flex: 1, backgroundColor: cor.fundo }}>
       <FaixaDoTopo
         chama={p.chama}
+        perdoes={p.perdoes ?? 0}
         amigas={p.amigas}
         trofeus={p.trofeus}
         saldo={p.saldo}
@@ -426,7 +433,7 @@ export function Caminho(p: PropsDoCaminho) {
               }}
             />
           ) : null}
-          <BotaoDaLoja saldo={p.saldo} aoTocar={p.aoAbrirLoja} />
+          <BotaoDaLoja saldo={p.saldo} aResgatar={p.aResgatar ?? 0} aoTocar={p.aoAbrirLoja} />
         </>
       )}
       {aviso}
@@ -479,6 +486,7 @@ function EnfeitesDoBloco({
 
 function FaixaDoTopo({
   chama,
+  perdoes,
   amigas,
   trofeus,
   saldo,
@@ -487,6 +495,7 @@ function FaixaDoTopo({
   aoAbrirAmigas,
 }: {
   chama: number;
+  perdoes: number;
   amigas: number | null;
   trofeus: number | null;
   saldo: number | null;
@@ -515,7 +524,25 @@ function FaixaDoTopo({
         rotulo={`${chama} ${chama === 1 ? "dia seguido" : "dias seguidos"} — ver como funciona`}
         aoTocar={() => aoAbrirFolha("chama")}
       >
-        <ChamaDaSequencia acesa={acesa} />
+        <View>
+          <ChamaDaSequencia acesa={acesa} />
+          {/* O escudinho do pós-parto também na gestação: há perdão guardado,
+              e um dia em branco não apaga a chama. */}
+          {acesa && perdoes > 0 ? (
+            <View
+              style={{
+                position: "absolute",
+                left: -7,
+                bottom: -4,
+                backgroundColor: cor.cartao,
+                borderRadius: 8,
+                padding: 1,
+              }}
+            >
+              <ShieldCheck size={11} color={corCaminho.chamaAcesa} strokeWidth={2.6} />
+            </View>
+          ) : null}
+        </View>
         <Text
           style={[
             estilo.numero,
@@ -1251,7 +1278,15 @@ function BrilhoDaPele({ caixa, cor: tinta }: { caixa: number; cor: string }) {
    O botão da loja e o aviso
    ══════════════════════════════════════════════════════════════════════════ */
 
-function BotaoDaLoja({ saldo, aoTocar }: { saldo: number | null; aoTocar: () => void }) {
+function BotaoDaLoja({
+  saldo,
+  aResgatar,
+  aoTocar,
+}: {
+  saldo: number | null;
+  aResgatar: number;
+  aoTocar: () => void;
+}) {
   const reduzido = useMovimentoReduzido();
   const v = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -1293,7 +1328,11 @@ function BotaoDaLoja({ saldo, aoTocar }: { saldo: number | null; aoTocar: () => 
       />
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Abrir o Meu Cantinho"
+        accessibilityLabel={
+          aResgatar > 0
+            ? `Abrir as Recompensas: ${aResgatar} ${aResgatar === 1 ? "conquista" : "conquistas"} para resgatar`
+            : "Abrir o Meu Cantinho"
+        }
         onPress={() => {
           toque();
           aoTocar();
@@ -1315,6 +1354,32 @@ function BotaoDaLoja({ saldo, aoTocar }: { saldo: number | null; aoTocar: () => 
         })}
       >
         <IconeLoja cor={corCaminho.lojaIcone} />
+        {/* As conquistas que esperam o toque: o selo roxo do lado oposto ao
+            saldo — e a cestinha abre direto na aba delas. */}
+        {aResgatar > 0 ? (
+          <View
+            style={{
+              position: "absolute",
+              left: -6,
+              top: -6,
+              minWidth: 22,
+              height: 22,
+              borderRadius: 11,
+              alignItems: "center",
+              justifyContent: "center",
+              paddingHorizontal: 5,
+              backgroundColor: corJornada.roxo,
+              borderWidth: 2,
+              borderColor: cor.branco,
+            }}
+          >
+            <Text
+              style={{ fontFamily: fonte.titulo, fontSize: 12, lineHeight: 15, color: cor.branco }}
+            >
+              {aResgatar}
+            </Text>
+          </View>
+        ) : null}
         {saldo != null ? (
           <View
             style={{

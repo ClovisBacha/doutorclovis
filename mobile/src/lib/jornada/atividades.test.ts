@@ -22,7 +22,14 @@ import {
   temChaoParaTirar,
 } from "./mexer";
 import { lerRegistro, planoDaSessao, temasDisponiveis } from "./meditacao";
-import { montarGrade, paraResgatar, placar, resumo, secoes } from "./conquistas";
+import {
+  montarGrade,
+  paraResgatar,
+  placar,
+  resumo,
+  secoes,
+  SEM_CAMINHO_NO_APP,
+} from "./conquistas";
 
 const unica: QuizQuestion = { q: "?", o: ["a", "b", "c"], a: 2, why: "porque" };
 const varias: QuizQuestion = { q: "?", o: ["a", "b", "c", "d"], a: [0, 2], why: "porque" };
@@ -269,11 +276,23 @@ describe("a grade de conquistas", () => {
     expect(paraResgatar(g)).toBe(0);
     expect(g.find((c) => c.def.key === "first_journal")!.estado).toBe("desbloqueada");
   });
-  test("na gestação, o placar do Início não conta as do pós-parto", () => {
+  test("na gestação, o placar do Início: as do pós-parto (sem tela no app) não entram trancadas", () => {
     const g = montarGrade(unlocked, []);
     const p = placar(g, false);
     expect(p.feitas).toBe(2);
-    expect(p.total).toBeLessThan(g.length);
+    expect(p.total).toBe(g.length);
+    expect(g.some((c) => c.def.posParto)).toBe(false);
+  });
+  test("as conquistas sem caminho no app somem trancadas, e ficam quando ela já as ganhou", () => {
+    const g = montarGrade(unlocked, []);
+    for (const k of SEM_CAMINHO_NO_APP) expect(g.some((c) => c.def.key === k)).toBe(false);
+    const ganhou = montarGrade(
+      [...unlocked, { achievement_key: "prenatal_done", unlocked_at: "2026-09-20T12:00:00Z" }],
+      [],
+    );
+    expect(ganhou.find((c) => c.def.key === "prenatal_done")?.estado).toBe("resgatar");
+    /* O "Perfil Completo" fica: o app agora pede a altura e o peso de antes. */
+    expect(g.some((c) => c.def.key === "profile_complete")).toBe(true);
   });
   test("a aba segue o site: seções na ordem do site, X de todas, e a nota do nascimento", () => {
     const g = montarGrade(unlocked, []);
@@ -284,7 +303,9 @@ describe("a grade de conquistas", () => {
     expect(r.feitas).toBe(2);
     expect(r.total).toBe(g.length);
     expect(r.pct).toBe(Math.round((2 / g.length) * 100));
-    expect(r.mostrarNotaDoNascimento).toBe(true);
+    /* Sem nenhuma do pós-parto à mostra (todas sem tela no app), a nota do
+       nascimento não tem do que falar. */
+    expect(r.mostrarNotaDoNascimento).toBe(false);
     const comPos = montarGrade(
       [...unlocked, { achievement_key: "first_vaccine", unlocked_at: "2027-01-01T12:00:00Z" }],
       [],

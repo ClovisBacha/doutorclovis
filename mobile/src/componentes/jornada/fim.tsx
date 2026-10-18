@@ -1,6 +1,6 @@
 import * as Haptics from "expo-haptics";
 import { useEffect, useRef, useState } from "react";
-import { Platform, View } from "react-native";
+import { Modal, Platform, Pressable, Text, View } from "react-native";
 import { Botao, Cartao, Carregando, T } from "~/componentes/base";
 import { pagarAula, pagarDiaFechado, pagarMomento } from "~/componentes/jornada/economia";
 import { corJornada } from "~/componentes/jornada/cores";
@@ -8,9 +8,10 @@ import { marcarLivre } from "~/componentes/jornada/livres";
 import { Constelacao, SementesSubindo } from "~/componentes/jornada/efeitos";
 import { BolhaComBalao, BotaoDaAtividade, Brilho } from "~/componentes/jornada/atividade";
 import { Bolha, Confete, Estrela, Estrelas, voltarParaJornada } from "~/componentes/jornada/pecas";
+import { TrofeuSeConstruindo } from "~/componentes/caminho/pecas";
 import { contarMomentos, flagsDoDia, type Momento } from "~/lib/jornada/momentos";
 import { marcar, useLoja } from "~/lib/jornada/loja";
-import { cor, espaco, raio } from "~/tema";
+import { cor, espaco, fonte, raio } from "~/tema";
 
 /**
  * O FIM DE UM MOMENTO — marca, paga, e celebra quando fecha o dia.
@@ -118,10 +119,13 @@ export function FimDoMomento({
     return () => clearTimeout(t);
   }, [alvo]);
   const jaFestejou = useRef(false);
+  /* O dia fechou agora: o troféu se constrói por cima da festa, uma vez. */
+  const [trofeu, setTrofeu] = useState(false);
   useEffect(() => {
     if ((festa || (confete && !cuidado)) && !jaFestejou.current) {
       jaFestejou.current = true;
       setConfete(true);
+      if (festa) setTrofeu(true);
     }
   }, [festa, confete, cuidado]);
 
@@ -211,6 +215,61 @@ export function FimDoMomento({
         />
       </View>
       {mostrarConfete ? <Confete pecas={confete === "grande" && !festa ? 72 : 36} /> : null}
+      {trofeu ? <TrofeuConquistado aoFechar={() => setTrofeu(false)} /> : null}
     </View>
+  );
+}
+
+/**
+ * O TROFÉU DO DIA FECHADO — a animação do site (`TrofeuConquistado`): o troféu
+ * se constrói do nada em 5 s, fica meio segundo pronto, e a tela some. Um
+ * toque pula. Antes o app mostrava só uma linha de texto no fim da atividade.
+ */
+function TrofeuConquistado({ aoFechar }: { aoFechar: () => void }) {
+  const fechado = useRef(false);
+  const fechar = () => {
+    if (fechado.current) return;
+    fechado.current = true;
+    aoFechar();
+  };
+  return (
+    <Modal transparent animationType="fade" visible onRequestClose={fechar}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Troféu conquistado. Tocar para continuar"
+        onPress={fechar}
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          gap: espaco.lg,
+          /* Escuro o bastante para a festa de trás não disputar com o troféu. */
+          backgroundColor: "rgba(30,16,40,0.86)",
+        }}
+      >
+        <TrofeuSeConstruindo largura={200} aoTerminar={() => setTimeout(fechar, 600)} />
+        <Text
+          style={{
+            textAlign: "center",
+            fontFamily: fonte.titulo,
+            fontSize: 26,
+            lineHeight: 32,
+            color: cor.branco,
+          }}
+        >
+          Troféu conquistado!
+        </Text>
+        <Text
+          style={{
+            textAlign: "center",
+            fontFamily: fonte.media,
+            fontSize: 15,
+            color: "rgba(255,255,255,0.85)",
+          }}
+        >
+          Um dia inteiro cuidado 🏆
+        </Text>
+      </Pressable>
+    </Modal>
   );
 }

@@ -37,6 +37,37 @@ export function estadoDe(
   return resgatadas.has(key) ? "resgatada" : "resgatar";
 }
 
+/**
+ * As conquistas que o app NÃO tem como dar: o servidor as desbloqueia por
+ * tabelas que só telas do site escrevem (convite de acompanhante, álbum da
+ * família, checklist do pré-natal, os registros do bebê). Trancadas, elas
+ * apareciam "bloqueadas" para sempre e contavam no "X de 39" — uma meta que
+ * ela não tinha como cumprir. Saem da grade enquanto trancadas; quem já as
+ * ganhou (no site) continua vendo a sua. Quando a tela existir no app, a
+ * chave sai daqui.
+ */
+export const SEM_CAMINHO_NO_APP: ReadonlySet<string> = new Set([
+  "companion_invited",
+  "album_post",
+  "prenatal_done",
+  "first_breastfeeding",
+  "first_baby_weight",
+  "first_vaccine",
+  "first_baby_milestone",
+]);
+
+/**
+ * A descrição como o APP a diz. O catálogo é do site e fala em "portal";
+ * no app, a conta foi criada aqui.
+ */
+const DESCRICAO_NO_APP: Record<string, string> = {
+  first_login: "Criou sua conta",
+};
+
+export function descricaoNoApp(def: ConquistaDef): string {
+  return DESCRICAO_NO_APP[def.key] ?? def.description;
+}
+
 export function montarGrade(
   unlocked: readonly ConquistaDesbloqueada[],
   resgatadas: readonly string[] | null,
@@ -44,12 +75,14 @@ export function montarGrade(
 ): Cartao[] {
   const mapa = new Map(unlocked.map((u) => [u.achievement_key, u.unlocked_at] as const));
   const res = resgatadas === null ? null : new Set(resgatadas);
-  return catalogo.map((def) => ({
-    def,
-    estado: estadoDe(def.key, mapa, res),
-    quando: mapa.get(def.key) ?? null,
-    sementinhas: RARIDADES[def.raridade].sementinhas,
-  }));
+  return catalogo
+    .map((def) => ({
+      def,
+      estado: estadoDe(def.key, mapa, res),
+      quando: mapa.get(def.key) ?? null,
+      sementinhas: RARIDADES[def.raridade].sementinhas,
+    }))
+    .filter((c) => !(c.estado === "bloqueada" && SEM_CAMINHO_NO_APP.has(c.def.key)));
 }
 
 export function paraResgatar(grade: readonly Cartao[]): number {

@@ -16,6 +16,7 @@ import { limparRastrosLocais } from "~/lib/armazem";
 import { ehBancada } from "~/lib/bancada";
 import { deYmd, paraYmd, RECADO_DA_DATA, recusaDaDum } from "~/lib/datas";
 import { gravarPerfil } from "~/lib/gravar-perfil";
+import { lerAltura, lerPeso, mostrarMedida } from "~/lib/medidas-do-perfil";
 import { guardarMedicoLocal, lerMedicoLocal } from "~/lib/medico-local";
 import { celularE164, emailValido } from "@/lib/medico-da-gestante";
 import { CartaoDaPermissaoDeIA } from "~/lib/ia/PermissaoDeIA";
@@ -70,6 +71,8 @@ function FormularioDoPerfil() {
   const [sangue, setSangue] = useState(texto(perfil?.blood_type));
   const [alergias, setAlergias] = useState(texto(perfil?.allergies));
   const [remedios, setRemedios] = useState(texto(perfil?.medications));
+  const [altura, setAltura] = useState(mostrarMedida(perfil?.height_cm));
+  const [pesoAntes, setPesoAntes] = useState(mostrarMedida(perfil?.pre_pregnancy_weight_kg));
   const [medicoNome, setMedicoNome] = useState(texto(perfil?.medico_nome));
   const [medicoCelular, setMedicoCelular] = useState(texto(perfil?.medico_celular));
   const [medicoEmail, setMedicoEmail] = useState(texto(perfil?.medico_email));
@@ -109,6 +112,16 @@ function FormularioDoPerfil() {
       medico_celular: medicoCelular.trim() || null,
       medico_email: medicoEmail.trim() || null,
     };
+    /* A altura e o peso de antes: a régua da curva de ganho e da nutrição. Fora
+       da faixa que a curva usa, o app pede para conferir em vez de gravar. */
+    const a = lerAltura(altura);
+    if (!a.ok)
+      return setRecado({ texto: "Confira a altura: em centímetros, como 165.", erro: true });
+    const pa = lerPeso(pesoAntes);
+    if (!pa.ok)
+      return setRecado({ texto: "Confira o peso de antes da gestação, em quilos.", erro: true });
+    campos.height_cm = a.valor;
+    campos.pre_pregnancy_weight_kg = pa.valor;
     if (medicoCelular.trim() && !celularE164(medicoCelular)) {
       return setRecado({ texto: "Confira o celular do médico: DDD e número.", erro: true });
     }
@@ -280,6 +293,32 @@ function FormularioDoPerfil() {
           <Campo rotulo="Alergias" value={alergias} onChangeText={setAlergias} />
           <Campo rotulo="Medicações em uso" value={remedios} onChangeText={setRemedios} />
         </Cartao>
+
+        {/* No Modo Cuidado a tela não fala da gestação: a seção some, e o que
+            já estava gravado continua gravado. */}
+        {cuidadoDaSessao ? null : (
+          <Cartao>
+            <T tipo="subtitulo">Antes da gestação</T>
+            <T tipo="apagado" estilo={{ fontSize: 14 }}>
+              A sua altura e o seu peso de antes servem de régua para o ganho de peso das semanas e
+              para as sugestões de nutrição.
+            </T>
+            <Campo
+              rotulo="Altura (cm)"
+              value={altura}
+              onChangeText={setAltura}
+              keyboardType="decimal-pad"
+              placeholder="Ex.: 165"
+            />
+            <Campo
+              rotulo="Peso antes da gestação (kg)"
+              value={pesoAntes}
+              onChangeText={setPesoAntes}
+              keyboardType="decimal-pad"
+              placeholder="Ex.: 62,5"
+            />
+          </Cartao>
+        )}
 
         <Cartao>
           <T tipo="subtitulo">Quem acompanha a sua gestação</T>

@@ -7,7 +7,9 @@ import { ChamaViva, Faiscas, Odometro } from "~/componentes/jornada/efeitos";
 import { Folha } from "~/componentes/jornada/pecas";
 import { BolhaViva } from "~/componentes/movimento";
 import { Pulso } from "~/componentes/movimento";
+import { itensDaLoja } from "~/lib/jornada/enfeites";
 import { explicacaoDaChama } from "~/lib/jornada/trilha";
+import { escadaDosTrofeus } from "~/lib/jornada/trofeus";
 import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
 
 /**
@@ -155,10 +157,17 @@ export function FolhasDoPlacar({
 
       <Folha aberta={aberta === "sementes"} aoFechar={aoFechar} titulo="🌱 Sementinhas">
         {pos ? (
-          <T>
-            No pós-parto, os momentos do dia são só seus: eles acendem a chama, sem somar
-            sementinhas. As conquistas continuam rendendo quando você as resgata.
-          </T>
+          <>
+            <T>
+              No pós-parto, os momentos do dia são só seus: eles acendem a chama, sem somar
+              sementinhas. O calendário continua rendendo:
+            </T>
+            <View style={{ gap: 6 }}>
+              <LinhaDeGanho rotulo="O nascimento" valor="+100" />
+              <LinhaDeGanho rotulo="Cada mês do bebê" valor="+25" />
+              <LinhaDeGanho rotulo="Resgatar uma conquista" valor="+15, +40 ou +120" />
+            </View>
+          </>
         ) : (
           <>
             <T>Você ganha sementinhas cuidando de você e aprendendo, todo dia:</T>
@@ -168,6 +177,10 @@ export function FolhasDoPlacar({
               <LinhaDeGanho rotulo="Mexer, meditar, a carta e a gratidão" valor="+5 cada" />
               <LinhaDeGanho rotulo="Fechar as cinco estrelas do dia" valor="+20" />
               <LinhaDeGanho rotulo="Resgatar uma conquista" valor="+15, +40 ou +120" />
+              {/* Os marcos do calendário: o servidor paga sozinho, e a festa
+                  deles abre na trilha (`FestaDoMarco`). */}
+              <LinhaDeGanho rotulo="Cada semana nova da gestação" valor="+25" />
+              <LinhaDeGanho rotulo="O fim de cada trimestre" valor="+100" />
             </View>
           </>
         )}
@@ -183,13 +196,69 @@ export function FolhasDoPlacar({
           {trofeus == null
             ? "Não conseguimos carregar a sua contagem agora."
             : trofeus === 0
-              ? "O primeiro vem no dia das cinco estrelas."
+              ? "O primeiro vem no dia em que as quatro se fecham."
               : `Você já tem ${trofeus} ${trofeus === 1 ? "troféu" : "troféus"}.`}
         </T>
+        {/* A escada: para que os troféus servem, e quanto falta para o próximo
+            degrau — antes era um número sem destino. */}
+        {trofeus != null ? <EscadaDosTrofeus trofeus={trofeus} /> : null}
       </Folha>
     </>
   );
 }
+
+function EscadaDosTrofeus({ trofeus }: { trofeus: number }) {
+  const { degraus, proximo } = escadaDosTrofeus(trofeus, ITENS_DA_LOJA_DO_APP);
+  return (
+    <View style={{ gap: espaco.sm }}>
+      {degraus.map((d) => (
+        <View
+          key={d.trofeus}
+          style={{ flexDirection: "row", alignItems: "flex-start", gap: espaco.md }}
+        >
+          <View
+            style={{
+              minWidth: 52,
+              borderRadius: 999,
+              paddingHorizontal: espaco.sm,
+              paddingVertical: 4,
+              alignItems: "center",
+              backgroundColor: d.feito ? corJornada.trofeuFundo : cor.apagado,
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: fonte.titulo,
+                fontSize: 13,
+                color: d.feito ? corJornada.trofeu : cor.textoApagado,
+              }}
+            >
+              {d.feito ? "✓ " : ""}
+              {d.trofeus} 🏆
+            </Text>
+          </View>
+          <View style={{ flex: 1, paddingTop: 3 }}>
+            {d.rotulos.map((r) => (
+              <T key={r} tipo={d.feito ? "corpo" : "apagado"}>
+                {r}
+              </T>
+            ))}
+          </View>
+        </View>
+      ))}
+      {proximo ? (
+        <T tipo="rotulo" cor={corJornada.trofeu}>
+          {proximo.faltam === 1
+            ? "Falta 1 dia completo para o próximo."
+            : `Faltam ${proximo.faltam} dias completos para o próximo.`}
+        </T>
+      ) : null}
+    </View>
+  );
+}
+
+/** O que a lojinha do app vende (sem a loja por fase): é onde o troféu destrava a Borboleta. */
+const ITENS_DA_LOJA_DO_APP = new Set(itensDaLoja([]).map((i) => i.id));
 
 function Pilar({
   rotulo,

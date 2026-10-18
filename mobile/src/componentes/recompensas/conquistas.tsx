@@ -16,7 +16,7 @@ import {
   vibrar,
 } from "~/componentes/recompensas/pecas";
 import { lerJson, gravarJson } from "~/lib/armazem";
-import { montarGrade, resumo, secoes, type Cartao } from "~/lib/jornada/conquistas";
+import { descricaoNoApp, montarGrade, resumo, secoes, type Cartao } from "~/lib/jornada/conquistas";
 import { dataCompleta } from "~/lib/jornada/dia";
 import { useSessao } from "~/lib/sessao";
 import { RARIDADES } from "@/lib/conquistas";
@@ -224,7 +224,7 @@ export function AbaDasConquistas({
               {r.feitas} de {r.total}
             </Text>
             <Text style={{ fontFamily: fonte.normal, fontSize: 14, color: cor.textoApagado }}>
-              badges desbloqueadas
+              conquistas desbloqueadas
             </Text>
           </View>
           <View
@@ -502,7 +502,7 @@ function CartaoDaConquista({
           color: cor.textoApagado,
         }}
       >
-        {c.def.description}
+        {descricaoNoApp(c.def)}
       </Text>
       <Text
         style={{
