@@ -19,6 +19,7 @@ import {
 } from "@/lib/cantinho";
 import { CONJUNTOS, conjuntosOrdenados, type ProgressoDoConjunto } from "@/lib/conjuntos";
 import { ehClima } from "@/lib/clima-do-cantinho";
+import { situacaoNaVitrine, type ItemPorFase } from "~/lib/jornada/loja-por-fase";
 
 export const CHAVE_DECOR = "dc-path-decor";
 export const DECOR_MAX = 120;
@@ -356,18 +357,54 @@ export function fatiaDoDegrade(
  *
  * O "Céu do app" (`tema`) também fica fora: ele troca o céu da tela inicial do
  * SITE, e no app não teria efeito nenhum — um "Usar" que não muda nada.
+ *
+ * A LOJA POR FASE (out/2026, `~/lib/jornada/loja-por-fase`): parte do Premium
+ * passa a ser vendida por sementinhas — moeda ganha no app, gasta no app, sem
+ * dinheiro no meio. Com a tabela lida do banco (`fase`), esses itens entram à
+ * venda quando a fase dela chega, e os da PRÓXIMA fase aparecem trancados no
+ * fim da vitrine. O preço que vale é o do banco.
  */
-export function itensDaLoja(possuidos: readonly string[]): CantinhoItem[] {
-  return CANTINHO_ITEMS.filter((i) => {
-    if (i.type === "tema") return false;
-    const tem = possuidos.includes(i.id);
-    if (i.aposentado && !tem) return false;
-    if (i.premium && !tem) return false;
-    return true;
-  }).sort((a, b) => {
-    const peso = (i: CantinhoItem) => (i.id === CANTINHO_COMPLETIONIST_ID ? 1 : 0);
-    return peso(a) - peso(b) || a.price - b.price || a.name.localeCompare(b.name, "pt-BR");
-  });
+export type LojaPorFase = { porItem: ReadonlyMap<string, ItemPorFase>; semana: number };
+
+export type SituacaoNaLoja = "a-venda" | "em-breve" | "escondido";
+
+/** Onde um item fica na vitrine dela. */
+export function situacaoNaLoja(
+  i: CantinhoItem,
+  possuidos: readonly string[],
+  fase: LojaPorFase | null,
+): SituacaoNaLoja {
+  if (i.type === "tema") return "escondido";
+  const tem = possuidos.includes(i.id);
+  if (tem) return "a-venda";
+  if (i.aposentado) return "escondido";
+  if (!i.premium) return "a-venda";
+  const f = fase?.porItem.get(i.id);
+  if (!f) return "escondido";
+  return situacaoNaVitrine(f, fase!.semana, semanasDasFases(fase!));
+}
+
+function semanasDasFases(fase: LojaPorFase): number[] {
+  return [...new Set([...fase.porItem.values()].map((v) => v.semana))];
+}
+
+export function itensDaLoja(
+  possuidos: readonly string[],
+  fase: LojaPorFase | null = null,
+): CantinhoItem[] {
+  const situacao = new Map(CANTINHO_ITEMS.map((i) => [i.id, situacaoNaLoja(i, possuidos, fase)]));
+  return CANTINHO_ITEMS.filter((i) => situacao.get(i.id) !== "escondido")
+    .map((i) => {
+      const f = fase?.porItem.get(i.id);
+      return f && f.preco !== i.price ? { ...i, price: f.preco } : i;
+    })
+    .sort((a, b) => {
+      /* Os trancados da próxima fase vão para o fim: o que ela pode comprar
+         agora vem primeiro, em escada de preço. */
+      const peso = (i: CantinhoItem) =>
+        situacao.get(i.id) === "em-breve" ? 2 : i.id === CANTINHO_COMPLETIONIST_ID ? 1 : 0;
+      return peso(a) - peso(b) || a.price - b.price || a.name.localeCompare(b.name, "pt-BR");
+    });
 }
 
 /** As fichas de categoria que têm pelo menos um item à mostra, na ordem do site. */
@@ -379,12 +416,22 @@ export function categoriasDaLoja(
 
 /**
  * Os conjuntos que ela consegue completar aqui (todos os itens à venda ou já
- * dela). ⚠️ Todo conjunto tem ao menos um item premium, então para quem nunca
- * comprou no site a lista é VAZIA — e a tela esconde a fileira, em vez de
- * mostrar "0 de 4" de coisas que o app não vende.
+ * dela). ⚠️ Todo conjunto tem ao menos um item premium: sem a loja por fase
+ * (o banco ainda sem a tabela) a lista é VAZIA para quem nunca comprou no site
+ * — e a tela esconde a fileira, em vez de mostrar "0 de 4" de coisas que o app
+ * não vende. Com ela, cada fase abre conjuntos inteiros.
  */
-export function conjuntosDaLoja(possuidos: readonly string[]): ProgressoDoConjunto[] {
-  const alcancaveis = new Set(itensDaLoja(possuidos).map((i) => i.id));
+export function conjuntosDaLoja(
+  possuidos: readonly string[],
+  fase: LojaPorFase | null = null,
+): ProgressoDoConjunto[] {
+  /* Só o que ela pode comprar AGORA (ou já tem): um conjunto com peça da
+     próxima fase ainda não dá para fechar, e a fileira não o promete. */
+  const alcancaveis = new Set(
+    itensDaLoja(possuidos, fase)
+      .filter((i) => situacaoNaLoja(i, possuidos, fase) === "a-venda")
+      .map((i) => i.id),
+  );
   const ok = new Set(
     CONJUNTOS.filter((c) => c.itens.every((id) => alcancaveis.has(id))).map((c) => c.id),
   );

@@ -18,6 +18,8 @@ import {
   type LeituraDoCantinho,
 } from "~/servidor/cantinho";
 import { lerCarteira } from "~/servidor/economia";
+import { comprarNaLojaPorFase, lerTabelaDaLojaPorFase } from "~/servidor/loja-por-fase";
+import { linhasDaTabela, type ItemPorFase } from "~/lib/jornada/loja-por-fase";
 import {
   aplicarCodigoDeQuemIndicou,
   enviarDepoimento,
@@ -36,6 +38,7 @@ import {
  *   &vazio=1          só o que o servidor dá a todas (os itens grátis)
  *   &itens=a,b  &clima=c   itens a mais (bichos, luzes, o ar da trilha)
  *   &saldo=N  &trofeus=N  &fundo=<id do cenário em uso>
+ *   &semfase=1        o banco ainda sem APLICAR_LOJA_POR_FASE.sql (a vitrine de antes)
  */
 
 export type CantinhoOk = Extract<LeituraDoCantinho, { ok: true }>;
@@ -106,11 +109,34 @@ export async function lerOCantinho(): Promise<CantinhoOk | null> {
 }
 
 /**
+ * A loja por fase (`~/lib/jornada/loja-por-fase`): o que abre em cada semana,
+ * lido do banco. `null` = o banco ainda não tem a tabela (ou a leitura falhou):
+ * a vitrine fica a de antes, sem itens que ela não conseguiria comprar.
+ */
+export async function lerALojaPorFase(): Promise<Map<string, ItemPorFase> | null> {
+  if (ehBancada()) {
+    if (parametroDaBancada("semfase") === "1") return null;
+    return new Map(
+      linhasDaTabela().map((l) => [l.item_id, { preco: l.preco, semana: l.semana_minima }]),
+    );
+  }
+  try {
+    return await lerTabelaDaLojaPorFase();
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Compra um item. Na bancada, as mesmas recusas do servidor (já possui, saldo,
  * troféus) e o mesmo bônus de conjunto, para a tela passar pelos mesmos
- * caminhos que a produção.
+ * caminhos que a produção. `daFase` = um item da loja por fase, vendido pela
+ * função do banco (a compra do servidor do site recusa todo Premium).
  */
-export async function comprarItem(itemId: string): Promise<CompraDoCantinho | null> {
+export async function comprarItem(
+  itemId: string,
+  daFase = false,
+): Promise<CompraDoCantinho | null> {
   if (ehBancada()) {
     await espera(500);
     const b = cantinhoDaBancada();
@@ -148,7 +174,7 @@ export async function comprarItem(itemId: string): Promise<CompraDoCantinho | nu
     };
   }
   try {
-    return await comprarDoCantinho({ itemId });
+    return daFase ? await comprarNaLojaPorFase(itemId) : await comprarDoCantinho({ itemId });
   } catch {
     return null;
   }

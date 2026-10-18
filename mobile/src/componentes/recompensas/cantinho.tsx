@@ -21,6 +21,7 @@ import { corRecompensas } from "~/componentes/recompensas/cores";
 import {
   comprarItem,
   equiparOCenario,
+  lerALojaPorFase,
   lerOCantinho,
   type CantinhoOk,
 } from "~/componentes/recompensas/economia-do-cantinho";
@@ -33,7 +34,14 @@ import {
   sombraDeCartao,
   vibrar,
 } from "~/componentes/recompensas/pecas";
-import { categoriasDaLoja, conjuntosDaLoja, itensDaLoja } from "~/lib/jornada/enfeites";
+import {
+  categoriasDaLoja,
+  conjuntosDaLoja,
+  itensDaLoja,
+  situacaoNaLoja,
+  type LojaPorFase,
+} from "~/lib/jornada/enfeites";
+import { quandoAbre, semanaDaLoja, type ItemPorFase } from "~/lib/jornada/loja-por-fase";
 import { gravarChave } from "~/lib/jornada/loja";
 import { cor, espaco, fonte } from "~/tema";
 
@@ -44,9 +52,10 @@ import { cor, espaco, fonte } from "~/tema";
  * grade de enfeites em escada de preço.
  *
  * O que é diferente do site, e por quê:
- *  · Sem os itens Premium e sem nenhuma porta de compra com dinheiro (a pílula
- *    do saldo abre o "Ganhe mais", e não a Loja de Sementinhas paga). Ver
- *    `itensDaLoja`.
+ *  · Sem nenhuma porta de compra com dinheiro (a pílula do saldo abre o
+ *    "Ganhe mais", e não a Loja de Sementinhas paga). Do Premium, só a parte
+ *    que a LOJA POR FASE vende por sementinhas, abrindo com a gestação — ver
+ *    `itensDaLoja` e `~/lib/jornada/loja-por-fase`.
  *  · Sem o "Céu do app": ele veste a tela inicial do SITE.
  *  · Os botões têm desenho de 30 px e alvo de 44 pt (`Botao3D`).
  *
@@ -70,8 +79,9 @@ export function AbaDoCantinho({
   aoVerCaminho: () => void;
   avisar: (texto: string) => void;
 }) {
-  /* Abre a jornada dela: a pele das bolinhas mora no blob (`dc-path-skin`). */
-  const { loja } = useJornada();
+  /* Abre a jornada dela: a pele das bolinhas mora no blob (`dc-path-skin`), e a
+     semana dela decide o que a loja por fase já abriu. */
+  const { dia, loja } = useJornada();
   const skinAtiva =
     typeof loja.blob[SKIN_KEY] === "string" ? (loja.blob[SKIN_KEY] as string) : null;
 
@@ -84,6 +94,9 @@ export function AbaDoCantinho({
   const [comprando, setComprando] = useState<string | null>(null);
   const [ganheAberto, setGanheAberto] = useState(false);
   const [festa, setFesta] = useState(0);
+  /* `null` = o banco ainda sem a loja por fase (ou leitura falha): a vitrine
+     de antes, sem nenhum item que ela não conseguiria comprar. */
+  const [porFase, setPorFase] = useState<Map<string, ItemPorFase> | null>(null);
 
   const ler = useCallback(() => {
     setLeitura("carregando");
@@ -99,11 +112,28 @@ export function AbaDoCantinho({
   }, [aoLerSaldo]);
   useEffect(() => {
     ler();
+    void lerALojaPorFase().then(setPorFase);
   }, [ler]);
 
-  const itens = useMemo(() => itensDaLoja(owned), [owned]);
+  const semana = semanaDaLoja({
+    semanaDaGestacao: dia.modo === "gestacao" ? dia.semana : null,
+    nasceu: dia.modo === "pos",
+  });
+  const fase = useMemo<LojaPorFase | null>(
+    () => (porFase ? { porItem: porFase, semana } : null),
+    [porFase, semana],
+  );
+  const itens = useMemo(() => itensDaLoja(owned, fase), [owned, fase]);
   const categorias = useMemo(() => categoriasDaLoja(itens), [itens]);
-  const conjuntos = useMemo(() => conjuntosDaLoja(owned), [owned]);
+  const conjuntos = useMemo(() => conjuntosDaLoja(owned, fase), [owned, fase]);
+  /* Quando chega o próximo lote — o que faz a loja ter futuro. */
+  const proximaFase = useMemo(() => {
+    if (!porFase) return null;
+    const futuras = [...new Set([...porFase.values()].map((v) => v.semana))]
+      .filter((s) => s > semana)
+      .sort((a, b) => a - b);
+    return futuras[0] ?? null;
+  }, [porFase, semana]);
   const daCategoria = useMemo(
     () => (cat === "all" ? itens : itens.filter((i) => i.type === cat)),
     [itens, cat],
@@ -138,7 +168,7 @@ export function AbaDoCantinho({
       return;
     }
     setComprando(item.id);
-    const r = await comprarItem(item.id);
+    const r = await comprarItem(item.id, !!porFase?.has(item.id) && !!item.premium);
     setComprando(null);
     if (!r) {
       vibrar("erro");
@@ -384,6 +414,40 @@ export function AbaDoCantinho({
         </View>
       ) : null}
 
+      {/* A loja por fase: quando chega o próximo lote de enfeites. */}
+      {proximaFase != null ? (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: espaco.md,
+            borderRadius: 16,
+            backgroundColor: corRecompensas.ambar50,
+            borderWidth: 1,
+            borderColor: corRecompensas.ambar200,
+            paddingHorizontal: espaco.lg,
+            paddingVertical: espaco.md,
+          }}
+        >
+          <Text style={{ fontSize: 22 }}>🌱</Text>
+          <Text
+            style={{
+              flex: 1,
+              fontFamily: fonte.media,
+              fontSize: 14,
+              lineHeight: 19,
+              color: corRecompensas.ambar800,
+            }}
+          >
+            A cada fase da gestação chegam enfeites novos. Os próximos chegam{" "}
+            <Text style={{ fontFamily: fonte.titulo }}>
+              {quandoAbre(proximaFase).toLowerCase()}
+            </Text>
+            .
+          </Text>
+        </View>
+      ) : null}
+
       {/* A loja */}
       <View>
         <ScrollView
@@ -435,6 +499,11 @@ export function AbaDoCantinho({
                 <Ladrilho
                   key={i.id}
                   item={i}
+                  emBreve={
+                    situacaoNaLoja(i, owned, fase) === "em-breve"
+                      ? quandoAbre(porFase?.get(i.id)?.semana ?? 0)
+                      : null
+                  }
                   tem={possui.has(i.id)}
                   saldo={saldo}
                   trofeus={trofeus}
@@ -461,6 +530,7 @@ export function AbaDoCantinho({
 /** Um enfeite da prateleira: objeto com corpo (sombra de cartão), não só contorno. */
 function Ladrilho({
   item: i,
+  emBreve,
   tem,
   saldo,
   trofeus,
@@ -471,6 +541,8 @@ function Ladrilho({
   aoUsar,
 }: {
   item: CantinhoItem;
+  /** Item da PRÓXIMA fase da loja: o quando abre ("No 3º trimestre"). */
+  emBreve: string | null;
   tem: boolean;
   saldo: number | null;
   trofeus: number;
@@ -487,12 +559,16 @@ function Ladrilho({
   const faltamTrof = tem ? 0 : faltamTrofeus(i.id, trofeus);
   /* Saldo desconhecido (`null`) não tranca nada: o servidor é quem decide. */
   const naoAlcanca = !tem && saldo != null && saldo < i.price;
-  const apagado = coroaTrancada || faltamTrof > 0;
+  const trancadoPelaFase = !tem && emBreve != null;
+  const apagado = coroaTrancada || faltamTrof > 0 || trancadoPelaFase;
   const arte = ARTE_DO_ITEM[i.id];
 
   const conteudo = (
     <>
       {coroa ? <Selo texto="COLEÇÃO" fundo={corRecompensas.ambar200} lado="direita" /> : null}
+      {trancadoPelaFase ? (
+        <Selo texto="EM BREVE" fundo={corRecompensas.ambar200} lado="direita" />
+      ) : null}
       {exigidos > 0 && !tem ? (
         <Selo
           texto={`${faltamTrof > 0 ? "🔒" : "✓"} ${exigidos} 🏆`}
@@ -506,7 +582,7 @@ function Ladrilho({
       <View
         style={{
           height: arte ? 56 : 40,
-          marginTop: coroa || (exigidos > 0 && !tem) ? 12 : 0,
+          marginTop: coroa || trancadoPelaFase || (exigidos > 0 && !tem) ? 12 : 0,
           justifyContent: "center",
           opacity: apagado ? 0.4 : 1,
         }}
@@ -542,6 +618,17 @@ function Ladrilho({
           ) : (
             <Botao3D tipo="claro" rotulo={coroa ? "Conquistado! 👑" : "No cantinho ✓"} />
           )
+        ) : trancadoPelaFase ? (
+          <>
+            <Botao3D
+              tipo="selo"
+              fundo={corRecompensas.ambar100}
+              tinta={corRecompensas.ambar700}
+              rotulo={`🔒 ${emBreve}`}
+              acessivel={`${i.name}: chega ${emBreve!.toLowerCase()}, por ${i.price} Sementinhas`}
+            />
+            <Text style={estilo.legendaAmbar}>🌱 {i.price}</Text>
+          </>
         ) : coroaTrancada ? (
           <>
             <Botao3D
