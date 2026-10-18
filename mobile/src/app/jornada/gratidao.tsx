@@ -116,7 +116,9 @@ export default function GratidaoTela() {
   const [desfecho, setDesfecho] = useState<Desfecho | null>(null);
   /* `null` = não conseguimos ler (a escrita continua: ler nunca impede de registrar). */
   const [gratidoes, setGratidoes] = useState<Gratidao[] | null>(null);
-  const [total, setTotal] = useState(0);
+  /* `null` = ainda não sei, ou não consegui ler: a tela nunca afirma "essa foi
+     a primeira" a quem tem dezenas guardadas só porque a leitura falhou. */
+  const [total, setTotal] = useState<number | null>(null);
   const [diaDificil, setDiaDificil] = useState(false);
   const [marco, setMarco] = useState<number | null>(null);
   const [cartaNova, setCartaNova] = useState(false);
@@ -231,14 +233,14 @@ export default function GratidaoTela() {
        próprio registro entrar é a espera que faz o número parecer quebrado. */
     const nova = { texto: t, quando: new Date().toISOString() };
     setGratidoes((antes) => [nova, ...(antes ?? [])]);
-    const novoTotal = total + 1;
+    const novoTotal = total == null ? null : total + 1;
     setTotal(novoTotal);
-    const m = at.cuidado ? null : marcoAtingido(novoTotal);
+    const m = at.cuidado || novoTotal == null ? null : marcoAtingido(novoTotal);
     setMarco(m);
     if (m && Platform.OS !== "web") {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     }
-    setCartaNova(!at.cuidado && cartaAcabouDeNascer(novoTotal));
+    setCartaNova(!at.cuidado && novoTotal != null && cartaAcabouDeNascer(novoTotal));
     setSalvando(false);
     setEtapa("guardado");
     setDesfecho(
@@ -262,13 +264,17 @@ export default function GratidaoTela() {
 
   const irParaCarta = () => router.push({ pathname: "/jornada/bebe", params: { delas: "1" } });
   /* A carta mora no Momento com o bebê, que não existe no Modo Cuidado. */
-  const temCarta = !at.cuidado && total >= MINIMO_PARA_CARTA;
+  const temCarta = !at.cuidado && total != null && total >= MINIMO_PARA_CARTA;
 
   if (etapa === "guardado") {
     /* A releitura usa o total como semente, como no site: cada nova guardada
        traz outra lembrança. Nunca a de hoje nem a de ontem — isso é eco. */
-    const releitura = gratidoes ? gratidaoParaReler(gratidoes, new Date(), total) : null;
-    const frase = falaDaBolha({ tela: "guardado", total, marco, temReleitura: !!releitura });
+    const releitura =
+      gratidoes && total != null ? gratidaoParaReler(gratidoes, new Date(), total) : null;
+    const frase =
+      total == null
+        ? "Guardei 💛 Está no seu diário."
+        : falaDaBolha({ tela: "guardado", total, marco, temReleitura: !!releitura });
     return (
       <FundoDaAtividade paleta={PALETA}>
         <ScrollView
@@ -348,7 +354,9 @@ export default function GratidaoTela() {
                     />
                   </View>
                 ) : null}
-                {total > 1 ? <Link texto="Ver todas" aoTocar={() => setEtapa("lista")} /> : null}
+                {(total ?? 0) > 1 ? (
+                  <Link texto="Ver todas" aoTocar={() => setEtapa("lista")} />
+                ) : null}
                 {/* Fora do instante da oitava, a carta não pode depender de estar
                     bem naquele dia: o link fica, sem duplicar o anúncio acima. */}
                 {!cartaNova && temCarta ? (
@@ -395,7 +403,7 @@ export default function GratidaoTela() {
               color: corGratidao.texto,
             }}
           >
-            {total} {total === 1 ? "guardada" : "guardadas"} até aqui 💛
+            {total ?? gratidoes?.length ?? 0} {total === 1 ? "guardada" : "guardadas"} até aqui 💛
           </Text>
           <View style={{ marginTop: 20, gap: espaco.md }}>
             {(gratidoes ?? []).map((g) => (
@@ -536,7 +544,7 @@ export default function GratidaoTela() {
 
   const fala = at.jaFeita
     ? "Você já me contou uma coisa boa hoje. Se quiser, conta outra — eu guardo também."
-    : falaDaBolha({ tela: "escrever", total, diaDificil, periodo });
+    : falaDaBolha({ tela: "escrever", total: total ?? 0, diaDificil, periodo });
 
   return (
     <KeyboardAvoidingView
@@ -668,7 +676,7 @@ export default function GratidaoTela() {
             />
           </View>
           {/* A coleção: o número já está na fala da bolha; aqui fica só a ação. */}
-          {total > 0 && gratidoes ? (
+          {(total ?? 0) > 0 && gratidoes ? (
             <Link texto="Ver todas" aoTocar={() => setEtapa("lista")} />
           ) : null}
         </ScrollView>

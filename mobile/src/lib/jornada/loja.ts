@@ -1,7 +1,13 @@
 import { AppState } from "react-native";
 import { useSyncExternalStore } from "react";
 import { gravarJson, lerJson } from "~/lib/armazem";
-import { chaveDoDia, marcarMomento, type Blob, type Momento } from "~/lib/jornada/momentos";
+import {
+  chaveDoDia,
+  fecharDiasCompletos,
+  marcarMomento,
+  type Blob,
+  type Momento,
+} from "~/lib/jornada/momentos";
 import { mesclarBlob } from "~/lib/jornada/sincronia";
 import { supabase } from "~/servidor/supabase";
 
@@ -15,11 +21,15 @@ import { supabase } from "~/servidor/supabase";
  * blob INTEIRO — inclusive as chaves que ele não usa (decoração, skins, notas
  * das lições), que só chegam aqui pelo pull.
  *
- * ⚠️ POR ISSO NENHUM PUSH ACONTECE ANTES DE UM PULL QUE DEU CERTO. Empurrar
- * antes sobrescreveria a jornada real na nuvem por um blob vazio (aparelho
- * novo) ou incompleto. O site libera o push mesmo depois de um pull que
- * falhou; aqui não: sem pull bem-sucedido, o push tenta o pull de novo e, se
- * ainda falhar, não empurra — o progresso fica no aparelho até a próxima vez.
+ * ⚠️ POR ISSO TODO PUSH VEM DEPOIS DE UM PULL QUE DEU CERTO — e não só o
+ * primeiro. Empurrar antes sobrescreveria a jornada real na nuvem por um blob
+ * vazio (aparelho novo), incompleto, ou VELHO: o iOS deixa o app suspenso por
+ * dias, e um pull só na abertura do processo fazia o iPhone devolver à nuvem
+ * a cópia da semana passada, apagando o que ela tinha feito no site ou noutro
+ * aparelho nesse meio-tempo (out/2026). O site libera o push mesmo depois de
+ * um pull que falhou; aqui não: sem pull bem-sucedido, não empurra — o
+ * progresso fica no aparelho até a próxima vez. E ao voltar para o primeiro
+ * plano o app puxa de novo, para a tela mostrar o que mudou lá fora.
  *
  * ── A marca ──
  * `marca` é o `updated_at` da nuvem que este aparelho já conhece (do último
@@ -55,6 +65,13 @@ const VAZIO: EstadoDaLoja = {
 let estado: EstadoDaLoja = VAZIO;
 let marca: string | null = null;
 let sujo = false;
+/**
+ * Cresce a cada mudança que precisa subir. O push compara antes e depois do
+ * envio: o que mudou DURANTE ele não subiu, e não pode ser dado como enviado
+ * (o humor marcado enquanto a meditação ainda subia se perdia assim).
+ */
+let versao = 0;
+let ultimoPull = 0;
 let pullEmVoo: Promise<boolean> | null = null;
 let relogio: ReturnType<typeof setTimeout> | null = null;
 const ouvintes = new Set<() => void>();
@@ -72,6 +89,11 @@ function assinar(f: () => void) {
 }
 
 const lerEstado = () => estado;
+
+function sujar() {
+  sujo = true;
+  versao++;
+}
 
 export function useLoja(): EstadoDaLoja {
   return useSyncExternalStore(assinar, lerEstado, lerEstado);
@@ -120,13 +142,16 @@ export async function abrirLoja(uid: string, bancada?: Blob): Promise<void> {
   /* Uma marca feita enquanto o aparelho era lido não pode ser apagada por ele. */
   const jaMarcado = estado.blob;
   const blob = Object.keys(jaMarcado).length ? mesclarBlob(jaMarcado, doAparelho).blob : doAparelho;
-  if (Object.keys(jaMarcado).length) sujo = true;
+  if (Object.keys(jaMarcado).length) sujar();
   definir({ blob, pronto: true });
   await puxar();
 }
 
-/** O pull, com duas novas tentativas. Devolve se deu certo. */
-function puxar(): Promise<boolean> {
+/**
+ * O pull, com duas novas tentativas. Devolve se deu certo. `agendar` = empurrar
+ * depois o que sobrou aqui (o push chama sem, porque ele mesmo empurra).
+ */
+function puxar(agendar = true): Promise<boolean> {
   if (pullEmVoo) return pullEmVoo;
   const uid = estado.uid;
   if (!uid || estado.bancada) return Promise.resolve(false);
@@ -145,17 +170,21 @@ function puxar(): Promise<boolean> {
           const naoMudou = marca != null && marca >= linha.updated_at;
           if (!naoMudou) {
             const r = mesclarBlob(estado.blob, linha.data);
+            /* A aula feita lá e as quatro atividades aqui: o dia completou na
+               mescla, e só agora entra nos feitos (e pede o bônus na aba). */
+            const f = fecharDiasCompletos(r.blob);
             marca = linha.updated_at;
-            if (r.localTinhaExtra) sujo = true;
-            definir({ blob: r.blob });
+            if (r.localTinhaExtra || f.fechados.length) sujar();
+            definir({ blob: f.blob });
           }
         } else if (Object.keys(estado.blob).length) {
           /* Sem jornada na nuvem e com progresso aqui: sobe. */
-          sujo = true;
+          sujar();
         }
+        ultimoPull = Date.now();
         definir({ nuvem: "ok" });
         await salvarLocal();
-        if (sujo) agendarPush();
+        if (sujo && agendar) agendarPush();
         return true;
       } catch {
         if (tentativa < 2) await new Promise((r) => setTimeout(r, 600 * (tentativa + 1)));
@@ -181,11 +210,17 @@ function agendarPush() {
 async function empurrar(): Promise<void> {
   const uid = estado.uid;
   if (!uid || estado.bancada || !sujo) return;
-  /* ⚠️ A barreira: só empurra depois de um pull que deu certo. */
-  if (estado.nuvem !== "ok") {
-    const ok = await puxar();
+  /* ⚠️ A barreira: só empurra depois de um pull que deu certo — e RECENTE, não
+     só o primeiro do processo. Se a nuvem mudou desde a marca, o pull mescla
+     e o que sobe é a jornada inteira, a de lá com a daqui. Um pull de menos
+     de 30 s dispensa outro: o push que sai quando ela tranca o celular tem
+     poucos segundos antes de o iOS suspender o app. */
+  if (estado.nuvem !== "ok" || Date.now() - ultimoPull > 30_000) {
+    const ok = await puxar(false);
     if (!ok) return;
   }
+  if (estado.uid !== uid || !sujo) return;
+  const enviada = versao;
   try {
     const { data, error } = await supabase
       .from("journey_state")
@@ -193,30 +228,56 @@ async function empurrar(): Promise<void> {
       .select("updated_at")
       .maybeSingle();
     if (error || estado.uid !== uid) return;
-    sujo = false;
     const quando = (data as { updated_at?: string } | null)?.updated_at;
     if (quando) marca = quando;
+    /* O que mudou enquanto subia continua pendente, e sobe no próximo envio. */
+    if (versao === enviada) sujo = false;
+    else agendarPush();
     await salvarLocal();
   } catch {
     /* sem rede: `sujo` continua, e a próxima escrita ou abertura tenta de novo */
   }
 }
 
-/* O iOS congela timers em segundo plano: o push pendente sai antes de ir. */
+/* O iOS congela timers em segundo plano: o push pendente sai antes de ir. E
+   na volta o app puxa — a nuvem pode ter mudado enquanto ele dormia. O
+   intervalo mínimo poupa a rede de quem só abriu a Central de Controle. */
 AppState.addEventListener("change", (s) => {
-  if (s !== "active" && relogio) {
-    clearTimeout(relogio);
-    relogio = null;
-    void empurrar();
+  if (s !== "active") {
+    if (relogio) {
+      clearTimeout(relogio);
+      relogio = null;
+      void empurrar();
+    }
+    return;
+  }
+  if (estado.uid && estado.pronto && !estado.bancada && Date.now() - ultimoPull > 15_000) {
+    void puxar();
   }
 });
+
+/**
+ * Sair da conta: a jornada sai da memória ANTES de o aparelho ser limpo, para
+ * nenhum pull ou push em voo gravá-la de volta depois da limpeza (LGPD) — e
+ * para a próxima conta não desenhar, nem por um instante, a trilha da anterior.
+ */
+export function fecharLoja() {
+  if (relogio) clearTimeout(relogio);
+  relogio = null;
+  marca = null;
+  sujo = false;
+  pullEmVoo = null;
+  ultimoPull = 0;
+  estado = VAZIO;
+  ouvintes.forEach((f) => f());
+}
 
 /** Grava uma chave `dc-path-*` qualquer (notas do exercício, cartas lidas…). */
 export function gravarChave(chave: string, valor: unknown) {
   if (!estado.uid || !chave.startsWith("dc-path-")) return;
   definir({ blob: { ...estado.blob, [chave]: valor } });
   if (estado.bancada) return;
-  sujo = true;
+  sujar();
   void salvarLocal();
   agendarPush();
 }
@@ -235,7 +296,7 @@ export function marcar(
   if (r.jaEstava) return { fechouAgora: false, jaEstava: true };
   definir({ blob: r.blob });
   if (!estado.bancada) {
-    sujo = true;
+    sujar();
     void salvarLocal();
     agendarPush();
   }

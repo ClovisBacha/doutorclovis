@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from "expo-router";
 import { Award, ChevronRight, Footprints, PenLine, Sparkles, Wind } from "lucide-react-native";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Linking, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { posChallenge } from "@/lib/daily-challenges";
@@ -30,6 +30,7 @@ import { FolhasDoPlacar, Placar, type FolhaDoPlacar } from "~/componentes/jornad
 import { Caminho } from "~/componentes/caminho/caminho";
 import { useJornada, type DiaDaJornada } from "~/componentes/jornada/usarJornada";
 import { ehBancada } from "~/lib/bancada";
+import { useSessao } from "~/lib/sessao";
 import { montarGrade, paraResgatar, placar as placarDasConquistas } from "~/lib/jornada/conquistas";
 import { diaLongo } from "~/lib/jornada/dia";
 import {
@@ -47,13 +48,19 @@ import {
   novoCheckin,
 } from "~/lib/jornada/caminho";
 import {
-  ATIVIDADES,
   CHAVE_FIGURINHAS,
   chaveDoPresente,
-  listaDeNumeros,
+  diasFechados,
   feito,
+  listaDeNumeros,
   flagsDoDia,
 } from "~/lib/jornada/momentos";
+import {
+  atividadesSemRecibo,
+  bonusResolvido,
+  diasDaReconciliacao,
+} from "~/lib/jornada/reconciliacao";
+import type { Atividade } from "~/servidor/economia";
 import { chama as calcularChama } from "~/lib/jornada/trilha";
 import { ALVO_MINIMO, cor, espaco, fonte, raio, sombra } from "~/tema";
 
@@ -142,11 +149,19 @@ function useConquistas(ativa: boolean) {
   return leitura;
 }
 
+/** Os dias cujo bônus das cinco estrelas o servidor já resolveu, neste processo. */
+const bonusResolvidos = new Set<number>();
+
 /**
- * Ao abrir a aba no dia de hoje: o que o servidor já registrou (feito no site
- * ou noutro aparelho) acende aqui; e o que está aceso aqui mas o servidor não
- * registrou (rede caiu no fim da atividade) é pago agora. O servidor não paga
- * duas vezes a mesma atividade no mesmo dia, então tentar de novo é seguro.
+ * Ao abrir a aba (`~/lib/jornada/reconciliacao`), para hoje e ontem: o que o
+ * servidor já registrou (feito no site ou noutro aparelho) acende aqui; o que
+ * está aceso aqui mas o servidor não registrou (rede caiu no fim da
+ * atividade) é pago agora; e o bônus das cinco estrelas é pedido de novo
+ * SEMPRE que o dia está fechado aqui — e não só quando a reconciliação o
+ * fecha. Antes, a resposta engolida no fim da quinta atividade era a única
+ * tentativa: os 20 🌱 sumiam sem rastro (o site já tentava de novo; out/2026).
+ * O servidor não paga duas vezes a mesma atividade nem o mesmo bônus, e
+ * reconfere as quatro atividades antes de pagá-lo: repetir é seguro.
  */
 function useReconciliacao(D: number, pronta: boolean, aoMudarSaldo: () => void) {
   const emVoo = useRef(false);
@@ -156,21 +171,22 @@ function useReconciliacao(D: number, pronta: boolean, aoMudarSaldo: () => void) 
       emVoo.current = true;
       void (async () => {
         try {
-          const noServidor = await lerProgressoDoDia(D);
-          if (!noServidor) return;
-          let fechou = false;
-          for (const a of noServidor) fechou = marcar(D, a).fechouAgora || fechou;
-          const flags = flagsDoDia(estadoAtual().blob, D);
           let pagou = false;
-          for (const a of ATIVIDADES) {
-            if (feito(flags, a) && !noServidor.includes(a)) {
-              const g = await pagarMomento(D, a);
+          for (const dia of diasDaReconciliacao(D)) {
+            const noServidor = await lerProgressoDoDia(dia);
+            if (!noServidor) continue;
+            for (const a of noServidor) marcar(dia, a);
+            const pagas: Atividade[] = [];
+            for (const a of atividadesSemRecibo(flagsDoDia(estadoAtual().blob, dia), noServidor)) {
+              const g = await pagarMomento(dia, a);
+              if (g != null) pagas.push(a);
               if (g && g > 0) pagou = true;
             }
-          }
-          if (fechou) {
-            const b = await pagarDiaFechado(D);
+            if (bonusResolvidos.has(dia) || !diasFechados(estadoAtual().blob).includes(dia))
+              continue;
+            const b = await pagarDiaFechado(dia);
             if (b && b > 0) pagou = true;
+            if (b != null && (b > 0 || bonusResolvido(noServidor, pagas))) bonusResolvidos.add(dia);
           }
           if (pagou) aoMudarSaldo();
         } finally {
@@ -194,6 +210,14 @@ function JornadaDaGestacao({
 }) {
   const { D, semana, perfil, hoje } = dia;
   const { carteira, recarregar } = useCarteira(true);
+  /* O servidor sabe do Modo Cuidado antes do aparelho (ligado noutro lugar):
+     a carteira volta com `careMode`, e a trilha relê o perfil na hora em vez
+     de seguir mostrando o bebê e as estrelas a quem acabou de perdê-lo. */
+  const { recarregarPerfil } = useSessao();
+  const servidorDizCuidado = carteira.estado === "ok" && carteira.dados.careMode === true;
+  useEffect(() => {
+    if (servidorDizCuidado) void recarregarPerfil();
+  }, [servidorDizCuidado, recarregarPerfil]);
   /* As conquistas não aparecem no Caminho (moram nas Recompensas), mas a
      leitura delas é o que DESBLOQUEIA no servidor as que ela acabou de ganhar —
      por isso a aba continua conferindo ao ganhar foco. */

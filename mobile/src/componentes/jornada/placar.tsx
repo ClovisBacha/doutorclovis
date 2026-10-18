@@ -176,8 +176,8 @@ export function FolhasDoPlacar({
 
       <Folha aberta={aberta === "trofeus"} aoFechar={aoFechar} titulo="🏆 Troféus">
         <T>
-          Cada dia em que você fecha os cinco momentos — a aula e as quatro atividades — vira um
-          troféu.
+          Cada dia em que você faz as quatro atividades — mexer o corpo, meditar, o momento com o
+          bebê e a gratidão — vira um troféu.
         </T>
         <T tipo="apagado">
           {trofeus == null

@@ -53,7 +53,19 @@ export default function Aula() {
   const [bancadaAplicada, setBancadaAplicada] = useState(false);
   /* "Revisar as respostas": a aula de hoje já feita, de novo, com o gabarito. */
   const [revisando, setRevisando] = useState(false);
-  const D = at.D;
+  /* O DIA DA AULA fica preso ao dia em que a tela abriu. Quem começa às 23h58
+     termina a aula de ONTEM (o servidor aceita ±1 dia) — antes, a virada da
+     meia-noite trocava as perguntas no meio, misturava o placar de dois dias
+     e travava a tela quando o dia novo tinha uma pergunta a menos. Uma tela
+     esquecida aberta por mais de um dia volta para a jornada: aquela aula já
+     não vale mais. */
+  const [diaDaAula, setDiaDaAula] = useState<number | null>(null);
+  useEffect(() => {
+    if (at.D == null) return;
+    if (diaDaAula == null) setDiaDaAula(at.D);
+    else if (at.D - diaDaAula > 1) voltarParaJornada();
+  }, [at.D, diaDaAula]);
+  const D = diaDaAula ?? at.D;
 
   useEffect(() => {
     if (D == null || at.pos || at.cuidado) return;
@@ -281,7 +293,7 @@ export default function Aula() {
     );
   }
 
-  const q = quiz.questions[e.indice];
+  const q = quiz.questions[Math.min(e.indice, total - 1)];
   const multi = isMultiQuestion(q);
   return (
     <SafeAreaView edges={["top", "bottom"]} style={{ flex: 1, backgroundColor: cor.fundo }}>

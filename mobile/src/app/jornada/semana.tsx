@@ -23,6 +23,7 @@ import {
   SEMANA_MINIMA,
   temaDoDia,
 } from "~/lib/jornada/dia";
+import { estadoAtual, gravarChave } from "~/lib/jornada/loja";
 import { CHAVE_FIGURINHAS, listaDeNumeros } from "~/lib/jornada/momentos";
 import { estadoDoNo } from "~/lib/jornada/trilha";
 import { cor, espaco, fonte, raio } from "~/tema";
@@ -48,6 +49,29 @@ export default function Semana() {
   useEffect(() => {
     if (semana == null && atual != null) setSemana(inicial(atual));
   }, [atual, semana]);
+
+  /* Abrir o álbum de uma semana que já chegou guarda a figurinha dela, como no
+     site (`collectSticker`) — aqui, e não só na moeda da trilha: pelas setas
+     ela chegava a uma semana que dizia "ela vem no primeiro dia de cinco
+     estrelas", regra que não existe. */
+  const figurinhas = listaDeNumeros(loja.blob[CHAVE_FIGURINHAS]);
+  const precisaGuardar =
+    loja.pronto &&
+    dia.modo === "gestacao" &&
+    !dia.cuidado &&
+    semana != null &&
+    atual != null &&
+    semana <= atual &&
+    !figurinhas.includes(semana);
+  useEffect(() => {
+    if (!precisaGuardar || semana == null) return;
+    const lista = listaDeNumeros(estadoAtual().blob[CHAVE_FIGURINHAS]);
+    if (!lista.includes(semana))
+      gravarChave(
+        CHAVE_FIGURINHAS,
+        [...lista, semana].sort((a, b) => a - b),
+      );
+  }, [precisaGuardar, semana]);
 
   if (dia.modo === "carregando") {
     return (
@@ -75,7 +99,7 @@ export default function Semana() {
     const n = estadoDoNo(loja.blob, D, hojeD);
     return n.tipo !== "futuro" && n.fechado;
   }).length;
-  const figurinha = listaDeNumeros(loja.blob[CHAVE_FIGURINHAS]).includes(semana);
+  const figurinha = figurinhas.includes(semana);
 
   return (
     <Tela bordas={["top", "bottom"]}>
@@ -202,7 +226,7 @@ export default function Semana() {
           <T tipo="apagado">
             {figurinha
               ? `${fechadosNaSemana} ${fechadosNaSemana === 1 ? "dia" : "dias"} de cinco estrelas nesta semana.`
-              : "Ela vem no primeiro dia de cinco estrelas da semana."}
+              : "Ela chega junto com a semana."}
           </T>
         </View>
       </View>

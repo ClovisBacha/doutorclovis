@@ -5,9 +5,11 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
+import { AppState } from "react-native";
 import { ehBancada, perfilDaBancada } from "~/lib/bancada";
 import { gestacaoDoPerfil } from "~/lib/gestacao";
 import { kitDoPerfil } from "~/lib/kit-sos";
@@ -88,6 +90,7 @@ export function ProvedorDeSessao({ children }: { children: ReactNode }) {
   }, []);
 
   const uid = sessao?.user.id ?? null;
+  const lidoEm = useRef(0);
 
   const recarregarPerfil = useCallback(async () => {
     if (ehBancada()) {
@@ -102,13 +105,16 @@ export function ProvedorDeSessao({ children }: { children: ReactNode }) {
       return;
     }
     setEstado((e) => (e === "pronto" ? e : "carregando"));
+    lidoEm.current = Date.now();
     const { data, error } = await supabase
       .from("patient_profiles")
       .select("*")
       .eq("id", uid)
       .maybeSingle();
     if (error) {
-      setEstado("falhou");
+      /* Já havia um perfil bom: a releitura que falhou (sem rede, ao voltar do
+         segundo plano) fica com ele, em vez de derrubar as telas. */
+      setEstado((e) => (e === "pronto" ? e : "falhou"));
       return;
     }
     const p = (data as Perfil | null) ?? null;
@@ -124,6 +130,21 @@ export function ProvedorDeSessao({ children }: { children: ReactNode }) {
   useEffect(() => {
     void recarregarPerfil();
   }, [recarregarPerfil]);
+
+  /* De volta ao primeiro plano, o perfil é relido: o Modo Cuidado ligado
+     noutro aparelho depois de uma perda, o parto registrado lá, uma data nova
+     de ultrassom. O iOS deixa o app suspenso por dias, e um perfil lido só na
+     abertura seguia mostrando o bebê a quem já não o tinha (out/2026). Uma
+     leitura que falhe aqui não derruba nada: `pronto` continua `pronto`. */
+  useEffect(() => {
+    if (ehBancada()) return;
+    const sub = AppState.addEventListener("change", (s) => {
+      if (s === "active" && uid && Date.now() - lidoEm.current > 20_000) {
+        void recarregarPerfil();
+      }
+    });
+    return () => sub.remove();
+  }, [uid, recarregarPerfil]);
 
   /* Modo Cuidado ligado (aqui ou em outro aparelho): nenhum "Vamos respirar?"
      agendado continua chegando — o servidor do site também pula quem está no

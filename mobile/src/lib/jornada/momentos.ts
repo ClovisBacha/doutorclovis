@@ -127,6 +127,38 @@ export function marcarMomento(
 }
 
 /**
+ * Fecha os dias que ficaram com os cinco momentos SEM passar pela marca que
+ * fecha — o que acontece quando dois aparelhos (ou o site e o app) fazem cada
+ * um uma parte do mesmo dia: a mescla junta as flags (OU), mas nenhum dos dois
+ * fechou o dia, então ele não entrava nos feitos nem soltava a figurinha.
+ * Devolve o mesmo blob (mesma referência) quando não há nada a fechar.
+ */
+export function fecharDiasCompletos(blob: Blob): { blob: Blob; fechados: number[] } {
+  const feitos = diasFechados(blob);
+  const fechados: number[] = [];
+  for (const [chave, v] of Object.entries(blob)) {
+    if (!chave.startsWith(PREFIXO_DIA)) continue;
+    const resto = chave.slice(PREFIXO_DIA.length);
+    if (!/^\d+$/.test(resto) || !ehObjeto(v)) continue;
+    const D = Number(resto);
+    if (feitos.includes(D)) continue;
+    if (contarMomentos(flagsDoDia(blob, D)) >= TOTAL_DO_DIA) fechados.push(D);
+  }
+  if (!fechados.length) return { blob, fechados };
+  fechados.sort((a, b) => a - b);
+  const figurinhas = listaDeNumeros(blob[CHAVE_FIGURINHAS]);
+  const semanas = fechados.map((D) => Math.floor(D / 7));
+  return {
+    blob: {
+      ...blob,
+      [CHAVE_FEITOS]: Array.from(new Set([...feitos, ...fechados])).sort((a, b) => a - b),
+      [CHAVE_FIGURINHAS]: Array.from(new Set([...figurinhas, ...semanas])).sort((a, b) => a - b),
+    },
+    fechados,
+  };
+}
+
+/**
  * Os dias em que ela fez ALGUMA coisa — é o que acende a chama (a mesma
  * pergunta de `diasComAlgumMomento` do site, sobre o blob já parseado).
  * O resto da chave tem de ser só dígitos.

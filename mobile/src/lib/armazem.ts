@@ -37,6 +37,10 @@ export async function apagar(chave: string): Promise<void> {
 
 /** Sair da conta não pode deixar a jornada, as filas e o kit do SOS no aparelho. */
 export async function limparRastrosLocais(): Promise<void> {
+  /* A jornada sai da memória ANTES da limpeza: um pull ou push em voo não
+     pode regravá-la no aparelho depois que ela saiu. (`import()` porque a
+     loja importa este arquivo.) */
+  await import("~/lib/jornada/loja").then((m) => m.fecharLoja()).catch(() => {});
   /* E nenhum lembrete agendado continua tocando para quem saiu. */
   await import("~/lib/lembrete-da-meditacao")
     .then((m) => m.cancelarLembretesDaMeditacao())

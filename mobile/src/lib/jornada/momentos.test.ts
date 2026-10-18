@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   contarMomentos,
   diasComAlgumMomento,
+  fecharDiasCompletos,
   flagsDoDia,
   marcarMomento,
   sementesDaAula,
@@ -128,5 +129,43 @@ describe("a trilha e a chama", () => {
     expect(t).toContain("14 dias seguidos");
     expect(t).toContain("2 perdões guardados");
     expect(explicacaoDaChama(0, 0).join(" ")).not.toContain("perdão guardado");
+  });
+});
+
+describe("fechar os dias que a mescla completou", () => {
+  const cinco = {
+    desafio: true,
+    w_movement: true,
+    w_meditation: true,
+    w_bonding: true,
+    w_gratitude: true,
+  };
+
+  test("a aula no site e as quatro no app: o dia fecha e a semana ganha a figurinha", () => {
+    const b: Blob = {
+      "dc-path-day-171": cinco,
+      "dc-path-done-days": [160],
+      "dc-path-stickers": [22],
+    };
+    const r = fecharDiasCompletos(b);
+    expect(r.fechados).toEqual([171]);
+    expect(r.blob["dc-path-done-days"]).toEqual([160, 171]);
+    expect(r.blob["dc-path-stickers"]).toEqual([22, 24]);
+  });
+
+  test("nada a fechar: devolve o mesmo blob, sem tocar em nada", () => {
+    const b: Blob = {
+      "dc-path-day-171": cinco,
+      "dc-path-day-172": { desafio: true },
+      "dc-path-done-days": [171],
+    };
+    const r = fecharDiasCompletos(b);
+    expect(r.fechados).toEqual([]);
+    expect(r.blob).toBe(b);
+  });
+
+  test("o pós-parto não fecha dia (a mesma régua da marca)", () => {
+    const r = fecharDiasCompletos({ "dc-path-pos-day-30": cinco });
+    expect(r.fechados).toEqual([]);
   });
 });

@@ -69,8 +69,14 @@ export default function Recompensas() {
 
   async function resgatar(key: string) {
     const r = await resgatarNoServidor(key);
-    if (r && conquistas && conquistas !== "carregando") {
-      setConquistas({ ...conquistas, resgatadas: [...(conquistas.resgatadas ?? []), key] });
+    if (r) {
+      /* Sobre o estado MAIS NOVO, e não o do toque: duas conquistas
+         resgatadas em seguida não podem desfazer a primeira. */
+      setConquistas((c) =>
+        c && c !== "carregando"
+          ? { ...c, resgatadas: Array.from(new Set([...(c.resgatadas ?? []), key])) }
+          : c,
+      );
       if (r.granted > 0) setSaldo((s) => (s == null ? s : s + r.granted));
     }
     return r;

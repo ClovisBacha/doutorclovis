@@ -6,6 +6,8 @@ import { BolhaViva } from "~/componentes/movimento";
 import { Botao, Campo, Cartao, Linha, T, Tela, toque } from "~/componentes/base";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { gravarPerfil } from "~/lib/gravar-perfil";
+import { abrirLoja, gravarChave } from "~/lib/jornada/loja";
+import { CHAVE_NASCIMENTO } from "~/lib/jornada/nascimento";
 import { guardarMedicoLocal } from "~/lib/medico-local";
 import { celularE164, emailValido } from "@/lib/medico-da-gestante";
 import {
@@ -144,13 +146,25 @@ export default function Ritual() {
       }
     }
     const r = await gravarPerfil(uid, payload);
-    setSalvando(false);
     if (!r.ok) {
+      setSalvando(false);
       setErro(
         "Não conseguimos salvar agora. Confira a internet e tente de novo — nada foi perdido nesta tela.",
       );
       return;
     }
+    /* A jornada fica de acordo com o perfil ANTES de ele ser relido: o
+       nascimento que o site guardou no blob (`dc-path-birth`) não pode voltar
+       a valer depois que ela o corrigiu aqui — nem o site, enquanto existir,
+       pode continuar achando que ela está grávida. */
+    if (modo === "nasceu" && ymd) {
+      await abrirLoja(uid);
+      gravarChave(CHAVE_NASCIMENTO, { date: ymd });
+    } else if (editar && ymd) {
+      await abrirLoja(uid);
+      gravarChave(CHAVE_NASCIMENTO, null);
+    }
+    setSalvando(false);
     await recarregarPerfil();
     if (editar && router.canGoBack()) router.back();
     else router.replace("/inicio");

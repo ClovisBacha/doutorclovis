@@ -4,6 +4,7 @@ import { AppState } from "react-native";
 import { blobDaBancada } from "~/componentes/jornada/bancada";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { gestacaoDoPerfil, ymdLocal } from "~/lib/gestacao";
+import { gravarPerfil } from "~/lib/gravar-perfil";
 import {
   diaDaJornada,
   passouDe42Semanas,
@@ -12,8 +13,9 @@ import {
   idadeEmDias,
   semanaDoDia,
 } from "~/lib/jornada/dia";
-import { abrirLoja, useLoja } from "~/lib/jornada/loja";
+import { abrirLoja, useLoja, type EstadoDaLoja } from "~/lib/jornada/loja";
 import { feito, flagsDoDia, type Momento } from "~/lib/jornada/momentos";
+import { nascimentoDoSite } from "~/lib/jornada/nascimento";
 import { useSessao, type Perfil } from "~/lib/sessao";
 
 /**
@@ -145,7 +147,35 @@ export function useJornada() {
     /* Na bancada a loja recebe o exemplo e nunca toca o aparelho nem a nuvem. */
     void abrirLoja(uid, ehBancada() ? (D != null ? blobDaBancada(D, pos) : {}) : undefined);
   }, [uid, D, pos]);
+  useNascimentoDoSite(dia, loja);
   return { dia, loja };
+}
+
+/** As contas cujo nascimento do site já foi passado ao perfil neste processo. */
+const nascimentoJaPassado = new Set<string>();
+
+/**
+ * A mãe que contou o nascimento na trilha do SITE (`~/lib/jornada/nascimento`):
+ * o app passa a data para o perfil, uma vez, e relê o perfil — a jornada, a
+ * Saúde e o SOS passam a saber que o bebê nasceu. Só depois de um pull que
+ * deu certo, para não agir sobre um blob velho do aparelho.
+ */
+function useNascimentoDoSite(dia: DiaDaJornada, loja: EstadoDaLoja) {
+  const { recarregarPerfil } = useSessao();
+  const semParto = (dia.modo === "gestacao" || dia.modo === "sem-data") && !dia.perfil.birth_date;
+  const uid = semParto ? dia.uid : null;
+  const data =
+    uid && loja.uid === uid && loja.pronto && loja.nuvem === "ok" && !loja.bancada
+      ? nascimentoDoSite(loja.blob, ymdLocal())
+      : null;
+  useEffect(() => {
+    if (!uid || !data || nascimentoJaPassado.has(uid)) return;
+    nascimentoJaPassado.add(uid);
+    void gravarPerfil(uid, { birth_date: data }).then((r) => {
+      if (r.ok) void recarregarPerfil();
+      else nascimentoJaPassado.delete(uid);
+    });
+  }, [uid, data, recarregarPerfil]);
 }
 
 /**
