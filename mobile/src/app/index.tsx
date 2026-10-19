@@ -22,5 +22,6 @@ export default function Porta() {
      de boas-vindas pede o que falta. */
   const temAncora = !!(perfil?.lmp_date || perfil?.reference_date || perfil?.birth_date);
   if (!perfil || !temAncora) return <Redirect href="/ritual" />;
-  return <Redirect href="/inicio" />;
+  /* O app abre no "Hoje", o cuidado do dia (decisão do dono, out/2026). */
+  return <Redirect href="/jornada" />;
 }

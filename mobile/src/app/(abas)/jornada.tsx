@@ -3,7 +3,6 @@ import { Award, ChevronRight, Footprints, PenLine, Sparkles, Wind } from "lucide
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Linking, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { posChallenge } from "@/lib/daily-challenges";
 import { Botao, Cartao, Carregando, NaoConsegueLer, T, Tela, toque } from "~/componentes/base";
 import { rota } from "~/componentes/jornada/bancada";
 import { SementesSubindo } from "~/componentes/jornada/efeitos";
@@ -31,7 +30,20 @@ import { FestaDoMarco } from "~/componentes/jornada/marco";
 import { CHAVE_MARCOS_VISTOS, festaDoExtrato, lerVistos, marcarVistos } from "~/lib/jornada/marcos";
 import { Caminho } from "~/componentes/caminho/caminho";
 import { useJornada, type DiaDaJornada } from "~/componentes/jornada/usarJornada";
-import { ehBancada } from "~/lib/bancada";
+import { ehBancada, parametroDaBancada } from "~/lib/bancada";
+import { TelaDeHoje } from "~/componentes/jornada/hoje";
+import {
+  cuidadosDoDia,
+  dataDeHoje,
+  diasQueFaltam,
+  saudacao,
+  type ChaveDoCuidado,
+} from "~/lib/jornada/hoje";
+import { primeiroNome } from "~/lib/gestacao";
+import { recadoDaBolha } from "@/lib/recado-da-bolha";
+import { gestChallenge, posChallenge } from "@/lib/daily-challenges";
+import { temQuizNoDia } from "@/lib/daily-quizzes";
+import { BarraDoTopo } from "~/componentes/jornada/pecas";
 import { useSessao } from "~/lib/sessao";
 import { montarGrade, paraResgatar, placar as placarDasConquistas } from "~/lib/jornada/conquistas";
 import { conquistaPorChave, type ConquistaDef } from "@/lib/conquistas";
@@ -110,6 +122,22 @@ export default function AbaJornada() {
 }
 
 const ir = (caminho: string) => router.push(rota(caminho) as never);
+
+const ROTA_DO_CUIDADO: Record<ChaveDoCuidado, string> = {
+  aula: "/jornada/aula",
+  movement: "/jornada/mexer",
+  meditation: "/jornada/meditar",
+  bonding: "/jornada/bebe",
+  gratitude: "/jornada/gratidao",
+};
+
+/** A hora que escolhe o céu e a saudação (`&hora=` na bancada). */
+function horaDaTela(): number {
+  const h = Number(parametroDaBancada("hora"));
+  return Number.isFinite(h) && h >= 0 && h < 24 && parametroDaBancada("hora") != null
+    ? h
+    : new Date().getHours();
+}
 
 /* ══════════════════════════════════════════════════════════════════════════
    Carteira, conquistas e reconciliação — o que a aba lê ao ganhar foco
@@ -233,13 +261,23 @@ function useReconciliacao(D: number, pronta: boolean, aoMudarSaldo: () => void) 
    Gestação
    ══════════════════════════════════════════════════════════════════════════ */
 
-function JornadaDaGestacao({
+/**
+ * A gestação em duas vistas: "hoje" (a aba — o cuidado do dia, com os avisos,
+ * a festa dos marcos e a reconciliação) e "trilha" (a rota /jornada/trilha — o
+ * Caminho inteiro, aberto por "Ver minha jornada"). Uma função só para as duas
+ * lerem a mesma carteira e o mesmo Cantinho; o que é da abertura do dia roda
+ * só na vista "hoje", para não festejar nem cobrar duas vezes.
+ */
+export function JornadaDaGestacao({
   dia,
   loja,
+  vista = "hoje",
 }: {
   dia: Extract<DiaDaJornada, { modo: "gestacao" }>;
   loja: EstadoDaLoja;
+  vista?: "hoje" | "trilha";
 }) {
+  const ehHoje = vista === "hoje";
   const { D, semana, perfil, hoje } = dia;
   const { carteira, recarregar } = useCarteira(true);
   /* A festa dos marcos chama a conferência das conquistas lá embaixo; os
@@ -258,7 +296,13 @@ function JornadaDaGestacao({
      aviso da conquista nova e, na cestinha da loja, quantas esperam o toque
      que paga (antes ela ganhava e não sabia). */
   const conquistas = useConquistas(true);
-  const marco = useFestaDoMarco({ carteira, recarregar, conquistas, loja, cuidado: dia.cuidado });
+  const marco = useFestaDoMarco({
+    carteira,
+    recarregar,
+    conquistas,
+    loja,
+    cuidado: dia.cuidado || !ehHoje,
+  });
   const aResgatar = useMemo(() => {
     if (!conquistas || conquistas === "carregando" || conquistas.careMode) return 0;
     if (conquistas.resgatadas === null) return 0;
@@ -271,7 +315,7 @@ function JornadaDaGestacao({
   }, [conquistas]);
   const chaveDasNovas = novas.map((d) => d.key).join(",");
   const mostrarNovas = novas.length > 0 && novasVistas !== chaveDasNovas;
-  useReconciliacao(D, loja.pronto, recarregar);
+  useReconciliacao(D, loja.pronto && ehHoje, recarregar);
   const amigas = useContagemDeAmigas();
   const [folha, setFolha] = useState<FolhaDoPlacar>(null);
 
@@ -297,8 +341,83 @@ function JornadaDaGestacao({
   /* Passou de 42 semanas: a trilha (presa no dia 300) dá lugar ao alerta. */
   if (dia.passouDe42) return <AlertaDas42Semanas nomeDoBebe={nomeDoBebe} />;
 
+  const avisos = (
+    <>
+      {carteira.estado === "falhou" ? (
+        <NaoConsegueLer
+          sossego="Os seus momentos de hoje continuam valendo e ficam guardados neste aparelho."
+          aoTentar={() => void recarregar()}
+        />
+      ) : null}
+      {ehHoje && mostrarNovas ? (
+        <AvisoDeConquista
+          conquistas={novas}
+          aoPegar={() => {
+            setNovasVistas(chaveDasNovas);
+            ir("/jornada/recompensas?aba=conquistas");
+          }}
+          aoFechar={() => setNovasVistas(chaveDasNovas)}
+        />
+      ) : null}
+      {ehHoje && presenteNovo ? (
+        <AvisoDePresente
+          quantidade={presenteNovo.quantidade}
+          de={presenteNovo.de}
+          nome={presenteNovo.nome}
+          aoFechar={() => gravarChave(chaveDoPresente(presenteNovo.quando), true)}
+        />
+      ) : null}
+    </>
+  );
+
+  if (ehHoje) {
+    const hora = horaDaTela();
+    const flags = flagsDoDia(loja.blob, D);
+    const cuidados = cuidadosDoDia({
+      flags,
+      semana,
+      nomeDoBebe,
+      desafio: temQuizNoDia(D) ? null : (gestChallenge(D)?.label ?? null),
+    });
+    const feitos = cuidados.filter((c) => c.feito).length;
+    return (
+      <View style={{ flex: 1, backgroundColor: cor.fundo }}>
+        <TelaDeHoje
+          saudacao={saudacao(hora, primeiroNome(perfil.display_name))}
+          data={dataDeHoje(hoje)}
+          nomeDoBebe={nomeDoBebe}
+          semana={semana}
+          dias={dia.diaNaSemana}
+          faltam={diasQueFaltam(D)}
+          hora={hora}
+          cuidados={cuidados}
+          recado={recadoDaBolha({
+            feitos,
+            total: 5,
+            dia: D,
+            hora,
+            bebe: nomeDoBebe ?? undefined,
+            semana,
+            posParto: false,
+            careMode: false,
+          })}
+          humor={feitos >= 5 ? "orgulhosa" : feitos >= 4 ? "surpresa" : "feliz"}
+          chama={diasDeChama}
+          avisos={avisos}
+          aoAbrir={(c) => ir(ROTA_DO_CUIDADO[c])}
+          aoVerJornada={() => ir("/jornada/trilha")}
+          sos={null}
+        />
+        <FestaDoMarco festa={marco.festa} nomeDoBebe={nomeDoBebe} aoFechar={marco.fechar} />
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: cor.fundo }}>
+      <View style={{ paddingHorizontal: espaco.lg }}>
+        <BarraDoTopo titulo="Minha jornada" />
+      </View>
       <Caminho
         hojeD={D}
         semanaAtual={semana}
@@ -341,34 +460,7 @@ function JornadaDaGestacao({
         pele={pele}
         podeSemear={loja.pronto && loja.nuvem === "ok"}
         aoGravarDecoracao={aoGravarDecoracao}
-        topo={
-          <>
-            {carteira.estado === "falhou" ? (
-              <NaoConsegueLer
-                sossego="Os seus momentos de hoje continuam valendo e ficam guardados neste aparelho."
-                aoTentar={() => void recarregar()}
-              />
-            ) : null}
-            {mostrarNovas ? (
-              <AvisoDeConquista
-                conquistas={novas}
-                aoPegar={() => {
-                  setNovasVistas(chaveDasNovas);
-                  ir("/jornada/recompensas?aba=conquistas");
-                }}
-                aoFechar={() => setNovasVistas(chaveDasNovas)}
-              />
-            ) : null}
-            {presenteNovo ? (
-              <AvisoDePresente
-                quantidade={presenteNovo.quantidade}
-                de={presenteNovo.de}
-                nome={presenteNovo.nome}
-                aoFechar={() => gravarChave(chaveDoPresente(presenteNovo.quando), true)}
-              />
-            ) : null}
-          </>
-        }
+        topo={avisos}
       />
       <FolhasDoPlacar
         aberta={folha}

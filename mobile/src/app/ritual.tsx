@@ -103,7 +103,7 @@ export default function Ritual() {
   }
 
   async function salvar() {
-    if (ehBancada()) return router.replace("/inicio?bancada=1");
+    if (ehBancada()) return router.replace("/jornada?bancada=1");
     const uid = sessao?.user.id;
     if (!uid) return router.replace("/entrar");
     setSalvando(true);
@@ -167,7 +167,7 @@ export default function Ritual() {
     setSalvando(false);
     await recarregarPerfil();
     if (editar && router.canGoBack()) router.back();
-    else router.replace("/inicio");
+    else router.replace("/jornada");
   }
 
   return (

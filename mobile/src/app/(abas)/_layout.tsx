@@ -1,5 +1,5 @@
 import { Redirect, router, Tabs } from "expo-router";
-import { Baby, Gamepad2, HeartPulse, House, Users } from "lucide-react-native";
+import { Baby, HeartPulse, House, Sun, Users } from "lucide-react-native";
 import { useEffect, useRef } from "react";
 import { Animated, Easing, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -23,14 +23,15 @@ export default function LayoutDasAbas() {
     >
       {/* No Modo Cuidado a aba não fala do bebê: vira "Início", com uma casa. */}
       <Tabs.Screen name="inicio" options={{ title: cuidado ? "Início" : "Bebê" }} />
-      <Tabs.Screen name="jornada" options={{ title: "Jornada" }} />
+      {/* "Hoje": o cuidado do dia é a porta do app (a trilha abre dali). */}
+      <Tabs.Screen name="jornada" options={{ title: "Hoje" }} />
       <Tabs.Screen name="comunidade" options={{ title: "Comunidade" }} />
       <Tabs.Screen name="saude" options={{ title: "Saúde" }} />
     </Tabs>
   );
 }
 
-const ICONES = { inicio: Baby, jornada: Gamepad2, comunidade: Users, saude: HeartPulse } as const;
+const ICONES = { inicio: Baby, jornada: Sun, comunidade: Users, saude: HeartPulse } as const;
 
 function BarraDeBaixo({ state, navigation, descriptors }: any) {
   const baixo = useSafeAreaInsets().bottom;
