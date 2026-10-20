@@ -37,7 +37,7 @@ import { cor, espaco, fonte } from "~/tema";
  * supor o sexo. Sem nome, "o bebê".
  */
 
-const ARTE: Record<ChaveDoCuidado, number> = {
+export const ARTE: Record<ChaveDoCuidado, number> = {
   aula: require("../../../../src/assets/grades/perguntas.webp"),
   movement: require("../../../../src/assets/grades/exercicios.webp"),
   meditation: require("../../../../src/assets/grades/meditacoes.webp"),
@@ -45,7 +45,7 @@ const ARTE: Record<ChaveDoCuidado, number> = {
   gratitude: require("../../../../src/assets/grades/diario.webp"),
 };
 
-const FICHA: Record<ChaveDoCuidado, string> = {
+export const FICHA: Record<ChaveDoCuidado, string> = {
   aula: "#fff1df",
   movement: "#e3f7ee",
   meditation: "#ffe9ef",
@@ -78,7 +78,7 @@ const DESTAQUE: Record<
 };
 
 /** O céu pintado da hora do dia, e a tinta que se lê em cima dele. */
-const CEUS = {
+export const CEUS = {
   amanhecer: {
     arte: require("../../../../src/assets/ceu/amanhecer.webp"),
     tinta: "#2e2348",
@@ -104,28 +104,42 @@ export function ceuDaHora(hora: number): keyof typeof CEUS {
   return "noite";
 }
 
-const FUNDO = "#fff8f5";
+export const FUNDO = "#fff8f5";
 
 /** Quantos cuidados a tela já mostrou feitos, por dia — neste processo. */
-const vistosPorDia = new Map<number, number>();
+const vistosPorDia = new Map<string, number>();
 
 /**
  * O instante em que um cuidado se acende: ela volta da atividade e a tela
  * reage — o anel pulsa, o celular vibra, e o quinto acende o céu e solta o
  * confete, uma vez. Ao ABRIR o app nada festeja: o que já estava feito é
- * estado, não acontecimento. (`&animar=1` na bancada finge o último.)
+ * estado, não acontecimento — e "abrir" inclui o instante em que a jornada
+ * ainda não foi lida do aparelho (`pronto`): contar com o blob vazio fazia a
+ * abertura festejar o que já estava feito. (`&animar=1` na bancada finge o
+ * último.)
  */
-function useMomentoDoDia(D: number, feitos: number) {
+export function useMomentoDoDia(
+  D: number,
+  feitos: number,
+  total = 5,
+  escopo = "gestacao",
+  /** A jornada já foi lida do aparelho: antes disso o blob é vazio, e contar
+      com ele faria a abertura do app "festejar" o que já estava feito. */
+  pronto = true,
+) {
   const reduzido = useMovimentoReduzido();
   const pulso = useRef(new Animated.Value(1)).current;
   const brilho = useRef(new Animated.Value(0)).current;
   const [festa, setFesta] = useState(false);
   useEffect(() => {
-    let anterior = vistosPorDia.get(D);
+    if (!pronto) return;
+    /* O D do pós-parto (7–90) repete números da gestação: o escopo separa. */
+    const chave = `${escopo}:${D}`;
+    let anterior = vistosPorDia.get(chave);
     if (anterior === undefined && parametroDaBancada("animar") === "1") anterior = feitos - 1;
-    vistosPorDia.set(D, feitos);
+    vistosPorDia.set(chave, feitos);
     if (anterior === undefined || feitos <= anterior) return;
-    const fechou = feitos >= 5 && anterior < 5;
+    const fechou = feitos >= total && anterior < total;
     if (Platform.OS !== "web") {
       void (
         fechou
@@ -155,12 +169,12 @@ function useMomentoDoDia(D: number, feitos: number) {
       const t = setTimeout(() => setFesta(false), 4000);
       return () => clearTimeout(t);
     }
-  }, [D, feitos, pulso, brilho, reduzido]);
+  }, [D, feitos, total, escopo, pronto, pulso, brilho, reduzido]);
   return { pulso, brilho, festa };
 }
 
 /** Entra subindo de leve (sem "Reduzir movimento"). */
-function Entrar({ atraso = 0, children }: { atraso?: number; children: ReactNode }) {
+export function Entrar({ atraso = 0, children }: { atraso?: number; children: ReactNode }) {
   const reduzido = useMovimentoReduzido();
   const v = useRef(new Animated.Value(reduzido ? 1 : 0)).current;
   useEffect(() => {
@@ -187,6 +201,7 @@ function Entrar({ atraso = 0, children }: { atraso?: number; children: ReactNode
 
 export function TelaDeHoje({
   D,
+  pronto = true,
   cartao,
   saudacao,
   data,
@@ -200,12 +215,15 @@ export function TelaDeHoje({
   humor,
   chama,
   avisos,
+  nascimento,
   agenda,
   aoAbrir,
   aoVerJornada,
   sos,
 }: {
   D: number;
+  /** A jornada já foi lida do aparelho (`loja.pronto`). */
+  pronto?: boolean;
   /** O cartão da semana para os Stories. */
   cartao: DadosDoCartao;
   saudacao: string;
@@ -222,6 +240,8 @@ export function TelaDeHoje({
   chama: number;
   /** Os avisos do momento (presente, conquista nova, carteira que falhou). */
   avisos?: ReactNode;
+  /** A partir da semana 37: a porta para contar o nascimento. */
+  nascimento?: ReactNode;
   /** A próxima consulta da agenda (ou o convite para marcar). */
   agenda?: ReactNode;
   aoAbrir: (c: ChaveDoCuidado) => void;
@@ -235,7 +255,7 @@ export function TelaDeHoje({
   const feitos = cuidados.filter((c) => c.feito).length;
   const proximo = cuidados.find((c) => !c.feito) ?? null;
   const resto = cuidados.filter((c) => c !== proximo);
-  const { pulso, brilho, festa } = useMomentoDoDia(D, feitos);
+  const { pulso, brilho, festa } = useMomentoDoDia(D, feitos, 5, "gestacao", pronto);
 
   return (
     <View style={{ flex: 1, backgroundColor: FUNDO }}>
@@ -360,6 +380,7 @@ export function TelaDeHoje({
           }}
         >
           {avisos}
+          {nascimento}
           <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.md }}>
             <View style={{ flex: 1 }}>
               <Text
@@ -466,7 +487,7 @@ export function TelaDeHoje({
   );
 }
 
-function Selo({ children }: { children: ReactNode }) {
+export function Selo({ children }: { children: ReactNode }) {
   return (
     <View
       style={{
@@ -482,23 +503,33 @@ function Selo({ children }: { children: ReactNode }) {
   );
 }
 
-/** O anel de cinco partes: uma por cuidado, e ele se fecha ao longo do dia. */
-function AnelDoDia({ feitos }: { feitos: number }) {
+/** O anel do dia: uma parte por cuidado (cinco na gestação, três no pós-parto). */
+export function AnelDoDia({
+  feitos,
+  total = 5,
+  cor: tinta = "#e8578f",
+  vazio = "#f6dbe6",
+}: {
+  feitos: number;
+  total?: number;
+  cor?: string;
+  vazio?: string;
+}) {
   const R = 30;
   const C = 2 * Math.PI * R;
-  const seg = C / 5;
-  const folga = 5;
+  const seg = C / total;
+  const folga = total > 4 ? 5 : 7;
   return (
-    <View accessible accessibilityLabel={`${feitos} de 5 cuidados feitos hoje`}>
+    <View accessible accessibilityLabel={`${feitos} de ${total} cuidados feitos hoje`}>
       <Svg width={80} height={80}>
-        {Array.from({ length: 5 }, (_, i) => (
+        {Array.from({ length: total }, (_, i) => (
           <Circle
             key={i}
             cx={40}
             cy={40}
             r={R}
             fill="none"
-            stroke={i < feitos ? "#e8578f" : "#f6dbe6"}
+            stroke={i < feitos ? tinta : vazio}
             strokeWidth={9}
             strokeLinecap="round"
             strokeDasharray={`${seg - folga} ${C - seg + folga}`}
@@ -514,7 +545,7 @@ function AnelDoDia({ feitos }: { feitos: number }) {
           fontSize={19}
           fill="#4a1f33"
         >
-          {`${feitos}/5`}
+          {`${feitos}/${total}`}
         </SvgText>
         <SvgText
           x={40}

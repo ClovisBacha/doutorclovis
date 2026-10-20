@@ -1,9 +1,10 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRef, useState } from "react";
-import { Modal, Platform, Pressable, Share, Text, View } from "react-native";
+import { useState } from "react";
+import { Pressable, Text, View } from "react-native";
 import { babyForWeek } from "@/lib/gestacao";
-import { BotaoDaAtividade, Brilho } from "~/componentes/jornada/atividade";
+import { Brilho } from "~/componentes/jornada/atividade";
+import { FolhaDeCompartilhar } from "~/componentes/jornada/compartilhar";
 import { arteDoBebe } from "~/componentes/jornada/arte-do-bebe";
 import { cor, espaco, fonte } from "~/tema";
 
@@ -151,24 +152,6 @@ function Linha({ emoji, texto }: { emoji: string; texto: string }) {
 /** A linha da tela Hoje que abre a prévia, e a prévia com o compartilhar. */
 export function CompartilharASemana({ d }: { d: DadosDoCartao }) {
   const [aberta, setAberta] = useState(false);
-  const [enviando, setEnviando] = useState(false);
-  const [falhou, setFalhou] = useState(false);
-  const alvo = useRef<View>(null);
-
-  async function compartilhar() {
-    setFalhou(false);
-    if (Platform.OS === "web") return;
-    setEnviando(true);
-    try {
-      const { captureRef } = await import("react-native-view-shot");
-      const uri = await captureRef(alvo, { format: "png", quality: 1, result: "tmpfile" });
-      await Share.share({ url: uri });
-    } catch {
-      setFalhou(true);
-    } finally {
-      setEnviando(false);
-    }
-  }
 
   return (
     <>
@@ -215,58 +198,9 @@ export function CompartilharASemana({ d }: { d: DadosDoCartao }) {
         <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: "#7a3fd1" }}>Ver ›</Text>
       </Pressable>
 
-      <Modal
-        visible={aberta}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setAberta(false)}
-      >
-        <View
-          style={{
-            flex: 1,
-            alignItems: "center",
-            justifyContent: "center",
-            gap: espaco.lg,
-            backgroundColor: "rgba(20,10,30,0.7)",
-            padding: espaco.xl,
-          }}
-        >
-          <View ref={alvo} collapsable={false}>
-            <CartaoDaSemana d={d} />
-          </View>
-          <View style={{ width: LARGURA, gap: espaco.sm }}>
-            <BotaoDaAtividade
-              cor="#7a3fd1"
-              rotulo={Platform.OS === "web" ? "Compartilhar (no iPhone)" : "Compartilhar"}
-              carregando={enviando}
-              aoTocar={() => void compartilhar()}
-            />
-            {falhou ? (
-              <Text
-                style={{
-                  textAlign: "center",
-                  fontFamily: fonte.media,
-                  fontSize: 13,
-                  color: cor.branco,
-                }}
-              >
-                Não consegui montar a imagem agora. Tente de novo.
-              </Text>
-            ) : null}
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setAberta(false)}
-              style={{ minHeight: 44, alignItems: "center", justifyContent: "center" }}
-            >
-              <Text
-                style={{ fontFamily: fonte.forte, fontSize: 15, color: "rgba(255,255,255,0.85)" }}
-              >
-                Fechar
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
+      <FolhaDeCompartilhar aberta={aberta} aoFechar={() => setAberta(false)} largura={LARGURA}>
+        <CartaoDaSemana d={d} />
+      </FolhaDeCompartilhar>
     </>
   );
 }

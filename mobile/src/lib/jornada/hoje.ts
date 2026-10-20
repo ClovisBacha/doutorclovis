@@ -64,7 +64,7 @@ export function saudacao(hora: number, nome: string | null): string {
 }
 
 const DIAS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
-const MESES = [
+export const MESES = [
   "janeiro",
   "fevereiro",
   "março",

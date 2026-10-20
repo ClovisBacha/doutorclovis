@@ -31,6 +31,21 @@ export function parametroDaBancada(nome: string): string | null {
   }
 }
 
+/**
+ * Vai para outra tela da bancada RECARREGANDO a página: o perfil de exemplo
+ * lê os parâmetros (`&pos=1`, `&idade=`) quando é montado, e uma troca de rota
+ * dentro do app não o remonta. No app de verdade quem troca o modo é o perfil
+ * relido do servidor — isto só existe para simular o mesmo na bancada.
+ */
+export function recarregarNaBancada(caminho: string) {
+  if (!ehBancada()) return;
+  try {
+    window.location.assign(caminho);
+  } catch {
+    /* sem efeito */
+  }
+}
+
 /** A gestante de exemplo: 24 semanas e 3 dias pela DUM. `?semana=N` muda. */
 export function perfilDaBancada(): Perfil {
   const semanas = Number(parametroDaBancada("semana") ?? 24);

@@ -8,6 +8,12 @@ import {
   type Blob,
   type Momento,
 } from "~/lib/jornada/momentos";
+import {
+  fecharDiasDoPosCompletos,
+  marcarTarefaDoPos,
+  type MarcaDoPos,
+  type TarefaDoPos,
+} from "~/lib/jornada/pos-parto";
 import { mesclarBlob } from "~/lib/jornada/sincronia";
 import { supabase } from "~/servidor/supabase";
 
@@ -173,9 +179,11 @@ function puxar(agendar = true): Promise<boolean> {
             /* A aula feita lá e as quatro atividades aqui: o dia completou na
                mescla, e só agora entra nos feitos (e pede o bônus na aba). */
             const f = fecharDiasCompletos(r.blob);
+            /* O mesmo no pós-parto: o check-in feito lá e a leitura aqui. */
+            const fp = fecharDiasDoPosCompletos(f.blob);
             marca = linha.updated_at;
-            if (r.localTinhaExtra || f.fechados.length) sujar();
-            definir({ blob: f.blob });
+            if (r.localTinhaExtra || f.fechados.length || fp.fechados.length) sujar();
+            definir({ blob: fp.blob });
           }
         } else if (Object.keys(estado.blob).length) {
           /* Sem jornada na nuvem e com progresso aqui: sobe. */
@@ -301,6 +309,25 @@ export function marcar(
     agendarPush();
   }
   return { fechouAgora: r.fechouAgora, jaEstava: false };
+}
+
+/**
+ * Marca uma das três tarefas do dia no pós-parto (humor, desafio, leitura).
+ * Devolve se o dia fechou AGORA e qual semana ganhou a figurinha — quem
+ * celebra é a tela.
+ */
+export function marcarNoPos(D: number, tarefa: TarefaDoPos): Omit<MarcaDoPos, "blob"> {
+  const nada = { jaEstava: false, fechouAgora: false, figurinhaNova: null };
+  if (!estado.uid) return nada;
+  const r = marcarTarefaDoPos(estado.blob, D, tarefa);
+  if (r.jaEstava) return { ...nada, jaEstava: true };
+  definir({ blob: r.blob });
+  if (!estado.bancada) {
+    sujar();
+    void salvarLocal();
+    agendarPush();
+  }
+  return { jaEstava: false, fechouAgora: r.fechouAgora, figurinhaNova: r.figurinhaNova };
 }
 
 /**

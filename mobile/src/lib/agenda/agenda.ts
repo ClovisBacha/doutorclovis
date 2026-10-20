@@ -19,6 +19,7 @@
  */
 
 import { consultaForWeek } from "@/lib/gestacao";
+import { orientacaoDoPos } from "~/lib/jornada/pos-parto";
 
 export const CHAVE_AGENDA = "dc-path-agenda";
 
@@ -283,6 +284,29 @@ export function sugestaoDaFase(semana: number): { texto: string; tipo: TipoDeCom
       ? "exame"
       : "consulta";
   return { texto, tipo };
+}
+
+/**
+ * O que marcar em cada semana de vida, tirado da orientação da semana do site:
+ * a revisão pós-parto, a consulta puerperal e as vacinas do bebê. Nas outras
+ * semanas a dica é só leitura — não há o que pôr na agenda.
+ */
+const AGENDA_DO_POS: Readonly<Record<number, { tipo: TipoDeCompromisso; titulo: string }>> = {
+  1: { tipo: "consulta", titulo: "Revisão pós-parto" },
+  4: { tipo: "consulta", titulo: "Consulta puerperal" },
+  5: { tipo: "vacina", titulo: "Vacinas de 2 meses do bebê" },
+  6: { tipo: "consulta", titulo: "Consulta puerperal" },
+  8: { tipo: "vacina", titulo: "Vacinas de 2 meses do bebê" },
+  12: { tipo: "vacina", titulo: "Vacina meningo C do bebê" },
+};
+
+export function sugestaoDoPosParto(semanaDeVida: number): {
+  texto: string;
+  tipo: TipoDeCompromisso | null;
+  titulo: string | null;
+} {
+  const a = AGENDA_DO_POS[semanaDeVida];
+  return { texto: orientacaoDoPos(semanaDeVida), tipo: a?.tipo ?? null, titulo: a?.titulo ?? null };
 }
 
 /** Id curto e único o bastante para a agenda de uma pessoa. */

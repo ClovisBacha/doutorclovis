@@ -26,6 +26,7 @@ import {
 import { estadoAtual, gravarChave } from "~/lib/jornada/loja";
 import { CHAVE_FIGURINHAS, listaDeNumeros } from "~/lib/jornada/momentos";
 import { estadoDoNo } from "~/lib/jornada/trilha";
+import { MARCOS } from "~/lib/jornada/caminho";
 import { cor, espaco, fonte, raio } from "~/tema";
 
 /**
@@ -46,6 +47,11 @@ export default function Semana() {
     return Number.isFinite(n) && n >= SEMANA_MINIMA ? Math.min(a, Math.floor(n)) : a;
   };
   const [semana, setSemana] = useState<number | null>(() => inicial(atual));
+  /* Depois do parto, a semana é uma LEMBRANÇA do álbum da gestação (1–42). */
+  const [semanaDaMemoria, setSemanaDaMemoria] = useState(() => {
+    const n = Number(pedida);
+    return Number.isFinite(n) && n >= SEMANA_MINIMA && n <= 42 ? Math.floor(n) : 40;
+  });
   useEffect(() => {
     if (semana == null && atual != null) setSemana(inicial(atual));
   }, [atual, semana]);
@@ -78,6 +84,15 @@ export default function Semana() {
       <Tela bordas={["top", "bottom"]}>
         <Carregando />
       </Tela>
+    );
+  }
+  if (dia.modo === "pos" && !dia.cuidado) {
+    return (
+      <MemoriaDaSemana
+        semana={semanaDaMemoria}
+        aoMudar={setSemanaDaMemoria}
+        figurinha={figurinhas.includes(semanaDaMemoria)}
+      />
     );
   }
   if (dia.modo !== "gestacao" || dia.cuidado || semana == null || atual == null) {
@@ -241,6 +256,90 @@ export default function Semana() {
               ? `${fechadosNaSemana} ${fechadosNaSemana === 1 ? "dia" : "dias"} de cinco estrelas nesta semana.`
               : "Ela chega junto com a semana."}
           </T>
+        </View>
+      </View>
+    </Tela>
+  );
+}
+
+/**
+ * A semana como LEMBRANÇA, depois do parto: a página do álbum da gestação (o
+ * `AlbumSheet` do site) — o que acontecia com o bebê, o tamanho, o peso, o
+ * marco e a figurinha —, sem a lista dos dias, que já passaram.
+ */
+function MemoriaDaSemana({
+  semana,
+  aoMudar,
+  figurinha,
+}: {
+  semana: number;
+  aoMudar: (s: number) => void;
+  figurinha: boolean;
+}) {
+  const bebe = babyForWeek(semana);
+  const marco = MARCOS[semana];
+  return (
+    <Tela bordas={["top", "bottom"]}>
+      <BarraDoTopo titulo="Álbum da gestação" />
+      <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
+        <BotaoRedondo
+          rotulo="Semana anterior"
+          aoTocar={() => aoMudar(Math.max(SEMANA_MINIMA, semana - 1))}
+          fundo={semana > SEMANA_MINIMA ? corJornada.roxoFundo : cor.apagado}
+        >
+          <ChevronLeft size={22} color={semana > SEMANA_MINIMA ? corJornada.roxo : cor.borda} />
+        </BotaoRedondo>
+        <View style={{ flex: 1, alignItems: "center" }}>
+          <Text style={{ fontFamily: fonte.titulo, fontSize: 24, color: cor.texto }}>
+            {fruitEmojiForWeek(semana)} Semana {semana}
+          </Text>
+          <T tipo="apagado">
+            {bebe.fruit} · {bebe.size}
+          </T>
+        </View>
+        <BotaoRedondo
+          rotulo="Próxima semana"
+          aoTocar={() => aoMudar(Math.min(42, semana + 1))}
+          fundo={semana < 42 ? corJornada.roxoFundo : cor.apagado}
+        >
+          <ChevronRight size={22} color={semana < 42 ? corJornada.roxo : cor.borda} />
+        </BotaoRedondo>
+      </View>
+      <Cartao fundo={corJornada.roxoFundo}>
+        <T tipo="rotulo" cor={corJornada.roxo}>
+          Nessa semana
+        </T>
+        <T>{bebe.desc}</T>
+        <T tipo="apagado">
+          Tamanho de {bebe.fruit.toLowerCase()} · {bebe.size}
+          {bebe.weight && bebe.weight !== "—" ? ` · ${bebe.weight}` : ""}
+        </T>
+      </Cartao>
+      {marco ? (
+        <Cartao>
+          <T tipo="rotulo">
+            {marco.emoji} {marco.label}
+          </T>
+        </Cartao>
+      ) : null}
+      <View
+        style={{
+          borderRadius: raio.lg,
+          padding: espaco.lg,
+          backgroundColor: figurinha ? corJornada.trofeuFundo : cor.apagado,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: espaco.md,
+        }}
+      >
+        <Text style={{ fontSize: 44, opacity: figurinha ? 1 : 0.35 }}>
+          {fruitEmojiForWeek(semana)}
+        </Text>
+        <View style={{ flex: 1 }}>
+          <T tipo="rotulo">
+            {figurinha ? "Figurinha guardada no álbum" : "Sem figurinha nessa semana"}
+          </T>
+          <T tipo="apagado">O álbum da gestação fica guardado para sempre 💝</T>
         </View>
       </View>
     </Tela>

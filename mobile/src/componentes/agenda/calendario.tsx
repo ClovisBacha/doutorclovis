@@ -33,6 +33,7 @@ export function CalendarioDoMes({
   aoEscolher,
   contagem,
   dpp,
+  bloqueado,
 }: {
   mes: Mes;
   aoMudarMes: (m: Mes) => void;
@@ -41,6 +42,8 @@ export function CalendarioDoMes({
   aoEscolher: (ymd: string) => void;
   contagem?: Map<string, number>;
   dpp?: string | null;
+  /** Dias que não se pode escolher (o futuro, na data do nascimento): ficam apagados. */
+  bloqueado?: (ymd: string) => boolean;
 }) {
   const semanas = semanasDoMes(mes.ano, mes.mes);
   const titulo = `${nomeDoMes(mes.mes)[0]!.toUpperCase()}${nomeDoMes(mes.mes).slice(1)} ${mes.ano}`;
@@ -98,6 +101,7 @@ export function CalendarioDoMes({
                 escolhido={ymd === selecionado}
                 consultas={contagem?.get(ymd) ?? 0}
                 ehDpp={ymd === dpp}
+                fechado={bloqueado?.(ymd) ?? false}
                 aoTocar={() => aoEscolher(ymd)}
               />
             ) : (
@@ -147,6 +151,7 @@ function Dia({
   escolhido,
   consultas,
   ehDpp,
+  fechado,
   aoTocar,
 }: {
   ymd: string;
@@ -154,6 +159,7 @@ function Dia({
   escolhido: boolean;
   consultas: number;
   ehDpp: boolean;
+  fechado: boolean;
   aoTocar: () => void;
 }) {
   const n = Number(ymd.slice(8, 10));
@@ -167,12 +173,19 @@ function Dia({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={partes.join(", ")}
-      accessibilityState={{ selected: escolhido }}
+      accessibilityState={{ selected: escolhido, disabled: fechado }}
+      disabled={fechado}
       onPress={() => {
         toque();
         aoTocar();
       }}
-      style={{ flex: 1, height: ALVO_MINIMO + 4, alignItems: "center", justifyContent: "center" }}
+      style={{
+        flex: 1,
+        height: ALVO_MINIMO + 4,
+        alignItems: "center",
+        justifyContent: "center",
+        opacity: fechado ? 0.3 : 1,
+      }}
     >
       <View
         style={{

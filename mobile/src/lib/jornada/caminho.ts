@@ -228,6 +228,11 @@ function tomDeLab(mainLab: Lab, lipLab: Lab): Tom {
   return { main: labParaHex(mainLab), lip: labParaHex(lipLab), mainLab, lipLab };
 }
 
+/** Um tom de dois hex fixos (as cores do 4º trimestre, o `posMeta` do site). */
+export function tomDeHex(main: string, lip: string): Tom {
+  return tomDeLab(hexParaLab(main), hexParaLab(lip));
+}
+
 export function coresDaSemana(semana: number): Tom {
   const h = matizDaSemana(semana);
   return tomDeLab(oklchParaLab(0.64, 0.163, h), oklchParaLab(0.47, 0.142, h));

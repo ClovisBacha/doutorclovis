@@ -1,5 +1,5 @@
 import { router, useFocusEffect } from "expo-router";
-import { Award, ChevronRight, Footprints, PenLine, Sparkles, Wind } from "lucide-react-native";
+import { Award, ChevronRight, Footprints, PenLine, Wind } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Linking, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -25,13 +25,31 @@ import { fundoBgFor } from "@/lib/cantinho";
 import { SKIN_KEY, TRILHA_SKINS } from "@/lib/trilha-skins";
 import { CHAVE_DECOR, lerDecoracao, type Decoracao } from "~/lib/jornada/enfeites";
 import { Pulsando } from "~/componentes/jornada/pecas";
-import { FolhasDoPlacar, Placar, type FolhaDoPlacar } from "~/componentes/jornada/placar";
+import { FolhasDoPlacar, type FolhaDoPlacar } from "~/componentes/jornada/placar";
 import { FestaDoMarco } from "~/componentes/jornada/marco";
 import { CHAVE_MARCOS_VISTOS, festaDoExtrato, lerVistos, marcarVistos } from "~/lib/jornada/marcos";
 import { Caminho } from "~/componentes/caminho/caminho";
 import { useJornada, type DiaDaJornada } from "~/componentes/jornada/usarJornada";
-import { ehBancada, parametroDaBancada } from "~/lib/bancada";
+import { ehBancada, parametroDaBancada, recarregarNaBancada } from "~/lib/bancada";
 import { TelaDeHoje } from "~/componentes/jornada/hoje";
+import { TelaDoQuartoTrimestre } from "~/componentes/jornada/hoje-pos";
+import { FestaDoNascimento, PortaDoNascimento } from "~/componentes/jornada/nascimento";
+import { TrilhaDoPosParto } from "~/componentes/caminho/caminho-pos";
+import { gravarPerfil } from "~/lib/gravar-perfil";
+import { CHAVE_NASCIMENTO } from "~/lib/jornada/nascimento";
+import {
+  abreFestaDoNascimento,
+  CHAVE_NASCIMENTO_FESTEJADO,
+  desafioDoPos,
+  diaNaTrilhaDoPos,
+  figurinhasDoPos,
+  formou,
+  lerNascimento,
+  resumoDaGestacao,
+  semanaDeVida,
+  tarefasFeitas,
+  type DadosDoNascimento,
+} from "~/lib/jornada/pos-parto";
 import { AgendaNaHoje } from "~/componentes/agenda/pecas";
 import {
   cuidadosDoDia,
@@ -42,9 +60,9 @@ import {
 } from "~/lib/jornada/hoje";
 import { primeiroNome } from "~/lib/gestacao";
 import { recadoDaBolha } from "@/lib/recado-da-bolha";
-import { gestChallenge, posChallenge } from "@/lib/daily-challenges";
+import { gestChallenge } from "@/lib/daily-challenges";
 import { temQuizNoDia } from "@/lib/daily-quizzes";
-import { BarraDoTopo } from "~/componentes/jornada/pecas";
+import { BarraDoTopo, voltarParaJornada } from "~/componentes/jornada/pecas";
 import { useSessao } from "~/lib/sessao";
 import { montarGrade, paraResgatar, placar as placarDasConquistas } from "~/lib/jornada/conquistas";
 import { conquistaPorChave, type ConquistaDef } from "@/lib/conquistas";
@@ -54,6 +72,7 @@ import {
   gravarChave,
   marcar,
   marcarFlagDoDia,
+  marcarNoPos,
   type EstadoDaLoja,
 } from "~/lib/jornada/loja";
 import {
@@ -309,13 +328,6 @@ export function JornadaDaGestacao({
     if (conquistas.resgatadas === null) return 0;
     return paraResgatar(montarGrade(conquistas.unlocked, conquistas.resgatadas));
   }, [conquistas]);
-  const [novasVistas, setNovasVistas] = useState<string | null>(null);
-  const novas = useMemo(() => {
-    if (!conquistas || conquistas === "carregando" || conquistas.careMode) return [];
-    return conquistas.novas.map((k) => conquistaPorChave(k)).filter((d): d is ConquistaDef => !!d);
-  }, [conquistas]);
-  const chaveDasNovas = novas.map((d) => d.key).join(",");
-  const mostrarNovas = novas.length > 0 && novasVistas !== chaveDasNovas;
   useReconciliacao(D, loja.pronto && ehHoje, recarregar);
   const amigas = useContagemDeAmigas();
   const [folha, setFolha] = useState<FolhaDoPlacar>(null);
@@ -325,8 +337,7 @@ export function JornadaDaGestacao({
   const checkin = lerCheckin(loja.blob[CHAVE_CHECKIN]);
   const fases = useMemo(() => fasesDaGestacao(D), [D]);
 
-  const presente = carteira.estado === "ok" ? carteira.dados.presente : null;
-  const presenteNovo = presente && !loja.blob[chaveDoPresente(presente.quando)] ? presente : null;
+  const avisos = useAvisosDoDia({ carteira, recarregar, conquistas, loja, ehHoje });
 
   /* ── O Cantinho na trilha: o que ela tem, o cenário e a pele ── */
   const cantinho = useCantinhoDaTrilha();
@@ -342,35 +353,6 @@ export function JornadaDaGestacao({
   /* Passou de 42 semanas: a trilha (presa no dia 300) dá lugar ao alerta. */
   if (dia.passouDe42) return <AlertaDas42Semanas nomeDoBebe={nomeDoBebe} />;
 
-  const avisos = (
-    <>
-      {carteira.estado === "falhou" ? (
-        <NaoConsegueLer
-          sossego="Os seus momentos de hoje continuam valendo e ficam guardados neste aparelho."
-          aoTentar={() => void recarregar()}
-        />
-      ) : null}
-      {ehHoje && mostrarNovas ? (
-        <AvisoDeConquista
-          conquistas={novas}
-          aoPegar={() => {
-            setNovasVistas(chaveDasNovas);
-            ir("/jornada/recompensas?aba=conquistas");
-          }}
-          aoFechar={() => setNovasVistas(chaveDasNovas)}
-        />
-      ) : null}
-      {ehHoje && presenteNovo ? (
-        <AvisoDePresente
-          quantidade={presenteNovo.quantidade}
-          de={presenteNovo.de}
-          nome={presenteNovo.nome}
-          aoFechar={() => gravarChave(chaveDoPresente(presenteNovo.quando), true)}
-        />
-      ) : null}
-    </>
-  );
-
   if (ehHoje) {
     const hora = horaDaTela();
     const flags = flagsDoDia(loja.blob, D);
@@ -385,6 +367,7 @@ export function JornadaDaGestacao({
       <View style={{ flex: 1, backgroundColor: cor.fundo }}>
         <TelaDeHoje
           D={D}
+          pronto={loja.pronto}
           cartao={{
             semana,
             nomeDoBebe,
@@ -413,6 +396,11 @@ export function JornadaDaGestacao({
           humor={feitos >= 5 ? "orgulhosa" : feitos >= 4 ? "surpresa" : "feliz"}
           chama={diasDeChama}
           avisos={avisos}
+          nascimento={
+            semana >= 37 ? (
+              <PortaDoNascimento nome={nomeDoBebe} aoTocar={() => ir("/jornada/nascimento")} />
+            ) : null
+          }
           agenda={<AgendaNaHoje loja={loja} />}
           aoAbrir={(c) => ir(ROTA_DO_CUIDADO[c])}
           aoVerJornada={() => ir("/jornada/trilha")}
@@ -463,7 +451,7 @@ export function JornadaDaGestacao({
         }
         aoAbrirAmigas={() => router.navigate("/comunidade" as never)}
         aoAbrirFolha={setFolha}
-        aoContarNascimento={() => router.push("/ritual?editar=1")}
+        aoContarNascimento={() => ir("/jornada/nascimento")}
         decoracao={decoracao}
         possuidos={possuidos}
         cenario={cenario}
@@ -481,6 +469,63 @@ export function JornadaDaGestacao({
       />
       <FestaDoMarco festa={marco.festa} nomeDoBebe={nomeDoBebe} aoFechar={marco.fechar} />
     </SafeAreaView>
+  );
+}
+
+/**
+ * Os avisos do topo da tela Hoje — a carteira que não carregou, a conquista
+ * nova (com o "pegar") e o presente que chegou —, iguais na gestação e no
+ * pós-parto.
+ */
+function useAvisosDoDia({
+  carteira,
+  recarregar,
+  conquistas,
+  loja,
+  ehHoje,
+}: {
+  carteira: EstadoDaCarteira;
+  recarregar: () => Promise<void>;
+  conquistas: LeituraDasConquistas | null | "carregando";
+  loja: EstadoDaLoja;
+  ehHoje: boolean;
+}) {
+  const [novasVistas, setNovasVistas] = useState<string | null>(null);
+  const novas = useMemo(() => {
+    if (!conquistas || conquistas === "carregando" || conquistas.careMode) return [];
+    return conquistas.novas.map((k) => conquistaPorChave(k)).filter((d): d is ConquistaDef => !!d);
+  }, [conquistas]);
+  const chaveDasNovas = novas.map((d) => d.key).join(",");
+  const mostrarNovas = novas.length > 0 && novasVistas !== chaveDasNovas;
+  const presente = carteira.estado === "ok" ? carteira.dados.presente : null;
+  const presenteNovo = presente && !loja.blob[chaveDoPresente(presente.quando)] ? presente : null;
+  return (
+    <>
+      {carteira.estado === "falhou" ? (
+        <NaoConsegueLer
+          sossego="Os seus momentos de hoje continuam valendo e ficam guardados neste aparelho."
+          aoTentar={() => void recarregar()}
+        />
+      ) : null}
+      {ehHoje && mostrarNovas ? (
+        <AvisoDeConquista
+          conquistas={novas}
+          aoPegar={() => {
+            setNovasVistas(chaveDasNovas);
+            ir("/jornada/recompensas?aba=conquistas");
+          }}
+          aoFechar={() => setNovasVistas(chaveDasNovas)}
+        />
+      ) : null}
+      {ehHoje && presenteNovo ? (
+        <AvisoDePresente
+          quantidade={presenteNovo.quantidade}
+          de={presenteNovo.de}
+          nome={presenteNovo.nome}
+          aoFechar={() => gravarChave(chaveDoPresente(presenteNovo.quando), true)}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -527,98 +572,160 @@ function useContagemDeAmigas(): number | null {
    Pós-parto
    ══════════════════════════════════════════════════════════════════════════ */
 
-function JornadaDoPosParto({
+/**
+ * O 4º TRIMESTRE — a tela Hoje com o bebê no colo (`TelaDoQuartoTrimestre`) e
+ * a trilha das 12 semanas de vida (`TrilhaDoPosParto`), o `PosPartoJourney`
+ * do site. Na primeira abertura depois de ela contar o nascimento, a festa da
+ * chegada (uma vez; nunca no Modo Cuidado, que nem chega aqui). Sem pagamento:
+ * o servidor só paga as atividades na gestação — e os marcos (o "Bem-vindo ao
+ * mundo" e cada mês do bebê) chegam pela festa dos marcos.
+ */
+export function JornadaDoPosParto({
   dia,
   loja,
+  vista = "hoje",
 }: {
   dia: Extract<DiaDaJornada, { modo: "pos" }>;
   loja: EstadoDaLoja;
+  vista?: "hoje" | "trilha";
 }) {
-  const { D, idadeDias, perfil } = dia;
+  const ehHoje = vista === "hoje";
+  const { D, idadeDias, perfil, hoje } = dia;
   const { carteira, recarregar } = useCarteira(true);
   const conquistas = useConquistas(true);
-  const marco = useFestaDoMarco({ carteira, recarregar, conquistas, loja, cuidado: dia.cuidado });
+  const marco = useFestaDoMarco({
+    carteira,
+    recarregar,
+    conquistas,
+    loja,
+    cuidado: dia.cuidado || !ehHoje,
+  });
+  const avisos = useAvisosDoDia({ carteira, recarregar, conquistas, loja, ehHoje });
+  const { recarregarPerfil } = useSessao();
+
   const flags = flagsDoDia(loja.blob, D, true);
-  const desafio = posChallenge(D);
-  const { dias: diasDeChama, perdoes } = calcularChama(loja.blob, D, true);
+  const { dias: diasDeChama } = calcularChama(loja.blob, D, true);
   const nomeDoBebe = (perfil.baby_name ?? "").trim() || null;
-  const quem = nomeDoBebe ?? "O bebê";
+  const checkin = lerCheckin(loja.blob[CHAVE_CHECKIN]);
+  const humorDeHoje = marcouHumorHoje(checkin, hoje) ? (checkin.mood ?? "Bem") : null;
+  const terminou = formou(idadeDias);
+  const hojeNaTrilha = diaNaTrilhaDoPos(idadeDias);
+  const semana = semanaDeVida(hojeNaTrilha);
+  const figurinhas =
+    listaDeNumeros(loja.blob[CHAVE_FIGURINHAS]).length + figurinhasDoPos(loja.blob).length;
 
-  const itens: ItemDoDia[] = [];
-  if (desafio) {
-    itens.push({
-      chave: "desafio",
-      titulo: `Desafio do dia ${desafio.emoji}`,
-      sub: desafio.label,
-      linhasDoSub: 3,
-      marcaPorToque: true,
-      Icone: Sparkles,
-      feito: feito(flags, "aula"),
-      aoTocar: () => {
-        if (!feito(flags, "aula")) marcar(D, "aula", true);
-      },
+  /* O check-in feito ainda na gestação, no dia do parto, vale como o humor de
+     hoje aqui também (a regra do site). */
+  const humorPendente = ehHoje && loja.pronto && !terminou && !!humorDeHoje && !flags.humor;
+  useEffect(() => {
+    if (humorPendente) marcarNoPos(D, "humor");
+  }, [humorPendente, D]);
+
+  /* A festa da chegada: a data é a do perfil; hora, peso e comprimento, do blob. */
+  const salvo = lerNascimento(loja.blob[CHAVE_NASCIMENTO]);
+  const nascimento: DadosDoNascimento | null = perfil.birth_date
+    ? salvo && salvo.date === perfil.birth_date
+      ? salvo
+      : { date: perfil.birth_date }
+    : null;
+  const abreFesta =
+    ehHoje &&
+    loja.pronto &&
+    loja.nuvem !== "esperando" &&
+    nascimento != null &&
+    abreFestaDoNascimento({
+      idadeDias,
+      festejado: loja.blob[CHAVE_NASCIMENTO_FESTEJADO] === true,
+      cuidado: dia.cuidado,
     });
-  }
-  itens.push(
-    {
-      chave: "meditar",
-      titulo: "Respirar",
-      sub: "Respiração 4-4-8 guiada",
-      Icone: Wind,
-      feito: feito(flags, "meditation"),
-      aoTocar: () => ir("/jornada/meditar"),
-    },
-    {
-      chave: "gratidao",
-      titulo: "Gratidão",
-      sub: "Uma coisa boa de hoje",
-      Icone: PenLine,
-      feito: feito(flags, "gratitude"),
-      aoTocar: () => ir("/jornada/gratidao"),
-    },
-  );
-  const feitos = itens.filter((i) => i.feito).length;
+  const sementesDaChegada =
+    marco.festa?.principal.tipo === "nascimento" ? marco.festa.sementinhas : null;
 
-  return (
-    <Tela>
-      <Saudacao titulo="Sua jornada" sub="O quarto trimestre, um dia de cada vez." />
-      <Placar
-        saldo={carteira.estado === "ok" ? carteira.dados.balance : null}
-        trofeus={carteira.estado === "ok" ? carteira.dados.trofeus : null}
-        carregando={carteira.estado === "carregando"}
-        chama={diasDeChama}
-        perdoes={perdoes}
-        pos
-      />
-      {carteira.estado === "falhou" ? (
-        <NaoConsegueLer
-          sossego="Os seus momentos de hoje continuam guardados."
-          aoTentar={() => void recarregar()}
+  if (!ehHoje) {
+    return (
+      <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: cor.fundo }}>
+        <View style={{ paddingHorizontal: espaco.lg }}>
+          <BarraDoTopo titulo="O 4º trimestre" />
+        </View>
+        <TrilhaDoPosParto
+          hojeD={hojeNaTrilha}
+          blob={loja.blob}
+          chama={diasDeChama}
+          figurinhas={figurinhas}
+          formou={terminou}
+          aoAbrirHoje={voltarParaJornada}
         />
-      ) : null}
-      <CartaoDoDia
-        sobre={`Semana ${Math.floor(idadeDias / 7) + 1} de vida`}
-        titulo={
-          idadeDias === 0
-            ? `🍼 ${quem} nasceu hoje`
-            : `🍼 ${quem} com ${idadeDias} ${idadeDias === 1 ? "dia" : "dias"}`
-        }
-        linha={null}
-        feitos={feitos}
-        total={itens.length}
-        itens={itens}
-        mostrarEstrelas={false}
-        rodape={
-          <T tipo="apagado">
-            {feitos === itens.length
-              ? "Tudo feito hoje. Descanse quando der."
-              : "Qualquer momento acende a chama de hoje."}
-          </T>
-        }
+      </SafeAreaView>
+    );
+  }
+
+  const hora = horaDaTela();
+  const feitos = tarefasFeitas(flags);
+  return (
+    <View style={{ flex: 1, backgroundColor: cor.fundo }}>
+      <TelaDoQuartoTrimestre
+        D={D}
+        pronto={loja.pronto}
+        idadeDias={idadeDias}
+        semana={semana}
+        formou={terminou}
+        saudacao={saudacao(hora, primeiroNome(perfil.display_name))}
+        data={dataDeHoje(hoje)}
+        hora={hora}
+        nomeDoBebe={nomeDoBebe}
+        flags={flags}
+        humorDeHoje={humorDeHoje}
+        desafio={terminou ? null : desafioDoPos(D)}
+        recado={recadoDaBolha({
+          feitos,
+          total: 3,
+          dia: D,
+          hora,
+          bebe: nomeDoBebe ?? undefined,
+          posParto: true,
+          careMode: false,
+        })}
+        chama={diasDeChama}
+        figurinhas={figurinhas}
+        avisos={avisos}
+        agenda={<AgendaNaHoje loja={loja} />}
+        extra={<BotaoDeConquistas leitura={conquistas} posParto />}
+        aoMarcarHumor={(humor) => {
+          gravarChave(CHAVE_CHECKIN, novoCheckin(checkin, humor, hoje));
+          marcarNoPos(D, "humor");
+        }}
+        aoFazerDesafio={() => marcarNoPos(D, "desafio")}
+        aoLerOrientacao={() => marcarNoPos(D, "leitura")}
+        aoAbrir={(a) => ir(ROTA_DO_CUIDADO[a])}
+        aoVerTrilha={() => ir("/jornada/trilha")}
+        aoVerAlbum={() => ir("/jornada/album")}
       />
-      <BotaoDeConquistas leitura={conquistas} posParto />
-      <FestaDoMarco festa={marco.festa} nomeDoBebe={nomeDoBebe} aoFechar={marco.fechar} />
-    </Tela>
+      {abreFesta && nascimento ? (
+        <FestaDoNascimento
+          nome={nomeDoBebe}
+          dados={nascimento}
+          {...resumoDaGestacao(loja.blob)}
+          sementinhas={sementesDaChegada}
+          aoComecar={() => {
+            gravarChave(CHAVE_NASCIMENTO_FESTEJADO, true);
+            if (sementesDaChegada != null) marco.fechar();
+          }}
+          aoDesfazer={async () => {
+            if (ehBancada()) {
+              recarregarNaBancada("/jornada?bancada=1&semana=39");
+              return;
+            }
+            const r = await gravarPerfil(dia.uid, { birth_date: null });
+            if (!r.ok) return;
+            gravarChave(CHAVE_NASCIMENTO, null);
+            gravarChave(CHAVE_NASCIMENTO_FESTEJADO, false);
+            await recarregarPerfil();
+          }}
+        />
+      ) : (
+        <FestaDoMarco festa={marco.festa} nomeDoBebe={nomeDoBebe} aoFechar={marco.fechar} />
+      )}
+    </View>
   );
 }
 
@@ -1041,7 +1148,7 @@ function AlertaDas42Semanas({ nomeDoBebe }: { nomeDoBebe: string | null }) {
             <Botao
               rotulo="Contar o nascimento"
               corFundo={corJornada.roxo}
-              aoTocar={() => router.push("/ritual?editar=1")}
+              aoTocar={() => ir("/jornada/nascimento")}
             />
           </View>
         </View>

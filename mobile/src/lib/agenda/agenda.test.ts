@@ -13,6 +13,7 @@ import {
   semCompromisso,
   separar,
   sugestaoDaFase,
+  sugestaoDoPosParto,
   type Compromisso,
 } from "./agenda";
 
@@ -138,5 +139,12 @@ describe("a agenda do pré-natal", () => {
     expect(sugestaoDaFase(25).tipo).toBe("exame");
     expect(sugestaoDaFase(15).tipo).toBe("consulta");
     expect(sugestaoDaFase(20).texto).toContain("morfológico");
+  });
+
+  test("no pós-parto, a dica é a orientação da semana de vida, com o que marcar", () => {
+    expect(sugestaoDoPosParto(1)).toMatchObject({ tipo: "consulta", titulo: "Revisão pós-parto" });
+    expect(sugestaoDoPosParto(8)).toMatchObject({ tipo: "vacina" });
+    expect(sugestaoDoPosParto(7)).toMatchObject({ tipo: null, titulo: null });
+    expect(sugestaoDoPosParto(4).texto).toContain("consulta puerperal");
   });
 });

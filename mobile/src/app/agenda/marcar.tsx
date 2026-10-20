@@ -1,10 +1,11 @@
 import { useLocalSearchParams } from "expo-router";
-import { Minus, Plus, Trash2 } from "lucide-react-native";
+import { Trash2 } from "lucide-react-native";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Linking, Platform, Pressable, Text, View } from "react-native";
 import { Botao, Campo, Carregando, T, Tela, toque } from "~/componentes/base";
 import { CabecalhoDaPilha, voltarOu } from "~/componentes/cabecalho";
 import { CalendarioDoMes, mesDe, type Mes } from "~/componentes/agenda/calendario";
+import { Passo } from "~/componentes/agenda/passo";
 import { apagarCompromisso, salvarCompromisso, useAgenda } from "~/componentes/agenda/usar-agenda";
 import { rota } from "~/componentes/jornada/bancada";
 import {
@@ -25,10 +26,15 @@ import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
  * lugar e as anotações. Depois da consulta, a mesma tela guarda o que o médico
  * disse.
  *
- * Rota: /agenda/marcar [?id=…] [?tipo=ultrassom] [?dia=AAAA-MM-DD]
+ * Rota: /agenda/marcar [?id=…] [?tipo=ultrassom] [?dia=AAAA-MM-DD] [?titulo=…]
  */
 export default function MarcarConsulta() {
-  const params = useLocalSearchParams<{ id?: string; tipo?: string; dia?: string }>();
+  const params = useLocalSearchParams<{
+    id?: string;
+    tipo?: string;
+    dia?: string;
+    titulo?: string;
+  }>();
   const { lista, pronto } = useAgenda();
   const existente = params.id ? (lista.find((c) => c.id === params.id) ?? null) : null;
   const editando = !!params.id;
@@ -38,7 +44,8 @@ export default function MarcarConsulta() {
   const [tipo, setTipo] = useState<TipoDeCompromisso>(() =>
     TIPOS.some((t) => t.tipo === params.tipo) ? (params.tipo as TipoDeCompromisso) : "consulta",
   );
-  const [titulo, setTitulo] = useState("");
+  /* `?titulo=` vem da dica da fase ("Consulta puerperal", "Vacinas de 2 meses"). */
+  const [titulo, setTitulo] = useState(() => (params.titulo ?? "").slice(0, 60));
   const [dia, setDia] = useState(() =>
     params.dia && paraData(`${params.dia}T09:00`) ? params.dia : amanha(agora),
   );
@@ -320,73 +327,6 @@ function Escolha({
       >
         {rotulo}
       </Text>
-    </Pressable>
-  );
-}
-
-function Passo({
-  valor,
-  rotulo,
-  aoMenos,
-  aoMais,
-}: {
-  valor: string;
-  rotulo: string;
-  aoMenos: () => void;
-  aoMais: () => void;
-}) {
-  return (
-    <View style={{ alignItems: "center", gap: 4 }}>
-      <BotaoDoPasso rotulo={`Mais ${rotulo}`} aoTocar={aoMais}>
-        <Plus size={20} color={cor.agenda} />
-      </BotaoDoPasso>
-      <Text
-        accessibilityLabel={`${valor} ${rotulo}`}
-        style={{
-          minWidth: 72,
-          textAlign: "center",
-          fontFamily: fonte.titulo,
-          fontSize: 40,
-          color: cor.texto,
-          fontVariant: ["tabular-nums"],
-        }}
-      >
-        {valor}
-      </Text>
-      <BotaoDoPasso rotulo={`Menos ${rotulo}`} aoTocar={aoMenos}>
-        <Minus size={20} color={cor.agenda} />
-      </BotaoDoPasso>
-    </View>
-  );
-}
-
-function BotaoDoPasso({
-  rotulo,
-  aoTocar,
-  children,
-}: {
-  rotulo: string;
-  aoTocar: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={rotulo}
-      onPress={() => {
-        toque();
-        aoTocar();
-      }}
-      style={({ pressed }) => ({
-        width: ALVO_MINIMO + 8,
-        height: ALVO_MINIMO,
-        borderRadius: raio.pilula,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: pressed ? cor.agenda : cor.agendaFundo,
-      })}
-    >
-      {children}
     </Pressable>
   );
 }

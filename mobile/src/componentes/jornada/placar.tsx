@@ -1,129 +1,20 @@
-import { Flame, ShieldCheck, Sprout, Trophy } from "lucide-react-native";
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Pressable, Text, View } from "react-native";
-import { T, toque } from "~/componentes/base";
+import { Text, View } from "react-native";
+import { T } from "~/componentes/base";
 import { corJornada } from "~/componentes/jornada/cores";
-import { ChamaViva, Faiscas, Odometro } from "~/componentes/jornada/efeitos";
 import { Folha } from "~/componentes/jornada/pecas";
 import { BolhaViva } from "~/componentes/movimento";
-import { Pulso } from "~/componentes/movimento";
 import { itensDaLoja } from "~/lib/jornada/enfeites";
 import { explicacaoDaChama } from "~/lib/jornada/trilha";
 import { escadaDosTrofeus } from "~/lib/jornada/trofeus";
-import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
-
-/**
- * O PLACAR DO TOPO: sementinhas 🌱, chama 🔥 e troféus 🏆. Cada um abre uma
- * folha que explica de onde ele vem — número sem explicação é número que
- * ninguém persegue.
- *
- * `saldo`/`trofeus` null = a carteira não carregou: mostra "—", nunca 0
- * (zero afirma um saldo; o traço admite que não sabemos).
- */
-export function Placar({
-  saldo,
-  trofeus,
-  chama,
-  perdoes,
-  carregando,
-  mostrarChama = true,
-  pos = false,
-}: {
-  saldo: number | null;
-  trofeus: number | null;
-  chama: number;
-  perdoes: number;
-  carregando: boolean;
-  mostrarChama?: boolean;
-  /** Pós-parto: os momentos do dia não somam sementinhas (o servidor só paga na gestação). */
-  pos?: boolean;
-}) {
-  const [aberta, setAberta] = useState<null | "sementes" | "chama" | "trofeus">(null);
-  const fmt = (n: number | null) => (carregando ? "…" : n == null ? "—" : String(n));
-  /* Faíscas quando o saldo SOBE (não ao carregar pela primeira vez). */
-  const saldoAntes = useRef<number | null>(null);
-  const [subiu, setSubiu] = useState(0);
-  useEffect(() => {
-    if (saldo != null && saldoAntes.current != null && saldo > saldoAntes.current)
-      setSubiu((n) => n + 1);
-    if (saldo != null) saldoAntes.current = saldo;
-  }, [saldo]);
-  return (
-    <>
-      <View style={{ flexDirection: "row", gap: espaco.sm }}>
-        <Pilar
-          rotulo={`Sementinhas: ${fmt(saldo)}`}
-          icone={<Sprout size={20} color={corJornada.sementinha} strokeWidth={2.4} />}
-          valor={fmt(saldo)}
-          faiscas={subiu}
-          fundo={corJornada.sementinhaFundo}
-          corValor={corJornada.sementinha}
-          aoTocar={() => setAberta("sementes")}
-        />
-        {mostrarChama ? (
-          <Pilar
-            rotulo={`Chama: ${chama} ${chama === 1 ? "dia seguido" : "dias seguidos"}`}
-            icone={
-              <View>
-                <ChamaViva acesa={chama > 0} dias={chama}>
-                  <Flame
-                    size={20}
-                    color={chama > 0 ? corJornada.chama : cor.textoApagado}
-                    fill={chama > 0 ? "#fdba74" : "transparent"}
-                    strokeWidth={2.4}
-                  />
-                </ChamaViva>
-                {/* O escudinho: há perdão guardado — um dia em branco não apaga a chama. */}
-                {chama > 0 && perdoes > 0 ? (
-                  <View
-                    style={{
-                      position: "absolute",
-                      left: -8,
-                      bottom: -6,
-                      backgroundColor: cor.cartao,
-                      borderRadius: 8,
-                      padding: 1,
-                    }}
-                  >
-                    <ShieldCheck size={12} color={corJornada.chama} strokeWidth={2.6} />
-                  </View>
-                ) : null}
-              </View>
-            }
-            valor={String(chama)}
-            fundo={chama > 0 ? corJornada.chamaFundo : cor.apagado}
-            corValor={chama > 0 ? corJornada.chama : cor.textoApagado}
-            aoTocar={() => setAberta("chama")}
-          />
-        ) : null}
-        <Pilar
-          rotulo={`Troféus: ${fmt(trofeus)}`}
-          icone={<Trophy size={20} color={corJornada.trofeu} strokeWidth={2.4} />}
-          valor={fmt(trofeus)}
-          fundo={corJornada.trofeuFundo}
-          corValor={corJornada.trofeu}
-          aoTocar={() => setAberta("trofeus")}
-        />
-      </View>
-
-      <FolhasDoPlacar
-        aberta={aberta}
-        aoFechar={() => setAberta(null)}
-        chama={chama}
-        perdoes={perdoes}
-        trofeus={trofeus}
-        pos={pos}
-      />
-    </>
-  );
-}
+import { cor, espaco, fonte, raio } from "~/tema";
 
 export type FolhaDoPlacar = null | "sementes" | "chama" | "trofeus";
 
 /**
- * As três folhas que explicam os números do topo — a chama (com o perdão), as
- * sementinhas (o que rende quanto) e os troféus. Separadas do placar para o
- * Caminho usar as mesmas: número sem explicação é número que ninguém persegue.
+ * As três folhas que explicam os números da faixa do Caminho — a chama (com o
+ * perdão), as sementinhas (o que rende quanto) e os troféus: número sem
+ * explicação é número que ninguém persegue. (O placar de pílulas que as abria
+ * no pós-parto saiu com a tela nova do 4º trimestre.)
  */
 export function FolhasDoPlacar({
   aberta,
@@ -259,65 +150,6 @@ function EscadaDosTrofeus({ trofeus }: { trofeus: number }) {
 
 /** O que a lojinha do app vende (sem a loja por fase): é onde o troféu destrava a Borboleta. */
 const ITENS_DA_LOJA_DO_APP = new Set(itensDaLoja([]).map((i) => i.id));
-
-function Pilar({
-  rotulo,
-  icone,
-  valor,
-  fundo,
-  corValor,
-  aoTocar,
-  faiscas,
-}: {
-  rotulo: string;
-  icone: ReactNode;
-  valor: string;
-  fundo: string;
-  corValor: string;
-  aoTocar: () => void;
-  /** Muda quando o valor SOBE: estoura faíscas em volta do pilar. */
-  faiscas?: number;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={rotulo}
-      accessibilityHint="Explica de onde vem"
-      onPress={() => {
-        toque();
-        aoTocar();
-      }}
-      style={({ pressed }) => ({
-        flex: 1,
-        minHeight: ALVO_MINIMO + 4,
-        borderRadius: raio.pilula,
-        backgroundColor: fundo,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 6,
-        paddingHorizontal: espaco.sm,
-        opacity: pressed ? 0.75 : 1,
-      })}
-    >
-      {icone}
-      {/* O número que mudou (ganhou sementinhas, a chama subiu) dá um pulo. */}
-      <Pulso chave={valor}>
-        {/* Rola até o valor novo como um odômetro. */}
-        <Odometro
-          valor={valor}
-          estilo={{
-            fontFamily: fonte.titulo,
-            fontSize: 18,
-            color: corValor,
-            fontVariant: ["tabular-nums"],
-          }}
-        />
-      </Pulso>
-      <Faiscas disparo={faiscas ?? null} cor={corValor} raio={34} />
-    </Pressable>
-  );
-}
 
 function LinhaDeGanho({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (

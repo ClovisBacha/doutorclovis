@@ -69,11 +69,12 @@ function useHoje(): Date {
   return useMemo(() => new Date(), [ymd]);
 }
 
-/** Na bancada, `&pos=1` dá um bebê de 20 dias ao perfil de exemplo. */
+/** Na bancada, `&pos=1` dá um bebê de 20 dias ao perfil de exemplo (`&idade=N`, outra idade). */
 function perfilDaJornada(perfil: Perfil | null): Perfil | null {
   if (!perfil || !ehBancada() || parametroDaBancada("pos") !== "1") return perfil;
+  const idade = Number(parametroDaBancada("idade") ?? 20);
   const d = new Date();
-  d.setDate(d.getDate() - 20);
+  d.setDate(d.getDate() - (Number.isFinite(idade) && idade >= 0 ? Math.floor(idade) : 20));
   return { ...perfil, birth_date: ymdLocal(d) };
 }
 

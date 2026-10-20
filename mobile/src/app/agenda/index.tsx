@@ -17,12 +17,14 @@ import {
   quandoPorExtenso,
   separar,
   sugestaoDaFase,
+  sugestaoDoPosParto,
   ymdDe,
   type Compromisso,
 } from "~/lib/agenda/agenda";
 import { lembretesLigados, reagendarAgenda } from "~/lib/agenda/lembretes";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { gestacaoDoPerfil, ymdLocal } from "~/lib/gestacao";
+import { diaNaTrilhaDoPos, semanaDeVida } from "~/lib/jornada/pos-parto";
 import { cor, espaco, fonte, raio, sombra } from "~/tema";
 
 /**
@@ -64,8 +66,30 @@ export default function Agenda() {
 
   const gest = dia.modo === "gestacao" ? gestacaoDoPerfil(dia.perfil, agora) : null;
   const dpp = gest?.totalDays != null ? somarDias(hoje, 280 - gest.totalDays) : null;
-  /* A dica da fase fala do bebê: some no Modo Cuidado e depois do parto. */
-  const sugestao = dia.modo === "gestacao" && !dia.cuidado ? sugestaoDaFase(dia.semana) : null;
+  /* A dica da fase fala do bebê: some no Modo Cuidado. No pós-parto ela é a
+     orientação da semana de vida (revisão, consulta puerperal, vacinas). */
+  const sugestao =
+    "cuidado" in dia && dia.cuidado
+      ? null
+      : dia.modo === "gestacao"
+        ? {
+            ...sugestaoDaFase(dia.semana),
+            titulo: null as string | null,
+            rotulo: `Nesta fase · semana ${dia.semana}`,
+          }
+        : dia.modo === "pos"
+          ? (() => {
+              const semana = semanaDeVida(diaNaTrilhaDoPos(dia.idadeDias));
+              return {
+                ...sugestaoDoPosParto(semana),
+                rotulo: `Nesta fase · semana ${semana} de vida`,
+              };
+            })()
+          : null;
+  const rotaDaSugestao =
+    sugestao?.tipo != null
+      ? `/agenda/marcar?tipo=${sugestao.tipo}${sugestao.titulo ? `&titulo=${encodeURIComponent(sugestao.titulo)}` : ""}`
+      : null;
 
   return (
     <Tela>
@@ -119,11 +143,13 @@ export default function Agenda() {
 
       {sugestao ? (
         <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Nesta fase: ${sugestao.texto}. Marcar na agenda`}
+          accessibilityRole={rotaDaSugestao ? "button" : undefined}
+          accessibilityLabel={`${sugestao.rotulo}: ${sugestao.texto}${rotaDaSugestao ? ". Marcar na agenda" : ""}`}
+          disabled={!rotaDaSugestao}
           onPress={() => {
+            if (!rotaDaSugestao) return;
             toque();
-            router.push(rota(`/agenda/marcar?tipo=${sugestao.tipo}`) as never);
+            router.push(rota(rotaDaSugestao) as never);
           }}
           style={({ pressed }) => [
             {
@@ -146,14 +172,16 @@ export default function Agenda() {
               color: cor.agenda,
             }}
           >
-            Nesta fase · semana {dia.modo === "gestacao" ? dia.semana : ""}
+            {sugestao.rotulo}
           </Text>
           <Text style={{ fontFamily: fonte.media, fontSize: 15, lineHeight: 22, color: cor.texto }}>
             {sugestao.texto}
           </Text>
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: cor.agenda }}>
-            Já marcou? Pôr na agenda ›
-          </Text>
+          {rotaDaSugestao ? (
+            <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: cor.agenda }}>
+              Já marcou? Pôr na agenda ›
+            </Text>
+          ) : null}
         </Pressable>
       ) : null}
 
