@@ -60,7 +60,7 @@ import {
 } from "~/lib/jornada/hoje";
 import { primeiroNome } from "~/lib/gestacao";
 import { recadoDaBolha } from "@/lib/recado-da-bolha";
-import { gestChallenge } from "@/lib/daily-challenges";
+import { desafioDaGestacao } from "~/lib/jornada/desafios-no-app";
 import { temQuizNoDia } from "@/lib/daily-quizzes";
 import { BarraDoTopo, voltarParaJornada } from "~/componentes/jornada/pecas";
 import { useSessao } from "~/lib/sessao";
@@ -360,7 +360,7 @@ export function JornadaDaGestacao({
       flags,
       semana,
       nomeDoBebe,
-      desafio: temQuizNoDia(D) ? null : (gestChallenge(D)?.label ?? null),
+      desafio: temQuizNoDia(D) ? null : (desafioDaGestacao(D)?.label ?? null),
     });
     const feitos = cuidados.filter((c) => c.feito).length;
     return (

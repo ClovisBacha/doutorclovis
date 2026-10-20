@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
-import { gestChallenge } from "@/lib/daily-challenges";
+import { desafioDaGestacao } from "~/lib/jornada/desafios-no-app";
 import { carregarQuizDoDia, temQuizNoDia, type DailyQuiz } from "@/lib/daily-quizzes";
 import { recadoDaBolha } from "@/lib/recado-da-bolha";
 import { Carregando, toque } from "~/componentes/base";
@@ -122,7 +122,7 @@ export default function FolhaDoDia() {
     posParto: false,
     careMode: false,
   });
-  const desafio = !temQuizNoDia(D) ? gestChallenge(D) : null;
+  const desafio = !temQuizNoDia(D) ? desafioDaGestacao(D) : null;
   const descDaAula =
     quiz && quiz !== "carregando"
       ? tituloDaAula(quiz)

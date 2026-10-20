@@ -3,7 +3,7 @@ import { Check, X } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import { Animated, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { gestChallenge } from "@/lib/daily-challenges";
+import { desafioDaGestacao } from "~/lib/jornada/desafios-no-app";
 import { carregarQuizDoDia, isMultiQuestion, type DailyQuiz } from "@/lib/daily-quizzes";
 import { Cartao, Carregando, NaoConsegueLer, T, Tela, toque } from "~/componentes/base";
 import { BotaoDaAtividade } from "~/componentes/jornada/atividade";
@@ -209,7 +209,7 @@ export default function Aula() {
   }
 
   if (!quiz) {
-    const desafio = gestChallenge(D);
+    const desafio = desafioDaGestacao(D);
     return (
       <Tela bordas={["top", "bottom"]}>
         <BarraDoTopo fechar titulo="Aula de hoje" />
