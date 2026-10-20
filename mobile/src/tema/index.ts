@@ -33,6 +33,8 @@ export const cor = {
   saudeFundo: "#d1fae5",
   nutricao: "#4d7c0f",
   nutricaoFundo: "#ecfccb",
+  agenda: "#4338ca",
+  agendaFundo: "#e0e7ff",
   jogo: "#6d28d9",
   jogoFundo: "#ede9fe",
   sementinha: "#15803d",

@@ -4,6 +4,7 @@ import { textoDoLembrete } from "@/lib/lembrete-de-meditacao";
 import { sequenciaAteODia } from "@/lib/sequencia";
 import { apagar, gravarJson, lerJson } from "~/lib/armazem";
 import { ymdLocal } from "~/lib/gestacao";
+import { notificacoesPermitidas } from "~/lib/notificacoes";
 import { horaValida, proximosLembretes } from "~/lib/jornada/lembrete";
 
 /**
@@ -23,20 +24,6 @@ export async function lerLembreteDaMeditacao(uid: string): Promise<string | null
   return horaValida(s.hora) ? s.hora : null;
 }
 
-async function permitido(pedir: boolean): Promise<boolean> {
-  try {
-    const atual = await Notifications.getPermissionsAsync();
-    if (atual.granted) return true;
-    if (!pedir || !atual.canAskAgain) return false;
-    const novo = await Notifications.requestPermissionsAsync({
-      ios: { allowAlert: true, allowSound: true, allowBadge: false },
-    });
-    return novo.granted;
-  } catch {
-    return false;
-  }
-}
-
 /**
  * Liga (com a hora) ou desliga (`null`). `"sem-permissao"` quando o iPhone
  * recusou as notificações — a tela diz como ligar nos Ajustes, e a escolha não
@@ -49,7 +36,7 @@ export async function definirLembreteDaMeditacao(
 ): Promise<"ok" | "sem-permissao"> {
   if (Platform.OS === "web") return "ok";
   if (hora) {
-    if (!(await permitido(true))) return "sem-permissao";
+    if (!(await notificacoesPermitidas(true))) return "sem-permissao";
     await gravarJson(chave(uid), { hora });
   } else {
     await apagar(chave(uid));
@@ -81,7 +68,7 @@ export async function cancelarLembretesDaMeditacao() {
 
 async function agendar(hora: string | null, dias: readonly string[]) {
   await cancelarLembretesDaMeditacao();
-  if (!hora || !(await permitido(false))) return;
+  if (!hora || !(await notificacoesPermitidas(false))) return;
   const hoje = ymdLocal();
   const quandos = proximosLembretes({ hora, agora: new Date(), meditouHoje: dias.includes(hoje) });
   try {

@@ -32,6 +32,7 @@ import { Caminho } from "~/componentes/caminho/caminho";
 import { useJornada, type DiaDaJornada } from "~/componentes/jornada/usarJornada";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { TelaDeHoje } from "~/componentes/jornada/hoje";
+import { AgendaNaHoje } from "~/componentes/agenda/pecas";
 import {
   cuidadosDoDia,
   dataDeHoje,
@@ -412,6 +413,7 @@ export function JornadaDaGestacao({
           humor={feitos >= 5 ? "orgulhosa" : feitos >= 4 ? "surpresa" : "feliz"}
           chama={diasDeChama}
           avisos={avisos}
+          agenda={<AgendaNaHoje loja={loja} />}
           aoAbrir={(c) => ir(ROTA_DO_CUIDADO[c])}
           aoVerJornada={() => ir("/jornada/trilha")}
           sos={null}
@@ -929,7 +931,7 @@ function AvisoDeConquista({
  * PASSOU DE 42 SEMANAS — o alerta do site, no lugar do Caminho: avaliação do
  * bem-estar do bebê HOJE, e direto para a maternidade com qualquer sinal. A
  * única ação de jornada que sobra é contar o nascimento. (O site mandava falar
- * com o consultório pela agenda, que o app não tem; aqui o caminho é o SOS,
+ * com o consultório pela agenda DELE, que o app não tem; aqui o caminho é o SOS,
  * que traz o médico e os contatos dela.)
  */
 function AlertaDas42Semanas({ nomeDoBebe }: { nomeDoBebe: string | null }) {

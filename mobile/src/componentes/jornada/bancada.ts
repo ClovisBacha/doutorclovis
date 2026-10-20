@@ -1,5 +1,6 @@
 import type { Blob } from "~/lib/jornada/momentos";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
+import { CHAVE_AGENDA } from "~/lib/agenda/agenda";
 
 /**
  * A BANCADA DA JORNADA — os dados de exemplo que entram nos MESMOS estados da
@@ -17,6 +18,7 @@ import { ehBancada, parametroDaBancada } from "~/lib/bancada";
  *   &itens=bicho-coelho,luz-vela        itens a mais no Cantinho de exemplo
  *   &clima=clima-petalas                o ar da trilha (a `?clima=` do site)
  *   &fundo=fundo-amanhecer              o cenário equipado
+ *   &agenda=vazia                       a agenda sem nada marcado
  */
 
 export function estadoDaBancada(): string | null {
@@ -35,7 +37,45 @@ const QUE_VIAJAM = [
   "itens",
   "clima",
   "fundo",
+  "agenda",
 ] as const;
+
+/**
+ * A agenda de exemplo (`/agenda?bancada=1`): uma consulta daqui a 3 dias, um
+ * morfológico daqui a 12 e um exame que já foi, com anotação. `&agenda=vazia`
+ * mostra a agenda sem nada.
+ */
+function agendaDaBancada(): Blob {
+  if (parametroDaBancada("agenda") === "vazia") return {};
+  const dia = (n: number, hora: string) => {
+    const d = new Date();
+    d.setDate(d.getDate() + n);
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${d.getFullYear()}-${m}-${dd}T${hora}`;
+  };
+  return {
+    [CHAVE_AGENDA]: [
+      { id: "b1", tipo: "consulta", quando: dia(3, "14:30"), onde: "Clínica Bem Nascer" },
+      {
+        id: "b2",
+        tipo: "ultrassom",
+        titulo: "Morfológico",
+        quando: dia(12, "09:00"),
+        onde: "Fetal Imagem · sala 3",
+        nota: "Levar o pedido e o ultrassom anterior.",
+      },
+      {
+        id: "b3",
+        tipo: "exame",
+        titulo: "Exames de sangue",
+        quando: dia(-9, "07:30"),
+        onde: "Laboratório Vida",
+        nota: "Tudo normal. Repetir o hemograma com 28 semanas.",
+      },
+    ],
+  };
+}
 
 /** Uma rota com a bancada junto, para a navegação dentro dela não perdê-la. */
 export function rota(caminho: string): string {
@@ -51,7 +91,7 @@ export function rota(caminho: string): string {
 /** O blob de uma jornada em andamento: a semana com dias fechados, parciais e hoje. */
 export function blobDaBancada(hojeD: number, pos: boolean): Blob {
   const estado = estadoDaBancada();
-  const blob: Blob = {};
+  const blob: Blob = { ...agendaDaBancada() };
   const cinco = {
     desafio: true,
     w_movement: true,

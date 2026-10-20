@@ -200,6 +200,7 @@ export function TelaDeHoje({
   humor,
   chama,
   avisos,
+  agenda,
   aoAbrir,
   aoVerJornada,
   sos,
@@ -221,6 +222,8 @@ export function TelaDeHoje({
   chama: number;
   /** Os avisos do momento (presente, conquista nova, carteira que falhou). */
   avisos?: ReactNode;
+  /** A próxima consulta da agenda (ou o convite para marcar). */
+  agenda?: ReactNode;
   aoAbrir: (c: ChaveDoCuidado) => void;
   aoVerJornada: () => void;
   sos: ReactNode;
@@ -416,6 +419,8 @@ export function TelaDeHoje({
               <LinhaDoCuidado key={c.chave} c={c} aoAbrir={() => aoAbrir(c.chave)} />
             ))}
           </View>
+
+          {agenda}
 
           <CompartilharASemana d={cartao} />
 

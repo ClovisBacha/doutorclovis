@@ -26,6 +26,9 @@ import { useSessao } from "~/lib/sessao";
 import { supabase } from "~/servidor/supabase";
 import { ALVO_MINIMO, cor, espaco, fonte, raio, sombra } from "~/tema";
 import { AvisoMedico } from "~/componentes/aviso-medico";
+import { PortaDaAgenda } from "~/componentes/agenda/pecas";
+import { useAgenda } from "~/componentes/agenda/usar-agenda";
+import { proximo } from "~/lib/agenda/agenda";
 import { IA_NO_APP } from "~/config";
 
 /**
@@ -176,6 +179,7 @@ export default function HubDaSaude() {
           <BlocoDaGrade key={b.chave} bloco={b} ordem={i} />
         ))}
       </View>
+      <AgendaNaSaude />
       <AvisoMedico />
     </Tela>
   );
@@ -233,6 +237,14 @@ function BlocoDaGrade({ bloco, ordem }: { bloco: Bloco; ordem: number }) {
       </View>
     </Inclinacao3D>
   );
+}
+
+/** A agenda do pré-natal: a folhinha da próxima consulta, ou o convite. */
+function AgendaNaSaude() {
+  const { lista, pronto } = useAgenda();
+  if (!pronto) return null;
+  const agora = new Date();
+  return <PortaDaAgenda c={proximo(lista, agora)} agora={agora} />;
 }
 
 /** A porta da triagem: em cima de tudo, porque é a que pode ser urgente. */
