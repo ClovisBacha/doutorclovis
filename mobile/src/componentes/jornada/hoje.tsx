@@ -1,13 +1,23 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import type { ReactNode } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import * as Haptics from "expo-haptics";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Animated, Easing, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Text as SvgText } from "react-native-svg";
 import { babyForWeek } from "@/lib/gestacao";
 import { toque } from "~/componentes/base";
 import { BotaoDaAtividade, Brilho, sombraDe } from "~/componentes/jornada/atividade";
-import { ArteDaBolha, Flutuar, type HumorDaArte } from "~/componentes/movimento";
+import {
+  ArteDaBolha,
+  Flutuar,
+  useMovimentoReduzido,
+  type HumorDaArte,
+} from "~/componentes/movimento";
+import { CompartilharASemana, type DadosDoCartao } from "~/componentes/jornada/cartao-da-semana";
+import { Confete } from "~/componentes/jornada/pecas";
+import { parametroDaBancada } from "~/lib/bancada";
+import { arteDoBebe } from "~/componentes/jornada/arte-do-bebe";
 import type { ChaveDoCuidado, Cuidado } from "~/lib/jornada/hoje";
 import { cor, espaco, fonte } from "~/tema";
 
@@ -67,19 +77,6 @@ const DESTAQUE: Record<
   },
 };
 
-/** O bebê ilustrado mais próximo da semana (as artes de 6, 10, 20, 30 e 40). */
-const BEBES = [
-  { desde: 0, arte: require("../../../../src/assets/bebes/semana-06.webp") },
-  { desde: 10, arte: require("../../../../src/assets/bebes/semana-10.webp") },
-  { desde: 20, arte: require("../../../../src/assets/bebes/semana-20.webp") },
-  { desde: 30, arte: require("../../../../src/assets/bebes/semana-30.webp") },
-  { desde: 40, arte: require("../../../../src/assets/bebes/semana-40.webp") },
-] as const;
-
-export function arteDoBebe(semana: number): number {
-  return [...BEBES].reverse().find((b) => semana >= b.desde)!.arte;
-}
-
 /** O céu pintado da hora do dia, e a tinta que se lê em cima dele. */
 const CEUS = {
   amanhecer: {
@@ -109,7 +106,88 @@ export function ceuDaHora(hora: number): keyof typeof CEUS {
 
 const FUNDO = "#fff8f5";
 
+/** Quantos cuidados a tela já mostrou feitos, por dia — neste processo. */
+const vistosPorDia = new Map<number, number>();
+
+/**
+ * O instante em que um cuidado se acende: ela volta da atividade e a tela
+ * reage — o anel pulsa, o celular vibra, e o quinto acende o céu e solta o
+ * confete, uma vez. Ao ABRIR o app nada festeja: o que já estava feito é
+ * estado, não acontecimento. (`&animar=1` na bancada finge o último.)
+ */
+function useMomentoDoDia(D: number, feitos: number) {
+  const reduzido = useMovimentoReduzido();
+  const pulso = useRef(new Animated.Value(1)).current;
+  const brilho = useRef(new Animated.Value(0)).current;
+  const [festa, setFesta] = useState(false);
+  useEffect(() => {
+    let anterior = vistosPorDia.get(D);
+    if (anterior === undefined && parametroDaBancada("animar") === "1") anterior = feitos - 1;
+    vistosPorDia.set(D, feitos);
+    if (anterior === undefined || feitos <= anterior) return;
+    const fechou = feitos >= 5 && anterior < 5;
+    if (Platform.OS !== "web") {
+      void (
+        fechou
+          ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+          : Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+      ).catch(() => {});
+    }
+    if (!reduzido) {
+      Animated.sequence([
+        Animated.timing(pulso, {
+          toValue: 1.18,
+          duration: 220,
+          easing: Easing.out(Easing.back(2)),
+          useNativeDriver: true,
+        }),
+        Animated.spring(pulso, { toValue: 1, friction: 4, useNativeDriver: true }),
+      ]).start();
+    }
+    if (fechou) {
+      setFesta(true);
+      if (!reduzido) {
+        Animated.sequence([
+          Animated.timing(brilho, { toValue: 0.6, duration: 500, useNativeDriver: true }),
+          Animated.timing(brilho, { toValue: 0, duration: 1800, useNativeDriver: true }),
+        ]).start();
+      }
+      const t = setTimeout(() => setFesta(false), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [D, feitos, pulso, brilho, reduzido]);
+  return { pulso, brilho, festa };
+}
+
+/** Entra subindo de leve (sem "Reduzir movimento"). */
+function Entrar({ atraso = 0, children }: { atraso?: number; children: ReactNode }) {
+  const reduzido = useMovimentoReduzido();
+  const v = useRef(new Animated.Value(reduzido ? 1 : 0)).current;
+  useEffect(() => {
+    if (reduzido) return;
+    Animated.timing(v, {
+      toValue: 1,
+      duration: 420,
+      delay: atraso,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [v, atraso, reduzido]);
+  return (
+    <Animated.View
+      style={{
+        opacity: v,
+        transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }],
+      }}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
 export function TelaDeHoje({
+  D,
+  cartao,
   saudacao,
   data,
   nomeDoBebe,
@@ -126,6 +204,9 @@ export function TelaDeHoje({
   aoVerJornada,
   sos,
 }: {
+  D: number;
+  /** O cartão da semana para os Stories. */
+  cartao: DadosDoCartao;
   saudacao: string;
   data: string;
   nomeDoBebe: string | null;
@@ -151,207 +232,232 @@ export function TelaDeHoje({
   const feitos = cuidados.filter((c) => c.feito).length;
   const proximo = cuidados.find((c) => !c.feito) ?? null;
   const resto = cuidados.filter((c) => c !== proximo);
+  const { pulso, brilho, festa } = useMomentoDoDia(D, feitos);
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: FUNDO }}
-      contentContainerStyle={{ paddingBottom: espaco.xxl }}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* O céu da hora, com o bebê da semana — o herói da tela. */}
-      <View style={{ height: 430 + topo, overflow: "hidden" }}>
-        <Image
-          source={ceu.arte}
-          style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }}
-          contentFit="cover"
-          accessibilityIgnoresInvertColors
-        />
-        <LinearGradient
-          colors={["rgba(255,248,245,0)", FUNDO]}
-          style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 120 }}
-        />
-        <View
-          style={{
-            paddingTop: topo + espaco.lg,
-            paddingHorizontal: 20,
-            flexDirection: "row",
-            alignItems: "flex-start",
-            justifyContent: "space-between",
-          }}
-        >
-          <View style={{ flex: 1 }}>
-            <Text
-              style={{
-                fontFamily: fonte.titulo,
-                fontSize: 12,
-                letterSpacing: 1.4,
-                textTransform: "uppercase",
-                color: ceu.sec,
-              }}
-            >
-              {data}
-            </Text>
-            <Text
-              accessibilityRole="header"
-              style={{
-                marginTop: 2,
-                fontFamily: fonte.titulo,
-                fontSize: 31,
-                lineHeight: 37,
-                letterSpacing: -0.5,
-                color: ceu.tinta,
-              }}
-            >
-              {saudacao}
-            </Text>
-          </View>
-          {sos}
-        </View>
-        <View style={{ alignItems: "center", marginTop: 2 }}>
-          <View style={{ alignItems: "center", justifyContent: "center" }}>
-            <Brilho tamanho={240} />
-            <Flutuar>
-              <Image
-                source={arteDoBebe(semana)}
-                style={{ width: 186, height: 186 }}
-                contentFit="contain"
-                accessibilityLabel={`${quem} com ${semana} semanas`}
-              />
-            </Flutuar>
-          </View>
-          {nomeDoBebe ? (
-            <Text style={{ fontFamily: fonte.titulo, fontSize: 22, color: "#2e2348" }}>
-              {nomeDoBebe}
-            </Text>
-          ) : null}
-          <Text
-            style={{
-              marginTop: 2,
-              paddingHorizontal: espaco.lg,
-              textAlign: "center",
-              fontFamily: fonte.forte,
-              fontSize: 14,
-              color: "#5d4d84",
-            }}
-          >
-            {semana} semanas{dias > 0 ? ` e ${dias} ${dias === 1 ? "dia" : "dias"}` : ""} · tamanho
-            de {bebe.fruit.toLowerCase()}
-          </Text>
-          <View style={{ flexDirection: "row", gap: espaco.sm, marginTop: 10 }}>
-            {faltam != null && faltam > 0 ? (
-              <Selo>
-                ⏳ faltam {faltam} {faltam === 1 ? "dia" : "dias"}
-              </Selo>
-            ) : null}
-            <Selo>📏 {bebe.size}</Selo>
-          </View>
-        </View>
-      </View>
-
-      {/* A folha que sobe sobre o céu. */}
-      <View
-        style={{
-          marginTop: -34,
-          borderTopLeftRadius: 32,
-          borderTopRightRadius: 32,
-          backgroundColor: FUNDO,
-          paddingHorizontal: 18,
-          paddingTop: 22,
-          gap: espaco.md,
-        }}
+    <View style={{ flex: 1, backgroundColor: FUNDO }}>
+      <ScrollView
+        style={{ flex: 1, backgroundColor: FUNDO }}
+        contentContainerStyle={{ paddingBottom: espaco.xxl }}
+        showsVerticalScrollIndicator={false}
       >
-        {avisos}
-        <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.md }}>
-          <View style={{ flex: 1 }}>
-            <Text
-              accessibilityRole="header"
-              style={{
-                fontFamily: fonte.titulo,
-                fontSize: 24,
-                letterSpacing: -0.3,
-                color: "#3a2230",
-              }}
-            >
-              O cuidado de hoje
-            </Text>
-            <Text style={{ marginTop: 2, fontFamily: fonte.media, fontSize: 14, color: "#9a7486" }}>
-              5 minutinhos para você e {quem}
-            </Text>
-          </View>
-          <AnelDoDia feitos={feitos} />
-        </View>
-
-        {/* A bolha, pequena: a personagem que acompanha, e não a dona da tela. */}
-        <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
-          <ArteDaBolha humor={humor} tamanho={58} />
+        {/* O céu da hora, com o bebê da semana — o herói da tela. */}
+        <View style={{ height: 430 + topo, overflow: "hidden" }}>
+          <Image
+            source={ceu.arte}
+            style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }}
+            contentFit="cover"
+            accessibilityIgnoresInvertColors
+          />
+          <LinearGradient
+            colors={["rgba(255,248,245,0)", FUNDO]}
+            style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 120 }}
+          />
+          {/* O céu se ilumina quando o quinto cuidado se acende. */}
+          <Animated.View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              top: 0,
+              bottom: 0,
+              backgroundColor: "#fff7e0",
+              opacity: brilho,
+            }}
+          />
           <View
             style={{
-              flex: 1,
-              borderRadius: 18,
-              borderTopLeftRadius: 6,
-              backgroundColor: cor.branco,
-              paddingHorizontal: 14,
-              paddingVertical: 10,
-              ...sombraDe("#b0708d", 0.6),
+              paddingTop: topo + espaco.lg,
+              paddingHorizontal: 20,
+              flexDirection: "row",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
             }}
           >
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{
+                  fontFamily: fonte.titulo,
+                  fontSize: 12,
+                  letterSpacing: 1.4,
+                  textTransform: "uppercase",
+                  color: ceu.sec,
+                }}
+              >
+                {data}
+              </Text>
+              <Text
+                accessibilityRole="header"
+                style={{
+                  marginTop: 2,
+                  fontFamily: fonte.titulo,
+                  fontSize: 31,
+                  lineHeight: 37,
+                  letterSpacing: -0.5,
+                  color: ceu.tinta,
+                }}
+              >
+                {saudacao}
+              </Text>
+            </View>
+            {sos}
+          </View>
+          <View style={{ alignItems: "center", marginTop: 2 }}>
+            <View style={{ alignItems: "center", justifyContent: "center" }}>
+              <Brilho tamanho={240} />
+              <Flutuar>
+                <Image
+                  source={arteDoBebe(semana)}
+                  style={{ width: 186, height: 186 }}
+                  contentFit="contain"
+                  accessibilityLabel={`${quem} com ${semana} semanas`}
+                />
+              </Flutuar>
+            </View>
+            {nomeDoBebe ? (
+              <Text style={{ fontFamily: fonte.titulo, fontSize: 22, color: "#2e2348" }}>
+                {nomeDoBebe}
+              </Text>
+            ) : null}
             <Text
-              style={{ fontFamily: fonte.media, fontSize: 14, lineHeight: 20, color: "#5b3a4a" }}
+              style={{
+                marginTop: 2,
+                paddingHorizontal: espaco.lg,
+                textAlign: "center",
+                fontFamily: fonte.forte,
+                fontSize: 14,
+                color: "#5d4d84",
+              }}
             >
-              {recado}
+              {semana} semanas{dias > 0 ? ` e ${dias} ${dias === 1 ? "dia" : "dias"}` : ""} ·
+              tamanho de {bebe.fruit.toLowerCase()}
             </Text>
+            <View style={{ flexDirection: "row", gap: espaco.sm, marginTop: 10 }}>
+              {faltam != null && faltam > 0 ? (
+                <Selo>
+                  ⏳ faltam {faltam} {faltam === 1 ? "dia" : "dias"}
+                </Selo>
+              ) : null}
+              <Selo>📏 {bebe.size}</Selo>
+            </View>
           </View>
         </View>
 
-        {proximo ? (
-          <ProximoCuidado c={proximo} aoAbrir={() => aoAbrir(proximo.chave)} />
-        ) : (
-          <DiaCheio quem={quem} />
-        )}
-
-        <View style={{ gap: 10 }}>
-          {resto.map((c) => (
-            <LinhaDoCuidado key={c.chave} c={c} aoAbrir={() => aoAbrir(c.chave)} />
-          ))}
-        </View>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`${chama} dias seguidos. Ver minha jornada`}
-          onPress={() => {
-            toque();
-            aoVerJornada();
+        {/* A folha que sobe sobre o céu. */}
+        <View
+          style={{
+            marginTop: -34,
+            borderTopLeftRadius: 32,
+            borderTopRightRadius: 32,
+            backgroundColor: FUNDO,
+            paddingHorizontal: 18,
+            paddingTop: 22,
+            gap: espaco.md,
           }}
-          style={({ pressed }) => ({
-            marginTop: espaco.xs,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            borderRadius: 18,
-            backgroundColor: "#fff1e6",
-            paddingHorizontal: 14,
-            paddingVertical: 13,
-            opacity: pressed ? 0.8 : 1,
-          })}
         >
-          <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: "#8a4d2a" }}>
-            {chama > 0 ? (
-              <>
-                <Text style={{ fontFamily: fonte.titulo, color: "#c2571a" }}>
-                  🔥 {chama} {chama === 1 ? "dia" : "dias"}
-                </Text>{" "}
-                cuidando de vocês
-              </>
+          {avisos}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.md }}>
+            <View style={{ flex: 1 }}>
+              <Text
+                accessibilityRole="header"
+                style={{
+                  fontFamily: fonte.titulo,
+                  fontSize: 24,
+                  letterSpacing: -0.3,
+                  color: "#3a2230",
+                }}
+              >
+                O cuidado de hoje
+              </Text>
+              <Text
+                style={{ marginTop: 2, fontFamily: fonte.media, fontSize: 14, color: "#9a7486" }}
+              >
+                5 minutinhos para você e {quem}
+              </Text>
+            </View>
+            <Animated.View style={{ transform: [{ scale: pulso }] }}>
+              <AnelDoDia feitos={feitos} />
+            </Animated.View>
+          </View>
+
+          {/* A bolha, pequena: a personagem que acompanha, e não a dona da tela. */}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
+            <ArteDaBolha humor={humor} tamanho={58} />
+            <View
+              style={{
+                flex: 1,
+                borderRadius: 18,
+                borderTopLeftRadius: 6,
+                backgroundColor: cor.branco,
+                paddingHorizontal: 14,
+                paddingVertical: 10,
+                ...sombraDe("#b0708d", 0.6),
+              }}
+            >
+              <Text
+                style={{ fontFamily: fonte.media, fontSize: 14, lineHeight: 20, color: "#5b3a4a" }}
+              >
+                {recado}
+              </Text>
+            </View>
+          </View>
+
+          <Entrar key={proximo?.chave ?? "cheio"}>
+            {proximo ? (
+              <ProximoCuidado c={proximo} aoAbrir={() => aoAbrir(proximo.chave)} />
             ) : (
-              "🌱 Sua jornada começa hoje"
+              <DiaCheio quem={quem} />
             )}
-          </Text>
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: "#7a3fd1" }}>
-            Ver minha jornada ›
-          </Text>
-        </Pressable>
-      </View>
-    </ScrollView>
+          </Entrar>
+
+          <View style={{ gap: 10 }}>
+            {resto.map((c) => (
+              <LinhaDoCuidado key={c.chave} c={c} aoAbrir={() => aoAbrir(c.chave)} />
+            ))}
+          </View>
+
+          <CompartilharASemana d={cartao} />
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${chama} dias seguidos. Ver minha jornada`}
+            onPress={() => {
+              toque();
+              aoVerJornada();
+            }}
+            style={({ pressed }) => ({
+              marginTop: espaco.xs,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              borderRadius: 18,
+              backgroundColor: "#fff1e6",
+              paddingHorizontal: 14,
+              paddingVertical: 13,
+              opacity: pressed ? 0.8 : 1,
+            })}
+          >
+            <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: "#8a4d2a" }}>
+              {chama > 0 ? (
+                <>
+                  <Text style={{ fontFamily: fonte.titulo, color: "#c2571a" }}>
+                    🔥 {chama} {chama === 1 ? "dia" : "dias"}
+                  </Text>{" "}
+                  cuidando de vocês
+                </>
+              ) : (
+                "🌱 Sua jornada começa hoje"
+              )}
+            </Text>
+            <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: "#7a3fd1" }}>
+              Ver minha jornada ›
+            </Text>
+          </Pressable>
+        </View>
+      </ScrollView>
+      {festa ? <Confete pecas={60} /> : null}
+    </View>
   );
 }
 

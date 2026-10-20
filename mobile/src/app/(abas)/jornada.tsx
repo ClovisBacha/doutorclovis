@@ -383,6 +383,14 @@ export function JornadaDaGestacao({
     return (
       <View style={{ flex: 1, backgroundColor: cor.fundo }}>
         <TelaDeHoje
+          D={D}
+          cartao={{
+            semana,
+            nomeDoBebe,
+            diasCheios: diasFechados(loja.blob).filter((d) => Math.floor(d / 7) === semana).length,
+            chama: diasDeChama,
+            faltam: diasQueFaltam(D),
+          }}
           saudacao={saudacao(hora, primeiroNome(perfil.display_name))}
           data={dataDeHoje(hoje)}
           nomeDoBebe={nomeDoBebe}
