@@ -239,8 +239,10 @@ export function lembretesDe(c: Compromisso, agora: Date): Lembrete[] {
 
 /**
  * Todos os lembretes a agendar, os mais próximos primeiro. O iOS guarda no
- * máximo 64 notificações locais por app — e a meditação usa algumas; 20 basta
- * para os próximos dez compromissos, e a próxima abertura do app completa.
+ * máximo 64 notificações locais por app, e elas são divididas: a meditação usa
+ * até 14, a jornada até 16 (`lembrete-da-jornada`) e a agenda até 20 — 50 no
+ * total. 20 bastam para os próximos dez compromissos, e a próxima abertura do
+ * app completa.
  */
 export function lembretesDaAgenda(lista: readonly Compromisso[], agora: Date, max = 20) {
   return lista

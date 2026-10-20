@@ -52,6 +52,11 @@ import {
 } from "~/lib/jornada/pos-parto";
 import { AgendaNaHoje } from "~/componentes/agenda/pecas";
 import {
+  ConviteDosLembretes,
+  contextoDoLembrete,
+  useLembretesDaJornada,
+} from "~/componentes/jornada/lembretes";
+import {
   cuidadosDoDia,
   dataDeHoje,
   diasQueFaltam,
@@ -116,6 +121,8 @@ import { ALVO_MINIMO, cor, espaco, fonte, raio, sombra } from "~/tema";
  */
 export default function AbaJornada() {
   const { dia, loja } = useJornada();
+  /* Os lembretes acompanham o estado do dia (a chama, o que já foi feito). */
+  useLembretesDaJornada(dia, loja);
 
   if (dia.modo === "carregando") {
     return (
@@ -401,7 +408,16 @@ export function JornadaDaGestacao({
               <PortaDoNascimento nome={nomeDoBebe} aoTocar={() => ir("/jornada/nascimento")} />
             ) : null
           }
-          agenda={<AgendaNaHoje loja={loja} />}
+          agenda={
+            <>
+              <ConviteDosLembretes
+                uid={dia.uid}
+                contexto={contextoDoLembrete(dia, loja.blob)}
+                mostrar={feitos > 0 || diasDeChama > 0}
+              />
+              <AgendaNaHoje loja={loja} />
+            </>
+          }
           aoAbrir={(c) => ir(ROTA_DO_CUIDADO[c])}
           aoVerJornada={() => ir("/jornada/trilha")}
           sos={null}
@@ -688,7 +704,16 @@ export function JornadaDoPosParto({
         chama={diasDeChama}
         figurinhas={figurinhas}
         avisos={avisos}
-        agenda={<AgendaNaHoje loja={loja} />}
+        agenda={
+          <>
+            <ConviteDosLembretes
+              uid={dia.uid}
+              contexto={contextoDoLembrete(dia, loja.blob)}
+              mostrar={feitos > 0 || diasDeChama > 0}
+            />
+            <AgendaNaHoje loja={loja} />
+          </>
+        }
         extra={<BotaoDeConquistas leitura={conquistas} posParto />}
         aoMarcarHumor={(humor) => {
           gravarChave(CHAVE_CHECKIN, novoCheckin(checkin, humor, hoje));

@@ -373,6 +373,20 @@ function FormularioDoPerfil() {
           </Linha>
         </Cartao>
 
+        <Cartao aoTocar={() => router.push("/lembretes")} rotuloAcessivel="Lembretes">
+          <Linha estilo={{ justifyContent: "space-between" }}>
+            <View style={{ flex: 1, gap: 2 }}>
+              <T tipo="rotulo">Lembretes</T>
+              <T tipo="apagado" estilo={{ fontSize: 14 }}>
+                O cuidado de hoje, a semana nova, a meditação e as consultas.
+              </T>
+            </View>
+            <T tipo="rotulo" cor={cor.textoApagado}>
+              ›
+            </T>
+          </Linha>
+        </Cartao>
+
         {IA_NO_APP ? <CartaoDaPermissaoDeIA /> : null}
 
         <AvisoMedico />

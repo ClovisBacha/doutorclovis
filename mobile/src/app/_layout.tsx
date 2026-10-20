@@ -37,6 +37,7 @@ export default function Raiz() {
       <ProvedorDeSessao>
         <GuardaDaSessao />
         {Platform.OS !== "web" ? <ToqueNaNotificacao /> : null}
+        {Platform.OS !== "web" ? <VigiaDosLembretes /> : null}
         <StatusBar style="dark" />
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: cor.fundo } }}>
           {/* Folha (pageSheet), como a Central de Emergência do site: a tela
@@ -84,5 +85,28 @@ function ToqueNaNotificacao() {
     const rota = resposta.notification.request.content.data?.rota;
     if (typeof rota === "string" && rota.startsWith("/")) router.push(rota as Href);
   }, [resposta, sessao]);
+  return null;
+}
+
+/**
+ * Os lembretes da jornada são agendados com até duas semanas de antecedência,
+ * com o texto do momento — o bebê, a semana nova. Se o Modo Cuidado liga (ou
+ * o bebê nasce, ou ela volta para a gestação), os que já estão no iPhone
+ * falariam da coisa errada: saem na hora, e a tela Hoje os refaz com o texto
+ * certo na próxima abertura.
+ */
+function VigiaDosLembretes() {
+  const { perfil } = useSessao();
+  const chave = perfil ? `${perfil.care_mode === true}|${perfil.birth_date ?? ""}` : null;
+  const anterior = useRef<string | null>(null);
+  useEffect(() => {
+    if (chave == null) return;
+    if (anterior.current != null && anterior.current !== chave) {
+      void import("~/lib/lembretes-da-jornada")
+        .then((m) => m.cancelarLembretesDaJornada())
+        .catch(() => {});
+    }
+    anterior.current = chave;
+  }, [chave]);
   return null;
 }

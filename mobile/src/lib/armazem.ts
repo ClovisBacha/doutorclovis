@@ -46,6 +46,9 @@ export async function limparRastrosLocais(): Promise<void> {
     .then((m) => m.cancelarLembretesDaMeditacao())
     .catch(() => {});
   await import("~/lib/agenda/lembretes").then((m) => m.cancelarLembretesDaAgenda()).catch(() => {});
+  await import("~/lib/lembretes-da-jornada")
+    .then((m) => m.cancelarLembretesDaJornada())
+    .catch(() => {});
   try {
     const chaves = await AsyncStorage.getAllKeys();
     const nossas = chaves.filter((c) => c.startsWith("dc-"));
