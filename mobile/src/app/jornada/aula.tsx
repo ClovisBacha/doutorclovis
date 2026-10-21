@@ -12,7 +12,8 @@ import { concluirMomento, FimDoMomento, type Desfecho } from "~/componentes/jorn
 import { pagarAula } from "~/componentes/jornada/economia";
 import { useBalanco, useQuique } from "~/componentes/jornada/efeitos";
 import { BarraDoTopo, Bolha, BolhaFalando, voltarParaJornada } from "~/componentes/jornada/pecas";
-import { useAtividade } from "~/componentes/jornada/usarJornada";
+import { AberturaDaAula } from "~/componentes/jornada/abertura-da-aula";
+import { useAtividade, useJornada } from "~/componentes/jornada/usarJornada";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import {
   comecarPerguntas,
@@ -28,7 +29,7 @@ import {
 } from "~/lib/jornada/aula";
 import { tocarConquista } from "~/lib/audio/som-de-conquista";
 import { marcar } from "~/lib/jornada/loja";
-import { sementesDaAula } from "~/lib/jornada/momentos";
+import { feito, flagsDoDia, sementesDaAula } from "~/lib/jornada/momentos";
 import { ALVO_MINIMO, cor, espaco, fonte } from "~/tema";
 import { AvisoMedico } from "~/componentes/aviso-medico";
 
@@ -42,9 +43,38 @@ import { AvisoMedico } from "~/componentes/aviso-medico";
  * reabre. Se o banco de aulas não descer, o desafio do dia (local) entra no
  * lugar — o momento do dia não fica refém da rede.
  *
- * Bancada: /jornada/aula?bancada=1 [&etapa=pergunta|verificada|fim|feita]
+ * Abre com a abertura de 1,5 s na cor da semana (`AberturaDaAula`, o
+ * `QuizIntro` do site), que o banco de aulas aproveita para descer.
+ *
+ * Bancada: /jornada/aula?bancada=1 (com a abertura) [&etapa=pergunta|verificada|fim|feita]
  */
 export default function Aula() {
+  const { dia, loja } = useJornada();
+  /* A abertura só vale para a aula de HOJE ainda por fazer (e nunca no luto
+     nem no pós-parto, que não têm aula). Na bancada, `&etapa=` a dispensa. */
+  const [abertura, setAbertura] = useState<"decidindo" | "mostrando" | "feita">("decidindo");
+  useEffect(() => {
+    if (abertura !== "decidindo" || dia.modo === "carregando") return;
+    if (dia.modo !== "gestacao" || dia.cuidado) return setAbertura("feita");
+    if (ehBancada()) return setAbertura(parametroDaBancada("etapa") ? "feita" : "mostrando");
+    if (!loja.pronto) return;
+    setAbertura(feito(flagsDoDia(loja.blob, dia.D), "aula") ? "feita" : "mostrando");
+  }, [abertura, dia, loja.pronto, loja.blob]);
+  return (
+    <View style={{ flex: 1 }}>
+      <AulaDoDia />
+      {abertura === "mostrando" && dia.modo === "gestacao" ? (
+        <AberturaDaAula
+          semana={dia.semana}
+          nomeDoBebe={(dia.perfil.baby_name ?? "").trim() || null}
+          aoTerminar={() => setAbertura("feita")}
+        />
+      ) : null}
+    </View>
+  );
+}
+
+function AulaDoDia() {
   const at = useAtividade("aula");
   const [quiz, setQuiz] = useState<DailyQuiz | null | "carregando">("carregando");
   const [tentativa, setTentativa] = useState(0);
