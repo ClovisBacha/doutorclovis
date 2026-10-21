@@ -22,7 +22,7 @@ const gest = (extra: Partial<ContextoDoLembrete> = {}): ContextoDoLembrete => ({
   feitosHoje: 0,
   totalDoDia: 5,
   desafio: (D) => (D % 2 === 0 ? `Desafio do dia ${D}` : null),
-  temAula: (D) => D % 3 === 0,
+  aula: (D) => (D % 3 === 0 ? `O assunto do dia ${D}` : null),
   ...extra,
 });
 
@@ -55,8 +55,10 @@ describe("o cuidado de hoje", () => {
     );
     /* D 172: par → desafio (e 172 não é múltiplo de 3, então não há aula). */
     expect(textoDoCuidado(gest(), 1).corpo).toBe("Desafio de hoje: Desafio do dia 172");
-    /* D 174: múltiplo de 3 → a aula, pelo tema do dia. */
-    expect(textoDoCuidado(gest(), 3).corpo).toMatch(/^Aula de hoje: /);
+    /* D 174: múltiplo de 3 → a aula, pelo assunto da própria lição. */
+    expect(textoDoCuidado(gest(), 3).corpo).toBe(
+      "Aula de hoje: O assunto do dia 174. Uns minutinhos para você e Helena.",
+    );
     /* Sem desafio nem aula. */
     expect(textoDoCuidado(gest({ nomeDoBebe: null }), 2).corpo).toBe(
       "5 minutinhos para você e o bebê.",

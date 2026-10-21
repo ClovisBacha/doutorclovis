@@ -23,7 +23,6 @@
  */
 
 import { babyForWeek } from "@/lib/gestacao";
-import { temaDoDia } from "~/lib/jornada/dia";
 import { orientacaoDoPos, ULTIMA_IDADE_DA_TRILHA } from "~/lib/jornada/pos-parto";
 
 export const DIAS_AGENDADOS = 14;
@@ -57,8 +56,12 @@ export type ContextoDoLembrete = {
   totalDoDia: number;
   /** O desafio do dia D, como o app o mostra (`null` = não há). */
   desafio: (D: number) => string | null;
-  /** Gestação: o dia D tem aula? (aí o aviso fala dela, e não do desafio). */
-  temAula?: (D: number) => boolean;
+  /**
+   * Gestação: o assunto da aula do dia D (`tituloCurtoDaAula`), quando já
+   * se sabe — aí o aviso fala dela, e não do desafio. As aulas não seguem o
+   * ritmo de temas por dia da semana: o assunto sai da própria lição.
+   */
+  aula?: (D: number) => string | null;
 };
 
 export type LembreteDaJornada = { id: string; quando: Date; titulo: string; corpo: string };
@@ -148,11 +151,11 @@ export function textoDoCuidado(
       corpo: `Um cuidado de hoje mantém a chama acesa. ${maiuscula(quem)} agradece 💜`,
     };
   }
-  if (c.temAula?.(D)) {
-    const tema = temaDoDia(D);
+  const aula = c.aula?.(D);
+  if (aula) {
     return {
       titulo: "O cuidado de hoje 💜",
-      corpo: `Aula de hoje: ${tema.emoji} ${tema.rotulo}. Uns minutinhos para você e ${quem}.`,
+      corpo: `Aula de hoje: ${aula}. Uns minutinhos para você e ${quem}.`,
     };
   }
   const desafio = c.desafio(D);

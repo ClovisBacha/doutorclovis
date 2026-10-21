@@ -2,7 +2,6 @@ import { useFocusEffect } from "expo-router";
 import { Bell } from "lucide-react-native";
 import { useCallback, useEffect, useState } from "react";
 import { Linking, Modal, Platform, Pressable, ScrollView, Text, View } from "react-native";
-import { temQuizNoDia } from "@/lib/daily-quizzes";
 import { toque } from "~/componentes/base";
 import { sombraDe } from "~/componentes/jornada/atividade";
 import type { DiaDaJornada } from "~/componentes/jornada/usarJornada";
@@ -74,7 +73,6 @@ export function contextoDoLembrete(
     feitosHoje: contarMomentos(flagsDoDia(blob, dia.D)),
     totalDoDia: 5,
     desafio: (D) => desafioDaGestacao(D)?.label ?? null,
-    temAula: (D) => temQuizNoDia(D),
   };
 }
 

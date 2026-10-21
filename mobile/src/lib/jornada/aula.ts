@@ -117,3 +117,23 @@ export function tituloDaLicao(teach: string): string {
   const frase = (m ? m[1] : t).trim();
   return frase.length > 90 ? `${frase.slice(0, 87).trimEnd()}…` : frase;
 }
+
+/**
+ * O assunto da aula numa linha curta (a folha do dia, a Semana e o lembrete):
+ * a primeira frase da lição, sem o ponto, cortada no espaço perto de 46
+ * caracteres. As aulas não seguem o ritmo de temas por dia da semana — por
+ * isso o rótulo de cada dia sai da própria lição, e não de `temaDoDia`.
+ */
+export function tituloCurtoDaAula(teach: string): string {
+  const frase = (teach ?? "")
+    .trim()
+    .split(/(?<=[.!?])\s/)[0]!
+    .replace(/[.!?]+$/, "")
+    .trim();
+  if (frase.length <= 46) return frase;
+  const corte = frase.slice(0, 44);
+  const espacoFinal = corte.lastIndexOf(" ");
+  /* Sem vírgula ou dois-pontos colados nas reticências (",…" lia como erro). */
+  const base = (espacoFinal > 24 ? corte.slice(0, espacoFinal) : corte).replace(/[\s,;:–—-]+$/, "");
+  return `${base}…`;
+}

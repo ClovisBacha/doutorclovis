@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
+import { tituloCurtoDaAula } from "~/lib/jornada/aula";
 import { desafioDaGestacao } from "~/lib/jornada/desafios-no-app";
 import { carregarQuizDoDia, temQuizNoDia, type DailyQuiz } from "@/lib/daily-quizzes";
 import { recadoDaBolha } from "@/lib/recado-da-bolha";
@@ -46,18 +47,6 @@ const ROTA: Record<Chave, string> = {
   bonding: "/jornada/bebe",
   gratitude: "/jornada/gratidao",
 };
-
-/** O assunto da aula numa linha: a primeira frase da lição, cortada no espaço. */
-function tituloDaAula(q: DailyQuiz): string {
-  const frase = q.teach
-    .split(/(?<=[.!?])\s/)[0]
-    .replace(/[.!?]+$/, "")
-    .trim();
-  if (frase.length <= 46) return frase;
-  const corte = frase.slice(0, 44);
-  const espacoFinal = corte.lastIndexOf(" ");
-  return `${(espacoFinal > 24 ? corte.slice(0, espacoFinal) : corte).trimEnd()}…`;
-}
 
 /** A cara da bolha (`humorDaJornada` do site, sem a festa: a festa é de instante). */
 function humorDoDia(feitos: number, hora: number): HumorDaArte {
@@ -125,7 +114,7 @@ export default function FolhaDoDia() {
   const desafio = !temQuizNoDia(D) ? desafioDaGestacao(D) : null;
   const descDaAula =
     quiz && quiz !== "carregando"
-      ? tituloDaAula(quiz)
+      ? tituloCurtoDaAula(quiz.teach)
       : quiz === "carregando"
         ? "Aula de hoje"
         : desafio?.label || "O desafio de hoje";

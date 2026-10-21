@@ -2,7 +2,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, Modal, Pressable, Text, View } from "react-native";
-import { conquistaPorChave } from "@/lib/conquistas";
+import { conquistaPorChave, type ConquistaDef } from "@/lib/conquistas";
 import { NaoConsegueLer, toque } from "~/componentes/base";
 import { Confete } from "~/componentes/jornada/pecas";
 import type { LeituraDasConquistas } from "~/componentes/jornada/economia";
@@ -20,6 +20,8 @@ import { descricaoNoApp, montarGrade, resumo, secoes, type Cartao } from "~/lib/
 import { dataCompleta } from "~/lib/jornada/dia";
 import { useSessao } from "~/lib/sessao";
 import { RARIDADES } from "@/lib/conquistas";
+import { CompartilharConquista } from "~/componentes/jornada/cartao-de-conquista";
+import { cartaoDaConquista } from "~/lib/jornada/cartoes";
 import { ALVO_MINIMO, cor, espaco, fonte } from "~/tema";
 
 /**
@@ -63,7 +65,11 @@ export function AbaDasConquistas({
     [leitura],
   );
   const [resgatando, setResgatando] = useState<Set<string>>(new Set());
-  const [conquistada, setConquistada] = useState<{ emoji: string; titulo: string } | null>(null);
+  const [conquistada, setConquistada] = useState<{
+    emoji: string;
+    titulo: string;
+    def: ConquistaDef | null;
+  } | null>(null);
   const [festa, setFesta] = useState(0);
   const [novas, setNovas] = useState<string[]>([]);
 
@@ -123,7 +129,11 @@ export function AbaDasConquistas({
       vibrar("sucesso");
       avisar(`+${res.granted} 🌱`);
       const def = conquistaPorChave(key);
-      setConquistada({ emoji: def?.emoji ?? "🏅", titulo: def?.title ?? "Conquista" });
+      setConquistada({
+        emoji: def?.emoji ?? "🏅",
+        titulo: def?.title ?? "Conquista",
+        def: def ?? null,
+      });
     } else if (res.repetido) {
       avisar("Essas Sementinhas já são suas 💛");
     }
@@ -386,11 +396,16 @@ export function AbaDasConquistas({
             >
               {conquistada?.titulo}
             </Text>
+            {conquistada?.def ? (
+              <View style={{ alignSelf: "stretch", marginTop: espaco.lg }}>
+                <CompartilharConquista d={cartaoDaConquista(conquistada.def)} />
+              </View>
+            ) : null}
             <Pressable
               accessibilityRole="button"
               onPress={() => setConquistada(null)}
               style={({ pressed }) => ({
-                marginTop: espaco.lg,
+                marginTop: espaco.sm,
                 alignSelf: "stretch",
                 minHeight: ALVO_MINIMO,
                 borderRadius: 999,

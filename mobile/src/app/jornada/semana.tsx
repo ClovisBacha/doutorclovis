@@ -21,8 +21,9 @@ import {
   diasDaSemana,
   quandoAbre,
   SEMANA_MINIMA,
-  temaDoDia,
 } from "~/lib/jornada/dia";
+import { carregarQuizDoDia } from "@/lib/daily-quizzes";
+import { tituloCurtoDaAula } from "~/lib/jornada/aula";
 import { estadoAtual, gravarChave } from "~/lib/jornada/loja";
 import { CHAVE_FIGURINHAS, listaDeNumeros } from "~/lib/jornada/momentos";
 import { estadoDoNo } from "~/lib/jornada/trilha";
@@ -47,6 +48,29 @@ export default function Semana() {
     return Number.isFinite(n) && n >= SEMANA_MINIMA ? Math.min(a, Math.floor(n)) : a;
   };
   const [semana, setSemana] = useState<number | null>(() => inicial(atual));
+  /* O assunto de cada dia sai da PRÓPRIA aula (as aulas não seguem o ritmo de
+     temas por dia da semana: o rótulo pelo `D % 7` dizia "Seu corpo" num dia
+     cuja aula era sobre outra coisa). Um download só, guardado pela sessão. */
+  const [titulos, setTitulos] = useState<Record<number, string>>({});
+  useEffect(() => {
+    if (semana == null) return;
+    let vivo = true;
+    const dias = diasDaSemana(semana).filter((D) => D >= D_MINIMO);
+    void Promise.all(
+      dias.map(async (D) => {
+        const q = await carregarQuizDoDia(D);
+        return [D, q ? tituloCurtoDaAula(q.teach) : null] as const;
+      }),
+    ).then((pares) => {
+      if (!vivo) return;
+      const novos: Record<number, string> = {};
+      for (const [D, t] of pares) if (t) novos[D] = t;
+      setTitulos((atual) => ({ ...atual, ...novos }));
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [semana]);
   /* Depois do parto, a semana é uma LEMBRANÇA do álbum da gestação (1–42). */
   const [semanaDaMemoria, setSemanaDaMemoria] = useState(() => {
     const n = Number(pedida);
@@ -161,14 +185,14 @@ export default function Semana() {
       <Cartao estilo={{ padding: 0, gap: 0, overflow: "hidden" }}>
         {dias.map((D, i) => {
           const no = estadoDoNo(loja.blob, D, hojeD);
-          const tema = temaDoDia(D);
+          const assunto = titulos[D] ?? "Aula do dia";
           const data = dataDoDia(D, hojeD, hoje);
           const ehHoje = no.tipo === "hoje";
           return (
             <View
               key={D}
               accessible
-              accessibilityLabel={`Dia ${diaNaSemana(D)}, ${tema.rotulo}, ${
+              accessibilityLabel={`Dia ${diaNaSemana(D)}, ${assunto}, ${
                 no.tipo === "futuro"
                   ? `abre ${quandoAbre(D, hojeD, hoje)}`
                   : `${no.momentos} de 5 momentos`
@@ -207,7 +231,7 @@ export default function Semana() {
                     color: no.tipo === "futuro" ? cor.textoApagado : cor.texto,
                   }}
                 >
-                  {tema.emoji} {tema.rotulo}
+                  📖 {assunto}
                 </Text>
                 <Text style={{ fontFamily: fonte.normal, fontSize: 13, color: cor.textoApagado }}>
                   {no.tipo === "futuro"

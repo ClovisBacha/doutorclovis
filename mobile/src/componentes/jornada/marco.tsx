@@ -2,7 +2,9 @@ import { Modal, Text, View } from "react-native";
 import { babyForWeek, fruitEmojiForWeek } from "@/lib/gestacao";
 import { BotaoDaAtividade, Brilho } from "~/componentes/jornada/atividade";
 import { corJornada } from "~/componentes/jornada/cores";
+import { CompartilharConquista } from "~/componentes/jornada/cartao-de-conquista";
 import { Confete } from "~/componentes/jornada/pecas";
+import { cartaoDoMarco } from "~/lib/jornada/cartoes";
 import type { Festa } from "~/lib/jornada/marcos";
 import { cor, espaco, fonte } from "~/tema";
 
@@ -126,8 +128,13 @@ export function FestaDoMarco({
               +{festa.sementinhas} sementinhas 🌱
             </Text>
           </View>
-          <View style={{ alignSelf: "stretch", marginTop: espaco.sm }}>
+          <View style={{ alignSelf: "stretch", marginTop: espaco.sm, gap: espaco.sm }}>
             <BotaoDaAtividade cor={corJornada.roxo} rotulo="Que bom!" aoTocar={aoFechar} />
+            <CompartilharConquista
+              d={cartaoDoMarco(m, nomeDoBebe)}
+              tinta={corJornada.roxo}
+              fundoDoBotao={corJornada.roxoFundo}
+            />
           </View>
         </View>
         <Confete pecas={48} />

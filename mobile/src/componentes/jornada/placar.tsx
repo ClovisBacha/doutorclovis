@@ -1,7 +1,9 @@
 import { Text, View } from "react-native";
 import { T } from "~/componentes/base";
 import { corJornada } from "~/componentes/jornada/cores";
+import { CompartilharConquista } from "~/componentes/jornada/cartao-de-conquista";
 import { Folha } from "~/componentes/jornada/pecas";
+import { CHAMA_PARA_COMPARTILHAR, cartaoDaChama } from "~/lib/jornada/cartoes";
 import { BolhaViva } from "~/componentes/movimento";
 import { itensDaLoja } from "~/lib/jornada/enfeites";
 import { explicacaoDaChama } from "~/lib/jornada/trilha";
@@ -44,6 +46,13 @@ export function FolhasDoPlacar({
             {l}
           </T>
         ))}
+        {chama >= CHAMA_PARA_COMPARTILHAR ? (
+          <CompartilharConquista
+            d={cartaoDaChama(chama, pos)}
+            tinta="#c2410c"
+            fundoDoBotao="#ffedd5"
+          />
+        ) : null}
       </Folha>
 
       <Folha aberta={aberta === "sementes"} aoFechar={aoFechar} titulo="🌱 Sementinhas">

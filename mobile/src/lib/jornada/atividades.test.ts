@@ -8,6 +8,7 @@ import {
   INICIO_DA_AULA,
   podeVerificar,
   dividirLicao,
+  tituloCurtoDaAula,
   tituloDaLicao,
   verificar,
 } from "./aula";
@@ -91,6 +92,22 @@ describe("a aula: uma tentativa por pergunta", () => {
     const longa = "A".repeat(100) + ". Resto.";
     expect(dividirLicao(longa)).toEqual({ titulo: null, corpo: longa });
     expect(dividirLicao("Uma frase só.")).toEqual({ titulo: null, corpo: "Uma frase só." });
+  });
+
+  test("o assunto curto da aula: a primeira frase, sem o ponto, cortada no espaço", () => {
+    expect(tituloCurtoDaAula("Cãibras são comuns. Alongue a panturrilha.")).toBe(
+      "Cãibras são comuns",
+    );
+    const longa =
+      "O ferro ajuda a levar oxigênio para você e para o bebê durante toda a gestação. Fim.";
+    const t = tituloCurtoDaAula(longa);
+    expect(t.endsWith("…")).toBe(true);
+    expect(t.length).toBeLessThanOrEqual(46);
+    expect(t).not.toMatch(/ …$/);
+    /* O corte que cai depois de uma vírgula não deixa ",…". */
+    expect(
+      tituloCurtoDaAula("Se o TOTG indicar diabetes gestacional, procure seu médico. Fim."),
+    ).toBe("Se o TOTG indicar diabetes gestacional…");
   });
 
   test("o título é a primeira frase da lição", () => {

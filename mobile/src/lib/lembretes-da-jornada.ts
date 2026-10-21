@@ -1,7 +1,10 @@
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import { gravarJson, lerJson } from "~/lib/armazem";
+import { carregarQuizDoDia } from "@/lib/daily-quizzes";
+import { tituloCurtoDaAula } from "~/lib/jornada/aula";
 import {
+  DIAS_AGENDADOS,
   lembretesDaJornada,
   lerPreferencia,
   type ContextoDoLembrete,
@@ -68,13 +71,31 @@ export async function cancelarLembretesDaJornada() {
   }
 }
 
+/**
+ * O assunto das aulas dos dias agendados (gestação), para o aviso dizer do
+ * que é a aula de amanhã. O banco de aulas é baixado uma vez por sessão;
+ * se falhar, o aviso fala do desafio do dia.
+ */
+async function comAulas(c: ContextoDoLembrete): Promise<ContextoDoLembrete> {
+  if (c.modo !== "gestacao" || c.D == null) return c;
+  const assuntos: Record<number, string> = {};
+  await Promise.all(
+    Array.from({ length: DIAS_AGENDADOS }, (_, i) => c.D! + i).map(async (D) => {
+      const q = await carregarQuizDoDia(D);
+      if (q) assuntos[D] = tituloCurtoDaAula(q.teach);
+    }),
+  );
+  return { ...c, aula: (D) => assuntos[D] ?? null };
+}
+
 async function agendar(pref: PreferenciaDosLembretes, contexto: ContextoDoLembrete) {
   if (Platform.OS === "web") return;
   await cancelarLembretesDaJornada();
   if (!pref.hora && !pref.semanaNova) return;
   if (!(await notificacoesPermitidas(false))) return;
+  const ctx = await comAulas(contexto);
   try {
-    for (const l of lembretesDaJornada(pref, contexto)) {
+    for (const l of lembretesDaJornada(pref, ctx)) {
       await Notifications.scheduleNotificationAsync({
         identifier: `${PREFIXO}${l.id}`,
         content: { title: l.titulo, body: l.corpo, data: { rota: "/jornada" } },
