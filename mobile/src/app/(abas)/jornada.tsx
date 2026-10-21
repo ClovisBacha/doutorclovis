@@ -51,6 +51,8 @@ import {
   type DadosDoNascimento,
 } from "~/lib/jornada/pos-parto";
 import { AgendaNaHoje } from "~/componentes/agenda/pecas";
+import { carimbarPresenca } from "~/componentes/amigas/economia";
+import { PortaDasAmigas } from "~/componentes/amigas/pecas";
 import {
   ConviteDosLembretes,
   contextoDoLembrete,
@@ -123,6 +125,11 @@ export default function AbaJornada() {
   const { dia, loja } = useJornada();
   /* Os lembretes acompanham o estado do dia (a chama, o que já foi feito). */
   useLembretesDaJornada(dia, loja);
+  /* "Vista há 2h" na lista das amigas: uma vez por abertura do app. */
+  const comConta = dia.modo !== "carregando" && dia.modo !== "falhou";
+  useEffect(() => {
+    if (comConta) carimbarPresenca();
+  }, [comConta]);
 
   if (dia.modo === "carregando") {
     return (
@@ -465,7 +472,7 @@ export function JornadaDaGestacao({
         aoAbrirLoja={() =>
           ir(aResgatar > 0 ? "/jornada/recompensas?aba=conquistas" : "/jornada/recompensas")
         }
-        aoAbrirAmigas={() => router.navigate("/comunidade" as never)}
+        aoAbrirAmigas={() => ir("/amigas")}
         aoAbrirFolha={setFolha}
         aoContarNascimento={() => ir("/jornada/nascimento")}
         decoracao={decoracao}
@@ -714,7 +721,12 @@ export function JornadaDoPosParto({
             <AgendaNaHoje loja={loja} />
           </>
         }
-        extra={<BotaoDeConquistas leitura={conquistas} posParto />}
+        extra={
+          <>
+            <BotaoDeConquistas leitura={conquistas} posParto />
+            <PortaDasAmigas rota={rota("/amigas")} />
+          </>
+        }
         aoMarcarHumor={(humor) => {
           gravarChave(CHAVE_CHECKIN, novoCheckin(checkin, humor, hoje));
           marcarNoPos(D, "humor");
