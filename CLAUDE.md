@@ -18,6 +18,22 @@ servidor dele (`/_serverFn/<sha256 do arquivo e do nome>`, ver
 site do ar derruba compras, SOS e tudo o que passa pelo servidor — e mexer num
 arquivo de `src/` que o app importa muda o que o app faz.
 
+## ⚠️ O APP É REDE SOCIAL + GAMIFICAÇÃO, NÃO CONSELHO MÉDICO (decisão do dono, 21/10/2026)
+
+Nas palavras dele: "Essa questão de conselhos médicos etc queria tirar a ideia,
+seria mais usar como uma rede social e questão da gamificação. Alguns dados de
+guardar da saúde para o SOS e o acompanhamento do Bebê."
+
+- O app não diz o que ela deve fazer clinicamente: sem triagem, sem interpretar
+  número (pressão, glicemia, chutes, contrações), sem exame, remédio,
+  suplemento ou dieta como orientação.
+- Sinal de alerta mora num lugar só: o SOS.
+- Dado de saúde só o que o SOS e o acompanhamento do bebê usam: o cartão do SOS
+  (contato, tipo sanguíneo, alergias, medicações, médico de contato), a datação
+  da gestação, o nascimento e os movimentos do bebê.
+- A auditoria do que foge disso e o plano estão no diário
+  (`docs/diario/2026-out.md`, "21/10 — auditoria").
+
 ## Stack
 
 - **React 19** + **TanStack Start / Router** (SSR, file-based routing)
