@@ -45,8 +45,17 @@ export function estadoDe(
  * ela não tinha como cumprir. Saem da grade enquanto trancadas; quem já as
  * ganhou (no site) continua vendo a sua. Quando a tela existir no app, a
  * chave sai daqui.
+ *
+ * ⚠️ 21/10/2026, decisão do dono (rede social + gamificação, não conselho
+ * médico): saíram o registro de peso, pressão e glicemia e a altura e o peso
+ * de antes no Perfil. As três conquistas que pagavam por isso ("Saúde em
+ * Dia", "Semana Saudável" e "Perfil Completo", que o servidor só dá com altura
+ * e peso) ficam aqui — o jogo não premia mais dado de saúde.
  */
 export const SEM_CAMINHO_NO_APP: ReadonlySet<string> = new Set([
+  "first_health_log",
+  "health_7_days",
+  "profile_complete",
   "companion_invited",
   "album_post",
   "prenatal_done",

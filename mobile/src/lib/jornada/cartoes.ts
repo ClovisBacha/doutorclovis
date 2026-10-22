@@ -7,7 +7,8 @@
  * Sem react-native aqui: é testado pelo bun.
  */
 
-import { babyForWeek, fruitEmojiForWeek } from "@/lib/gestacao";
+import { fruitEmojiForWeek } from "@/lib/gestacao";
+import { bebeDaSemana } from "~/lib/bebe-da-semana";
 import { RARIDADES, type ConquistaDef } from "@/lib/conquistas";
 import type { DadosDoCartaoDeConquista } from "~/componentes/jornada/cartao-de-conquista";
 import { descricaoNoApp } from "~/lib/jornada/conquistas";
@@ -27,7 +28,7 @@ export function cartaoDaConquista(def: ConquistaDef): DadosDoCartaoDeConquista {
 export function cartaoDoMarco(m: Marco, nomeDoBebe: string | null): DadosDoCartaoDeConquista {
   const quem = nomeDoBebe?.trim() || null;
   if (m.tipo === "semana") {
-    const b = babyForWeek(m.semana);
+    const b = bebeDaSemana(m.semana);
     return {
       eyebrow: "Novo marco",
       titulo: `Semana ${m.semana}!`,

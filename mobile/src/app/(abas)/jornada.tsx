@@ -1,7 +1,7 @@
 import { router, useFocusEffect } from "expo-router";
 import { Award, ChevronRight, Footprints, PenLine, Wind } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Linking, Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Botao, Cartao, Carregando, NaoConsegueLer, T, Tela, toque } from "~/componentes/base";
 import { rota } from "~/componentes/jornada/bancada";
@@ -364,7 +364,7 @@ export function JornadaDaGestacao({
   const pele = typeof skin === "string" ? (TRILHA_SKINS[skin] ?? null) : null;
   const aoGravarDecoracao = useCallback((d: Decoracao) => gravarChave(CHAVE_DECOR, d), []);
 
-  /* Passou de 42 semanas: a trilha (presa no dia 300) dá lugar ao alerta. */
+  /* Passou de 42 semanas: a trilha (presa no dia 300) dá lugar à tela da reta final. */
   if (dia.passouDe42) return <AlertaDas42Semanas nomeDoBebe={nomeDoBebe} />;
 
   if (ehHoje) {
@@ -1078,6 +1078,15 @@ function AvisoDeConquista({
  * com o consultório pela agenda DELE, que o app não tem; aqui o caminho é o SOS,
  * que traz o médico e os contatos dela.)
  */
+/**
+ * Passou das 42 semanas: a trilha (presa no dia 300) dá lugar a esta tela.
+ *
+ * ⚠️ 21/10/2026, decisão do dono (rede social + gamificação, não conselho
+ * médico): ela era um alerta clínico — "entre em contato com o consultório
+ * hoje… decisão sobre o parto… vá direto à maternidade se…". Ficou carinhosa,
+ * com o SOS a um toque (é lá que moram os sinais de alerta) e a porta para
+ * contar o nascimento.
+ */
 function AlertaDas42Semanas({ nomeDoBebe }: { nomeDoBebe: string | null }) {
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: cor.fundo }}>
@@ -1087,9 +1096,7 @@ function AlertaDas42Semanas({ nomeDoBebe }: { nomeDoBebe: string | null }) {
         <View
           style={{
             borderRadius: 24,
-            borderWidth: 2,
-            borderColor: "#ffd230",
-            backgroundColor: "#fffbeb",
+            backgroundColor: cor.rosaMarca,
             padding: espaco.xl,
             gap: espaco.sm,
           }}
@@ -1100,28 +1107,24 @@ function AlertaDas42Semanas({ nomeDoBebe }: { nomeDoBebe: string | null }) {
               fontSize: 13,
               letterSpacing: 0.6,
               textTransform: "uppercase",
-              color: "#bb4d00",
+              color: cor.primariaEscura,
             }}
           >
-            Acompanhamento necessário
+            Reta final
           </Text>
           <Text
             accessibilityRole="header"
-            style={{ fontFamily: fonte.forte, fontSize: 18, lineHeight: 24, color: "#7b3306" }}
+            style={{ fontFamily: fonte.forte, fontSize: 18, lineHeight: 24, color: cor.texto }}
           >
-            Sua gestação passou de 42 semanas
+            {nomeDoBebe ?? "O bebê"} está chegando 💛
           </Text>
           <Text
-            style={{ fontFamily: fonte.normal, fontSize: 14, lineHeight: 22, color: "#973c00" }}
+            style={{ fontFamily: fonte.normal, fontSize: 14, lineHeight: 22, color: cor.texto }}
           >
-            Entre em contato com o consultório do seu médico{" "}
-            <Text style={{ fontFamily: fonte.forte }}>hoje</Text> para avaliação do bem-estar do
-            bebê e decisão sobre o parto. Se notar diminuição dos movimentos, perda de líquido ou
-            sangramento, vá direto à maternidade.
+            Falta pouquíssimo para vocês se encontrarem. O seu caminho, as figurinhas e tudo o que
+            vocês viveram até aqui estão guardados. Se precisar, o SOS está a um toque.
           </Text>
-          <View
-            style={{ marginTop: espaco.sm, flexDirection: "row", flexWrap: "wrap", gap: espaco.sm }}
-          >
+          <View style={{ marginTop: espaco.sm, flexDirection: "row" }}>
             <Pressable
               accessibilityRole="button"
               onPress={() => router.push("/sos")}
@@ -1129,30 +1132,13 @@ function AlertaDas42Semanas({ nomeDoBebe }: { nomeDoBebe: string | null }) {
                 minHeight: ALVO_MINIMO,
                 paddingHorizontal: espaco.xl,
                 borderRadius: 999,
-                backgroundColor: "#e17100",
+                backgroundColor: cor.urgente,
                 justifyContent: "center",
                 opacity: pressed ? 0.85 : 1,
               })}
             >
               <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: cor.branco }}>
                 Abrir o SOS
-              </Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => void Linking.openURL("tel:192")}
-              style={({ pressed }) => ({
-                minHeight: ALVO_MINIMO,
-                paddingHorizontal: espaco.xl,
-                borderRadius: 999,
-                borderWidth: 2,
-                borderColor: "#e17100",
-                justifyContent: "center",
-                opacity: pressed ? 0.85 : 1,
-              })}
-            >
-              <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: "#bb4d00" }}>
-                Emergência: 192
               </Text>
             </Pressable>
           </View>

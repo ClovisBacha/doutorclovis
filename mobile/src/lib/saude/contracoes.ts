@@ -4,9 +4,9 @@ import type { ContracaoPendente } from "./fila";
 import { horaCurta, inicioDoDia } from "./formato";
 
 /**
- * O CRONÔMETRO DE CONTRAÇÕES — o que não é desenho, puro. A análise clínica
- * é a do site (`@/lib/analise-de-contracoes`); aqui só nasce, fecha e se
- * desenha a lista.
+ * O CRONÔMETRO DE CONTRAÇÕES — o que não é desenho, puro: nasce, fecha e se
+ * desenha a lista. Não há análise clínica no app (21/10/2026): o cronômetro
+ * não diz quando ligar.
  */
 
 export type ContracaoDaTela = {
@@ -49,8 +49,8 @@ export type LinhaDaLista = {
 /**
  * As linhas, da mais recente para a mais antiga.
  *
- * ⚠️ O intervalo é de INÍCIO a INÍCIO (a régua da análise mede assim): medir
- * do fim de uma ao começo da outra encurta o número que decide.
+ * ⚠️ O intervalo é de INÍCIO a INÍCIO, como se mede contração: medir do fim
+ * de uma ao começo da outra encurta o número.
  */
 export function linhasDaLista(lista: readonly ContracaoDaTela[]): LinhaDaLista[] {
   const cresc = [...lista].sort(
@@ -74,7 +74,10 @@ export function linhasDaLista(lista: readonly ContracaoDaTela[]): LinhaDaLista[]
 }
 
 /** "3 hoje · última às 14:20" — ou null quando nenhuma começou hoje. */
-export function resumoDeContracoes(lista: readonly ContracaoDaTela[], agora: number): string | null {
+export function resumoDeContracoes(
+  lista: readonly ContracaoDaTela[],
+  agora: number,
+): string | null {
   const hoje = inicioDoDia(agora);
   const deHoje = lista
     .map((c) => new Date(c.started_at).getTime())
@@ -91,19 +94,4 @@ export function perguntaParaApagarContracao(l: LinhaDaLista): string {
       ? `, de ${l.duracaoSeg < 60 ? `${l.duracaoSeg} s` : `${Math.floor(l.duracaoSeg / 60)} min ${String(l.duracaoSeg % 60).padStart(2, "0")} s`}`
       : "";
   return `Apagar a contração das ${l.hora}${dur}? Isso não tem volta.`;
-}
-
-/**
- * A análise olha as contrações das últimas 2 horas (a mesma janela do site),
- * para o alerta não ficar preso a ontem. Sem corte por quantidade: a régua
- * conta quantas começaram na última HORA, e cortar em dez truncaria
- * justamente a contagem que decide o alerta de prematuridade.
- */
-export const JANELA_DA_ANALISE_MS = 2 * 3600000;
-
-export function janelaDaAnalise<T extends { started_at: string }>(lista: readonly T[], agora: number): T[] {
-  return lista.filter((c) => {
-    const t = new Date(c.started_at).getTime();
-    return Number.isFinite(t) && agora - t < JANELA_DA_ANALISE_MS;
-  });
 }

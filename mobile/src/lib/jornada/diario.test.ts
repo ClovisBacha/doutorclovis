@@ -10,13 +10,13 @@ const ler = (...p: string[]) => readFileSync(join(RAIZ, ...p), "utf8").replace(/
 const SITE = ler("src", "components", "gestacao-path.tsx");
 
 describe("as atividades escrevem no diário como o site", () => {
-  test("o exercício: 'Exercício de N min · queixa: desfecho'", () => {
-    expect(SITE).toContain(
-      "content: `Exercício de ${minutos} min · ${rotulo}: ${desfecho.toLowerCase()}`",
-    );
-    expect(ler("mobile", "src", "app", "jornada", "mexer.tsx")).toContain(
-      "`Exercício de ${minutos} min · ${rotulo}: ${d.toLowerCase()}`",
-    );
+  test("o exercício NÃO escreve mais no diário (21/10/2026: sem desfecho de queixa)", () => {
+    /* O site gravava "Exercício de 5 min · Dor nas costas: melhorou" para o
+       médico ver. O app não é conselho médico: o Mexer escolhe por energia e
+       tempo, e não guarda desfecho nenhum. */
+    const app = ler("mobile", "src", "app", "jornada", "mexer.tsx");
+    expect(app).not.toContain("anotarNoDiario");
+    expect(app).not.toContain("Exercício de ${");
   });
   test("a meditação: 'Meditação de N min · humor', com o emoji no humor", () => {
     expect(SITE).toContain("content: `Meditação de ${minutos} min · ${label}`");

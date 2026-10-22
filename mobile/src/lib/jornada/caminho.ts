@@ -34,19 +34,20 @@ export function fasesDaGestacao(diaCru: number): Fase[] {
   return diaCru > 286 ? [...FASES, FASE_BONUS] : [...FASES];
 }
 
+/**
+ * Os marcos das semanas na trilha — os do site, MENOS os que eram exame ou
+ * conduta (translucência nucal, morfológico, viabilidade fetal, scan de
+ * crescimento, monitoramento pós-data, avaliação para indução): o app não é
+ * conselho médico (decisão do dono, 21/10/2026). Semana sem marco mostra o
+ * placar dela, "N de 7 dias".
+ */
 export const MARCOS: Readonly<Record<number, { emoji: string; label: string }>> = {
   4: { emoji: "🌱", label: "Início da jornada" },
   8: { emoji: "💗", label: "Coração batendo" },
-  12: { emoji: "✨", label: "Translucência nucal" },
   16: { emoji: "🫐", label: "Sente a luz" },
-  20: { emoji: "🎶", label: "Ultrassom morfológico" },
-  24: { emoji: "🏥", label: "Viabilidade fetal" },
   28: { emoji: "💜", label: "3º Trimestre!" },
-  32: { emoji: "🌟", label: "Scan de crescimento" },
   36: { emoji: "🏠", label: "Quase em casa" },
   40: { emoji: "🎊", label: "Data prevista do parto!" },
-  41: { emoji: "⏳", label: "Pós-data — monitoramento próximo" },
-  42: { emoji: "🏥", label: "Avaliação para indução" },
 };
 
 export const HUMORES: readonly { emoji: string; label: string }[] = [

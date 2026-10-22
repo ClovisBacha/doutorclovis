@@ -1,7 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { analyzeContractions } from "@/lib/analise-de-contracoes";
-import { sinalMovimentosReduzidos } from "@/lib/sinais-clinicos";
-import { contracoesDeExemplo, registrosDeExemplo, sessaoEmCursoDeExemplo } from "./bancada";
+import { contracoesDeExemplo, sessaoEmCursoDeExemplo } from "./bancada";
 import {
   chaveDaSessaoDeChutes,
   chutesDeHoje,
@@ -10,13 +8,7 @@ import {
   pacoteDaSessao,
   sanearSessao,
 } from "./chutes";
-import {
-  fecharContracao,
-  janelaDaAnalise,
-  linhasDaLista,
-  novaContracao,
-  resumoDeContracoes,
-} from "./contracoes";
+import { fecharContracao, linhasDaLista, novaContracao, resumoDeContracoes } from "./contracoes";
 import {
   chaveDaFilaDeChutes,
   chaveDaFilaDeContracoes,
@@ -29,146 +21,8 @@ import {
   type ContracaoPendente,
 } from "./fila";
 import { duracaoFalada, numeroBR, relogio } from "./formato";
-import {
-  FORM_VAZIO,
-  lerRegistro,
-  linhaParaInserir,
-  mensagemDoErroDeGravacao,
-  perguntaParaApagar,
-  resumoParaOHub,
-  serieDePressao,
-  ultimaPressao,
-  type RegistroDeSaude,
-} from "./registros";
-import { orientacaoLocal, piorNivel, sintomasParaMarcar } from "./triagem-local";
 
 const UID = "00000000-0000-4000-8000-000000000001";
-
-describe("registros de saúde", () => {
-  test("insere só os campos preenchidos, com vírgula decimal", () => {
-    const r = linhaParaInserir({ ...FORM_VAZIO, weight_kg: "68,4" }, UID, "2026-10-02");
-    expect(r.ok).toBe(true);
-    if (r.ok) expect(r.linha).toEqual({ user_id: UID, log_date: "2026-10-02", weight_kg: 68.4 });
-  });
-
-  test("formulário vazio não grava", () => {
-    const r = linhaParaInserir(FORM_VAZIO, UID, "2026-10-02");
-    expect(r.ok).toBe(false);
-  });
-
-  test("pressão pela metade é recusada pela régua do site", () => {
-    const r = linhaParaInserir({ ...FORM_VAZIO, systolic: "120" }, UID, "2026-10-02");
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.erro).toContain("dois números");
-  });
-
-  test("pressão com vírgula é recusada antes do banco (coluna inteira)", () => {
-    const r = linhaParaInserir(
-      { ...FORM_VAZIO, systolic: "120,5", diastolic: "80" },
-      UID,
-      "2026-10-02",
-    );
-    expect(r.ok).toBe(false);
-  });
-
-  test("glicemia em mmol/L ganha a frase própria da régua", () => {
-    const r = linhaParaInserir({ ...FORM_VAZIO, glucose_mg_dl: "5,4" }, UID, "2026-10-02");
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.erro).toContain("mmol/L");
-  });
-
-  test("observação entra aparada; observação sozinha não basta", () => {
-    const r = linhaParaInserir(
-      { ...FORM_VAZIO, glucose_mg_dl: "92", notes: "  depois do almoço " },
-      UID,
-      "2026-10-02",
-    );
-    expect(r.ok && r.linha.notes).toBe("depois do almoço");
-    expect(linhaParaInserir({ ...FORM_VAZIO, notes: "oi" }, UID, "2026-10-02").ok).toBe(false);
-  });
-
-  test("23514 tem frase própria — nunca 'tente de novo'", () => {
-    expect(mensagemDoErroDeGravacao({ code: "23514" })).not.toContain("tente de novo");
-    expect(mensagemDoErroDeGravacao({ code: "08006" })).toContain("tente de novo");
-  });
-
-  test("glicemia de 118 nunca sai como 'Normal'", () => {
-    const l = lerRegistro({ systolic: null, diastolic: null, glucose_mg_dl: 118 });
-    expect(l.glicemia).not.toBeNull();
-    expect(l.glicemia!.rotulo.toLowerCase()).not.toContain("normal");
-    expect(l.glicemia!.orientacao).toContain("jejum");
-  });
-
-  test("pressão grave pela régua do site", () => {
-    const l = lerRegistro({ systolic: 165, diastolic: 112, glucose_mg_dl: null });
-    expect(l.pressao!.gravidade).toBe("grave");
-    expect(l.pior).toBe("grave");
-    expect(l.pressao!.orientacao).toBeTruthy();
-  });
-
-  test("o resumo do hub pega o último peso e a última pressão", () => {
-    const lista: RegistroDeSaude[] = [
-      {
-        id: "a",
-        log_date: "2026-10-02",
-        weight_kg: null,
-        systolic: 118,
-        diastolic: 76,
-        glucose_mg_dl: null,
-        notes: null,
-      },
-      {
-        id: "b",
-        log_date: "2026-10-01",
-        weight_kg: 68.4,
-        systolic: 130,
-        diastolic: 80,
-        glucose_mg_dl: null,
-        notes: null,
-      },
-      {
-        id: "c",
-        log_date: "2026-09-20",
-        weight_kg: 66,
-        systolic: null,
-        diastolic: null,
-        glucose_mg_dl: null,
-        notes: null,
-      },
-    ];
-    expect(resumoParaOHub(lista)).toBe("68,4 kg · pressão 118/76");
-    expect(resumoParaOHub([])).toBeNull();
-    expect(ultimaPressao(lista)?.id).toBe("a");
-  });
-
-  test("a confirmação diz o que vai apagar", () => {
-    const p = perguntaParaApagar({
-      id: "x",
-      log_date: "2026-09-28",
-      weight_kg: 68.4,
-      systolic: 118,
-      diastolic: 76,
-      glucose_mg_dl: 92,
-      notes: null,
-    });
-    expect(p).toContain("28/09");
-    expect(p).toContain("68,4 kg");
-    expect(p).toContain("118/76");
-    expect(p).toContain("92 mg/dL");
-  });
-
-  test("a série da pressão é cronológica e pintada pela régua", () => {
-    const s = serieDePressao(registrosDeExemplo(Date.now()));
-    expect(s[s.length - 1].gravidade).toBe("grave");
-    expect(s[0].gravidade).toBe("normal");
-  });
-
-  test("a bancada traz a pressão grave por último e uma glicemia de 118", () => {
-    const lista = registrosDeExemplo(Date.now());
-    expect(lerRegistro(ultimaPressao(lista)!).pressao!.gravidade).toBe("grave");
-    expect(lista.some((r) => r.glucose_mg_dl === 118)).toBe(true);
-  });
-});
 
 /** Um disco de mentira, para exercitar o laço de subida. */
 function disco<T>(inicial: T[]) {
@@ -452,22 +306,21 @@ describe("contagem de movimentos", () => {
     expect(isoNormal("2026-10-02T18:15:03.123+00:00")).toBe("2026-10-02T18:15:03.123Z");
   });
 
-  test("a bancada de alerta dispara a régua do site; a de 'contando' não", () => {
+  test("a bancada não tem mais contagem 'em alerta': o app não julga a contagem", () => {
     const agora = Date.now();
-    const alerta = sessaoEmCursoDeExemplo(agora, "alerta")!;
-    const min = (agora - new Date(alerta.startedAt).getTime()) / 60000;
-    expect(
-      sinalMovimentosReduzidos({ semanas: 30, movimentos: alerta.count, minutos: min })?.gravidade,
-    ).toBe("grave");
-    const contando = sessaoEmCursoDeExemplo(agora, "contando")!;
-    const m2 = (agora - new Date(contando.startedAt).getTime()) / 60000;
-    expect(
-      sinalMovimentosReduzidos({ semanas: 30, movimentos: contando.count, minutos: m2 }),
-    ).toBeNull();
+    expect(sessaoEmCursoDeExemplo(agora, "alerta")).toBeNull();
+    expect(sessaoEmCursoDeExemplo(agora, "contando")?.count).toBe(6);
   });
 });
 
 describe("contrações", () => {
+  test("a bancada traz três de hoje e duas de ontem, sem régua nenhuma", () => {
+    const agora = Date.now();
+    const lista = contracoesDeExemplo(agora);
+    expect(lista.length).toBe(5);
+    expect(resumoDeContracoes(lista, agora)).toMatch(/^3 hoje · última às \d\d:\d\d$/);
+  });
+
   test("nasce aberta no aparelho e fecha com a intensidade", () => {
     const c = novaContracao(AGORA);
     expect(ehContracaoPendente(c)).toBe(true);
@@ -509,44 +362,6 @@ describe("contrações", () => {
       "3 hoje · última às 14:20",
     );
     expect(resumoDeContracoes([h(22, 0, 1)], AGORA)).toBeNull();
-  });
-
-  test("a análise olha só as últimas 2 horas", () => {
-    const c = (min: number) => ({ started_at: new Date(AGORA - min * 60000).toISOString() });
-    expect(janelaDaAnalise([c(10), c(119), c(121), c(60 * 20)], AGORA).length).toBe(2);
-  });
-
-  test("bancada: 5-1-1 a termo pede ligar; prematuro às 31 é urgente", () => {
-    const agora = Date.now();
-    const cinco = analyzeContractions(contracoesDeExemplo(agora, "cinco"), 39, agora);
-    expect(cinco.status).toBe("alerta");
-    const prem = analyzeContractions(contracoesDeExemplo(agora, "prematuro"), 31, agora);
-    expect(prem.status).toBe("urgente");
-  });
-});
-
-describe("triagem local", () => {
-  test("a orientação existe sem rede, pela régua do site", () => {
-    const r = orientacaoLocal(["sangramento"], { systolic: null, diastolic: null }, false);
-    expect(r.level).toBe("vermelho");
-    expect(r.message).toContain("192");
-  });
-
-  test("pressão alta sozinha já dá nível", () => {
-    expect(orientacaoLocal([], { systolic: 165, diastolic: 100 }, false).level).toBe("vermelho");
-  });
-
-  test("no Modo Cuidado sai o sintoma do bebê e o verde não fala de pré-natal", () => {
-    expect(sintomasParaMarcar(true).some((s) => s.id === "movimentos")).toBe(false);
-    expect(sintomasParaMarcar(false).some((s) => s.id === "movimentos")).toBe(true);
-    expect(orientacaoLocal([], { systolic: null, diastolic: null }, true).message).not.toContain(
-      "pré-natal",
-    );
-  });
-
-  test("o servidor só pode subir o nível", () => {
-    expect(piorNivel("vermelho", "verde")).toBe("vermelho");
-    expect(piorNivel("verde", "amarelo")).toBe("amarelo");
   });
 });
 

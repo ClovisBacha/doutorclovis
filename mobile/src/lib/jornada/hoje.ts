@@ -37,7 +37,7 @@ export function cuidadosDoDia(o: {
     aula: o.desafio
       ? { titulo: "O desafio de hoje", sub: o.desafio }
       : { titulo: `Aprender sobre a semana ${o.semana}`, sub: "2 min · uma lição e perguntas" },
-    movement: { titulo: "Soltar o corpo", sub: "5 min · alivia as costas e o inchaço" },
+    movement: { titulo: "Soltar o corpo", sub: "5 min · no ritmo do seu corpo" },
     meditation: { titulo: `Respirar com ${para}`, sub: "3 min · a mente desacelera junto" },
     bonding: {
       titulo: `Ler para ${para}`,

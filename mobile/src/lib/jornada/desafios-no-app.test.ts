@@ -4,7 +4,7 @@ import { DESAFIOS_DA_GESTACAO_NO_APP, desafioDaGestacao } from "~/lib/jornada/de
 
 /** As telas do site que o app não tem (ou chama por outro nome). */
 const TELA_QUE_NAO_EXISTE =
-  /\baba (Consultas|Exames|Nutrição|Bem-estar|Alertas|Chutes)\b|Álbum|Diário|Meditações|Alertas|em Chutes|Dr\. Clóvis/;
+  /\baba (Consultas|Exames|Nutrição|Bem-estar|Alertas|Chutes)\b|Álbum|Diário|Meditações|Alertas|em Chutes|Dr\. Clóvis|Estou com um sintoma/;
 
 describe("os desafios da gestação no app", () => {
   test("os trocados ainda são, no site, o texto que foi trocado", () => {
@@ -19,10 +19,13 @@ describe("os desafios da gestação no app", () => {
       const d = desafioDaGestacao(D);
       expect(d).not.toBeNull();
       expect(d!.label).not.toMatch(TELA_QUE_NAO_EXISTE);
-      /* A aba Saúde do app guarda peso, pressão e glicemia (com o gráfico): é
-         só disso que um desafio pode falar ao citá-la. */
-      if (/\bSaúde\b/.test(d!.label) && !/sintoma|Movimentos|Contrações/.test(d!.label))
-        expect(d!.label).toMatch(/peso|pressão|registr|curva/i);
+      /* Na aba Saúde do app sobraram só os Movimentos do bebê (e a agenda): o
+         registro de peso, pressão e glicemia saiu, e as contrações moram no
+         SOS (21/10/2026). Desafio que cita a Saúde fala dos Movimentos. */
+      if (/\bSaúde\b/.test(d!.label)) expect(d!.label).toMatch(/Movimentos/);
+      /* Nem meta de movimentos nem régua de trabalho de parto: o app não dá
+         conduta. */
+      expect(d!.label).not.toMatch(/\b10 movimentos\b|5-1-1/);
     }
     expect(desafioDaGestacao(301)).toBeNull();
   });
@@ -35,9 +38,12 @@ describe("os desafios da gestação no app", () => {
     }
   });
 
-  test("o emoji e o id do site continuam", () => {
+  test("o emoji e o id do site continuam — a não ser que a troca traga a sua", () => {
     const d = desafioDaGestacao(90)!;
     expect(d.emoji).toBe(gestChallenge(90)!.emoji);
     expect(d.id).toBe(gestChallenge(90)!.id);
+    const trocado = desafioDaGestacao(80)!;
+    expect(trocado.emoji).toBe("💌");
+    expect(trocado.id).toBe(gestChallenge(80)!.id);
   });
 });

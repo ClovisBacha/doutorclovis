@@ -140,16 +140,15 @@ export async function lerConquistas(): Promise<LeituraDasConquistas | null> {
     if (estado === "falhou") return null;
     const unlocked = [
       ["first_login", "2026-06-02T12:00:00Z"],
-      ["profile_complete", "2026-06-03T12:00:00Z"],
+      ["medita_1", "2026-06-03T12:00:00Z"],
       ["first_journal", "2026-07-10T12:00:00Z"],
-      ["first_health_log", "2026-07-11T12:00:00Z"],
-      ["health_7_days", "2026-08-02T12:00:00Z"],
+      ["gratidao_1", "2026-07-11T12:00:00Z"],
+      ["carta_1", "2026-08-02T12:00:00Z"],
       ["journal_10", "2026-09-20T12:00:00Z"],
     ].map(([achievement_key, unlocked_at]) => ({ achievement_key, unlocked_at }));
     return {
       unlocked,
-      resgatadas:
-        estado === "neutro" ? null : ["first_login", "profile_complete", "first_health_log"],
+      resgatadas: estado === "neutro" ? null : ["first_login", "medita_1", "gratidao_1"],
       careMode: false,
       /* `&novas=journal_10` — o aviso de conquista nova, na bancada. */
       novas: (parametroDaBancada("novas") ?? "").split(",").filter(Boolean),

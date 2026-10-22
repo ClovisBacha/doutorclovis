@@ -24,6 +24,7 @@ import { tocarAlarmeDoSos } from "~/lib/alarme-do-sos";
 import { abrir, ligar } from "~/lib/links";
 import { localizacaoNegada, localizacaoParaSocorro, type Ponto } from "~/lib/localizacao";
 import { lerMedicoLocal } from "~/lib/medico-local";
+import { ferramentasDaGestacao } from "~/lib/ferramentas";
 import { sinaisDeSocorro } from "~/lib/saude/triagem-local";
 import { situacaoParaSocorro, useSessao } from "~/lib/sessao";
 import { dispararEmergencia, type CanaisAviso } from "~/servidor/emergencia";
@@ -102,6 +103,14 @@ export default function Sos() {
     ? kitDoPerfil(perfil, situacaoParaSocorro(perfil), new Date(), medicoLocal)
     : kitGuardado;
   const g = perfil && !perfil.care_mode ? gestacaoDoPerfil(perfil) : null;
+  /* O cronômetro de contrações mora aqui (21/10/2026): é ferramenta de
+     socorro, e não conteúdo. Da 20ª semana em diante, fica no Modo Cuidado e
+     sai depois do parto — a régua de `ferramentasDaGestacao`. */
+  const ferramentas = ferramentasDaGestacao({
+    semanas: perfil && !perfil.care_mode ? (gestacaoDoPerfil(perfil)?.weeks ?? null) : null,
+    cuidado: perfil?.care_mode === true,
+    nasceu: !!perfil?.birth_date,
+  });
   const telContato = telefoneInternacional(kit?.contatoTelefone ?? null);
   const telMedico = telefoneInternacional(kit?.medicoCelular ?? null);
   const nomeMedico = (kit?.medicoNome ?? "").trim();
@@ -803,12 +812,10 @@ export default function Sos() {
               </Text>
             </View>
           ))}
-          {/* A pergunta seguinte à lista — "é o meu caso?" — é a que a
-              triagem responde. Discreto: quem está em pânico aperta o círculo. */}
-          {sessao ? (
+          {sessao && ferramentas.contracoes ? (
             <BotaoLinha
-              aoTocar={() => router.push("/saude/sintomas")}
-              rotulo="Não tenho certeza — avaliar meus sintomas"
+              aoTocar={() => router.push("/contracoes")}
+              rotulo="⏱️ Cronometrar contrações"
               ligacao={false}
             />
           ) : null}

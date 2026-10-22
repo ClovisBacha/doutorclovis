@@ -39,11 +39,6 @@ describe("com a IA desligada, nada leva a ela", () => {
     expect(semChave.map((f) => relative(RAIZ, f))).toEqual([]);
   });
 
-  test.skipIf(IA_NO_APP)("a triagem só chama a IA atrás da chave", () => {
-    const s = ler(join(RAIZ, "app", "saude", "sintomas.tsx"));
-    expect(s).toContain("IA_NO_APP &&");
-  });
-
   test.skipIf(IA_NO_APP)("o Perfil não mostra a permissão de IA", () => {
     const s = ler(join(RAIZ, "app", "perfil.tsx"));
     expect(s).toContain("IA_NO_APP ? <CartaoDaPermissaoDeIA");

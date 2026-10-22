@@ -226,7 +226,7 @@ export default function MarcarConsulta() {
         rotulo={jaPassou ? "O que foi dito" : "Anotações"}
         placeholder={
           jaPassou
-            ? "O que o médico disse, os próximos exames, o peso…"
+            ? "Como foi, o que você quer lembrar…"
             : "Perguntas para levar, o que pedir, o preparo…"
         }
         value={nota}

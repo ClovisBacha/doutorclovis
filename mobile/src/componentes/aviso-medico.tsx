@@ -5,8 +5,8 @@ import { AVISO_MEDICO } from "~/lib/aviso-medico";
 import { cor, espaco } from "~/tema";
 
 /**
- * O aviso médico, nas duas medidas: o CARTÃO (Saúde, Perfil, Registros) e a
- * LINHA miúda no pé das telas de conteúdo (Início, Bebê, Aula). O texto é o de
+ * O aviso médico, nas duas medidas: o CARTÃO (Saúde, Perfil) e a LINHA miúda
+ * no pé das telas de conteúdo (Início, Bebê, Aula). O texto é o de
  * `~/lib/aviso-medico`.
  */
 export function AvisoMedico({ curto = false }: { curto?: boolean }) {

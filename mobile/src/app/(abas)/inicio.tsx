@@ -1,23 +1,15 @@
 import { semanaDaArte } from "@/lib/arte-do-bebe";
-import {
-  babyForWeek,
-  consultaForWeek,
-  fruitEmojiForWeek,
-  retaFinalMensagem,
-  trimesterForWeek,
-} from "@/lib/gestacao";
-import { diaLocalDe, fraseDoDia, periodoDaHora } from "@/lib/frases-do-mascote";
+import { fruitEmojiForWeek, trimesterForWeek } from "@/lib/gestacao";
+import { diaLocalDe, periodoDaHora } from "@/lib/frases-do-mascote";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import {
-  Activity,
   Apple,
   ChevronRight,
   HeartHandshake,
   MessageCircleHeart,
   Phone,
   Sparkles,
-  Timer,
   UserRound,
 } from "lucide-react-native";
 import type { ComponentType } from "react";
@@ -25,7 +17,9 @@ import { Pressable, View } from "react-native";
 import { BEBE } from "~/componentes/artes";
 import { Cartao, Linha, NaoConsegueLer, Pilula, T, Tela, toque } from "~/componentes/base";
 import { CVV } from "~/config";
+import { bebeDaSemana, retaFinalNoApp } from "~/lib/bebe-da-semana";
 import { ferramentasDaGestacao, NOME_DOS_MOVIMENTOS } from "~/lib/ferramentas";
+import { fraseDoDiaNoApp } from "~/lib/frase-do-dia";
 import { gestacaoDoPerfil, primeiroNome } from "~/lib/gestacao";
 import {
   dataCurta,
@@ -62,7 +56,7 @@ export default function Inicio() {
     nasceu: !!perfil?.birth_date,
   });
   const nascido = perfil?.birth_date ? idadeDoBebe(perfil.birth_date, agora) : null;
-  const frase = fraseDoDia({
+  const frase = fraseDoDiaNoApp({
     dia: diaLocalDe(agora),
     periodo: periodoDaHora(agora.getHours()),
     nome,
@@ -185,40 +179,20 @@ export default function Inicio() {
         fundoIcone={cor.jogoFundo}
         aoTocar={() => router.push("/jornada")}
       />
-      <Atalho
-        ordem={2}
-        Icone={Activity}
-        titulo="Registrar pressão, peso ou glicemia"
-        texto="O app avisa se algum número pedir atenção."
-        corIcone={cor.saude}
-        fundoIcone={cor.saudeFundo}
-        aoTocar={() => router.push("/saude/registros")}
-      />
       {ferramentas.movimentos && gest ? (
         <Atalho
-          ordem={3}
+          ordem={2}
           Icone={HeartHandshake}
           titulo={NOME_DOS_MOVIMENTOS}
-          texto="Dez movimentos, no seu tempo."
+          texto="Conte as mexidinhas do bebê, no seu tempo."
           corIcone={cor.chutes}
           fundoIcone={cor.chutesFundo}
           aoTocar={() => router.push("/saude/chutes")}
         />
       ) : null}
-      {ferramentas.contracoes && gest ? (
-        <Atalho
-          ordem={4}
-          Icone={Timer}
-          titulo="Cronometrar contrações"
-          texto="Duração e intervalo, com os sinais para procurar atendimento."
-          corIcone={cor.contracoes}
-          fundoIcone={cor.contracoesFundo}
-          aoTocar={() => router.push("/saude/contracoes")}
-        />
-      ) : null}
       {IA_NO_APP ? (
         <Atalho
-          ordem={5}
+          ordem={3}
           Icone={Apple}
           titulo="Perguntar à nutricionista"
           texto="Pode comer? O que fazer com o que tem em casa?"
@@ -229,7 +203,7 @@ export default function Inicio() {
       ) : null}
       {!cuidado ? (
         <Atalho
-          ordem={6}
+          ordem={4}
           Icone={MessageCircleHeart}
           titulo="Comunidade"
           texto="Gestantes na mesma fase que você."
@@ -237,16 +211,6 @@ export default function Inicio() {
           fundoIcone={cor.destaque}
           aoTocar={() => router.push("/comunidade")}
         />
-      ) : null}
-
-      {!cuidado && gest ? (
-        <Cartao fundo={cor.apagado} estilo={{ marginTop: espaco.sm }}>
-          <T tipo="rotulo">Nesta fase da gestação</T>
-          <T tipo="apagado">{consultaForWeek(gest.weeks)}</T>
-          <T tipo="apagado" estilo={{ fontSize: 13 }}>
-            Informação geral. Quem decide os seus exames é a sua equipe de saúde.
-          </T>
-        </Cartao>
       ) : null}
       <AvisoMedico curto />
     </Tela>
@@ -264,10 +228,10 @@ function CartaoDaSemana({
   totalDias: number;
   nomeDoBebe: string | null;
 }) {
-  const bebe = babyForWeek(semanas);
+  const bebe = bebeDaSemana(semanas);
   const tri = trimesterForWeek(semanas);
   const faltam = diasAteADpp(totalDias);
-  const reta = retaFinalMensagem(semanas);
+  const reta = retaFinalNoApp(semanas);
   const arte = BEBE[semanaDaArte(semanas)];
   return (
     <Inclinacao3D
@@ -352,10 +316,7 @@ function CartaoDeAcolhimento() {
   return (
     <Cartao fundo={cor.destaque}>
       <T tipo="subtitulo">Estamos aqui com você</T>
-      <T>
-        Este é um espaço para cuidar de você, no seu tempo. Os seus registros e o SOS continuam
-        aqui.
-      </T>
+      <T>Este é um espaço para cuidar de você, no seu tempo. O SOS continua aqui.</T>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Ligar para o CVV, 188"

@@ -1,25 +1,19 @@
-import { analyzeContractions } from "@/lib/analise-de-contracoes";
-import { bandeirasDoParto } from "@/lib/bandeiras-do-parto";
 import { comPacote, ehLocal, mesclar, semPacote } from "@/lib/fila-local";
 import { INTENSIDADE_PADRAO, NIVEIS_DE_INTENSIDADE } from "@/lib/intensidade-da-contracao";
-import { Phone } from "lucide-react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Carregando, Cartao, Linha, NaoConsegueLer, T, Tela, toque } from "~/componentes/base";
-import { Cabecalho, CartaoDeSocorro, Confirmacao, Escolha } from "~/componentes/saude/pecas";
+import { Cabecalho, Confirmacao, Escolha } from "~/componentes/saude/pecas";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
-import { gestacaoDoPerfil } from "~/lib/gestacao";
-import { ligar } from "~/lib/links";
-import { SAMU } from "~/config";
 import { gravarFila, lerFila } from "~/lib/saude/armazem-de-filas";
 import { contracoesDeExemplo } from "~/lib/saude/bancada";
 import { isoNormal } from "~/lib/saude/chutes";
 import {
   fecharContracao,
-  janelaDaAnalise,
   linhasDaLista,
   novaContracao,
   perguntaParaApagarContracao,
+  resumoDeContracoes,
   type ContracaoDaTela,
   type LinhaDaLista,
 } from "~/lib/saude/contracoes";
@@ -37,18 +31,20 @@ import { supabase } from "~/servidor/supabase";
 import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
 
 /**
- * O CRONÔMETRO DE CONTRAÇÕES. Fica no Modo Cuidado: quem perdeu a gestação
- * pode estar em trabalho de parto. Lá ele só para de falar do bebê (a
- * bandeira do bebê sai, e a semana não entra na régua nem no texto).
+ * O CRONÔMETRO DE CONTRAÇÕES — um cronômetro simples, aberto de dentro do SOS.
+ *
+ * ⚠️ 21/10/2026, decisão do dono (rede social + gamificação, não conselho
+ * médico): saiu a régua — o status ("ligue para o seu médico agora"), o
+ * 5-1-1, o alerta de prematuro, a tendência da intensidade e a lista "vá à
+ * maternidade se". O app não diz quando ligar. Ficam o Começou/Terminou, a
+ * dor de cada uma, a tabela (hora, duração, intervalo, intensidade) e a conta
+ * crua do dia. Os sinais de alerta moram no SOS, que é de onde ela chega.
+ *
+ * Fica no Modo Cuidado: quem perdeu a gestação pode estar em trabalho de parto.
  */
 export default function Contracoes() {
-  const { sessao, perfil, cuidado } = useSessao();
+  const { sessao } = useSessao();
   const uid = sessao?.user.id ?? null;
-  const semanaDaBancada =
-    parametroDaBancada("estado") === "cinco" && !parametroDaBancada("semana") ? 39 : null;
-  /* No Modo Cuidado a régua roda SEM semana: ela escala igual (os cortes só
-     sobem) e o texto não cita a gestação. */
-  const semanas = cuidado ? null : (semanaDaBancada ?? gestacaoDoPerfil(perfil)?.weeks ?? null);
 
   const [estado, setEstado] = useState<"carregando" | "pronto" | "falhou">("carregando");
   const [historico, setHistorico] = useState<ContracaoDaTela[]>([]);
@@ -124,7 +120,7 @@ export default function Contracoes() {
       }
       if (est === "falhou") setEstado("falhou");
       else {
-        setHistorico(contracoesDeExemplo(t, est));
+        setHistorico(contracoesDeExemplo(t));
         setEstado("pronto");
       }
       return;
@@ -224,15 +220,18 @@ export default function Contracoes() {
   }
 
   const todas = mesclar(historico, pendentes) as ContracaoDaTela[];
-  const analise = analyzeContractions(janelaDaAnalise(todas, agora), semanas, agora);
   const linhas = linhasDaLista(todas.filter((c) => c.id !== ativa?.id)).slice(0, 12);
-  const bandeiras = bandeirasDoParto(cuidado);
-  const titulo = analise.label.replace(/^⚠️\s*/, "");
-  const pedeLigar = analise.status === "urgente" || analise.status === "alerta";
+  /* A conta crua do dia — "3 hoje · última às 14:20". Nenhum julgamento. */
+  const resumo = resumoDeContracoes(todas, agora);
 
   return (
     <Tela>
-      <Cabecalho titulo="Contrações" arte="contracoes" fundo={cor.contracoesFundo} />
+      <Cabecalho
+        titulo="Contrações"
+        arte="contracoes"
+        fundo={cor.contracoesFundo}
+        voltarPara="/sos"
+      />
 
       <Cartao fundo={cor.contracoesFundo} estilo={{ alignItems: "center", gap: espaco.md }}>
         {ativa ? (
@@ -282,54 +281,11 @@ export default function Contracoes() {
         )}
       </Cartao>
 
-      {pedeLigar ? (
-        <CartaoDeSocorro
-          titulo={titulo}
-          texto={analise.detail}
-          grande={analise.status === "urgente"}
-        >
-          <Numeros analise={analise} />
-        </CartaoDeSocorro>
-      ) : (
-        <Cartao fundo={analise.status === "atencao" ? cor.atencaoFundo : cor.cartao}>
-          <T tipo="rotulo" cor={analise.status === "atencao" ? cor.atencao : cor.texto}>
-            {titulo}
-          </T>
-          <T tipo="apagado" cor={cor.texto}>
-            {analise.detail}
-          </T>
-          {analise.notaDaIntensidade ? <T tipo="apagado">{analise.notaDaIntensidade}</T> : null}
-          <Numeros analise={analise} />
-        </Cartao>
-      )}
-
-      <Cartao>
-        <T tipo="subtitulo">Vá à maternidade ou ligue 192 se:</T>
-        {bandeiras.map((b) => (
-          <Linha key={b} estilo={{ justifyContent: "space-between", gap: espaco.md }}>
-            <T estilo={{ flex: 1 }}>{b.charAt(0).toUpperCase() + b.slice(1)}</T>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Ligar 192: ${b}`}
-              onPress={() => ligar(SAMU)}
-              style={({ pressed }) => ({
-                minHeight: ALVO_MINIMO,
-                paddingHorizontal: espaco.md,
-                borderRadius: raio.pilula,
-                backgroundColor: pressed ? cor.urgentePressionado : cor.urgente,
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 6,
-              })}
-            >
-              <Phone size={16} color={cor.branco} />
-              <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: cor.branco }}>
-                Ligar 192
-              </Text>
-            </Pressable>
-          </Linha>
-        ))}
-      </Cartao>
+      {resumo ? (
+        <T tipo="rotulo" centro>
+          {resumo}
+        </T>
+      ) : null}
 
       {estado === "carregando" ? <Carregando texto="Lendo suas contrações…" /> : null}
       {estado === "falhou" ? (
@@ -385,23 +341,6 @@ export default function Contracoes() {
 }
 
 const COLUNAS = [{ width: 56 }, { width: 72 }, { width: 80 }, { flex: 1 }] as const;
-
-function Numeros({ analise }: { analise: ReturnType<typeof analyzeContractions> }) {
-  const partes = [
-    `${analise.naUltimaHora} na última hora`,
-    analise.intervaloMin != null ? `a cada ${analise.intervaloMin} min` : null,
-    analise.duracaoSeg != null ? `duram ~${analise.duracaoSeg} s` : null,
-  ].filter(Boolean);
-  return (
-    <View style={{ gap: 2 }}>
-      {/* O texto da régua já diz quantas foram na última hora: aqui não repete. */}
-      {analise.detail.includes("na última hora") ? null : <T tipo="rotulo">{partes.join(" · ")}</T>}
-      {analise.sustentadoMin != null && analise.sustentadoMin > 0 ? (
-        <T tipo="apagado">O padrão está assim há {analise.sustentadoMin} min.</T>
-      ) : null}
-    </View>
-  );
-}
 
 function BotaoRedondo({
   rotulo,

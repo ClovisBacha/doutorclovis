@@ -1,12 +1,13 @@
 /**
  * QUANDO as ferramentas da gestação aparecem — uma régua só, para o Início,
- * o hub da Saúde e as próprias telas não discordarem.
+ * o hub da Saúde, o SOS e as próprias telas não discordarem.
  *
  * - Movimentos do bebê: da 24ª semana em diante (antes disso os movimentos
  *   ainda não são regulares o bastante para contar). Nunca no Modo Cuidado,
  *   nunca depois do parto.
  * - Contrações: da 20ª semana em diante. FICA no Modo Cuidado (é socorro, não
- *   é conteúdo sobre o bebê); sai depois do parto.
+ *   é conteúdo sobre o bebê); sai depois do parto. Desde 21/10/2026 a porta
+ *   mora no SOS, e o cronômetro não diz quando ligar.
  * - Semana desconhecida (sem DUM nem ultrassom): mostra — melhor oferecer a
  *   ferramenta que escondê-la de quem pode precisar.
  */

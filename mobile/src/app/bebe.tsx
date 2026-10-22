@@ -1,13 +1,5 @@
 import { semanaDaArte } from "@/lib/arte-do-bebe";
-import {
-  babyForWeek,
-  consultaForWeek,
-  fruitEmojiForWeek,
-  trimesterForWeek,
-  WEEK_MAX,
-  WEEK_MIN,
-} from "@/lib/gestacao";
-import { nutricaoDaSemana } from "@/lib/nutricao-da-semana";
+import { fruitEmojiForWeek, trimesterForWeek, WEEK_MAX, WEEK_MIN } from "@/lib/gestacao";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { ChevronLeft, ChevronRight } from "lucide-react-native";
@@ -16,6 +8,7 @@ import { Pressable, ScrollView, Text } from "react-native";
 import { BEBE } from "~/componentes/artes";
 import { Botao, Cartao, Linha, Pilula, T, Tela, toque } from "~/componentes/base";
 import { parametroDaBancada } from "~/lib/bancada";
+import { bebeDaSemana } from "~/lib/bebe-da-semana";
 import { gestacaoDoPerfil } from "~/lib/gestacao";
 import { semGeneroDoBebe } from "~/lib/nutricao/frase-do-topo";
 import { BolhaViva, Entrada, Flutuar, Inclinacao3D } from "~/componentes/movimento";
@@ -74,8 +67,7 @@ export default function Bebe() {
     );
   }
 
-  const bebe = babyForWeek(semana);
-  const nutri = nutricaoDaSemana(semana);
+  const bebe = bebeDaSemana(semana);
   const rotulo =
     gest && semana === hoje
       ? "Esta semana"
@@ -184,22 +176,6 @@ export default function Bebe() {
         </Cartao>
       </Inclinacao3D>
 
-      {nutri ? (
-        <Cartao fundo={cor.nutricaoFundo}>
-          <T tipo="rotulo" cor={cor.nutricao}>
-            No prato: {semGeneroDoBebe(nutri.titulo)}
-          </T>
-          <T>{semGeneroDoBebe(nutri.texto)}</T>
-        </Cartao>
-      ) : null}
-
-      <Cartao>
-        <T tipo="rotulo">Nesta fase da gestação</T>
-        <T tipo="apagado">{consultaForWeek(semana)}</T>
-        <T tipo="apagado" estilo={{ fontSize: 13 }}>
-          Informação geral. Quem decide os seus exames é a sua equipe de saúde.
-        </T>
-      </Cartao>
       <AvisoMedico curto />
     </Tela>
   );

@@ -1,5 +1,6 @@
 import { Modal, Text, View } from "react-native";
-import { babyForWeek, fruitEmojiForWeek } from "@/lib/gestacao";
+import { fruitEmojiForWeek } from "@/lib/gestacao";
+import { bebeDaSemana } from "~/lib/bebe-da-semana";
 import { BotaoDaAtividade, Brilho } from "~/componentes/jornada/atividade";
 import { corJornada } from "~/componentes/jornada/cores";
 import { CompartilharConquista } from "~/componentes/jornada/cartao-de-conquista";
@@ -27,7 +28,7 @@ export function FestaDoMarco({
   if (!festa) return null;
   const m = festa.principal;
   const bebe = nomeDoBebe ?? "O bebê";
-  const semana = m.tipo === "semana" ? babyForWeek(m.semana) : null;
+  const semana = m.tipo === "semana" ? bebeDaSemana(m.semana) : null;
   const arte =
     m.tipo === "semana"
       ? fruitEmojiForWeek(m.semana)

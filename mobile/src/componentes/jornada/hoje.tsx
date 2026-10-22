@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Animated, Easing, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Text as SvgText } from "react-native-svg";
-import { babyForWeek } from "@/lib/gestacao";
+import { bebeDaSemana } from "~/lib/bebe-da-semana";
 import { toque } from "~/componentes/base";
 import { BotaoDaAtividade, Brilho, sombraDe } from "~/componentes/jornada/atividade";
 import {
@@ -250,7 +250,7 @@ export function TelaDeHoje({
 }) {
   const topo = useSafeAreaInsets().top;
   const ceu = CEUS[ceuDaHora(hora)];
-  const bebe = babyForWeek(semana);
+  const bebe = bebeDaSemana(semana);
   const quem = nomeDoBebe ?? "o bebê";
   const feitos = cuidados.filter((c) => c.feito).length;
   const proximo = cuidados.find((c) => !c.feito) ?? null;

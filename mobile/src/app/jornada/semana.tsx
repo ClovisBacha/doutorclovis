@@ -2,7 +2,8 @@ import { useLocalSearchParams } from "expo-router";
 import { ChevronLeft, ChevronRight, Lock } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
-import { babyForWeek, fruitEmojiForWeek } from "@/lib/gestacao";
+import { fruitEmojiForWeek } from "@/lib/gestacao";
+import { bebeDaSemana } from "~/lib/bebe-da-semana";
 import { Botao, Cartao, Carregando, T, Tela } from "~/componentes/base";
 import { corJornada } from "~/componentes/jornada/cores";
 import { Descolar } from "~/componentes/jornada/efeitos";
@@ -133,7 +134,7 @@ export default function Semana() {
 
   const { D: hojeD, hoje } = dia;
   const dias = diasDaSemana(semana).filter((D) => D >= D_MINIMO);
-  const bebe = babyForWeek(semana);
+  const bebe = bebeDaSemana(semana);
   const fechadosNaSemana = dias.filter((D) => {
     const n = estadoDoNo(loja.blob, D, hojeD);
     return n.tipo !== "futuro" && n.fechado;
@@ -300,7 +301,7 @@ function MemoriaDaSemana({
   aoMudar: (s: number) => void;
   figurinha: boolean;
 }) {
-  const bebe = babyForWeek(semana);
+  const bebe = bebeDaSemana(semana);
   const marco = MARCOS[semana];
   return (
     <Tela bordas={["top", "bottom"]}>

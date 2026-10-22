@@ -12,7 +12,6 @@ import {
   semanasDoMes,
   semCompromisso,
   separar,
-  sugestaoDaFase,
   sugestaoDoPosParto,
   type Compromisso,
 } from "./agenda";
@@ -132,13 +131,6 @@ describe("a agenda do pré-natal", () => {
     expect(
       contagemPorDia([c("a", "2026-10-22T09:00"), c("b", "2026-10-22T15:00")]).get("2026-10-22"),
     ).toBe(2);
-  });
-
-  test("a dica da fase vem da régua do site, com o tipo a marcar", () => {
-    expect(sugestaoDaFase(20).tipo).toBe("ultrassom");
-    expect(sugestaoDaFase(25).tipo).toBe("exame");
-    expect(sugestaoDaFase(15).tipo).toBe("consulta");
-    expect(sugestaoDaFase(20).texto).toContain("morfológico");
   });
 
   test("no pós-parto, a dica é a orientação da semana de vida, com o que marcar", () => {

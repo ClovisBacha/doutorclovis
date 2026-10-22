@@ -43,10 +43,14 @@ describe("o Caminho do app é o mesmo do site", () => {
     }
   });
 
-  test("os marcos das semanas são os mesmos", () => {
+  test("os marcos que ficaram são os do site; os de exame e conduta saíram", () => {
     for (const [semana, m] of Object.entries(MARCOS)) {
       expect(SITE).toContain(`${semana}: { emoji: "${m.emoji}", label: "${m.label}" }`);
+      expect(m.label).not.toMatch(
+        /nucal|morfológico|viabilidade|crescimento|monitoramento|indução/i,
+      );
     }
+    expect(Object.keys(MARCOS).map(Number)).toEqual([4, 8, 16, 28, 36, 40]);
   });
 
   test("os humores do check-in são os mesmos", () => {

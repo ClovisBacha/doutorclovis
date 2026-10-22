@@ -308,8 +308,10 @@ describe("a grade de conquistas", () => {
       [],
     );
     expect(ganhou.find((c) => c.def.key === "prenatal_done")?.estado).toBe("resgatar");
-    /* O "Perfil Completo" fica: o app agora pede a altura e o peso de antes. */
-    expect(g.some((c) => c.def.key === "profile_complete")).toBe(true);
+    /* 21/10/2026: o app não pede mais altura e peso, nem registra peso,
+       pressão e glicemia — as conquistas que pagavam por isso saem trancadas. */
+    for (const k of ["profile_complete", "first_health_log", "health_7_days"])
+      expect(g.some((c) => c.def.key === k)).toBe(false);
   });
   test("a aba segue o site: seções na ordem do site, X de todas, e a nota do nascimento", () => {
     const g = montarGrade(unlocked, []);

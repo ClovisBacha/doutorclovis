@@ -1,16 +1,8 @@
 import { comPacote, ehLocal, mesclar } from "@/lib/fila-local";
 import { FORCA_PADRAO, NIVEIS_DE_FORCA, nivelDeForca } from "@/lib/forca-do-movimento";
-import {
-  faixaPessoal,
-  FRASE_DA_LINHA_PLANA,
-  leituraDeHoje,
-  MINIMO_PARA_FAIXA,
-  serieDeChutes,
-  ultimaContagem,
-  type SessaoDeChutes,
-} from "@/lib/serie-de-chutes";
-import { sinalMovimentosReduzidos } from "@/lib/sinais-clinicos";
-import { Redirect } from "expo-router";
+import type { SessaoDeChutes } from "@/lib/serie-de-chutes";
+import { Redirect, router } from "expo-router";
+import { ChevronRight } from "lucide-react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import {
@@ -24,11 +16,9 @@ import {
   Tela,
   toque,
 } from "~/componentes/base";
-import { GraficoDeLinha } from "~/componentes/saude/grafico";
-import { Cabecalho, CartaoDeSocorro, Escolha } from "~/componentes/saude/pecas";
+import { Cabecalho, Escolha } from "~/componentes/saude/pecas";
 import { apagar, gravarJson, lerJson } from "~/lib/armazem";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
-import { gestacaoDoPerfil } from "~/lib/gestacao";
 import { gravarFila, lerFila } from "~/lib/saude/armazem-de-filas";
 import { sessaoEmCursoDeExemplo, sessoesDeExemplo } from "~/lib/saude/bancada";
 import {
@@ -46,25 +36,27 @@ import {
   sincronizarFila,
   type SessaoPendente,
 } from "~/lib/saude/fila";
-import { duracaoFalada, numeroBR, quandoFoi, relogio } from "~/lib/saude/formato";
+import { duracaoFalada, quandoFoi, relogio } from "~/lib/saude/formato";
 import { usarRelogio, usarRetorno, usarTelaAcesa } from "~/lib/saude/usar-retorno";
 import { useSessao } from "~/lib/sessao";
 import { supabase } from "~/servidor/supabase";
 import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
 
-/** A partir daqui se OBSERVA (o piso numérico da régua continua nas 28). */
-const SEMANA_DE_OBSERVAR = 26;
-
 type Contagem = SessaoDeChutes & { id: string; strength?: number | null };
 type Aviso = { texto: string; tom: "ok" | "aparelho" | "neutro" } | null;
 
+/**
+ * OS MOVIMENTOS DO BEBÊ — acompanhar o bebê, e não protocolo.
+ *
+ * ⚠️ 21/10/2026, decisão do dono (rede social + gamificação, não conselho
+ * médico): saíram a meta de 10, o alarme das 2 horas, "o seu normal" e o
+ * gráfico do tempo até 10. Ela conta quando quiser, pelo tempo que quiser, e
+ * o histórico fica. O que o app diz sobre um bebê diferente é uma linha fixa
+ * que abre o SOS — o único lugar com sinais de alerta.
+ */
 export default function Chutes() {
   const { sessao, perfil, cuidado, estadoDoPerfil } = useSessao();
   const uid = sessao?.user.id ?? null;
-  /* Bancada sem ?semana= abre já na fase de contar (30 semanas); `&semana=22` mostra o antes. */
-  const semanaDaBancada = ehBancada() && !parametroDaBancada("semana") ? 30 : null;
-  const semanas = semanaDaBancada ?? gestacaoDoPerfil(perfil)?.weeks ?? null;
-  const fase = semanas == null || semanas >= SEMANA_DE_OBSERVAR;
 
   const [estado, setEstado] = useState<"carregando" | "pronto" | "falhou">("carregando");
   const [historico, setHistorico] = useState<Contagem[]>([]);
@@ -230,15 +222,7 @@ export default function Chutes() {
     );
   if (cuidado || perfil?.birth_date) return <Redirect href="/saude" />;
 
-  const minutos = emCurso ? (agora - new Date(emCurso.startedAt).getTime()) / 60000 : 0;
-  const alarme = emCurso
-    ? sinalMovimentosReduzidos({ semanas, movimentos: emCurso.count, minutos })
-    : null;
   const todas = mesclar(historico, pendentes) as Contagem[];
-  const serie = serieDeChutes(todas);
-  const faixa = faixaPessoal(serie);
-  const leitura = leituraDeHoje(serie, faixa);
-  const ultima = ultimaContagem(todas);
   const forca = emCurso?.forca ?? FORCA_PADRAO;
 
   return (
@@ -275,7 +259,6 @@ export default function Chutes() {
             >
               {emCurso.count}
             </Text>
-            <Text style={{ fontFamily: fonte.forte, fontSize: 17, color: cor.branco }}>de 10</Text>
           </Pressable>
           <T tipo="apagado" centro>
             Toque no círculo a cada movimento que sentir.
@@ -283,36 +266,21 @@ export default function Chutes() {
           <T tipo="subtitulo" cor={cor.chutes} estilo={{ fontVariant: ["tabular-nums"] }}>
             {relogio(agora - new Date(emCurso.startedAt).getTime())}
           </T>
-          {emCurso.count >= 10 && !alarme ? (
-            <T centro cor={cor.chutes} estilo={{ fontFamily: fonte.forte }}>
-              Chegou a 10. Pode encerrar para guardar.
-            </T>
-          ) : null}
         </Cartao>
-      ) : null}
-
-      {alarme ? (
-        <CartaoDeSocorro
-          titulo="Menos movimentos que o esperado"
-          texto={`Você sentiu ${emCurso!.count} ${emCurso!.count === 1 ? "movimento" : "movimentos"} em 2 horas, e o esperado são 10. Ligue para o 192 ou procure a maternidade agora.`}
-          grande
-        />
       ) : null}
 
       {emCurso ? (
         <View style={{ gap: espaco.md }}>
-          {!alarme ? (
-            <View style={{ gap: espaco.sm }}>
-              <T tipo="rotulo">Como estão os movimentos?</T>
-              <Escolha
-                opcoes={NIVEIS_DE_FORCA.map((n) => ({ valor: n.valor, rotulo: n.rotulo }))}
-                valor={forca}
-                corAtiva={cor.chutes}
-                rotuloAcessivel="Força dos movimentos"
-                aoEscolher={(v) => guardar({ ...emCurso, forca: v })}
-              />
-            </View>
-          ) : null}
+          <View style={{ gap: espaco.sm }}>
+            <T tipo="rotulo">Como estão os movimentos?</T>
+            <Escolha
+              opcoes={NIVEIS_DE_FORCA.map((n) => ({ valor: n.valor, rotulo: n.rotulo }))}
+              valor={forca}
+              corAtiva={cor.chutes}
+              rotuloAcessivel="Força dos movimentos"
+              aoEscolher={(v) => guardar({ ...emCurso, forca: v })}
+            />
+          </View>
           <Botao
             rotulo={encerrarDescarta(emCurso, agora) ? "Cancelar contagem" : "Encerrar e guardar"}
             aoTocar={() => void encerrar()}
@@ -345,31 +313,13 @@ export default function Chutes() {
         </View>
       ) : (
         <Cartao fundo={cor.chutesFundo}>
-          {fase ? (
-            <>
-              <T>
-                Conte quanto tempo o bebê leva para fazer 10 movimentos. Deitada de lado, no começo
-                da noite — para a maioria são uns 20 minutos.
-              </T>
-              <T tipo="apagado">Valem chutes, socos, rolamentos e cutucadas. Soluços não contam.</T>
-              <T tipo="apagado">
-                Passadas 2 horas sem chegar a 10, ligue para o 192 ou procure a maternidade.
-              </T>
-              <Botao rotulo="Começar a contar" aoTocar={comecar} corFundo={cor.chutes} />
-            </>
-          ) : (
-            <>
-              <T>
-                Você está com {semanas} semanas. Antes da semana {SEMANA_DE_OBSERVAR} é normal não
-                sentir o bebê todos os dias nem chegar a 10 — o bebê se mexe muito, mas ainda não dá
-                para confiar no que se sente.
-              </T>
-              <T tipo="apagado">A contagem começa por volta da semana {SEMANA_DE_OBSERVAR}.</T>
-              <Botao rotulo="Contar mesmo assim" tipo="secundario" aoTocar={comecar} />
-            </>
-          )}
+          <T>Conte as mexidinhas do bebê quando quiser, pelo tempo que quiser.</T>
+          <T tipo="apagado">Valem chutes, socos, rolamentos e cutucadas. Soluços não contam.</T>
+          <Botao rotulo="Começar a contar" aoTocar={comecar} corFundo={cor.chutes} />
         </Cartao>
       )}
+
+      <LinhaDoSos />
 
       {aviso ? (
         <Cartao
@@ -396,57 +346,6 @@ export default function Chutes() {
             void buscar();
           }}
         />
-      ) : null}
-
-      {estado === "pronto" && ultima ? (
-        <Cartao>
-          <T tipo="subtitulo">A última contagem</T>
-          <T>
-            {ultima.estado === "completa"
-              ? `10 movimentos em ${numeroBR(ultima.minutos, 0)} min — ${quandoFoi(ultima.em, Date.now())}.`
-              : ultima.estado === "incompleta"
-                ? `${ultima.movimentos} ${ultima.movimentos === 1 ? "movimento" : "movimentos"}, sem chegar a 10 — ${quandoFoi(ultima.em, Date.now())}.`
-                : `${quandoFoi(ultima.em, Date.now())}, sem uma duração que dê para usar.`}
-          </T>
-          {faixa ? (
-            <T tipo="apagado">
-              O seu normal: de {numeroBR(faixa.de, 0)} a {numeroBR(faixa.ate, 0)} min até 10
-              movimentos, nas últimas {faixa.sessoes} contagens.
-              {ultima.estado === "completa"
-                ? leitura === "dentro"
-                  ? " A última ficou dentro dele."
-                  : leitura === "acima"
-                    ? " A última levou mais tempo que o seu normal."
-                    : leitura === "abaixo"
-                      ? " A última foi mais rápida que o seu normal."
-                      : ""
-                : ""}
-            </T>
-          ) : (
-            <T tipo="apagado">
-              Com {MINIMO_PARA_FAIXA} contagens completas, eu mostro o seu normal.
-            </T>
-          )}
-          <T tipo="apagado">
-            Se você sentir o bebê diferente do que costuma, não espere um número: ligue para o 192
-            ou procure a maternidade.
-          </T>
-          {serie.length >= 2 ? (
-            <View style={{ gap: espaco.xs, marginTop: espaco.sm }}>
-              <T tipo="rotulo">Minutos até 10 movimentos</T>
-              <GraficoDeLinha
-                pontos={serie.slice(-14).map((p) => ({
-                  rotulo: quandoFoi(p.em, Date.now()).replace(/ às .*/, ""),
-                  valor: p.valor,
-                  gravidade: "normal",
-                }))}
-                corDaSerie={cor.chutes}
-                rotuloAcessivel={`Gráfico do tempo até 10 movimentos nas últimas ${Math.min(14, serie.length)} contagens`}
-              />
-              <T tipo="apagado">{FRASE_DA_LINHA_PLANA}</T>
-            </View>
-          ) : null}
-        </Cartao>
       ) : null}
 
       {estado === "pronto" && todas.length ? (
@@ -493,5 +392,40 @@ export default function Chutes() {
         </View>
       ) : null}
     </Tela>
+  );
+}
+
+/**
+ * A LINHA FIXA: o que o app diz a quem sente o bebê diferente. Sem número, sem
+ * régua — abre o SOS, onde moram os sinais de alerta e o socorro.
+ */
+function LinhaDoSos() {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Sentiu o bebê diferente? Abra o SOS"
+      onPress={() => {
+        toque();
+        router.push("/sos");
+      }}
+      style={({ pressed }) => ({
+        flexDirection: "row",
+        alignItems: "center",
+        gap: espaco.sm,
+        minHeight: ALVO_MINIMO + 4,
+        paddingHorizontal: espaco.lg,
+        borderRadius: raio.md,
+        borderWidth: 1,
+        borderColor: cor.urgenteBorda,
+        backgroundColor: cor.cartao,
+        opacity: pressed ? 0.8 : 1,
+      })}
+    >
+      <Text style={{ flex: 1, fontFamily: fonte.media, fontSize: 15, color: cor.texto }}>
+        Sentiu o bebê diferente?{" "}
+        <Text style={{ fontFamily: fonte.forte, color: cor.urgente }}>Abra o SOS</Text>
+      </Text>
+      <ChevronRight size={20} color={cor.urgente} />
+    </Pressable>
   );
 }

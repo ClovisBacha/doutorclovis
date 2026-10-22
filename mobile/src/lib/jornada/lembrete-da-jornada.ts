@@ -22,7 +22,7 @@
  * Sem react-native aqui: é testado pelo bun.
  */
 
-import { babyForWeek } from "@/lib/gestacao";
+import { bebeDaSemana } from "~/lib/bebe-da-semana";
 import { orientacaoDoPos, ULTIMA_IDADE_DA_TRILHA } from "~/lib/jornada/pos-parto";
 
 export const DIAS_AGENDADOS = 14;
@@ -175,7 +175,7 @@ export function textoDaSemanaNova(
     if (total === 0 || total % 7 !== 0) return null;
     const semana = c.semana + total / 7;
     if (semana < 4 || semana > 42) return null;
-    const bebe = babyForWeek(semana);
+    const bebe = bebeDaSemana(semana);
     const quem = c.nomeDoBebe?.trim() || "Seu bebê";
     return {
       titulo: `Semana ${semana} começou! 🌱`,

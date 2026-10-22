@@ -1,13 +1,8 @@
-import type { Gravidade } from "@/lib/sinais-clinicos";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { Phone } from "lucide-react-native";
-import type { ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
-import { Botao, Cartao, Linha, T, toque } from "~/componentes/base";
+import { Botao, Linha, T, toque } from "~/componentes/base";
 import { BotaoVoltar, PilulaSos } from "~/componentes/cabecalho";
-import { SAMU } from "~/config";
-import { ligar } from "~/lib/links";
 import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
 
 /** As peças 3D do site (mesmas artes, um lugar só). */
@@ -28,14 +23,17 @@ export function Cabecalho({
   titulo,
   arte,
   fundo,
+  voltarPara = "/saude",
 }: {
   titulo: string;
   arte?: keyof typeof ARTES;
   fundo?: string;
+  /** Sem pilha para voltar (abriu direto), vai para cá. */
+  voltarPara?: "/saude" | "/sos";
 }) {
   return (
     <Linha estilo={{ gap: espaco.md, marginBottom: espaco.xs }}>
-      <BotaoVoltar voltarPara="/saude" />
+      <BotaoVoltar voltarPara={voltarPara} />
       {arte ? (
         <View
           style={{
@@ -56,60 +54,6 @@ export function Cabecalho({
       <PilulaSos />
     </Linha>
   );
-}
-
-/** O botão do 192 — liga direto, funciona sem internet. */
-export function BotaoLigar192({
-  grande,
-  rotulo = "Ligar 192",
-}: {
-  grande?: boolean;
-  rotulo?: string;
-}) {
-  return (
-    <Botao
-      rotulo={rotulo}
-      tipo="perigo"
-      aoTocar={() => ligar(SAMU)}
-      icone={<Phone size={grande ? 22 : 18} color={cor.branco} />}
-      estilo={grande ? { minHeight: 60 } : undefined}
-    />
-  );
-}
-
-/** O cartão vermelho: o fato, o que fazer, e o 192 a um toque. */
-export function CartaoDeSocorro({
-  titulo,
-  texto,
-  grande,
-  children,
-}: {
-  titulo: string;
-  texto?: string | null;
-  grande?: boolean;
-  children?: ReactNode;
-}) {
-  return (
-    <Cartao
-      fundo={cor.urgenteFundo}
-      estilo={{ borderWidth: 1.5, borderColor: cor.urgente, gap: espaco.md }}
-    >
-      <T tipo="subtitulo" cor={cor.urgente}>
-        {titulo}
-      </T>
-      {texto ? <T cor={cor.texto}>{texto}</T> : null}
-      {children}
-      <BotaoLigar192 grande={grande} />
-    </Cartao>
-  );
-}
-
-export function coresDaGravidade(g: Gravidade) {
-  if (g === "grave") return { fundo: cor.urgenteFundo, texto: cor.urgente };
-  if (g === "atencao") return { fundo: cor.atencaoFundo, texto: cor.atencao };
-  /* ⚠️ "normal" é NEUTRO, nunca verde: a régua da glicemia não sabe se foi
-     em jejum, e verde afirmaria um "está bom" que o app não sabe. */
-  return { fundo: cor.apagado, texto: cor.textoApagado };
 }
 
 /** Escolha de uma entre poucas opções (pílulas de 44 pt). */
@@ -208,24 +152,6 @@ export function Confirmacao({
         <Botao rotulo={rotuloSim} tipo="perigo" aoTocar={aoConfirmar} carregando={carregando} />
         <Botao rotulo="Cancelar" tipo="secundario" aoTocar={aoCancelar} desabilitado={carregando} />
       </Linha>
-    </View>
-  );
-}
-
-/** Pílula de gravidade com o texto da régua. */
-export function SeloDeGravidade({ gravidade, texto }: { gravidade: Gravidade; texto: string }) {
-  const c = coresDaGravidade(gravidade);
-  return (
-    <View
-      style={{
-        alignSelf: "flex-start",
-        backgroundColor: c.fundo,
-        borderRadius: raio.sm,
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-      }}
-    >
-      <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: c.texto }}>{texto}</Text>
     </View>
   );
 }

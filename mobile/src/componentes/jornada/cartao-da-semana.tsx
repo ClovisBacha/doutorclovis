@@ -2,7 +2,7 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import { babyForWeek } from "@/lib/gestacao";
+import { bebeDaSemana } from "~/lib/bebe-da-semana";
 import { Brilho } from "~/componentes/jornada/atividade";
 import { FolhaDeCompartilhar } from "~/componentes/jornada/compartilhar";
 import { arteDoBebe } from "~/componentes/jornada/arte-do-bebe";
@@ -34,7 +34,7 @@ const LARGURA = 300;
 const ALTURA = Math.round((LARGURA * 16) / 9);
 
 export function CartaoDaSemana({ d }: { d: DadosDoCartao }) {
-  const bebe = babyForWeek(d.semana);
+  const bebe = bebeDaSemana(d.semana);
   return (
     <View style={{ width: LARGURA, height: ALTURA, borderRadius: 28, overflow: "hidden" }}>
       <Image

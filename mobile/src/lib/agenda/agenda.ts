@@ -18,7 +18,6 @@
  * Sem react-native aqui: é testado pelo bun.
  */
 
-import { consultaForWeek } from "@/lib/gestacao";
 import { orientacaoDoPos } from "~/lib/jornada/pos-parto";
 
 export const CHAVE_AGENDA = "dc-path-agenda";
@@ -272,23 +271,13 @@ export function contagemPorDia(lista: readonly Compromisso[]): Map<string, numbe
   return m;
 }
 
-/* ── O que costuma vir nesta fase ─────────────────────────────────────────── */
+/* ── O que marcar no pós-parto ──────────────────────────────────────────── */
 
 /**
- * A dica da fase, do calendário de rotina do site (`consultaForWeek`) — o
- * mesmo texto que a aba Início já mostra — com o tipo que ela sugere marcar.
- */
-export function sugestaoDaFase(semana: number): { texto: string; tipo: TipoDeCompromisso } {
-  const texto = consultaForWeek(semana);
-  const tipo: TipoDeCompromisso = /ultrassom|translucência/i.test(texto)
-    ? "ultrassom"
-    : /teste oral|glicose/i.test(texto)
-      ? "exame"
-      : "consulta";
-  return { texto, tipo };
-}
-
-/**
+ * ⚠️ 21/10/2026: a "dica da fase" da AGENDA saiu (era o calendário de exames
+ * do site, e o app não é conselho médico). Isto sobrevive só para o botão
+ * "Pôr na agenda" da leitura da semana do pós-parto, que a fase 2 reescreve.
+ *
  * O que marcar em cada semana de vida, tirado da orientação da semana do site:
  * a revisão pós-parto, a consulta puerperal e as vacinas do bebê. Nas outras
  * semanas a dica é só leitura — não há o que pôr na agenda.
