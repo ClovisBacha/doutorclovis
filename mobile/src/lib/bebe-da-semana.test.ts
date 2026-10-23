@@ -6,7 +6,7 @@ import { FRASES_FORA_DO_APP, fraseDoDiaNoApp } from "~/lib/frase-do-dia";
 
 /** O que o app não diz mais (21/10/2026: rede social + gamificação, não conselho médico). */
 const CLINICO =
-  /aborto|viabilidade|acompanhamento|equipe|cardioto|líquido|indução|médic|sentir os movimentos/i;
+  /aborto|viabilidade|acompanhamento|equipe|cardioto|líquido|indução|médic|sentir os movimentos|termo|pulmões (quase )?prontos|cefálic|encaixe|sonha/i;
 
 describe("o bebê da semana no app", () => {
   test("as trocadas ainda são, no site, o texto que foi trocado", () => {
@@ -19,6 +19,11 @@ describe("o bebê da semana no app", () => {
   test("nenhuma semana fala como prontuário — nem a 43, que o site prende na 42", () => {
     for (let s = 1; s <= 45; s++) expect(bebeDaSemana(s).desc).not.toMatch(CLINICO);
     expect(bebeDaSemana(43).desc).toBe(DESCRICAO_NO_APP[42].app);
+  });
+
+  test("nenhuma semana dá gênero ao bebê", () => {
+    /* A 40 do site dizia "no tempo dele". */
+    for (let s = 1; s <= 45; s++) expect(bebeDaSemana(s).desc).not.toMatch(/\b(dele|dela)\b/i);
   });
 
   test("o resto da semana é o do site", () => {

@@ -2,7 +2,7 @@ import { babyForWeek, retaFinalMensagem } from "@/lib/gestacao";
 
 /**
  * O BEBÊ DA SEMANA COMO O APP O DIZ — a tabela do site (`babyForWeek`,
- * congelada), com seis semanas trocadas.
+ * congelada), com catorze semanas trocadas.
  *
  * ⚠️ 21/10/2026, decisão do dono: o app é rede social + gamificação, e não
  * conselho médico. Quatro descrições falavam como prontuário ("Risco de
@@ -20,6 +20,13 @@ import { babyForWeek, retaFinalMensagem } from "@/lib/gestacao";
  * semana 25 ensina justamente isso: os olhinhos correm debaixo das pálpebras,
  * mas se o bebê sonha, ninguém pode dizer. Fica o fato da semana: os olhos,
  * que começaram a abrir na 26, já abrem e fecham.
+ *
+ * Da 34 à 40, preparando as aulas do 3º trimestre: a tabela falava a língua do
+ * prontuário ("Pulmões quase prontos", "Posição cefálica se define", "termo
+ * precoce", "Encaixe pélvico", "Termo completo!") e, na 40, chamava o bebê de
+ * "dele". Viram um fato do bebê, como as quatro da fase 1. A da 32 ("Unhas dos
+ * pés se formam") dava como estreia o que vem de semanas — o mesmo engano do
+ * soluço apresentado como novidade da 23.
  *
  * A troca casa pelo TEXTO do site, e não pela semana: `babyForWeek` prende a
  * semana entre 4 e 42, então a 43 devolve o texto da 42 — e a troca vale para
@@ -41,6 +48,38 @@ export const DESCRICAO_NO_APP: Readonly<Record<number, { site: string; app: stri
   28: {
     site: "Sonha em REM. Início do 3º trimestre.",
     app: "Início do 3º trimestre: os olhinhos já abrem e fecham.",
+  },
+  32: {
+    site: "Unhas dos pés se formam.",
+    app: "As unhas dos pés já estão formadinhas.",
+  },
+  34: {
+    site: "Pulmões quase prontos.",
+    app: "Os rins vão completando seus filtrinhos.",
+  },
+  35: {
+    site: "Posição cefálica se define.",
+    app: "A pele fica mais madura e resistente.",
+  },
+  36: {
+    site: "Considerado a termo precoce em breve.",
+    app: "A cartilagem das orelhinhas fica mais firme.",
+  },
+  37: {
+    site: "Termo precoce — pulmões prontos.",
+    app: "A cabeça já é cerca de um quarto do corpinho.",
+  },
+  38: {
+    site: "Encaixe pélvico em muitos casos.",
+    app: "As bochechas ficam redondinhas.",
+  },
+  39: {
+    site: "Termo completo!",
+    app: "A penugem do corpinho quase toda já caiu.",
+  },
+  40: {
+    site: "Pronto para chegar a qualquer momento — no tempo dele.",
+    app: "No tempo do bebê, o encontro de vocês se aproxima.",
   },
   41: {
     site: "Termo tardio — acompanhamento mais de pertinho, tudo sob cuidado.",
