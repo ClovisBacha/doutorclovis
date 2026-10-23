@@ -1409,7 +1409,7 @@
   },
   "33": {
     "teach": "Duas linhas no teste e mil emoções no coração: alegria, surpresa, incredulidade, euforia, talvez até um pouco de medo, tudo misturado. Tudo bem sentir tudo isso junto, mesmo quando a gravidez foi muito desejada. Não existe uma emoção certa para esse momento, nem um prazo obrigatório para contar a novidade. Você conta quando e para quem quiser: algumas contam na hora, outras guardam a surpresa por um tempo, só para si ou para planejar um jeito especial de contar. Falar sobre o que você sente com alguém de confiança, como o parceiro, a parceira, uma amiga ou as gestantes da Comunidade do app, também ajuda a acolher essa mistura. E vale guardar a lembrança: anotar onde você estava e o que sentiu transforma este dia numa memória para sempre. Acolha o que vier, sem culpa.",
-    "funFact": "Em português, um jeito antigo e carinhoso de dizer que alguém espera um bebê é 'estar de esperanças'; em espanhol, se diz 'estar en estado de buena esperanza'.",
+    "funFact": "Num livro do francês Marcel Proust, o narrador prova um bolinho chamado madeleine e, de repente, a infância inteira volta à memória. Detalhes assim, como a música que tocava, também podem guardar o dia do positivo.",
     "questions": [
       {
         "type": "choice",
@@ -1454,10 +1454,14 @@
       },
       {
         "type": "choice",
-        "q": "Que expressão antiga do português quer dizer que alguém espera um bebê?",
-        "o": ["Estar de esperanças", "Estar nas nuvens", "Estar com a cabeça na lua"],
+        "q": "Num livro de Marcel Proust, o que faz a infância inteira voltar à memória do narrador?",
+        "o": [
+          "Um bolinho chamado madeleine",
+          "Uma carta antiga achada na gaveta",
+          "Uma foto de família"
+        ],
         "a": 0,
-        "why": "'Estar de esperanças' é um jeito antigo e carinhoso de falar da espera, e o espanhol tem uma expressão parecida."
+        "why": "Basta provar a madeleine para a infância voltar inteira: pequenos detalhes, como um sabor ou uma música, guardam lembranças."
       }
     ]
   },
@@ -1839,8 +1843,8 @@
     ]
   },
   "42": {
-    "teach": "Nesta semana, o embrião chega a cerca de 5 mm, mais ou menos o tamanho de uma lentilha. E o corpinho ganha novidades: dos lados aparecem pequenos brotos, como botõezinhos, que vão virar os braços e as pernas. Os brotos não surgem todos de uma vez: os dos braços aparecem um pouquinho antes dos das pernas, porque o corpo se forma de cima para baixo, da cabeça em direção aos pés. Enquanto isso, o cérebro cresce depressa, e por isso a cabeça é bem grande em comparação com o resto do corpinho nesta fase. Curvado como a letra C, o embrião tem até uma pequena cauda, que vai sumindo nas próximas semanas, conforme o corpo se alonga. E o coraçãozinho que começou a bater na semana passada segue trabalhando sem parar. Que tal anotar no diário: semana 6, do tamanho de uma lentilha?",
-    "funFact": "A palavra 'embrião' vem do grego e quer dizer algo como 'o que cresce por dentro'. Um nome que combina direitinho com esta fase!",
+    "teach": "Nesta semana, o embrião chega a cerca de 5 mm, mais ou menos o tamanho de uma lentilha. E o corpinho ganha novidades: dos lados aparecem pequenos brotos, como botõezinhos, que vão virar os braços e as pernas. Os brotos não surgem todos de uma vez: os dos braços aparecem um pouquinho antes dos das pernas, porque o corpo se forma de cima para baixo, da cabeça em direção aos pés. Enquanto isso, o cérebro cresce depressa, e por isso a cabeça é bem grande em comparação com o resto do corpinho nesta fase. O embrião tem até uma pequena cauda, que vai sumindo nas próximas semanas, conforme o corpo se alonga. Que tal anotar no diário: semana 6, do tamanho de uma lentilha?",
+    "funFact": "A lente dos óculos ganhou esse nome por causa da lentilha, a fruta desta semana no app: em latim, 'lens' quer dizer lentilha, e as lentes têm o mesmo formato arredondado do grãozinho.",
     "questions": [
       {
         "type": "choice",
@@ -1856,10 +1860,10 @@
           "Mede cerca de 5 mm, como uma lentilha",
           "Já tem braços e pernas compridos",
           "Tem uma pequena cauda, que vai sumindo",
-          "Está curvado como a letra C"
+          "Ganha brotinhos dos lados, como botõezinhos"
         ],
         "a": [0, 2, 3],
-        "why": "Com uns 5 mm, curvado como um C e com uma caudinha que vai sumindo, o embrião ainda tem braços e pernas em forma de brotinhos."
+        "why": "Com uns 5 mm, o embrião tem uma caudinha que vai sumindo e ganha brotinhos dos lados, que só com o tempo vão virar braços e pernas compridos."
       },
       {
         "type": "choice",
@@ -1874,10 +1878,10 @@
       },
       {
         "type": "choice",
-        "q": "Verdadeiro ou falso: a palavra 'embrião' vem do grego e quer dizer algo como 'o que cresce por dentro'.",
+        "q": "Verdadeiro ou falso: a palavra 'lente' vem do nome da lentilha em latim, por causa do formato.",
         "o": ["Verdadeiro", "Falso"],
         "a": 0,
-        "why": "Verdadeiro! O nome vem do grego e fala justamente de algo que cresce por dentro."
+        "why": "Verdadeiro! A lente tem o formato arredondado de um grãozinho de lentilha, e o nome veio daí."
       }
     ]
   },
@@ -2010,7 +2014,7 @@
     ]
   },
   "46": {
-    "teach": "Seu bebê já tem a primeira piscina. Uma bolsa fininha e transparente, chamada bolsa amniótica, envolve o embrião e vai se enchendo de líquido, o líquido amniótico. Lá dentro, o embrião fica boiando num lugar macio e protegido. Esse líquido funciona como uma almofada de água: quando você anda, sobe uma escada ou se abaixa para pegar alguma coisa, o líquido amortece os movimentos do seu dia a dia. Também ajuda a manter a temperatura lá dentro estável e quentinha. E a bolsa não fica do mesmo tamanho: cresce junto com o bebê, e o líquido vai aumentando com as semanas, dando espaço para o bebê crescer e, mais adiante, se mexer à vontade. Hoje, quando você caminhar, imagine essa piscininha balançando de leve, como um embalo.",
+    "teach": "Seu bebê já tem a primeira piscina. Uma bolsa fininha e transparente, chamada bolsa amniótica, envolve o embrião e vai se enchendo de líquido, o líquido amniótico. Lá dentro, o embrião fica num lugar macio e quentinho. Esse líquido é como uma piscininha morna: o embrião flutua levinho, quase sem peso. O líquido também ajuda a manter a temperatura lá dentro estável. E a bolsa não fica do mesmo tamanho: cresce junto com o bebê, e o líquido vai aumentando com as semanas, dando espaço para o bebê crescer e, mais adiante, se mexer à vontade. Hoje, imagine essa piscininha balançando de leve, como um embalo.",
     "funFact": "Na tradição popular, quem nasce ainda envolto na bolsa é chamado de 'empelicado', e a palavra virou sinônimo de pessoa de sorte.",
     "questions": [
       {
@@ -2024,13 +2028,13 @@
         "type": "multi",
         "q": "Marque o que o líquido amniótico faz pelo bebê, segundo a aula (marque todas):",
         "o": [
-          "Amortece os movimentos do seu dia a dia",
+          "Deixa o bebê flutuar levinho",
           "Ajuda a manter a temperatura estável",
           "Deixa a bolsa dura como uma casca",
           "Dá espaço para o bebê crescer"
         ],
         "a": [0, 1, 3],
-        "why": "O líquido é uma almofada de água, mantém a temperatura estável e dá espaço para crescer; a bolsa continua fininha e macia."
+        "why": "O líquido deixa o bebê flutuar levinho, ajuda a manter a temperatura estável e dá espaço para crescer; a bolsa continua fininha e macia."
       },
       {
         "type": "choice",
@@ -2092,7 +2096,7 @@
     ]
   },
   "48": {
-    "teach": "Que semana cheia! O embrião chegou a cerca de 5 mm, o tamanho de uma lentilha, e ganhou brotinhos que vão virar braços e pernas, os dos braços um pouquinho antes, porque o corpo se forma de cima para baixo. Você conheceu a bolsa amniótica, a primeira piscina do bebê, com um líquido que amortece os movimentos do seu dia a dia e vai aumentando com as semanas. Também pensou nas mulheres que te inspiram e na mãe que você quer ser, com três coisas para levar e uma para fazer do seu jeito. Organizou as memórias digitais, com pastas, nomes claros e uma cópia de segurança em outro lugar. Convidou os futuros avós para esta história, até na conversa de como querem ser chamados. E viajou pelos nomes do mundo, de Wayan e Made, em Bali, a Kofi e Afua, de Gana. Mais uma semana para guardar!",
+    "teach": "Que semana cheia! O embrião chegou a cerca de 5 mm, o tamanho de uma lentilha, e ganhou brotinhos que vão virar braços e pernas, os dos braços um pouquinho antes, porque o corpo se forma de cima para baixo. Você conheceu a bolsa amniótica, a primeira piscina, onde o bebê flutua levinho, num líquido que vai aumentando com as semanas. Também pensou nas mulheres que te inspiram e na mãe que você quer ser, com três coisas para levar e uma para fazer do seu jeito. Organizou as memórias digitais, com pastas, nomes claros e uma cópia de segurança em outro lugar. Convidou os futuros avós para esta história, até na conversa de como querem ser chamados. E viajou pelos nomes do mundo, de Wayan e Made, em Bali, a Kofi e Afua, de Gana. Mais uma semana para guardar!",
     "funFact": "Na semana que vem, a fruta do app vira um mirtilo: o embrião chega a cerca de 1 cm e o rostinho começa a se desenhar.",
     "questions": [
       {
@@ -2120,14 +2124,10 @@
       },
       {
         "type": "choice",
-        "q": "Na revisão: o que o líquido da bolsa amniótica faz com os movimentos do seu dia a dia?",
-        "o": [
-          "Faz o bebê sentir cada passo com força",
-          "Esfria a barriga a cada passo",
-          "Amortece, como uma almofada de água"
-        ],
+        "q": "Na revisão: o que acontece com o líquido da bolsa amniótica ao longo das semanas?",
+        "o": ["Fica sempre igual", "Muda de cor toda semana", "Vai aumentando, junto com o bebê"],
         "a": 2,
-        "why": "O líquido amniótico funciona como uma almofada de água, que amortece os movimentos do seu dia a dia."
+        "why": "A bolsa cresce junto com o bebê, e o líquido vai aumentando com as semanas."
       },
       {
         "type": "choice",
@@ -2273,7 +2273,7 @@
   },
   "52": {
     "teach": "Muita gente sente culpa na hora de pedir ajuda, como se precisasse dar conta de tudo sozinha. Mas pedir ajuda não é fraqueza: é deixar a sua rede participar desta jornada. Um segredo é fazer pedidos concretos. Em vez de um vago 'se puder, me ajuda', experimente algo como 'você me ajuda a organizar o armário no sábado?'. Pedidos claros são mais fáceis de aceitar e de cumprir. E quando alguém oferecer ajuda, vale dizer sim: aceitar também é um presente para quem oferece, que se sente parte da história. Uma ideia é ter à mão uma listinha de tarefas em que as pessoas podem ajudar, para responder na hora quando perguntarem 'precisa de alguma coisa?'. E a Comunidade do app também é um lugar para trocar experiências e dicas com outras gestantes.",
-    "funFact": "Um ditado muito citado como provérbio africano diz que é preciso uma aldeia inteira para educar uma criança.",
+    "funFact": "Mutirão é uma palavra de origem tupi para um costume antigo: vizinhos e amigos se juntam para fazer, juntos, uma tarefa grande de alguém, como erguer uma casa ou colher a roça.",
     "questions": [
       {
         "type": "choice",
@@ -2311,10 +2311,14 @@
       },
       {
         "type": "choice",
-        "q": "Segundo o ditado citado como provérbio africano, o que é preciso para educar uma criança?",
-        "o": ["Uma aldeia inteira", "Só uma pessoa muito forte", "Um manual completo"],
+        "q": "O que é um mutirão, palavra de origem tupi?",
+        "o": [
+          "Vizinhos e amigos se juntarem para fazer uma tarefa grande de alguém",
+          "Uma comida típica das festas de São João",
+          "Um tipo de rede de dormir"
+        ],
         "a": 0,
-        "why": "O ditado lembra que criar uma criança é tarefa de muitas mãos: uma aldeia inteira."
+        "why": "No mutirão, muita gente se junta para fazer a tarefa grande de alguém, e com muitas mãos o trabalho fica mais leve."
       }
     ]
   },
@@ -2454,7 +2458,7 @@
     ]
   },
   "56": {
-    "teach": "Nesta semana, o embrião mede cerca de 1,6 cm e pesa por volta de 1 g, mais ou menos o tamanho de uma framboesa, a fruta da semana no app. E a grande novidade está nas mãos. Até pouco tempo, as mãozinhas pareciam pequenos remos, achatadas e sem divisões. Agora os dedinhos começam a se separar: nas mãos aparecem uns sulcos, como risquinhos, que marcam o lugar de cada dedo, e ao longo das próximas semanas os dedinhos se soltam de vez. Os braços também mudam: ficam mais compridos e começam a dobrar na altura dos cotovelos. As pernas seguem o mesmo caminho, só que um pouquinho atrás, porque o corpo se forma de cima para baixo, da cabeça em direção aos pés. Que tal olhar para a sua mão hoje e imaginar uma versão minúscula ganhando forma aí dentro?",
+    "teach": "Nesta semana, o embrião mede cerca de 1,6 cm e pesa por volta de 1 g, mais ou menos o tamanho de uma framboesa, a fruta da semana no app. E a grande novidade está nas mãos. Até pouco tempo, as mãozinhas pareciam pequenos remos, achatadas e sem divisões. Agora os dedinhos começam a se separar: nas mãos aparecem uns sulcos, como risquinhos, que marcam o lugar de cada dedo, e ao longo das próximas semanas os dedinhos se soltam de vez. Os braços também mudam: ficam mais compridos e começam a dobrar na altura dos cotovelos. As pernas seguem o mesmo caminho, só que um pouquinho atrás. E a palavra 'cotovelo' tem história: vem do latim, da mesma raiz do côvado, uma medida muito antiga que ia do cotovelo até a ponta dos dedos. Que tal olhar para a sua mão hoje e imaginar uma versão minúscula ganhando forma aí dentro?",
     "funFact": "Os dedinhos se separam porque as células que ficam entre os dedos vão sumindo, num trabalho programado do próprio corpo. Nos patos, boa parte dessa pele entre os dedos fica, e por isso os patos têm pés de nadador!",
     "questions": [
       {
@@ -2493,8 +2497,8 @@
     ]
   },
   "57": {
-    "teach": "Basta abrir uma rede social para ver barrigas lindas, quartinhos prontos e gestantes que parecem dar conta de tudo. Mas o que aparece ali é só um recorte: a foto escolhida, o ângulo bonito, o dia bom. Os dias comuns, as dúvidas e a louça na pia quase nunca entram no álbum. Por isso, comparar a sua jornada com o melhor momento da vida de outra pessoa é uma conta que nunca fecha. Cada corpo, cada família e cada gestação têm o próprio ritmo: tem quem monte o quarto logo no começo, tem quem prefira esperar, e as duas escolhas têm o seu valor. Mudar o olhar ajuda muito: em vez de régua, as histórias das outras podem virar inspiração. Na Comunidade do app, dá para contar a sua parte real e ouvir a parte real das outras, sem competição. Que tal reparar numa coisa da sua jornada que é só sua?",
-    "funFact": "Duas gestantes na mesma semana podem ter barrigas bem diferentes: a altura, o formato do corpo e ser ou não a primeira gestação mudam o jeito de a barriga aparecer.",
+    "teach": "Basta abrir uma rede social para ver ensaios de fotos caprichados, quartinhos prontos e gestantes que parecem dar conta de tudo. Mas o que aparece ali é só um recorte: a foto escolhida, o ângulo bonito, o dia bom. Os dias comuns, as dúvidas e a louça na pia quase nunca entram no álbum. Por isso, comparar a sua jornada com o melhor momento da vida de outra pessoa é uma conta que nunca fecha. Cada família e cada jornada têm o próprio ritmo: tem quem monte o quarto logo no começo, tem quem prefira esperar, e as duas escolhas têm o seu valor. Mudar o olhar ajuda muito: em vez de régua, as histórias das outras podem virar inspiração. Na Comunidade do app, dá para contar a sua parte real e ouvir a parte real das outras, sem competição. Que tal reparar numa coisa da sua jornada que é só sua?",
+    "funFact": "Em 2013, o dicionário Oxford escolheu 'selfie' como a palavra do ano: o autorretrato feito com o celular tinha virado mania nas redes.",
     "questions": [
       {
         "type": "choice",
@@ -2510,9 +2514,14 @@
       {
         "type": "multi",
         "q": "O que tem o próprio ritmo, segundo a aula de hoje? (marque todas)",
-        "o": ["Cada corpo", "Um padrão único que vale para todas", "Cada família", "Cada gestação"],
-        "a": [0, 2, 3],
-        "why": "Cada corpo, cada família e cada gestação seguem o próprio ritmo; não existe um padrão único para todas."
+        "o": [
+          "Cada família",
+          "Um padrão único que vale para todas",
+          "Cada jornada",
+          "A régua das redes sociais"
+        ],
+        "a": [0, 2],
+        "why": "Cada família e cada jornada seguem o próprio ritmo, até na hora de montar o quarto. Não existe um padrão único, nem a régua das redes, que valha para todas."
       },
       {
         "type": "choice",
@@ -2523,10 +2532,10 @@
       },
       {
         "type": "choice",
-        "q": "Verdadeiro ou falso: na mesma semana, todas as gestantes têm barrigas do mesmo tamanho e formato.",
+        "q": "Verdadeiro ou falso: em 2013, 'selfie' foi escolhida a palavra do ano pelo dicionário Oxford.",
         "o": ["Verdadeiro", "Falso"],
-        "a": 1,
-        "why": "Falso! A altura, o formato do corpo e ser ou não a primeira gestação mudam o jeito de a barriga aparecer."
+        "a": 0,
+        "why": "Verdadeiro! O autorretrato feito com o celular tinha virado tanta mania nas redes que 'selfie' ganhou o título de palavra do ano."
       }
     ]
   },
@@ -2626,7 +2635,7 @@
     ]
   },
   "60": {
-    "teach": "Como será o lugar onde o bebê está crescendo? Para começar, é quentinho, mais ou menos na temperatura do centro do seu corpo, e com o tempo o bebê fica até um tiquinho mais quente que você. O líquido ao redor ajuda a manter esse calorzinho bem estável. Também é um lugar de penumbra, quase escuro. Mais adiante na gestação, uma luz bem forte lá de fora, como a do sol ou de uma lanterna, pode atravessar a pele e chegar como um brilho alaranjado e suave. E lá dentro não existe dia nem noite. Mas o seu corpo tem um relógio interno que segue o ritmo do dia e da noite, e alguns sinais desse ritmo chegam ao bebê pela placenta. Um desses sinais é a melatonina, uma substância que o seu corpo produz mais no escuro. É como se você contasse as horas para quem ainda nem viu o sol.",
+    "teach": "Como será o lugar onde o bebê está crescendo? Para começar, é quentinho, mais ou menos na temperatura do centro do seu corpo, e com o tempo o bebê fica até um tiquinho mais quente que você. Também é um lugar de penumbra, quase escuro. Mais adiante na gestação, uma luz bem forte lá de fora, como a do sol ou de uma lanterna, pode atravessar a pele e chegar como um brilho alaranjado e suave. E lá dentro não existe dia nem noite. Mas o seu corpo tem um relógio interno que segue o ritmo do dia e da noite, e alguns sinais desse ritmo chegam ao bebê pela placenta. Um desses sinais é a melatonina, uma substância que o seu corpo produz mais no escuro. É como se você contasse as horas para quem ainda nem viu o sol.",
     "funFact": "Quer ter uma ideia desse brilho? Tape uma lanterna acesa com a palma da mão: a luz que atravessa a pele fica alaranjada, parecida com a que chega lá dentro.",
     "questions": [
       {
@@ -2638,7 +2647,7 @@
           "Muda o tempo todo, ora fria, ora bem quente"
         ],
         "a": 0,
-        "why": "Lá dentro é quentinho, mais ou menos como o centro do seu corpo, e o líquido ao redor do bebê ajuda a manter esse calorzinho bem estável."
+        "why": "Lá dentro é quentinho, mais ou menos como o centro do seu corpo, e com o tempo o bebê fica até um tiquinho mais quente que você."
       },
       {
         "type": "choice",
@@ -2655,14 +2664,13 @@
         "type": "multi",
         "q": "O que é verdade sobre o lugar onde o bebê cresce? (marque todas)",
         "o": [
-          "É um lugar de penumbra",
-          "Lá dentro existe dia e noite, como aqui fora",
-          "O líquido ajuda a manter o calorzinho bem estável",
+          "Lá dentro não existe dia nem noite",
           "Lá dentro a luz é forte o tempo todo",
+          "É um lugar de penumbra",
           "Sinais do seu ritmo de dia e de noite chegam pela placenta"
         ],
-        "a": [0, 2, 4],
-        "why": "É um lugar de penumbra, com um calorzinho bem estável e sem dia e noite, mas os sinais do seu ritmo chegam pela placenta."
+        "a": [0, 2, 3],
+        "why": "É um lugar de penumbra, sem dia nem noite, mas os sinais do seu ritmo de dia e de noite chegam pela placenta. A luz forte de fora só chega mais adiante, como um brilho suave."
       },
       {
         "type": "choice",
@@ -2756,7 +2764,7 @@
     ]
   },
   "63": {
-    "teach": "Semana 9! O bebê está com cerca de 2,3 cm e 2 g, o tamanho de uma uva, e vive uma mudança de nome: por volta desta fase, deixa de ser chamado de embrião e passa a ser chamado de feto. As duas palavras são antigas e cheias de poesia. 'Embrião' vem do grego e lembra algo que brota e cresce dentro, como um brotinho bem guardado. 'Feto' vem do latim e quer dizer cria, fruto. Junto com o nome novo, o corpinho também muda de jeito. Até pouco tempo, o bebê era curvadinho como a letra C, com a cabecinha dobrada sobre o peito. Agora vai se esticando aos poucos, a cabecinha vai se levantando e o jeitinho fica cada vez mais humano, com os bracinhos, as perninhas e os dedinhos que você já conheceu nas últimas semanas. Uma uva pequenininha, e já com cara de gente: dá vontade de imaginar quanto carinho cabe nesse fruto.",
+    "teach": "Semana 9! O bebê está com cerca de 2,3 cm e 2 g, o tamanho de uma uva, e vive uma mudança de nome: por volta desta fase, deixa de ser chamado de embrião e passa a ser chamado de feto. A palavra nova é antiga e cheia de poesia: 'feto' vem do latim e quer dizer cria, fruto. Junto com o nome novo, o corpinho também muda de jeito. Até pouco tempo, o bebê era curvadinho como a letra C, com a cabecinha dobrada sobre o peito. Agora vai se esticando aos poucos, a cabecinha vai se levantando e o jeitinho fica cada vez mais humano, com os bracinhos, as perninhas e os dedinhos que você já conheceu nas últimas semanas. Uma uva pequenininha, e já com cara de gente: dá vontade de imaginar quanto carinho cabe nesse fruto.",
     "funFact": "Em espanhol e em italiano também se diz feto, e em inglês, fetus: todas essas palavras vêm do mesmo latim, que quer dizer cria, fruto.",
     "questions": [
       {
@@ -2775,15 +2783,15 @@
       },
       {
         "type": "multi",
-        "q": "Marque o que esta aula contou sobre as palavras embrião e feto (marque todas):",
+        "q": "Marque o que esta aula contou sobre a palavra feto (marque todas):",
         "o": [
-          "'Embrião' vem do grego",
-          "'Embrião' lembra algo que brota e cresce dentro",
-          "'Feto' vem do latim e quer dizer cria, fruto",
-          "'Feto' quer dizer pedrinha preciosa"
+          "'Feto' vem do latim",
+          "'Feto' quer dizer pedrinha preciosa",
+          "'Feto' quer dizer cria, fruto",
+          "Em espanhol e em italiano também se diz feto"
         ],
-        "a": [0, 1, 2],
-        "why": "'Embrião' vem do grego e lembra algo que brota e cresce dentro; 'feto' vem do latim e quer dizer cria, fruto. Pedrinha preciosa não entra nessa história."
+        "a": [0, 2, 3],
+        "why": "'Feto' vem do latim e quer dizer cria, fruto, e o espanhol e o italiano usam a mesma palavra. Pedrinha preciosa não entra nessa história."
       },
       {
         "type": "choice",
@@ -3294,8 +3302,8 @@
     ]
   },
   "75": {
-    "teach": "Além do nome, o bebê vai receber sobrenomes, e cada um carrega uma história antiga. Muitos sobrenomes portugueses terminados em -es queriam dizer filho de alguém: Fernandes era o filho de Fernando, Rodrigues, o filho de Rodrigo, e Gonçalves, o filho de Gonçalo. Outros nasceram da natureza e dos lugares, como Pereira e Oliveira, que vêm da árvore da pera e da árvore da azeitona. Na Islândia, o sobrenome se forma com o nome do pai ou da mãe mais -son, que quer dizer filho, ou -dóttir, que quer dizer filha. Assim, a filha de um pai chamado Jón leva o sobrenome Jónsdóttir. Que tal desenhar uma pequena árvore da família com os sobrenomes de cada lado? Esse desenho mostra de onde vem cada pedacinho da história do bebê e pode virar uma página linda do álbum.",
-    "funFact": "Na Islândia, como os sobrenomes mudam a cada geração, a lista telefônica é organizada pelo primeiro nome das pessoas.",
+    "teach": "Além do nome, o bebê vai receber sobrenomes, e cada um carrega uma história antiga. Muitos sobrenomes portugueses terminados em -es queriam dizer filho de alguém: Fernandes era o filho de Fernando, Rodrigues, o filho de Rodrigo, e Gonçalves, o filho de Gonçalo. Outros nasceram da natureza e dos lugares, como Pereira e Oliveira, que vêm da árvore da pera e da árvore da azeitona. Em muitos países de língua espanhola, cada pessoa costuma levar dois sobrenomes, um do lado do pai e outro do lado da mãe. O escritor colombiano Gabriel García Márquez, por exemplo, recebeu o García do pai e o Márquez da mãe. Que tal desenhar uma pequena árvore da família com os sobrenomes de cada lado? Esse desenho mostra de onde vem cada pedacinho da história do bebê e pode virar uma página linda do álbum.",
+    "funFact": "O pintor espanhol Pablo Picasso tinha dois sobrenomes, Ruiz, do pai, e Picasso, da mãe, e escolheu assinar as obras só com o da mãe.",
     "questions": [
       {
         "type": "choice",
@@ -3313,17 +3321,25 @@
       },
       {
         "type": "choice",
-        "q": "Na Islândia, qual seria o sobrenome da filha de um pai chamado Jón?",
-        "o": ["Jónsson", "Jónes", "Jónsdóttir"],
+        "q": "Em muitos países de língua espanhola, de onde costumam vir os dois sobrenomes de cada pessoa?",
+        "o": [
+          "Os dois do lado do pai",
+          "Da cidade onde a pessoa nasceu",
+          "Um do lado do pai e outro do lado da mãe"
+        ],
         "a": 2,
-        "why": "Na Islândia, -dóttir quer dizer filha, então a filha de Jón é Jónsdóttir; Jónsson seria o filho."
+        "why": "Lá, cada pessoa costuma levar um sobrenome de cada lado: García Márquez, por exemplo, recebeu o García do pai e o Márquez da mãe."
       },
       {
         "type": "choice",
-        "q": "Verdadeiro ou falso: na Islândia, a lista telefônica é organizada pelo sobrenome das pessoas.",
-        "o": ["Verdadeiro", "Falso"],
+        "q": "Com qual dos dois sobrenomes o pintor Pablo Picasso escolheu assinar as obras?",
+        "o": [
+          "Ruiz, que vinha do pai",
+          "Picasso, que vinha da mãe",
+          "Um apelido de artista, sem ligação com a família"
+        ],
         "a": 1,
-        "why": "Falso. Como os sobrenomes mudam a cada geração, a lista islandesa é organizada pelo primeiro nome."
+        "why": "Picasso tinha o Ruiz do pai e o Picasso da mãe, e escolheu assinar as obras com o sobrenome que vinha da mãe."
       }
     ]
   },
@@ -3375,7 +3391,7 @@
     ]
   },
   "77": {
-    "teach": "Semana 11! O bebê está do tamanho de um figo, com cerca de 4,1 cm e 7 g, e começa a formar as unhas. Tudo começa na pontinha dos dedinhos das mãos, numa área pequenina de onde as unhas vão nascer; as dos pés seguem o mesmo caminho um pouco depois. As unhas crescem devagarinho, semana após semana, e só chegam à ponta dos dedos lá para o fim da gestação. A pele ainda é fininha e transparente, tão delicada que deixa ver os vasinhos por baixo, e vai ganhando camadas com o tempo. E tem um detalhe que encanta: a cabeça é grandona! Nesta fase, corresponde a cerca de metade do comprimento do corpo, porque o cérebro cresceu muito nas últimas semanas. Aos poucos, o corpinho vai alcançando a cabeça, e as proporções vão ficando parecidas com as de um recém-nascido.",
+    "teach": "Semana 11! O bebê está do tamanho de um figo, com cerca de 4,1 cm e 7 g, e começa a formar as unhas. Tudo começa na pontinha dos dedinhos das mãos, numa área pequenina de onde as unhas vão nascer; as dos pés seguem o mesmo caminho um pouco depois. As unhas crescem devagarinho, semana após semana, e só chegam à ponta dos dedos lá para o fim da gestação. A pele ainda é fininha e transparente, tão delicada que deixa ver os vasinhos por baixo, e vai ganhando camadas com o tempo. Que capricho: num corpinho do tamanho de um figo, até a pontinha dos dedos ganha atenção, um detalhe de cada vez.",
     "funFact": "Curiosidade da fruta da semana: o figo é, na verdade, um conjunto de florzinhas que crescem viradas para dentro, e cada sementinha crocante vem de uma dessas flores.",
     "questions": [
       {
@@ -3389,13 +3405,13 @@
         "type": "multi",
         "q": "Marque o que esta aula contou sobre as unhas do bebê (marque todas):",
         "o": [
-          "Já nascem compridinhas, até a ponta dos dedos",
+          "Começam no meio da palma da mão",
           "Começam a se formar nesta fase",
           "As das mãos vêm primeiro, e as dos pés, um pouco depois",
           "Crescem devagarinho, semana após semana"
         ],
         "a": [1, 2, 3],
-        "why": "As unhas começam a se formar agora, primeiro nas mãos e depois nos pés, e crescem devagarinho: só chegam à ponta dos dedos lá para o fim da gestação."
+        "why": "As unhas começam a se formar agora, na pontinha dos dedinhos das mãos, e as dos pés vêm um pouco depois. E crescem devagarinho, semana após semana."
       },
       {
         "type": "choice",
@@ -3410,14 +3426,10 @@
       },
       {
         "type": "choice",
-        "q": "Por que a cabeça do bebê corresponde a cerca de metade do comprimento do corpo nesta fase?",
-        "o": [
-          "Porque o cérebro cresceu muito",
-          "Porque o corpinho parou de crescer",
-          "Porque os cabelos já são bem volumosos"
-        ],
+        "q": "Quando as unhas do bebê chegam à ponta dos dedinhos?",
+        "o": ["Lá para o fim da gestação", "Já nesta semana 11", "Logo na semana que vem"],
         "a": 0,
-        "why": "O cérebro cresceu muito nas últimas semanas, por isso a cabeça é grandona; aos poucos, o corpinho vai alcançando."
+        "why": "As unhas crescem devagarinho, semana após semana, e só chegam à ponta dos dedos lá para o fim da gestação."
       }
     ]
   },
@@ -3706,7 +3718,7 @@
     ]
   },
   "84": {
-    "teach": "Nesta semana, o bebê mede cerca de 5,4 cm e pesa por volta de 14 g, mais ou menos o tamanho de um limão, a fruta da semana no app. E chega uma novidade cheia de encanto: os reflexos ganham força. Reflexo é um movimento que o corpo faz sozinho, sem precisar pensar, e mostra que os nervinhos e os músculos começam a conversar entre si. Os dedinhos das mãos já abrem e fecham, num movimento que lembra o de agarrar, como se o bebê ensaiasse um gesto que vai repetir muitas e muitas vezes. O rostinho também muda: o perfil fica mais definido, com o queixo e o narizinho ganhando forma, e os olhos, que começaram nas laterais da cabeça, vão se aproximando da frente do rosto. Tudo isso acontece num corpinho do tamanho de um limão, em movimentos tão pequeninos que ainda passam despercebidos aqui fora.",
+    "teach": "Nesta semana, o bebê mede cerca de 5,4 cm e pesa por volta de 14 g, mais ou menos o tamanho de um limão, a fruta da semana no app. E chega uma novidade cheia de encanto: os reflexos ganham força. Reflexo é um movimento que o corpo faz sozinho, sem precisar pensar, como o pulinho que a gente dá quando leva um susto. Os dedinhos das mãos já abrem e fecham, num movimento que lembra o de agarrar, como se o bebê ensaiasse um gesto que vai repetir muitas e muitas vezes. O rostinho também muda: o perfil fica mais definido, com o queixo e o narizinho ganhando forma. Que tal abrir e fechar a sua mão bem devagarinho agora e imaginar esse mesmo gesto, em tamanho pequenininho, acontecendo aí dentro?",
     "funFact": "No Brasil, o limão mais comum na feira, o taiti, é chamado pelos botânicos de lima ácida. Pequeno e cheio de suco, do jeitinho do bebê desta semana: pequenino e cheio de novidades.",
     "questions": [
       {
@@ -3718,7 +3730,7 @@
           "Um gesto que o bebê aprende olhando alguém"
         ],
         "a": 0,
-        "why": "Reflexo é um movimento que o corpo faz sozinho, e mostra que nervinhos e músculos começam a conversar."
+        "why": "Reflexo é um movimento que o corpo faz sozinho, sem precisar pensar, como o pulinho que a gente dá quando leva um susto."
       },
       {
         "type": "choice",
@@ -3738,10 +3750,10 @@
           "Tem mais ou menos o tamanho de um limão",
           "O queixo e o narizinho ganham forma",
           "Já pesa por volta de 1 quilo",
-          "Os olhos vão se aproximando da frente do rosto"
+          "O perfil fica mais definido"
         ],
         "a": [0, 1, 3],
-        "why": "Com cerca de 5,4 cm e 14 g, do tamanho de um limão, o bebê ganha um perfil mais definido, e os olhos caminham para a frente do rosto."
+        "why": "Com cerca de 5,4 cm e 14 g, do tamanho de um limão, o bebê ganha um perfil mais definido, com o queixo e o narizinho tomando forma. Um quilo é muito mais do que os cerca de 14 g desta semana."
       },
       {
         "type": "choice",
@@ -3886,7 +3898,7 @@
     ]
   },
   "88": {
-    "teach": "Os olhinhos do bebê já se formaram e, por volta desta fase, recebem uma proteção delicada: as pálpebras se fecham por cima dos olhos, como uma cortininha. E ficam assim até o começo do terceiro trimestre, quando voltam a se abrir. Enquanto a cortina está fechada, o trabalho continua por dentro: a retina, a parte do olho que um dia vai captar a luz, segue amadurecendo no seu tempo. É como um cinema sendo montado com as cortinas fechadas, antes da estreia. Lá na frente, quando as pálpebras se abrirem, a luz que atravessa a barriga chega bem suave e filtrada, e o bebê vai poder perceber a diferença entre o claro e o escuro. E, depois do nascimento, a visão continua se desenvolvendo aos pouquinhos nos primeiros meses, com o rosto de quem cuida como uma das paisagens favoritas.",
+    "teach": "Os olhinhos do bebê já se formaram e, por volta desta fase, recebem uma proteção delicada: as pálpebras se fecham por cima dos olhos, como uma cortininha. E ficam assim até o começo do terceiro trimestre, quando voltam a se abrir. Enquanto a cortina está fechada, o trabalho continua por dentro: a retina, a parte do olho que um dia vai captar a luz, segue amadurecendo no seu tempo. É como um cinema sendo montado com as cortinas fechadas, antes da estreia. Lá na frente, quando as pálpebras se abrirem, o bebê vai poder perceber a diferença entre o claro e o escuro. E, depois do nascimento, a visão continua se desenvolvendo aos pouquinhos nos primeiros meses, com o rosto de quem cuida como uma das paisagens favoritas.",
     "funFact": "Logo depois de nascer, o bebê enxerga melhor o que está a uns 20 a 30 cm de distância, mais ou menos o caminho entre o colo e o rosto de quem segura.",
     "questions": [
       {
@@ -3933,7 +3945,7 @@
     ]
   },
   "89": {
-    "teach": "Em muitas famílias brasileiras, escolher padrinhos e madrinhas é um momento especial, cheio de emoção. A tradição tem origem religiosa, ligada ao batismo, quando os padrinhos assumiam o compromisso de acompanhar a criança na fé. Hoje, muitas famílias, religiosas ou não, escolhem pelo afeto: pessoas queridas para estar por perto, celebrar as conquistas, dar colo e fazer parte da vida do bebê. Não existe regra única, e cada família faz do seu jeito. O convite também pode virar uma pequena festa: um bilhete escrito à mão, uma caixinha com um par de meias pequeninas, um quebra-cabeça que revela a pergunta quando a última peça se encaixa. Fazer o convite de um jeito criativo vira lembrança para os dois lados, e muita gente guarda esse momento para sempre.",
+    "teach": "Em muitas famílias brasileiras, escolher padrinhos e madrinhas é um momento especial, cheio de emoção. A tradição tem origem religiosa, ligada ao batismo, quando os padrinhos assumiam o compromisso de acompanhar a criança na fé. Hoje, muitas famílias, religiosas ou não, escolhem pelo afeto: pessoas queridas para estar por perto, celebrar as conquistas, dar colo e fazer parte da vida do bebê. Não existe regra única, e cada família faz do seu jeito. O convite também pode virar uma pequena festa: um cartãozinho 'escrito pelo bebê', com a pergunta 'quer ser meu padrinho?' ou 'quer ser minha madrinha?'; uma caneca ou uma camiseta estampada com o convite; ou um vídeo curtinho em que a família toda faz a pergunta junta. Fazer o convite de um jeito criativo vira lembrança para os dois lados.",
     "funFact": "Quem aceita ser padrinho ou madrinha vira compadre ou comadre dos pais do bebê. Compadre vem do latim compater, algo como 'pai junto'.",
     "questions": [
       {
@@ -3949,15 +3961,15 @@
       },
       {
         "type": "multi",
-        "q": "Marque as ideias de convite criativo citadas na aula (marque todas):",
+        "q": "Marque as ideias de convite para padrinhos e madrinhas citadas na aula (marque todas):",
         "o": [
-          "Um bilhete escrito à mão",
-          "Uma caixinha com um par de meias pequeninas",
-          "Um quebra-cabeça que revela a pergunta",
-          "Um anúncio no jornal da cidade"
+          "Um cartãozinho 'escrito pelo bebê'",
+          "Um anúncio no jornal da cidade",
+          "Uma caneca ou uma camiseta com o convite",
+          "Um vídeo curtinho da família fazendo a pergunta"
         ],
-        "a": [0, 1, 2],
-        "why": "Bilhete, caixinha com meias e quebra-cabeça: convites criativos que viram lembrança para os dois lados."
+        "a": [0, 2, 3],
+        "why": "Cartãozinho 'escrito pelo bebê', caneca ou camiseta e vídeo da família: convites criativos que viram lembrança para os dois lados."
       },
       {
         "type": "choice",
@@ -4086,61 +4098,61 @@
     ]
   },
   "92": {
-    "teach": "Sabia que a barriga está se preparando para entrar em cena? Fora da gestação, o útero fica escondidinho na pelve, a bacia de ossos do quadril. Por volta do fim do primeiro trimestre, o útero começa a subir acima do osso púbico, o osso da frente da pelve. Em algumas mulheres a barriga aparece mais cedo, em outras mais tarde, e cada barriga vai ganhando, no seu tempo, um formato todo seu. Muitas mulheres se pegam com a mão na barriga, olhando de lado no espelho, se acostumando com a nova silhueta. Tudo bem sentir encanto, estranheza ou as duas coisas juntas. E este momento merece entrar na série de fotos da barriga, mesmo que a curva ainda nem apareça: escolha um cantinho com boa luz, repita a mesma pose e o mesmo ângulo, e lá na frente você vai ver, foto a foto, como tudo começou.",
-    "funFact": "Diz a crendice popular que barriga pontuda é de menino e barriga redonda é de menina. É só uma brincadeira divertida: o formato da barriga não conta nada sobre isso.",
+    "teach": "Tem dia em que você se pega de lado na frente do espelho, procurando uma curvinha nova. E tem dia em que a mão vai sozinha para a barriga: no meio de uma conversa, na fila do mercado, antes de dormir. Muitas gestantes só reparam nesse gesto quando alguém comenta, e a mão pousada ali já é, de certo modo, um primeiro colo. Se acostumar com a nova silhueta também leva tempo, e o olhar pode demorar um pouquinho para acompanhar o corpo. Tudo bem sentir encanto, estranheza ou as duas coisas juntas, às vezes no mesmo dia: encanto por ver a espera ganhando forma, estranheza por não reconhecer de cara a própria imagem. Você não precisa gostar de tudo logo de primeira, e o que sente ao se ver pode mudar com as semanas. E, se quiser, hoje é um bom dia para a foto da semana 13 da sua série.",
+    "funFact": "A palavra silhueta vem de Étienne de Silhouette, ministro das finanças da França em 1759. Os retratos de perfil recortados em papel preto, simples e baratinhos, acabaram ganhando o nome dele.",
     "questions": [
       {
         "type": "choice",
-        "q": "O que o útero começa a fazer por volta do fim do primeiro trimestre?",
+        "q": "Segundo esta aula, em que gesto muitas gestantes só reparam quando alguém comenta?",
         "o": [
-          "Descer e ficar ainda mais escondido dentro da pelve",
-          "Subir acima do osso púbico",
-          "Encostar nas costelas"
+          "Cruzar os braços na frente do corpo",
+          "Pousar a mão na barriga, quase sem pensar",
+          "Olhar o relógio a toda hora"
         ],
         "a": 1,
-        "why": "Fora da gestação o útero fica escondidinho na pelve; por volta do fim do primeiro trimestre, começa a subir acima do osso púbico."
+        "why": "A mão vai sozinha para a barriga, no meio de uma conversa ou antes de dormir, e muita gente só repara quando alguém comenta."
       },
       {
         "type": "choice",
-        "q": "Segundo esta aula, como vai ser o formato da sua barriga?",
-        "o": [
-          "Todo seu, com um jeito próprio",
-          "Igualzinho ao de todas as gestantes",
-          "Definido desde a primeira semana"
-        ],
-        "a": 0,
-        "why": "Pouco a pouco, cada uma no seu tempo, a barriga vai ganhando um formato todo seu."
-      },
-      {
-        "type": "multi",
-        "q": "Marque as dicas desta aula para a série de fotos da barriga (marque todas):",
-        "o": [
-          "Escolher um cantinho com boa luz",
-          "Repetir a mesma pose e o mesmo ângulo",
-          "Trocar de lugar e de pose a cada foto",
-          "Incluir este momento na série",
-          "Esperar a barriga crescer bem para fotografar"
-        ],
-        "a": [0, 1, 3],
-        "why": "Boa luz, mesma pose e mesmo ângulo, e este momento entra na série, mesmo sem curva à vista: lá na frente, você vê foto a foto como tudo começou."
+        "q": "Para esta aula, a mão pousada na barriga já é, de certo modo, o quê?",
+        "o": ["Um aceno de despedida", "Um aperto de mão cerimonioso", "Um primeiro colo"],
+        "a": 2,
+        "why": "Esse gesto quase automático já é, de certo modo, um primeiro colo para o bebê."
       },
       {
         "type": "choice",
         "q": "Diante da nova silhueta, o que esta aula diz sobre os sentimentos?",
         "o": [
+          "Tudo bem sentir encanto, estranheza ou os dois",
           "Só vale sentir encanto, e nunca estranheza",
-          "O melhor é deixar para pensar nisso no fim da gestação",
-          "Tudo bem sentir encanto, estranheza ou os dois"
+          "O melhor é deixar para pensar nisso no fim da gestação"
         ],
-        "a": 2,
-        "why": "Se acostumar com a nova silhueta pode trazer encanto, estranheza ou os dois, e tudo bem."
+        "a": 0,
+        "why": "Se acostumar com a nova silhueta pode trazer encanto, estranheza ou os dois, às vezes no mesmo dia, e tudo bem."
+      },
+      {
+        "type": "multi",
+        "q": "Marque o que esta aula disse sobre se ver no espelho nesta fase (marque todas):",
+        "o": [
+          "O olhar pode levar um tempinho para acompanhar o corpo",
+          "É preciso gostar de tudo logo de primeira",
+          "O que você sente ao se ver pode mudar com as semanas",
+          "Estranhar a própria imagem de vez em quando cabe nesta fase",
+          "Só vale se olhar quando a curva já aparecer bem"
+        ],
+        "a": [0, 2, 3],
+        "why": "O olhar leva um tempinho para acompanhar o corpo, a estranheza também tem lugar, e o que você sente pode mudar com as semanas, sem pressa de gostar de tudo de cara."
       },
       {
         "type": "choice",
-        "q": "Verdadeiro ou falso: o formato da barriga revela se o bebê é menino ou menina.",
-        "o": ["Verdadeiro", "Falso"],
+        "q": "De onde vem a palavra silhueta, segundo a curiosidade desta aula?",
+        "o": [
+          "De uma palavra grega que quer dizer sombra",
+          "Do sobrenome de um ministro francês de 1759",
+          "Do nome de um espelho famoso de Veneza"
+        ],
         "a": 1,
-        "why": "Barriga pontuda ou redonda é só crendice divertida: o formato não conta nada sobre isso."
+        "why": "Vem de Étienne de Silhouette, ministro francês de 1759: os retratos de perfil recortados em papel preto, simples e baratinhos, ganharam o nome dele."
       }
     ]
   },
