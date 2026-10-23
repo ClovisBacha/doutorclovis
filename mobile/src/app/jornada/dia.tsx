@@ -6,7 +6,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import { tituloCurtoDaAula } from "~/lib/jornada/aula";
 import { desafioDaGestacao } from "~/lib/jornada/desafios-no-app";
-import { carregarQuizDoDia, temQuizNoDia, type DailyQuiz } from "@/lib/daily-quizzes";
+import { temQuizNoDia, type DailyQuiz } from "@/lib/daily-quizzes";
+import { carregarAulaDoDia } from "~/lib/jornada/aulas-do-app";
 import { recadoDaBolha } from "@/lib/recado-da-bolha";
 import { Carregando, toque } from "~/componentes/base";
 import { corCaminho, META_DAS_ATIVIDADES } from "~/componentes/caminho/cores";
@@ -72,7 +73,7 @@ export default function FolhaDoDia() {
       setQuiz(null);
       return;
     }
-    void carregarQuizDoDia(D).then((q) => {
+    void carregarAulaDoDia(D).then((q) => {
       if (vivo) setQuiz(q);
     });
     return () => {

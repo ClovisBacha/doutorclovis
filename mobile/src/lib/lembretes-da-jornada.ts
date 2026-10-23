@@ -1,7 +1,7 @@
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import { gravarJson, lerJson } from "~/lib/armazem";
-import { carregarQuizDoDia } from "@/lib/daily-quizzes";
+import { carregarAulaDoDia } from "~/lib/jornada/aulas-do-app";
 import { tituloCurtoDaAula } from "~/lib/jornada/aula";
 import {
   DIAS_AGENDADOS,
@@ -81,7 +81,7 @@ async function comAulas(c: ContextoDoLembrete): Promise<ContextoDoLembrete> {
   const assuntos: Record<number, string> = {};
   await Promise.all(
     Array.from({ length: DIAS_AGENDADOS }, (_, i) => c.D! + i).map(async (D) => {
-      const q = await carregarQuizDoDia(D);
+      const q = await carregarAulaDoDia(D);
       if (q) assuntos[D] = tituloCurtoDaAula(q.teach);
     }),
   );

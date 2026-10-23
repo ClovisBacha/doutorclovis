@@ -23,7 +23,7 @@ import {
   quandoAbre,
   SEMANA_MINIMA,
 } from "~/lib/jornada/dia";
-import { carregarQuizDoDia } from "@/lib/daily-quizzes";
+import { carregarAulaDoDia } from "~/lib/jornada/aulas-do-app";
 import { tituloCurtoDaAula } from "~/lib/jornada/aula";
 import { estadoAtual, gravarChave } from "~/lib/jornada/loja";
 import { CHAVE_FIGURINHAS, listaDeNumeros } from "~/lib/jornada/momentos";
@@ -59,7 +59,7 @@ export default function Semana() {
     const dias = diasDaSemana(semana).filter((D) => D >= D_MINIMO);
     void Promise.all(
       dias.map(async (D) => {
-        const q = await carregarQuizDoDia(D);
+        const q = await carregarAulaDoDia(D);
         return [D, q ? tituloCurtoDaAula(q.teach) : null] as const;
       }),
     ).then((pares) => {

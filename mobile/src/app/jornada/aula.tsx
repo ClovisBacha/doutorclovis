@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { Animated, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { desafioDaGestacao } from "~/lib/jornada/desafios-no-app";
-import { carregarQuizDoDia, isMultiQuestion, type DailyQuiz } from "@/lib/daily-quizzes";
+import { isMultiQuestion, type DailyQuiz } from "@/lib/daily-quizzes";
+import { carregarAulaDoDia } from "~/lib/jornada/aulas-do-app";
 import { Cartao, Carregando, NaoConsegueLer, T, Tela, toque } from "~/componentes/base";
 import { BotaoDaAtividade } from "~/componentes/jornada/atividade";
 import { corJornada } from "~/componentes/jornada/cores";
@@ -101,7 +102,7 @@ function AulaDoDia() {
     if (D == null || at.pos || at.cuidado) return;
     let vivo = true;
     setQuiz("carregando");
-    void carregarQuizDoDia(D).then((q) => {
+    void carregarAulaDoDia(D).then((q) => {
       if (vivo) setQuiz(q);
     });
     return () => {

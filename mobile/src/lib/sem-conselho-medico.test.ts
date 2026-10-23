@@ -70,6 +70,9 @@ describe("o app não dá conselho médico", () => {
     );
     expect(ondeAparece(/\bconsultaForWeek\b/)).toEqual([]);
     expect(ondeAparece(/\bfraseDoDia\(/, ["lib/frase-do-dia.ts"])).toEqual([]);
+    /* As aulas passam pelo banco do app (fase 2): ele troca as que ensinavam
+       conduta e cai no site só nos dias que ainda não foram trocados. */
+    expect(ondeAparece(/\bcarregarQuizDoDia\b/, ["lib/jornada/aulas-do-app.ts"])).toEqual([]);
   });
 
   test("nenhuma frase promete um médico que a v1 não tem, nem dá régua", () => {
