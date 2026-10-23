@@ -2,7 +2,7 @@ import { babyForWeek, retaFinalMensagem } from "@/lib/gestacao";
 
 /**
  * O BEBÊ DA SEMANA COMO O APP O DIZ — a tabela do site (`babyForWeek`,
- * congelada), com cinco semanas trocadas.
+ * congelada), com seis semanas trocadas.
  *
  * ⚠️ 21/10/2026, decisão do dono: o app é rede social + gamificação, e não
  * conselho médico. Quatro descrições falavam como prontuário ("Risco de
@@ -15,6 +15,11 @@ import { babyForWeek, retaFinalMensagem } from "@/lib/gestacao";
  * não sente nada na 20 lê ali um sinal. Movimento é encanto, nunca régua — o
  * que preocupa mora no SOS. Fica o fato que a tabela não explicava: o salto de
  * 15,3 para 25,6 cm é a medida passando a ser da cabeça aos pés.
+ *
+ * A da semana 28 ("Sonha em REM") afirma o que ninguém sabe — e a aula da
+ * semana 25 ensina justamente isso: os olhinhos correm debaixo das pálpebras,
+ * mas se o bebê sonha, ninguém pode dizer. Fica o fato da semana: os olhos,
+ * que começaram a abrir na 26, já abrem e fecham.
  *
  * A troca casa pelo TEXTO do site, e não pela semana: `babyForWeek` prende a
  * semana entre 4 e 42, então a 43 devolve o texto da 42 — e a troca vale para
@@ -32,6 +37,10 @@ export const DESCRICAO_NO_APP: Readonly<Record<number, { site: string; app: stri
   24: {
     site: "Limite da viabilidade fetal.",
     app: "Está ganhando peso e ficando mais forte a cada dia.",
+  },
+  28: {
+    site: "Sonha em REM. Início do 3º trimestre.",
+    app: "Início do 3º trimestre: os olhinhos já abrem e fecham.",
   },
   41: {
     site: "Termo tardio — acompanhamento mais de pertinho, tudo sob cuidado.",
