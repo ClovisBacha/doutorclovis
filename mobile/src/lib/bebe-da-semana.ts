@@ -98,22 +98,34 @@ export function bebeDaSemana(semana: number) {
 }
 
 /**
- * A mensagem da reta final (40 a 42+ semanas) sem exame nem conduta: a do
- * site citava cardiotocografia, avaliação do líquido e a indução. Fica a parte
- * que acolhe; a das 40 semanas já era só isso e segue igual.
+ * O cartão da reta final (40 a 42+ semanas) como o app o diz. O do site citava
+ * cardiotocografia, avaliação do líquido e a indução — isso saiu na fase 1 —,
+ * mas ficaram o título da 41 ("Passou da DPP?") e corpos que tranquilizam
+ * sobre o corpo ("uma janela normal e segura", "nada de errado com você",
+ * "não é sinal de problema"): régua clínica, que o app não dá. Fica o carinho,
+ * sem prazo. A tela mostra o título e o corpo; o resto também é trocado, para
+ * nenhuma tela futura trazer de volta o "Termo tardio" ou a dica do site.
  */
+const RETA_FINAL_NO_APP = {
+  40: {
+    titulo: "Você chegou às 40 semanas 💛",
+    corpo:
+      "A data provável é só uma estimativa: poucos bebês chegam exatamente nela. Que a espera seja leve, do seu jeito.",
+  },
+  41: {
+    titulo: "Cada bebê tem o seu tempo 💛",
+    corpo:
+      "Enquanto o encontro não acontece, vale guardar estes dias com calma: descanso, colo e gente querida por perto.",
+  },
+  42: {
+    titulo: "Na reta final, com carinho 💛",
+    corpo: "Que estes dias sejam de descanso e de gente querida por perto, no tempo do bebê.",
+  },
+} as const;
+
 export function retaFinalNoApp(semanas: number) {
   const r = retaFinalMensagem(semanas);
-  if (!r || semanas < 41) return r;
-  if (semanas < 42)
-    return {
-      ...r,
-      corpo:
-        "É super comum, principalmente na primeira gestação, o bebê chegar depois das 40 semanas — nada de errado com você. Você e seu bebê estão sendo bem cuidados.",
-    };
-  return {
-    ...r,
-    corpo:
-      "Falta pouquíssimo para vocês se encontrarem — e isso não é sinal de problema. Seu corpo está no tempo dele.",
-  };
+  if (!r) return r;
+  const faixa = semanas < 41 ? 40 : semanas < 42 ? 41 : 42;
+  return { ...r, eyebrow: "Reta final", dica: "", ...RETA_FINAL_NO_APP[faixa] };
 }

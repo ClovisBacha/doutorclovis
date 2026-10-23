@@ -34,16 +34,22 @@ describe("o bebê da semana no app", () => {
 });
 
 describe("a reta final no app", () => {
-  test("antes das 40, nada; nas 40, a do site", () => {
+  test("antes das 40, nada; da 40 em diante, o cartão do app nas mesmas semanas do site", () => {
     expect(retaFinalNoApp(39)).toBeNull();
-    expect(retaFinalNoApp(40)).toEqual(retaFinalMensagem(40));
+    for (const s of [40, 41, 42, 43]) expect(retaFinalNoApp(s)).not.toBeNull();
+    expect(retaFinalMensagem(39)).toBeNull();
   });
 
-  test("41 e 42+ sem exame nem indução, com o título do site", () => {
-    for (const s of [41, 42, 43]) {
+  test("sem exame, indução, prazo nem régua sobre o corpo — título, corpo e o resto", () => {
+    /* O título da 41 no site era "Passou da DPP?"; os corpos diziam "janela
+       normal e segura", "nada de errado com você", "não é sinal de problema". */
+    const REGUA = /passou|dpp|termo|normal|segur|problema|errado|atrasad|acompanhamento/i;
+    for (const s of [40, 41, 42, 43]) {
       const r = retaFinalNoApp(s)!;
-      expect(r.corpo).not.toMatch(CLINICO);
-      expect(r.titulo).toBe(retaFinalMensagem(s)!.titulo);
+      for (const texto of [r.titulo, r.corpo, r.eyebrow, r.dica]) {
+        expect(texto).not.toMatch(CLINICO);
+        expect(texto).not.toMatch(REGUA);
+      }
     }
   });
 });
