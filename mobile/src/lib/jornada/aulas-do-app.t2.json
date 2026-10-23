@@ -1,6 +1,6 @@
 {
   "98": {
-    "teach": "Semana 14: o dedinho na boca. O bebê mede cerca de 8,7 cm e pesa por volta de 43 g, mais ou menos o tamanho de um limão-siciliano, a fruta da semana no app. E já pode fazer uma coisa de derreter o coração: chupar o dedinho. As mãozinhas acham o caminho da boca, e os lábios e a língua trabalham juntinhos para sugar. O corpinho vai pegando o jeito no próprio ritmo, um pouquinho de cada vez: sugar é um dos primeiros talentos do bebê, treinado com calma lá dentro. Que tal imaginar essa cena agora? Um bebê do tamanho de um limão-siciliano, de olhinhos fechados, com um dedinho na boca e todo o tempo do mundo.",
+    "teach": "Semana 14: o dedinho na boca. O bebê mede cerca de 8,7 cm e pesa por volta de 43 g, mais ou menos o tamanho de um limão-siciliano, a fruta da semana no app. E já pode fazer uma coisa de derreter o coração: chupar o dedinho. As mãozinhas acham o caminho da boca, e os lábios e a língua trabalham juntinhos para sugar. O corpinho vai pegando o jeito no próprio ritmo, um pouquinho de cada vez: sugar é um dos primeiros talentos do bebê, treinado com calma lá dentro. Que tal imaginar essa cena agora? Um bebê do tamanho de um limão-siciliano, de olhinhos fechados, com um dedinho na boca e nenhuma pressa.",
     "funFact": "Pesquisadores que observaram centenas de bebês na barriga notaram que a grande maioria preferia chupar o polegar direito.",
     "questions": [
       {
@@ -91,7 +91,7 @@
         "o": [
           "Amanhã de manhã, logo cedo",
           "Na semana 27, no fim do trimestre",
-          "Quando o bebê fizer um ano"
+          "No dia do chá de bebê"
         ],
         "a": 1,
         "why": "Na semana 27, no fim do 2º trimestre, vale reler e ver o que cada intenção trouxe."
@@ -197,14 +197,14 @@
         "type": "multi",
         "q": "Marque os jeitos de quem está ao seu lado viver a espera, segundo a aula (marque todas):",
         "o": [
-          "Esperar o bebê nascer para participar",
+          "Ficar de fora até o chá de bebê",
           "Ler a aula do dia juntos",
           "Conversar com a barriga no fim do dia",
           "Deixar todas as escolhas só para você",
           "Participar das escolhas, do nome ao enxoval"
         ],
         "a": [1, 2, 4],
-        "why": "Ler a aula juntos, conversar com a barriga e participar das escolhas são jeitos de viver a espera desde já. Esperar o nascimento ou deixar tudo só com você não estavam na lista."
+        "why": "Ler a aula juntos, conversar com a barriga e participar das escolhas são jeitos de viver a espera desde já. Ficar de fora até o chá ou deixar tudo só com você não estavam na lista."
       },
       {
         "type": "choice",
@@ -248,14 +248,14 @@
       },
       {
         "type": "choice",
-        "q": "Segundo pesquisadores, como a virada às vezes começa?",
+        "q": "Segundo a aula, como a virada às vezes começa?",
         "o": [
           "Com as perninhas, um pé de cada vez",
           "Com um empurrão das duas mãos ao mesmo tempo",
-          "Com um giro rápido da cabecinha"
+          "Soprando bolhinhas de ar, como um peixinho"
         ],
         "a": 0,
-        "why": "Pesquisadores descrevem que a virada às vezes começa com movimentos alternados das perninhas contra a parede do útero, um pé de cada vez."
+        "why": "A aula contou que a virada às vezes começa com movimentos alternados das perninhas contra a parede do útero, um pé de cada vez."
       },
       {
         "type": "choice",
@@ -282,7 +282,7 @@
     ]
   },
   "103": {
-    "teach": "Cada semana pode virar uma figurinha. No álbum do app, toda semana da jornada ganha uma figurinha com a fruta daquela semana, e a coleção vai crescendo junto com o bebê. E colecionar figurinhas é quase uma paixão nacional: tem gente que guarda até hoje o álbum da Copa do Mundo da infância, completo ou com aquele buraquinho que ficou faltando. Que tal começar também um álbum de papel, em paralelo? A ideia é colar uma lembrança por semana: um bilhete carinhoso, o ingresso de um passeio, uma foto pequena da barriga, a etiqueta da primeira roupinha. Ao lado, anote a data e uma frase sobre a semana. No fim, você vai ter uma coleção que nenhuma banca vende: a da sua própria espera.",
+    "teach": "Cada semana pode virar uma figurinha. No álbum do app, toda semana da jornada ganha uma figurinha com a fruta daquela semana, e a coleção vai crescendo junto com o bebê. E colecionar figurinhas é quase uma paixão nacional: tem gente que guarda até hoje o álbum da Copa do Mundo da infância, completo ou com aquele buraquinho que ficou faltando. Que tal começar também um álbum de papel, em paralelo? A ideia é colar uma lembrança por semana: um bilhete carinhoso, o ingresso de um passeio, uma foto pequena da barriga, uma florzinha seca de um dia especial. Ao lado, anote a data e uma frase sobre a semana. No fim, você vai ter uma coleção que nenhuma banca vende: a da sua própria espera.",
     "funFact": "Os álbuns de figurinhas da Copa do Mundo da Panini começaram em 1970, na Copa do México, a mesma em que o Brasil conquistou o tricampeonato.",
     "questions": [
       {
@@ -303,11 +303,11 @@
           "Uma página inteira de jornal por dia",
           "Um bilhete carinhoso",
           "O ingresso de um passeio",
-          "A etiqueta da primeira roupinha",
+          "Uma florzinha seca de um dia especial",
           "Todas as notas fiscais do mês"
         ],
         "a": [1, 2, 3],
-        "why": "Bilhete, ingresso e a etiqueta da primeira roupinha cabem direitinho, uma lembrança por semana. Jornal todo dia e notas fiscais do mês não fazem parte da ideia."
+        "why": "Bilhete, ingresso e uma florzinha seca de um dia especial cabem direitinho, uma lembrança por semana. Jornal todo dia e notas fiscais do mês não fazem parte da ideia."
       },
       {
         "type": "choice",
@@ -342,7 +342,7 @@
   },
   "104": {
     "teach": "Revisão da semana 14! Do tamanho de um limão-siciliano, com cerca de 8,7 cm e 43 g, o bebê pode chupar o dedinho: as mãozinhas acham o caminho da boca, e sugar é um talento treinado com calma lá dentro. Você chegou ao 2º trimestre, que vai da semana 14 à 27, e conheceu a ideia das três intenções, que não são metas, para reler na semana 27. Na segunda rodada do nome, viu o veto sem explicação, o teste de chamar a barriga por um finalista e o desempate com um nome composto. Descobriu que, no cavalo-marinho, quem gesta é o pai, que o pinguim-imperador choca o ovo sobre os pés e que vale um ritual semanal com quem está ao seu lado. Lá dentro, o bebê dá cambalhotas e faz viradas de nadador. E cada semana pode virar figurinha, no app e num álbum de papel.",
-    "funFact": "Na semana que vem, a fruta do app muda para a maçã: o bebê terá cerca de 10,1 cm e 70 g e poderá sentir a luz através das pálpebras.",
+    "funFact": "Na semana que vem, a figurinha do app vira a maçã, que na tabela marca cerca de 10,1 cm e 70 g, e a novidade tem a ver com a luz.",
     "questions": [
       {
         "type": "choice",
@@ -404,7 +404,7 @@
     ]
   },
   "105": {
-    "teach": "Semana 15: a luz chega de mansinho. O bebê mede cerca de 10,1 cm e pesa por volta de 70 g, mais ou menos o tamanho de uma maçã, a fruta da semana no app. E tem uma novidade delicada: o bebê pode sentir a luz através das pálpebras, que continuam fechadinhas, cobrindo os olhinhos que seguem se preparando. Enquanto isso, lá no alto da cabecinha, acontece um trabalho caprichado: por volta destas semanas, o desenho do cabelo vai se formando por baixo da pele, inclusive o redemoinho, aquele ponto de onde os fios parecem sair girando. Os fios ainda vão demorar um pouco para aparecer, mas a direção de cada um já vai sendo traçada. Uma maçã com luz nas pálpebras e um redemoinho se desenhando: quanta coisa cabe numa semana!",
+    "teach": "Semana 15: a maçã e o redemoinho. O bebê mede cerca de 10,1 cm e pesa por volta de 70 g, mais ou menos o tamanho de uma maçã, a fruta da semana no app. E a tabela do app traz uma novidade delicada para esta semana: o bebê pode sentir a luz através das pálpebras, que continuam fechadinhas. Enquanto isso, lá no alto da cabecinha, acontece um trabalho caprichado: por volta destas semanas, o desenho do cabelo vai se formando por baixo da pele, inclusive o redemoinho, aquele ponto de onde os fios parecem sair girando. Os fios ainda vão demorar um pouco para aparecer, mas a direção de cada um já vai sendo traçada. Um bebê do tamanho de uma maçã, com um redemoinho se desenhando: quanta coisa cabe numa semana!",
     "funFact": "Curiosidade da fruta da semana: a maçã é da família das rosas, a mesma da pera e do morango. E, cortada ao meio na horizontal, mostra uma estrelinha de cinco pontas onde ficam as sementes.",
     "questions": [
       {
@@ -419,7 +419,7 @@
         "q": "Segundo o app, o que o bebê pode sentir através das pálpebras na semana 15?",
         "o": ["O cheirinho da casa", "A luz", "As cores do quarto"],
         "a": 1,
-        "why": "Na semana 15, o bebê pode sentir a luz através das pálpebras, que continuam fechadinhas."
+        "why": "Pela tabela do app, na semana 15 o bebê pode sentir a luz através das pálpebras, que continuam fechadinhas."
       },
       {
         "type": "choice",
@@ -506,7 +506,7 @@
     ]
   },
   "107": {
-    "teach": "Body, mijão, pagão: o idioma do enxoval. Conhecer esses nomes ajuda a montar a lista e a entender as etiquetas das lojas. O body é a peça inteiriça que veste o tronco e fecha com botões de pressão entre as perninhas, com manga curta ou comprida. O macacão vai além e veste o corpo inteiro, muitas vezes com pezinho. O mijão é a calça com pezinho, um clássico brasileiro de nome bem-humorado, fácil de adivinhar de onde vem. E o pagão é o casaquinho de manga comprida, aberto na frente, dos primeiros dias; com o mijão, forma um conjunto clássico do enxoval brasileiro. O nome, diz a tradição, vem do costume antigo de chamar de pagãozinho o bebê que ainda não tinha sido batizado: era a roupinha dessa fase. Que tal revisar a sua lista com esse glossário na mão?",
+    "teach": "Body, mijão, pagão: o idioma do enxoval. Conhecer esses nomes ajuda a montar a lista e a entender as etiquetas das lojas. O body é a peça inteiriça que veste o tronco e fecha com botões de pressão entre as perninhas. O macacão vai além e veste o corpo inteiro, muitas vezes com pezinho. O mijão é a calça com pezinho, um clássico brasileiro de nome bem-humorado, fácil de adivinhar de onde vem. E o pagão é o casaquinho de manga comprida, aberto na frente, dos primeiros dias; junto com o mijão, forma o conjunto pagão, um clássico do enxoval brasileiro (muitas lojas chamam o conjunto inteiro só de pagão). O nome, diz a tradição, vem do costume antigo de chamar de pagãozinho o bebê que ainda não tinha sido batizado: era a roupinha dessa fase. Que tal revisar a lista com esse glossário?",
     "funFact": "Outra peça antiga do enxoval é o cueiro, o paninho que envolvia o bumbum e as perninhas do bebê. O cueiro deixou até uma expressão: de alguém bem novinho, diz-se que 'mal saiu dos cueiros'.",
     "questions": [
       {
@@ -564,7 +564,7 @@
     ]
   },
   "108": {
-    "teach": "Alguém vai estrear como tia ou tio. Irmãos, cunhadas, cunhados e primos queridos ganham um título novo, muitos como tios de primeira viagem. E, no Brasil, essa família cresce ainda mais, porque é comum as crianças chamarem de tia e tio os amigos próximos da casa: os tios de coração também contam. Que tal dar a cada tio e a cada tia um jeitinho de participar desde já? Um tio pode inventar um aperto de mão secreto, só dos dois, para ensinar ao bebê um dia; uma tia pode cuidar das fotos da espera. E vale combinar um 'dia dos tios' para quando o bebê chegar, com passeio, colo e brincadeira. Quem vão ser os tios e as tias do seu bebê, de sangue e de coração?",
+    "teach": "Alguém vai estrear como tia ou tio. Irmãos, cunhadas, cunhados e primos queridos ganham um título novo, muitos como tios de primeira viagem. E, no Brasil, essa família cresce ainda mais, porque é comum as crianças chamarem de tia e tio os amigos próximos da casa: os tios de coração também contam. Que tal dar a cada tio e a cada tia um jeitinho de participar desde já? Um tio pode inventar um grito de torcida só dos tios, para animar os encontros da família; uma tia pode cuidar das fotos da espera. E vale combinar um dia dos tios ainda nesta fase, com um almoço, uma foto com a barriga e um recado para o álbum. Quem são os tios e as tias desta história, de sangue e de coração?",
     "funFact": "A palavra 'tio' veio do grego theîos, que passou ao latim como thius. Da mesma origem vêm o 'tío' do espanhol e o 'zio' do italiano.",
     "questions": [
       {
@@ -582,14 +582,14 @@
         "type": "multi",
         "q": "Marque ideias para os tios e as tias participarem, segundo a aula (marque todas):",
         "o": [
-          "Inventar um aperto de mão secreto",
+          "Inventar um grito de torcida dos tios",
           "Cuidar das fotos da espera",
           "Comprar sozinhos o enxoval inteiro",
-          "Combinar um 'dia dos tios' para quando o bebê chegar",
+          "Combinar um dia dos tios ainda nesta fase",
           "Dar palpite em cada escolha da família"
         ],
         "a": [0, 1, 3],
-        "why": "Aperto de mão secreto, fotos da espera e um 'dia dos tios' foram as ideias da aula. Comprar o enxoval inteiro sozinhos e dar palpite em tudo não estavam na lista."
+        "why": "Grito de torcida, fotos da espera e um dia dos tios ainda nesta fase foram as ideias da aula. Comprar o enxoval inteiro sozinhos e dar palpite em tudo não estavam na lista."
       },
       {
         "type": "choice",
@@ -674,7 +674,7 @@
     ]
   },
   "110": {
-    "teach": "Primeiros marcos do bebê pelo mundo. Na Coreia, no primeiro aniversário, acontece uma brincadeira chamada doljabi: objetos são colocados à frente do bebê, como um lápis, um novelo de linha ou dinheiro, e a família se diverte com os palpites sobre o futuro conforme o que o bebê pega. Quem pega o lápis, dizem, vai gostar de estudar. Já em Bali, na Indonésia, pela tradição, o bebê só encosta os pezinhos no chão numa cerimônia por volta dos 105 dias de vida, porque, até ali, é considerado sagrado demais para isso. E na sua família? Que tal escolher desde já um marco que vocês queiram celebrar do seu jeito, como o primeiro mês, o primeiro passeio no parque ou o primeiro encontro com os avós? Cada família inventa as próprias tradições.",
+    "teach": "Primeiros marcos dos bebês pelo mundo. Na Coreia, no primeiro aniversário, acontece uma brincadeira chamada doljabi: objetos são colocados à frente do bebê, como um lápis, um novelo de linha ou dinheiro, e a família se diverte com os palpites sobre o futuro conforme o que o bebê pega. Quem pega o lápis, dizem, vai gostar de estudar. Já em Bali, na Indonésia, pela tradição, o bebê só encosta os pezinhos no chão numa cerimônia por volta dos 105 dias de vida, porque, até ali, é considerado sagrado demais para isso. E na sua família? Que tal escolher desde já um marco da espera para celebrar do seu jeito, como o dia em que o nome foi escolhido ou a metade do caminho, na semana 20? Cada família inventa as próprias tradições.",
     "funFact": "Em Bali, também se comemora o otonan, um aniversário que volta a cada 210 dias, pelo calendário tradicional da ilha: quase dois aniversários por ano!",
     "questions": [
       {
@@ -695,12 +695,12 @@
         "type": "choice",
         "q": "Qual é a ideia desta aula para a sua família?",
         "o": [
-          "Escolher um marco para celebrar do seu jeito",
+          "Escolher um marco da espera para celebrar",
           "Copiar exatamente a festa que outra família fez",
-          "Esperar o bebê crescer para pensar nisso"
+          "Deixar alguém da família decidir por você"
         ],
         "a": 0,
-        "why": "Cada família inventa as próprias tradições: vale escolher desde já um marco para celebrar do jeito de vocês."
+        "why": "Cada família inventa as próprias tradições: vale escolher desde já um marco da espera, como a metade do caminho, para celebrar do seu jeito."
       },
       {
         "type": "choice",
@@ -723,8 +723,8 @@
     ]
   },
   "111": {
-    "teach": "Revisão da semana 15! Do tamanho de uma maçã, com cerca de 10,1 cm e 70 g, o bebê pode sentir a luz através das pálpebras, que continuam fechadinhas, e o desenho do cabelo, com redemoinho e tudo, vai se formando por baixo da pele. Você viu que a barriga puxa conversa e que quem escolhe quem pode tocá-la é você. Aprendeu o idioma do enxoval: body, macacão, mijão e pagão. Conheceu os tios e as tias de sangue e de coração, com jeitinhos para cada um participar. Descobriu que o bebê ensaia respirar debaixo d'água, com o peito e o diafragma subindo e descendo e um pouquinho de líquido no lugar do ar. E viajou pelos primeiros marcos: o doljabi coreano, os pezinhos no chão em Bali e o marco que a sua família quer celebrar.",
-    "funFact": "Na semana que vem, a fruta do app muda para o abacate: o bebê terá cerca de 11,6 cm e 100 g, com movimentos coordenados de cabeça.",
+    "teach": "Revisão da semana 15! Do tamanho de uma maçã, com cerca de 10,1 cm e 70 g, o bebê pode, pela tabela do app, sentir a luz através das pálpebras, e o desenho do cabelo, com redemoinho e tudo, vai se formando por baixo da pele. Você viu que a barriga puxa conversa e que quem escolhe quem pode tocá-la é você. Aprendeu o idioma do enxoval: body, macacão, mijão e pagão. Conheceu os tios e as tias de sangue e de coração, com jeitinhos para cada um participar. Descobriu que o bebê ensaia respirar debaixo d'água, com o peito e o diafragma subindo e descendo e um pouquinho de líquido no lugar do ar. E viajou pelos primeiros marcos: o doljabi coreano, os pezinhos no chão em Bali e um marco da espera para celebrar do seu jeito.",
+    "funFact": "Na semana que vem, a figurinha do app vira o abacate, que na tabela marca cerca de 11,6 cm e 100 g, e a novidade está na cabecinha.",
     "questions": [
       {
         "type": "choice",
@@ -742,13 +742,13 @@
         "q": "Marque tudo que apareceu nas aulas desta semana 15 (marque todas):",
         "o": [
           "Os tios de coração não contam",
-          "O bebê pode sentir a luz através das pálpebras",
+          "Pela tabela do app, o bebê pode sentir a luz pelas pálpebras",
           "Nos ensaios de respiração, o que entra e sai é o ar",
           "O pagão forma um conjunto clássico com o mijão",
-          "Um tio pode inventar um aperto de mão secreto"
+          "Um tio pode inventar um grito de torcida dos tios"
         ],
         "a": [1, 3, 4],
-        "why": "A luz nas pálpebras, o conjunto de pagão e mijão e o aperto de mão secreto estavam na semana. Os tios de coração contam, sim, e nos ensaios o que entra e sai é um pouquinho de líquido, não ar."
+        "why": "A luz pelas pálpebras, como a tabela do app conta, o conjunto de pagão e mijão e o grito de torcida dos tios estavam na semana. Os tios de coração contam, sim, e nos ensaios o que entra e sai é um pouquinho de líquido, não ar."
       },
       {
         "type": "choice",
@@ -841,7 +841,7 @@
     ]
   },
   "113": {
-    "teach": "Do que você brincava quando era criança? Pular amarelinha, rodar pião, empinar pipa, brincar de esconde-esconde ou de casinha: lembrar das brincadeiras preferidas é um jeito gostoso de se reencontrar nesta fase em que tanta coisa muda. Vale puxar o assunto com a família e com quem conviveu com você na infância: qual era o seu brinquedo preferido? Que mania engraçada você tinha? Qual brincadeira fazia você perder a hora? Muitas vezes, os outros lembram de detalhes que a gente esqueceu. Uma ideia para hoje é começar uma listinha de brincadeiras para ensinar ao bebê um dia, com as suas e as de quem está ao seu lado. E, se quiser, conte na Comunidade do app qual era a sua preferida: é bem capaz de outra gestante ter brincado da mesma coisa, talvez com outro nome.",
+    "teach": "Do que você brincava quando era criança? Pular amarelinha, rodar pião, empinar pipa, brincar de esconde-esconde ou de casinha: lembrar das brincadeiras preferidas é um jeito gostoso de se reencontrar nesta fase em que tanta coisa muda. Vale puxar o assunto com a família e com quem conviveu com você na infância: qual era o seu brinquedo preferido? Que mania engraçada você tinha? Qual brincadeira fazia você perder a hora? Muitas vezes, os outros lembram de detalhes que a gente esqueceu. Uma ideia para hoje é começar a listinha das brincadeiras da família, com as suas e as de quem está ao seu lado, para guardar no seu diário. E, se quiser, conte na Comunidade do app qual era a sua preferida: é bem capaz de outra gestante ter brincado da mesma coisa, talvez com outro nome.",
     "funFact": "A mesma brincadeira muda de nome pelo Brasil: dependendo da região, a pipa também é chamada de papagaio, arraia ou pandorga.",
     "questions": [
       {
@@ -874,17 +874,17 @@
         "o": [
           "Comprar de uma vez os brinquedos que você tinha na infância",
           "Escolher uma brincadeira só e esquecer as outras",
-          "Começar uma listinha de brincadeiras para ensinar ao bebê um dia"
+          "Começar a listinha das brincadeiras da família, para o diário"
         ],
         "a": 2,
-        "why": "A listinha pode juntar as suas brincadeiras e as de quem está ao seu lado, para ensinar ao bebê um dia."
+        "why": "A listinha junta as suas brincadeiras e as de quem está ao seu lado, para guardar no seu diário."
       },
       {
         "type": "choice",
-        "q": "Onde dá para contar qual era a sua brincadeira preferida e conhecer a de outras gestantes?",
-        "o": ["No grupo de mensagens da família", "Na Comunidade do app", "Num caderno só seu"],
+        "q": "Quais destas brincadeiras a aula citou?",
+        "o": ["Xadrez e dominó", "Amarelinha e pião", "Videogame e quebra-cabeça"],
         "a": 1,
-        "why": "Na Comunidade do app você conta a sua e pode descobrir que outra gestante brincou da mesma coisa, talvez com outro nome."
+        "why": "A aula lembrou de pular amarelinha, rodar pião, empinar pipa e brincar de esconde-esconde ou de casinha."
       },
       {
         "type": "choice",
@@ -951,7 +951,7 @@
     ]
   },
   "115": {
-    "teach": "Cada família tem o seu próprio desenho. Tem família de mãe e pai, de duas mães, de dois pais, de mãe solo, de avós que criam junto, de amigas que viram família. Não existe um modelo único, e nenhum formato é mais família do que outro. E o desenho não fica parado: com o tempo, quem ocupa cada lugar pode mudar. Pode ser a avó que vem morar mais perto, uma pessoa nova que chega e passa a fazer parte, um irmãozinho que nasce anos depois. A família vai se desenhando junto com o bebê, dia após dia, com os traços que vocês escolhem. As datas e os rituais também podem ser reinventados do jeito de vocês, e há escolas que já celebram um Dia da Família, que abraça todos os formatos de uma vez. Seja qual for o desenho da sua, o bebê está chegando a uma família de verdade, do jeitinho que vocês são.",
+    "teach": "Cada família tem o seu próprio desenho. Tem família de mãe e pai, de duas mães, de dois pais, de mãe solo, de avós que criam junto, de amigas que viram família. Não existe um modelo único, e nenhum formato é mais família do que outro. E o desenho não fica parado: com o tempo, quem ocupa cada lugar pode mudar. Pode ser a avó que vem morar mais perto, uma pessoa nova que chega e passa a fazer parte, um tio que volta a morar na mesma cidade. A família vai se desenhando junto com o bebê, dia após dia, com os traços que vocês escolhem. As datas e os rituais também podem ser reinventados do jeito de vocês, e há escolas que já celebram um Dia da Família, que abraça todos os formatos de uma vez. Seja qual for o desenho da sua, é uma família de verdade, do jeitinho que vocês são.",
     "funFact": "A ONU celebra o Dia Internacional das Famílias em 15 de maio. A data foi criada em 1993 e é comemorada desde 1994.",
     "questions": [
       {
@@ -983,7 +983,7 @@
           "A avó que vem morar mais perto de vocês"
         ],
         "a": 2,
-        "why": "A avó que vem morar perto, uma pessoa nova que passa a fazer parte, um irmãozinho que nasce anos depois: é assim que o desenho vai mudando."
+        "why": "A avó que vem morar perto, uma pessoa nova que passa a fazer parte, um tio que volta para a mesma cidade: é assim que o desenho vai mudando."
       },
       {
         "type": "choice",
@@ -1002,7 +1002,7 @@
     ]
   },
   "116": {
-    "teach": "O paladar do bebê é um sentido em construção. Lá no 1º trimestre, as papilas da língua começaram a se formar e, ao longo desta fase, seguem amadurecendo devagarinho. Se você olhar a sua língua no espelho, vai ver pontinhos e relevinhos: são as papilas. Mas o segredo do gosto fica escondido: em muitas delas, não em todas, moram os botões gustativos, que dá para chamar, com carinho, de botões do gosto. São eles que um dia vão sentir os sabores, e uma mesma papila pode guardar vários deles. Na linguinha do bebê, esse trabalho acontece em silêncio e sem pressa. Dá para imaginar essa linguinha como um pequeno jardim de botões, que vão amadurecendo no seu tempo. Um sentido inteiro sendo montado assim, botão por botão.",
+    "teach": "O paladar do bebê é um sentido em construção. Lá no 1º trimestre, as papilas da língua começaram a se formar e, ao longo desta fase, seguem amadurecendo devagarinho. Se você olhar a sua língua no espelho, vai ver pontinhos e relevinhos: são as papilas. Mas o segredo do gosto fica escondido: em muitas delas, não em todas, moram os botões gustativos, que dá para chamar, com carinho, de botões do gosto. São eles que sentem os sabores, e uma mesma papila pode guardar vários deles. Na linguinha do bebê, esse trabalho acontece em silêncio e sem pressa. Dá para imaginar essa linguinha como um pequeno jardim de botões, que vão amadurecendo no seu tempo. Um sentido inteiro sendo montado assim, botão por botão.",
     "funFact": "O 'mapa da língua', com o doce na ponta e o amargo no fundo, é mito: nasceu de uma leitura errada de um estudo alemão de 1901. Todas as partes da língua com botões do gosto sentem todos os sabores.",
     "questions": [
       {
@@ -1057,7 +1057,7 @@
     ]
   },
   "117": {
-    "teach": "A espera também tem as suas primeiras vezes. O primeiro presente que o bebê ganhou, a primeira roupinha comprada, a primeira vez que alguém chamou a barriga pelo nome ou pelo apelido, a primeira foto em que a barriga apareceu de verdade. Que tal reunir esses momentos numa lista e ir preenchendo aos poucos? A primeira mexidinha percebida também tem lugar garantido e entra na lista no seu tempo, sem pressa nenhuma. O segredo para a lista ficar ainda mais bonita é anotar, junto de cada item, a data e um detalhe do momento: onde você estava, quem estava junto, o que alguém disse. Assim, a lista deixa de ser só uma lista e vira uma linha do tempo da espera, para reler daqui a alguns meses e, um dia, mostrar ao bebê como cada novidade foi recebida. Qual primeira vez você anotaria hoje?",
+    "teach": "A espera também tem as suas primeiras vezes. O primeiro presente que o bebê ganhou, a primeira roupinha comprada, a primeira vez que alguém chamou a barriga pelo nome ou pelo apelido, a primeira foto em que a barriga apareceu de verdade. Que tal reunir esses momentos numa lista e ir preenchendo aos poucos? A primeira música cantada para a barriga também merece uma linha. O segredo para a lista ficar ainda mais bonita é anotar, junto de cada item, a data e um detalhe do momento: onde você estava, quem estava junto, o que alguém disse. Assim, a lista deixa de ser só uma lista e vira uma linha do tempo da espera, para reler daqui a alguns meses e, um dia, se quiserem, mostrar ao bebê como cada novidade foi recebida. Qual primeira vez você anotaria hoje?",
     "funFact": "Uma das primeiras linhas do tempo modernas foi publicada em 1765 pelo inglês Joseph Priestley: a vida de pessoas famosas aparecia como tracinhos, lado a lado, ao longo dos séculos.",
     "questions": [
       {
@@ -1066,12 +1066,12 @@
         "o": [
           "O primeiro chá de bebê",
           "A primeira roupinha comprada",
+          "O primeiro livro lido em voz alta",
           "A primeira música cantada para a barriga",
-          "A primeira mexidinha percebida, no seu tempo",
-          "O primeiro livro lido em voz alta"
+          "O primeiro presente que o bebê ganhou"
         ],
-        "a": [1, 3],
-        "why": "A primeira roupinha comprada e a primeira mexidinha percebida, no seu tempo, foram exemplos da aula, junto com o primeiro presente, a barriga chamada pelo nome e a primeira foto. O chá, a música e o livro podem entrar na sua lista, mas não foram citados."
+        "a": [1, 3, 4],
+        "why": "A primeira roupinha comprada, a primeira música cantada para a barriga e o primeiro presente foram exemplos da aula. O chá e o livro podem entrar na sua lista, mas não foram citados."
       },
       {
         "type": "choice",
@@ -1093,18 +1093,14 @@
           "Numa linha do tempo da espera"
         ],
         "a": 2,
-        "why": "Com data e detalhe, a lista vira uma linha do tempo da espera, para reler e, um dia, mostrar ao bebê."
+        "why": "Com data e detalhe, a lista vira uma linha do tempo da espera, para reler e lembrar como cada novidade chegou."
       },
       {
         "type": "choice",
-        "q": "Como a primeira mexidinha percebida entra na lista, segundo a aula?",
-        "o": [
-          "No seu tempo, sem pressa nenhuma",
-          "Numa data marcada com antecedência",
-          "Fica de fora da lista"
-        ],
-        "a": 0,
-        "why": "A primeira mexidinha percebida tem lugar garantido e entra na lista no seu tempo, sem pressa."
+        "q": "Verdadeiro ou falso: a lista das primeiras vezes precisa ficar pronta de uma vez só.",
+        "o": ["Verdadeiro", "Falso"],
+        "a": 1,
+        "why": "Falso: a lista vai sendo preenchida aos poucos, um momento de cada vez."
       },
       {
         "type": "choice",
@@ -1116,8 +1112,8 @@
     ]
   },
   "118": {
-    "teach": "Hora de revisar a semana do abacate! Com cerca de 11,6 cm e 100 g, o bebê ganhou movimentos de cabeça coordenados, num 'sim' e num 'não' sem palavras, e os olhinhos começaram a se mexer devagar por baixo das pálpebras fechadas. Você revisitou a criança que foi, descobriu que a pipa muda de nome pelo Brasil e pensou numa listinha de brincadeiras para ensinar ao bebê um dia. Para o cantinho, viu como escolher um tema, uma paleta de três cores e a decoração afetiva. Descobriu que cada família tem o seu próprio desenho, que pode mudar com o tempo, e que o paladar é um sentido em construção, com os botões do gosto escondidos em muitas das papilas. O mapa da língua? É mito! E conheceu a lista das primeiras vezes da espera, que, com data e detalhe, vira uma linha do tempo. Vamos ver o que ficou?",
-    "funFact": "Na semana que vem, o app troca o abacate por uma cebola: o bebê chega a cerca de 13 cm e 140 g.",
+    "teach": "Hora de revisar a semana do abacate! Com cerca de 11,6 cm e 100 g, o bebê ganhou movimentos de cabeça coordenados, num 'sim' e num 'não' sem palavras, e os olhinhos começaram a se mexer devagar por baixo das pálpebras fechadas. Você revisitou a criança que foi, descobriu que a pipa muda de nome pelo Brasil e pensou na listinha das brincadeiras da família. Para o cantinho, viu como escolher um tema, uma paleta de três cores e a decoração afetiva. Descobriu que cada família tem o seu próprio desenho, que pode mudar com o tempo, e que o paladar é um sentido em construção, com os botões do gosto escondidos em muitas das papilas. O mapa da língua? É mito! E conheceu a lista das primeiras vezes da espera, que, com data e detalhe, vira uma linha do tempo. Vamos ver o que ficou?",
+    "funFact": "Na semana que vem, a figurinha do app vira a cebola, que na tabela marca cerca de 13 cm e 140 g.",
     "questions": [
       {
         "type": "choice",
@@ -1171,7 +1167,7 @@
     ]
   },
   "119": {
-    "teach": "Semana 17: os ossinhos vão ficando firmes. O bebê mede cerca de 13 cm e pesa por volta de 140 g, mais ou menos o tamanho de uma cebola. E o destaque da semana no app é o esqueleto endurecendo: o trabalho que começou lá atrás segue agora, osso por osso. Boa parte do esqueleto se formou primeiro como cartilagem, que vai sendo trocada por osso aos pouquinhos. A cartilagem é um material firme e flexível, como o da ponta do nariz. Sabia que, ao nascer, o bebê tem mais peças no esqueleto do que um adulto? Muitas vão se unindo com o tempo, até chegar aos cerca de 206 ossos de gente grande. E os ossos da cabeça ainda não se juntaram: entre eles há emendas e espaços macios, e os maiores desses espaços são as moleiras, que dão lugar para a cabecinha crescer. Um trabalho caprichado e sem pressa.",
+    "teach": "Semana 17: os ossinhos vão ficando firmes. O bebê mede cerca de 13 cm e pesa por volta de 140 g, mais ou menos o tamanho de uma cebola. E o destaque da semana no app é o esqueleto endurecendo: o trabalho que começou lá atrás segue agora, osso por osso. Boa parte do esqueleto se formou primeiro como cartilagem, que vai sendo trocada por osso aos pouquinhos. A cartilagem é um material firme e flexível, como o da ponta do nariz. Sabia que os bebês nascem com mais peças no esqueleto do que um adulto, e que muitas vão se unindo com o tempo até formar os cerca de 206 ossos de gente grande? E os ossos da cabeça ainda não se juntaram: entre eles há emendas e espaços macios, e os maiores desses espaços são as moleiras, que dão lugar para a cabecinha crescer. Um trabalho caprichado e sem pressa.",
     "funFact": "A palavra 'esqueleto' vem do grego skeletós, que quer dizer ressecado. Nada mais diferente do bebê, que cresce mergulhado na piscina de líquido!",
     "questions": [
       {
@@ -1190,10 +1186,10 @@
       },
       {
         "type": "choice",
-        "q": "Verdadeiro ou falso: ao nascer, o bebê tem mais peças no esqueleto do que um adulto.",
+        "q": "Verdadeiro ou falso: os bebês nascem com mais peças no esqueleto do que um adulto.",
         "o": ["Verdadeiro", "Falso"],
         "a": 0,
-        "why": "Verdadeiro: muitas peças vão se unindo com o tempo, até chegar aos cerca de 206 ossos de gente grande."
+        "why": "Verdadeiro: com o tempo, muitas peças se unem, até formar os cerca de 206 ossos de gente grande."
       },
       {
         "type": "multi",
@@ -1394,7 +1390,7 @@
     ]
   },
   "123": {
-    "teach": "Um narizinho que cresce debaixo d'água. Lá dentro, mergulhado na piscina de líquido, o narizinho do bebê segue crescendo e amadurecendo ao longo desta fase, como o de um pequeno mergulhador. E, junto com o nariz, o olfato, o sentido dos cheiros, vai se preparando sem pressa. Tem uma descoberta bonita sobre isso: em pesquisas dos anos 1990, recém-nascidos viraram o rostinho na direção do cheiro do líquido em que tinham vivido, como quem reconhece algo familiar. Dá para dizer, então, que o primeiro cheirinho de casa do bebê é o daí de dentro. Aqui fora, outros cheiros vão entrar nessa coleção: o do seu colo, o da roupinha lavada, o da casa onde a família mora. E qual é o cheiro que faz você se sentir em casa?",
+    "teach": "Um narizinho que cresce debaixo d'água. Lá dentro, mergulhado na piscina de líquido, o narizinho do bebê segue crescendo e amadurecendo ao longo desta fase, como o de um pequeno mergulhador. E, junto com o nariz, o olfato, o sentido dos cheiros, vai se preparando sem pressa. Tem uma descoberta bonita sobre isso: em pesquisas dos anos 1990, recém-nascidos viraram o rostinho na direção do cheiro do líquido em que tinham vivido, como quem reconhece algo familiar. Dá para dizer, então, que o primeiro cheirinho de casa do bebê é o daí de dentro. E você também tem a sua coleção de cheiros de casa: a roupa recém-lavada, a terra molhada depois da chuva, o perfume de alguém querido. Qual é o seu preferido?",
     "funFact": "Estima-se que o nariz de um cachorro tenha dezenas de vezes mais receptores de cheiro do que o nosso. Não é à toa que o faro dos cães é tão famoso!",
     "questions": [
       {
@@ -1421,15 +1417,16 @@
       },
       {
         "type": "multi",
-        "q": "Marque os cheiros que a aula imaginou na coleção do bebê aqui fora (marque todas):",
+        "q": "Marque os cheiros de casa que a aula citou (marque todas):",
         "o": [
           "O do mar de uma praia distante",
-          "O do seu colo",
-          "O da roupinha lavada",
-          "O da casa onde a família mora"
+          "O da roupa recém-lavada",
+          "O da terra molhada depois da chuva",
+          "O perfume de alguém querido",
+          "O de livro novo"
         ],
         "a": [1, 2, 3],
-        "why": "O cheiro do seu colo, o da roupinha lavada e o da casa da família foram os que a aula imaginou entrando na coleção."
+        "why": "A roupa recém-lavada, a terra molhada depois da chuva e o perfume de alguém querido foram os cheiros de casa da aula. O mar e o livro novo não apareceram."
       },
       {
         "type": "choice",
@@ -1452,7 +1449,7 @@
     ]
   },
   "124": {
-    "teach": "Tem presente que vira tradição. Em inglês, quando alguém nasce em berço de ouro, dizem que nasceu 'com uma colher de prata na boca'. A expressão é ligada a um costume antigo da Inglaterra: no batizado, os padrinhos davam ao bebê uma colherzinha de prata. Nos Estados Unidos, virou moda banhar em bronze o primeiro sapatinho do bebê, para guardar de lembrança. No Brasil, muitas famílias dão uma medalhinha, um mimo para guardar numa caixinha ou junto do álbum. E há quem invente uma tradição só da família: dar todo ano o mesmo tipo de presente, como um enfeite de Natal, um livro ou um brinquedo, formando uma coleção que cresce junto com a criança. Em todas elas, o valor está na história que cada presente carrega. Que presente poderia virar a tradição de vocês?",
+    "teach": "Tem presente que vira tradição. Em inglês, quando alguém nasce em berço de ouro, dizem que nasceu 'com uma colher de prata na boca'. A expressão costuma ser ligada a um costume antigo da Inglaterra: no batizado, os padrinhos davam ao bebê uma colherzinha de prata. Nos Estados Unidos, virou moda banhar em bronze o primeiro sapatinho do bebê, para guardar de lembrança. No Brasil, muitas famílias dão uma medalhinha, um mimo para guardar numa caixinha ou junto do álbum. Em todas elas, o valor está na história que cada presente carrega. Que presente poderia virar o símbolo da espera de vocês?",
     "funFact": "Na Inglaterra, muitas dessas colherzinhas de batizado traziam no cabo a figura de um apóstolo, e por isso ficaram conhecidas como colheres dos apóstolos.",
     "questions": [
       {
@@ -1468,14 +1465,14 @@
       },
       {
         "type": "choice",
-        "q": "A expressão da colher de prata é ligada a que costume antigo da Inglaterra?",
+        "q": "A que costume antigo da Inglaterra a expressão da colher de prata costuma ser ligada?",
         "o": [
           "Padrinhos davam uma colherzinha no batizado",
           "Toda família comprava talheres de prata no casamento",
           "As crianças ganhavam colheres de prata na escola"
         ],
         "a": 0,
-        "why": "No batizado, os padrinhos davam uma colherzinha de prata, e daí vem a expressão."
+        "why": "No batizado, os padrinhos davam uma colherzinha de prata, e muita gente liga a expressão a esse costume."
       },
       {
         "type": "choice",
@@ -1499,7 +1496,7 @@
           "A medalhinha para guardar de lembrança"
         ],
         "a": [1, 2, 4],
-        "why": "A colherzinha de prata, o sapatinho de bronze e a medalhinha apareceram na aula, junto com a coleção de presentes que cresce com a criança. O cofrinho e o quadro não foram citados."
+        "why": "A colherzinha de prata, o sapatinho de bronze e a medalhinha apareceram na aula. O cofrinho e o quadro não foram citados."
       },
       {
         "type": "choice",
@@ -1515,8 +1512,8 @@
     ]
   },
   "125": {
-    "teach": "Hora de revisar a semana da cebola! Com cerca de 13 cm e 140 g, o bebê teve uma semana de obras no esqueleto, que segue endurecendo, com a cartilagem virando osso aos pouquinhos. Você descobriu que, ao nascer, o bebê tem mais peças no esqueleto do que um adulto, que vão se unindo até os cerca de 206 ossos, e que as moleiras dão lugar para a cabecinha crescer. Conheceu o hábito das três coisas boas, com o porquê de cada uma. Viu como organizar o enxoval em caixas por tamanho, com etiqueta e lista do que já chegou, e como incluir o bichinho da casa na espera. Acompanhou o narizinho crescendo debaixo d'água e os recém-nascidos que viraram o rostinho para o cheiro do líquido em que viveram. E conheceu presentes que viram tradição, da colherzinha de prata à medalhinha. Vamos revisar?",
-    "funFact": "Na semana que vem, o app troca a cebola por um pimentão: o bebê chega a cerca de 14,2 cm e 190 g, e a audição está se desenvolvendo.",
+    "teach": "Hora de revisar a semana da cebola! Com cerca de 13 cm e 140 g, o bebê teve uma semana de obras no esqueleto, que segue endurecendo, com a cartilagem virando osso aos pouquinhos. Você descobriu que os bebês nascem com mais peças no esqueleto do que um adulto, que vão se unindo até os cerca de 206 ossos, e que as moleiras dão lugar para a cabecinha crescer. Conheceu o hábito das três coisas boas, com o porquê de cada uma. Viu como organizar o enxoval em caixas por tamanho, com etiqueta e lista do que já chegou, e como incluir o bichinho da casa na espera. Acompanhou o narizinho crescendo debaixo d'água e os recém-nascidos que viraram o rostinho para o cheiro do líquido em que viveram. E conheceu presentes que viram tradição, da colherzinha de prata à medalhinha. Vamos revisar?",
+    "funFact": "Na semana que vem, a figurinha do app vira o pimentão, que na tabela marca cerca de 14,2 cm e 190 g, e a novidade é a audição.",
     "questions": [
       {
         "type": "choice",
@@ -1567,7 +1564,7 @@
   },
   "126": {
     "teach": "Semana 18: o caminho do som vai ficando pronto. Com cerca de 14,2 cm e 190 g, o bebê está do tamanho de um pimentão, a fruta da semana no app. E a novidade desta semana é a audição, que está se desenvolvendo. Por volta desta fase, o ouvido vai começando a mandar sinais ao cérebro, como as primeiras chamadas numa linha de telefone recém-instalada. E lá dentro o som faz um caminho diferente do nosso: não chega pelo ar, como aqui fora, mas viaja pelo líquido da piscina e pelas vibrações do seu corpo. Na água, aliás, o som corre: viaja cerca de quatro vezes mais rápido do que no ar. Que tal pousar a mão na barriga hoje e imaginar esse caminho do som ganhando forma, aos pouquinhos, aí dentro?",
-    "funFact": "Curiosidade da fruta: o pimentão verde é o fruto colhido antes de amadurecer. Se fica mais tempo no pé, muda de cor e fica vermelho, amarelo ou laranja, conforme a variedade.",
+    "funFact": "Curiosidade da fruta: na botânica, a parte branquinha do pimentão que segura as sementes tem um nome que você já conhece: placenta.",
     "questions": [
       {
         "type": "choice",
@@ -1608,14 +1605,10 @@
       },
       {
         "type": "choice",
-        "q": "Segundo a curiosidade da fruta, o que é o pimentão verde?",
-        "o": [
-          "Uma variedade que nunca muda de cor",
-          "O fruto que passou do ponto no pé",
-          "O fruto colhido antes de amadurecer"
-        ],
-        "a": 2,
-        "why": "O pimentão verde é colhido antes de amadurecer; se fica mais tempo no pé, muda de cor, conforme a variedade."
+        "q": "Segundo a curiosidade da fruta, como se chama, na botânica, a parte branquinha do pimentão que segura as sementes?",
+        "o": ["Âmnio", "Placenta", "Casca"],
+        "a": 1,
+        "why": "Na botânica, o lugar onde as sementes se prendem se chama placenta, um nome que você já conhece da gestação."
       }
     ]
   },
@@ -1730,7 +1723,7 @@
     ]
   },
   "129": {
-    "teach": "Uma carta para o bebê, escrita a quatro mãos. Desta vez, quem escreve com você é quem está ao seu lado nesta espera: o parceiro, a parceira, uma avó, uma amiga querida. Há dois jeitos gostosos de fazer. No primeiro, vocês dividem o mesmo papel e vão alternando os parágrafos, cada um continuando de onde o outro parou. No segundo, cada um escreve a sua parte, e depois um responde à carta do outro, como numa troca de correspondência. Se a folha em branco travar a mão, vale começar por uma destas frases: 'o que eu senti quando soube', 'o que eu quero te mostrar no mundo' ou 'uma promessa boba e uma séria'. No fim, a data e a assinatura de cada um. Duas letras diferentes lado a lado, uma mais redondinha, outra mais apressada, já contam muito sobre quem espera o bebê.",
+    "teach": "Uma carta para o bebê, escrita a quatro mãos. Desta vez, quem escreve com você é quem está ao seu lado nesta espera: o parceiro, a parceira, uma avó, uma amiga querida. Há dois jeitos gostosos de fazer. No primeiro, vocês dividem o mesmo papel e vão alternando os parágrafos, cada um continuando de onde o outro parou. No segundo, cada um escreve a sua parte, e depois um responde à carta do outro, como numa troca de correspondência. Se a folha em branco travar a mão, vale começar por uma destas frases: 'o que eu senti quando soube', 'o que eu já amo em você' ou 'uma promessa boba e uma séria'. No fim, a data e a assinatura de cada um. Duas letras diferentes lado a lado, uma mais redondinha, outra mais apressada, já contam muito sobre quem espera o bebê.",
     "funFact": "Na música, uma peça 'a quatro mãos' é tocada por duas pessoas, lado a lado, no mesmo piano, cada uma cuidando de uma parte.",
     "questions": [
       {
@@ -1763,11 +1756,11 @@
           "O dia em que a gente se conheceu",
           "O que eu senti quando soube",
           "Uma promessa boba e uma séria",
-          "O que eu quero te mostrar no mundo",
+          "O que eu já amo em você",
           "Tudo o que já compramos para você"
         ],
         "a": [1, 2, 3],
-        "why": "'O que eu senti quando soube', 'o que eu quero te mostrar no mundo' e 'uma promessa boba e uma séria' foram as sugestões para quando a folha em branco trava a mão."
+        "why": "'O que eu senti quando soube', 'o que eu já amo em você' e 'uma promessa boba e uma séria' foram as sugestões para quando a folha em branco trava a mão."
       },
       {
         "type": "choice",
@@ -1794,7 +1787,7 @@
     ]
   },
   "130": {
-    "teach": "Um casaquinho de penugem para o bebê. Nesta fase, uma penugem fininha e macia, chamada lanugo, vai cobrindo a pele do bebê. Os fiozinhos são tão finos que lembram a penugem de um pêssego. E esse casaquinho tem trabalho: ajuda a segurar no lugar o verniz, uma camada cremosa que vai cobrir a pele e que é o assunto da semana que vem. Mas o lanugo não fica para sempre. Mais perto do fim da gestação, ainda dentro da barriga, a maior parte dessa penugem vai caindo, como um casaquinho que sai de cena depois de cumprir o seu papel. O nome também é uma graça: 'lanugo' vem do latim lana, que quer dizer lã. Um bebê do tamanho de um pimentão, vestido de lã fininha: dá para imaginar coisa mais delicada?",
+    "teach": "Um casaquinho de penugem para o bebê. Nesta fase, uma penugem fininha e macia, chamada lanugo, vai cobrindo a pele do bebê. Os fiozinhos são tão finos que lembram a penugem de um pêssego. E esse casaquinho tem trabalho: ajuda a segurar no lugar o verniz, uma camada cremosa da pele, assunto da semana que vem. Mas o lanugo não fica para sempre. Mais perto do fim da gestação, ainda dentro da barriga, a maior parte dessa penugem vai caindo, como um casaquinho que sai de cena depois de cumprir o seu papel. O nome também é uma graça: 'lanugo' vem do latim lana, que quer dizer lã. Um bebê do tamanho de um pimentão, vestido de lã fininha: dá para imaginar coisa mais delicada?",
     "funFact": "A palavra 'penugem' vem de 'pena' e também nomeia as primeiras peninhas, finas e macias, dos filhotes de passarinho.",
     "questions": [
       {
@@ -1848,7 +1841,7 @@
     ]
   },
   "131": {
-    "teach": "De onde vem a sua família? Pegue um mapa do Brasil ou do mundo, impresso ou desenhado à mão, e marque as cidades de onde vieram avós, bisavós e outras pessoas queridas, de todos os lados da família. Cada marquinha puxa uma história: a mudança do interior para a cidade grande, a chegada de navio de um bisavô, o sotaque que ficou na família depois de tantos anos. Vale montar o mapa junto com quem guarda essas histórias, como os avós e os tios, e anotar ao lado de cada ponto um nome, uma data ou uma frase. Um barbante ligando as cidades mostra o caminho que a família percorreu até chegar ao bebê. E tudo bem se alguma marquinha ganhar um ponto de interrogação: o mapa também guarda o que ainda dá para descobrir, e pode virar um quadro no cantinho do bebê ou uma página do álbum de lembranças.",
+    "teach": "De onde vem a sua família? Pegue um mapa do Brasil ou do mundo e marque as cidades de onde vieram avós, bisavós e outras pessoas queridas, de todos os lados da família. Se você desenhou a árvore dos sobrenomes no 1º trimestre, o mapa mostra onde cada galho morou. Cada marquinha puxa uma história: a mudança do interior para a cidade grande, a chegada de navio de um bisavô, o sotaque que ficou na família. Vale montar o mapa com quem guarda essas histórias e anotar ao lado de cada ponto um nome, uma data ou uma frase. Um barbante ligando as cidades mostra o caminho que a família percorreu até chegar ao bebê. E tudo bem se alguma marquinha ganhar um ponto de interrogação: o mapa também guarda o que ainda dá para descobrir, e pode virar um quadro no cantinho do bebê.",
     "funFact": "A palavra 'mapa' vem do latim mappa, que quer dizer toalha ou pano. Na Idade Média, um mapa do mundo era chamado de mappa mundi.",
     "questions": [
       {
@@ -1908,7 +1901,7 @@
   },
   "132": {
     "teach": "Revisão da semana 18! Com cerca de 14,2 cm e 190 g, o tamanho de um pimentão, o bebê está com a audição se desenvolvendo, a novidade da semana no app. O ouvido vai começando a mandar sinais ao cérebro, e lá dentro o som viaja pelo líquido e pelas vibrações do seu corpo. Na pele, uma penugem fininha, o lanugo, forma um casaquinho que ajuda a segurar o verniz; o nome vem de lana, lã. Para você, ficou o convite de guardar um canto só seu, com as coisas que têm a sua cara; em 1929, Virginia Woolf já defendia um espaço próprio em 'Um teto todo seu'. A lista de presentes ganhou três segredos: valores variados, um lugar só e o que já chegou bem marcado. A carta para o bebê ganhou um jeito a quatro mãos. E o mapa das origens mostrou o caminho da família até o bebê. Vamos revisar?",
-    "funFact": "Na semana que vem, a fruta do app vira um tomate: com cerca de 15,3 cm e 240 g, a pele do bebê ganha uma capa cremosa.",
+    "funFact": "Na semana que vem, a figurinha do app vira o tomate, que na tabela marca cerca de 15,3 cm e 240 g, e a novidade é uma capa cremosa na pele.",
     "questions": [
       {
         "type": "choice",
@@ -1950,12 +1943,12 @@
         "q": "Marque as ideias desta semana para guardar a história da família (marque todas):",
         "o": [
           "Um mapa com as cidades de onde a família veio",
-          "Uma árvore com os sobrenomes da família",
+          "Um calendário da gestação na geladeira",
           "Uma carta para o bebê escrita a quatro mãos",
           "Uma cápsula do tempo com lembranças de hoje"
         ],
         "a": [0, 2],
-        "why": "A carta a quatro mãos e o mapa das origens foram as ideias desta semana; a árvore de sobrenomes e a cápsula do tempo vieram lá no 1º trimestre."
+        "why": "A carta a quatro mãos e o mapa das origens foram as ideias desta semana; o calendário da gestação e a cápsula do tempo vieram lá no 1º trimestre."
       },
       {
         "type": "choice",
@@ -2121,7 +2114,7 @@
         "type": "choice",
         "q": "Segundo a curiosidade da aula, o que é a hora azul?",
         "o": [
-          "A hora em que se acendem as luzes da rua, à noite",
+          "No meio da madrugada, com o céu bem escuro",
           "O fim da manhã, quando o céu fica bem limpinho",
           "Logo antes do nascer e logo depois do pôr do sol"
         ],
@@ -2131,7 +2124,7 @@
     ]
   },
   "136": {
-    "teach": "Parlendas: rimas que atravessam gerações. São versinhos ritmados, quase cantados, que passam de boca em boca: dos avós para os netos, das crianças mais velhas para as mais novas. 'Hoje é domingo, pé de cachimbo' é uma delas. Outra é a dos dedos: 'Dedo mindinho, seu vizinho, pai de todos, fura-bolo, mata-piolho'. É uma rima feita para brincar com mãozinhas e, desde já, pode passear pela barriga, um dedo de cada vez. Enquanto a audição do bebê se desenvolve, recitar em voz alta já vira uma brincadeira sua, ou a dois, se quem está ao seu lado entrar na roda. Que tal pedir aos avós as parlendas da infância deles? Cada região tem as suas: conte na Comunidade do app a da sua terra e conheça as das outras gestantes.",
+    "teach": "Parlendas: rimas que atravessam gerações. São versinhos ritmados, quase cantados, que passam de boca em boca: dos avós para os netos, das crianças mais velhas para as mais novas. 'Hoje é domingo, pé de cachimbo' é uma delas. Outra é a dos dedos: 'Dedo mindinho, seu vizinho, pai de todos, fura-bolo, mata-piolho'. Desde já, essa rima pode passear pela barriga, um dedo de cada vez. Enquanto a audição do bebê se desenvolve, recitar em voz alta já vira uma brincadeira sua, ou a dois, se quem está ao seu lado entrar na roda. Que tal pedir a quem é mais velho na sua vida, como avós, tias ou vizinhas, as parlendas da infância dessas pessoas? Cada região tem as suas: conte na Comunidade do app a da sua terra e conheça as das outras gestantes.",
     "funFact": "Em Portugal, essas rimas de brincar se chamam lengalengas. E o 'Uni, duni, tê', de escolher quem começa a brincadeira, também é uma parlenda.",
     "questions": [
       {
@@ -2158,12 +2151,12 @@
         "o": [
           "Recitar a dos dedos passeando pela barriga",
           "Inventar uma parlenda nova com o nome do bebê",
-          "Pedir aos avós as parlendas da infância deles",
+          "Pedir as parlendas de infância a quem é mais velho na sua vida",
           "Contar na Comunidade do app a parlenda da sua região",
           "Gravar um vídeo recitando para as redes"
         ],
         "a": [0, 2, 3],
-        "why": "Passear com a parlenda pela barriga, colher as dos avós e trocar as da sua região na Comunidade foram as ideias da aula."
+        "why": "Passear com a parlenda pela barriga, colher as de quem é mais velho na sua vida e trocar as da sua região na Comunidade foram as ideias da aula."
       },
       {
         "type": "choice",
@@ -2288,7 +2281,7 @@
   },
   "139": {
     "teach": "Revisão da semana 19! Com cerca de 15,3 cm e 240 g, o tamanho de um tomate, o bebê ganhou o vernix caseoso, uma capa branquinha e cremosa que protege a pele mergulhada no líquido; o nome junta verniz e caseus, queijo. Lá dentro, o mundo é abafado, e os sons graves atravessam a barriga melhor do que os agudos. Você viu que decide o que da espera vai para as redes e o que fica entre vocês, e que vale combinar com a família o que pode ser postado. Ganhou um roteiro de ensaio: a luz da hora dourada, os sapatinhos, as letras do nome e as mãos em coração. Brincou com as parlendas, como a dos dedos, e recebeu o convite de contar a da sua região na Comunidade. E viajou pelas boas-vindas do mundo: as muisjes da Holanda, os ovos vermelhos da China e as lembrancinhas daqui. Pronta para revisar?",
-    "funFact": "Na semana que vem, a fruta do app vira uma banana, e a tabela dá um salto: de 15,3 cm para 25,6 cm. O porquê fica para a semana 20!",
+    "funFact": "Na semana que vem, a figurinha do app vira a banana, e a tabela dá um salto: de 15,3 cm para 25,6 cm. O porquê fica para a semana 20!",
     "questions": [
       {
         "type": "choice",
@@ -2348,7 +2341,7 @@
     ]
   },
   "140": {
-    "teach": "Semana 20: metade do caminho! São 20 semanas de uma jornada de cerca de 40, e o bebê está com cerca de 25,6 cm e 300 g, o tamanho de uma banana, a fruta da semana no app. Se você comparou com a semana passada, talvez tenha estranhado: de 15,3 cm para 25,6 cm em sete dias? O segredo está na régua. Até aqui, a medida da tabela ia da cabeça ao bumbum, como quem mede alguém sentadinho, de perninhas dobradas. Por volta desta semana, a medida passa a ir da cabeça aos pés, e as perninhas entram na conta. E um encanto à parte: muitas gestantes descrevem as primeiras mexidinhas como bolhinhas, borboletas ou um peixinho nadando. Cada uma percebe no seu tempo, sem regra nem prazo, e cada descrição é única. Metade do caminho, uma régua nova e muita história pela frente.",
+    "teach": "Semana 20: metade do caminho! São 20 semanas de uma jornada de cerca de 40, e o bebê está com cerca de 25,6 cm e 300 g, o tamanho de uma banana, a fruta da semana no app. Se você comparou com a semana passada, talvez tenha estranhado: de 15,3 cm para 25,6 cm em sete dias? O segredo está na régua, como a tabela do app conta nesta semana. Até aqui, a medida ia da cabeça ao bumbum, como quem mede alguém sentadinho, de perninhas dobradas. Por volta desta semana, a medida passa a ir da cabeça aos pés, e as perninhas entram na conta. Com a régua nova, dá para imaginar o bebê de corpo inteiro, da cabecinha à pontinha dos pés, do comprimento de uma banana. Metade do caminho e uma régua nova!",
     "funFact": "A bananeira não é uma árvore: é uma erva gigante. O que parece um tronco é feito das bases das folhas, bem enroladinhas umas nas outras.",
     "questions": [
       {
@@ -2360,10 +2353,14 @@
       },
       {
         "type": "choice",
-        "q": "A semana 20 marca que pedaço de uma jornada de cerca de 40 semanas?",
-        "o": ["Um quarto", "A metade", "O finalzinho"],
+        "q": "Com que imagem a aula explicou a medida antiga, da cabeça ao bumbum?",
+        "o": [
+          "Como quem mede alguém deitado, com os braços bem abertos",
+          "Como quem mede alguém sentadinho, de perninhas dobradas",
+          "Como quem mede só a cabecinha, com uma fita"
+        ],
         "a": 1,
-        "why": "São 20 semanas de uma jornada de cerca de 40: metade do caminho!"
+        "why": "Da cabeça ao bumbum é como medir alguém sentadinho, de perninhas dobradas. Agora, com a régua nova, as perninhas entram na conta."
       },
       {
         "type": "choice",
@@ -2378,16 +2375,16 @@
       },
       {
         "type": "multi",
-        "q": "Marque o que a aula contou sobre as primeiras mexidinhas (marque todas):",
+        "q": "Marque tudo que é verdade sobre a semana 20, segundo a aula (marque todas):",
         "o": [
-          "Todas as gestantes descrevem do mesmo jeito",
-          "Há quem fale em bolhinhas ou borboletas",
-          "Todas sentem na mesma semana",
-          "Há quem compare a um peixinho nadando",
-          "Cada gestante percebe no seu tempo"
+          "O bebê já está na reta final da jornada",
+          "É a metade de uma jornada de cerca de 40 semanas",
+          "O bebê tem o comprimento de uma banana",
+          "Com a régua nova, as perninhas entram na conta",
+          "A régua nova mede só até o joelho"
         ],
-        "a": [1, 3, 4],
-        "why": "Bolhinhas, borboletas, um peixinho nadando: cada gestante descreve do seu jeito e percebe no seu tempo. Não existe um jeito único de descrever nem uma semana igual para todas."
+        "a": [1, 2, 3],
+        "why": "Metade de uma jornada de cerca de 40 semanas, o comprimento de uma banana e as perninhas na conta: é a semana 20. Não é a reta final, e a régua nova vai da cabeça aos pés."
       },
       {
         "type": "choice",
@@ -2403,7 +2400,7 @@
     ]
   },
   "141": {
-    "teach": "A ficha cai de muitos jeitos. Com a barriga crescendo, muitas gestantes contam que o bebê vai parecendo mais real a cada dia, como se a ficha fosse caindo. Às vezes, isso acontece num momento pequeno: ao dobrar a primeira roupinha, ao ouvir alguém chamar a barriga pelo nome, ao ver a fruta da semana mudar no app. Para algumas, a ficha cai de uma vez só; para outras, aos pouquinhos, ou em dias alternados: num dia tudo parece real, no outro parece sonho. Tudo bem viver de qualquer um desses jeitos, e tudo bem se vierem juntos alegria, susto e ternura. Que tal anotar no diário os momentos em que a sua ficha caiu, com a data e o que você sentiu? E, se quiser, conte na Comunidade do app como foi com você e conheça as histórias das outras gestantes.",
+    "teach": "A ficha cai de muitos jeitos. Com a barriga crescendo, muitas gestantes contam que o bebê vai parecendo mais real a cada dia, como se a ficha fosse caindo. Às vezes, isso acontece num momento pequeno: ao ouvir uma criança perguntar se tem um bebê aí dentro, ao ver o cantinho do bebê ganhando forma, ao ver a fruta da semana mudar no app. Para algumas, a ficha cai de uma vez só; para outras, aos pouquinhos, ou em dias alternados: num dia tudo parece real, no outro parece sonho. Tudo bem viver de qualquer um desses jeitos, e tudo bem se vierem juntos alegria, susto e ternura. Se você começou a lista das primeiras vezes, esses momentos podem entrar nela, com o que você sentiu. E, se quiser, leve a pergunta 'quando a sua ficha caiu?' para a Comunidade do app.",
     "funFact": "A expressão 'cair a ficha' vem dos antigos orelhões, que funcionavam com fichas: a ligação só se completava quando a ficha caía.",
     "questions": [
       {
@@ -2421,14 +2418,14 @@
         "type": "multi",
         "q": "Marque os momentos pequenos em que a ficha pode cair, citados na aula (marque todas):",
         "o": [
-          "Ao terminar de pintar o quarto inteiro",
-          "Ao dobrar a primeira roupinha",
-          "Ao ouvir alguém chamar a barriga pelo nome",
+          "Ao terminar de ler um livro sobre bebês",
+          "Ao ouvir uma criança perguntar se tem um bebê aí dentro",
+          "Ao ver o cantinho do bebê ganhando forma",
           "Ao ver a fruta da semana mudar no app",
           "Ao fechar a lista de convidados do chá"
         ],
         "a": [1, 2, 3],
-        "why": "A primeira roupinha, a barriga chamada pelo nome e a fruta da semana mudando no app foram os momentos da aula. O quarto pintado e a lista do chá não estavam nela."
+        "why": "Uma criança perguntando do bebê, o cantinho ganhando forma e a fruta da semana mudando no app foram os momentos da aula. O livro e a lista do chá não estavam nela."
       },
       {
         "type": "choice",
@@ -2443,14 +2440,14 @@
       },
       {
         "type": "choice",
-        "q": "Que registro a aula sugeriu para os momentos em que a ficha caiu?",
+        "q": "Onde a aula sugeriu guardar esses momentos, com o que você sentiu?",
         "o": [
-          "Anotar no diário, com a data e o que sentiu",
-          "Fazer uma planilha de compras",
-          "Guardar tudo só na memória, para contar depois"
+          "Na lista das primeiras vezes",
+          "Numa planilha com as compras do enxoval",
+          "Só na memória, para contar depois"
         ],
         "a": 0,
-        "why": "Anotar no diário, com a data e o que você sentiu, guarda esses momentos para sempre."
+        "why": "Se você começou a lista das primeiras vezes, esses momentos podem entrar nela, com o que você sentiu."
       },
       {
         "type": "choice",
@@ -2580,7 +2577,7 @@
     ]
   },
   "144": {
-    "teach": "Além de ouvir, o ouvido cuida do equilíbrio. Lá no fundinho dele fica o labirinto, que guarda a parte da audição e também a parte que percebe os giros e as mudanças de posição. Nessa parte do equilíbrio existem três canaizinhos em forma de arco, cheios de líquido e cada um num plano diferente: juntos, percebem giros em qualquer direção, como o 'sim' e o 'não' da cabeça. Lá dentro, o bebê gira e dá cambalhotas na piscina, e cada virada vai sendo percebida por esse sentido em formação. É um sentido discreto: quase ninguém pensa nele, mas é o labirinto que conta ao cérebro para que lado a cabeça virou. Aqui fora, esse sentido vai acompanhar o bebê num gesto que aparece em famílias do mundo todo: embalar no colo, num vaivém de mansinho, com uma cantiga ou com um silêncio gostoso.",
+    "teach": "Além de ouvir, o ouvido cuida do equilíbrio. Lá no fundinho dele fica o labirinto, que guarda a parte da audição e também a parte que percebe os giros e as mudanças de posição. Nessa parte do equilíbrio existem três canaizinhos em forma de arco, cheios de líquido e cada um num plano diferente: juntos, percebem giros em qualquer direção, como o 'sim' e o 'não' da cabeça. Lá dentro, o bebê gira e dá cambalhotas na piscina, e esse sentido, ainda em formação, vai se preparando para perceber cada virada. É um sentido discreto: quase ninguém pensa nele, mas é o labirinto que conta ao cérebro para que lado a cabeça virou. Aqui fora, é esse mesmo sentido que ajuda uma bailarina a girar e parar sem perder o rumo.",
     "funFact": "O labirinto do ouvido tem esse nome por causa dos seus canaizinhos cheios de curvas, que lembram o labirinto do mito grego do Minotauro.",
     "questions": [
       {
@@ -2616,14 +2613,14 @@
       },
       {
         "type": "choice",
-        "q": "Segundo a aula, o que esse sentido em formação vai percebendo lá dentro?",
+        "q": "Segundo a aula, o que esse sentido em formação vai se preparando para perceber?",
         "o": [
           "As palavras de uma carta lida",
           "As cores do lado de fora",
           "As viradas e cambalhotas do bebê"
         ],
         "a": 2,
-        "why": "Cada virada e cada cambalhota do bebê na piscina vai sendo percebida pelo labirinto, esse sentido em formação."
+        "why": "Esse sentido, ainda em formação, vai se preparando para perceber cada virada e cada cambalhota do bebê na piscina."
       },
       {
         "type": "choice",
@@ -2690,8 +2687,8 @@
     ]
   },
   "146": {
-    "teach": "Revisão da semana 20, a semana da metade! O bebê chegou a cerca de 25,6 cm e 300 g, o tamanho de uma banana, e a tabela ganhou uma régua nova: a medida passou a ir da cabeça aos pés. Você viu como muitas gestantes descrevem as primeiras mexidinhas: bolhinhas, borboletas ou um peixinho nadando. E cada uma percebe no seu tempo. Também viu que a ficha cai de muitos jeitos e que o diário guarda esses momentos. No chá de bebê, o passo a passo foi data, tamanho e convite, com as frutas da jornada como tema. Na rede de apoio, você aprendeu a devolver a pergunta 'e você, como está?' e a escutar sem corrigir nem resolver. No mundo do bebê, o labirinto do ouvido, com seus três canaizinhos, percebe cada virada. E a festa da metade trouxe a foto com a banana e um dia dividido em duas partes.",
-    "funFact": "Na semana que vem, a fruta do app vira a cenoura: com cerca de 26,7 cm, o bebê vai estar com sobrancelhas e pálpebras formadas.",
+    "teach": "Revisão da semana 20, a semana da metade! O bebê chegou a cerca de 25,6 cm e 300 g, o tamanho de uma banana, e a tabela ganhou uma régua nova: a medida passou a ir da cabeça aos pés. Você viu que a ficha cai de muitos jeitos e que esses momentos podem entrar na lista das primeiras vezes. No chá de bebê, o passo a passo foi data, tamanho e convite, com as frutas da jornada como tema. Na rede de apoio, você aprendeu a devolver a pergunta 'e você, como está?' e a escutar sem corrigir nem resolver. No mundo do bebê, o labirinto do ouvido, com seus três canaizinhos, vai se preparando para perceber cada virada. E a festa da metade trouxe a foto com a banana e um dia dividido em duas partes.",
+    "funFact": "Na semana que vem, a figurinha do app vira a cenoura, que na tabela marca cerca de 26,7 cm, e a novidade está no rostinho.",
     "questions": [
       {
         "type": "choice",
@@ -2735,17 +2732,17 @@
         "o": [
           "Montar o quarto inteiro num fim de semana",
           "Uma foto da metade segurando uma banana",
-          "Anotar no diário os momentos em que a ficha caiu",
+          "Pôr os momentos da ficha caindo na lista das primeiras vezes",
           "Pendurar a lista de presentes na geladeira",
           "Um dia dividido em duas partes, uma só sua e outra com alguém querido"
         ],
         "a": [1, 2, 4],
-        "why": "A foto com a banana, o diário da ficha caindo e o dia dividido em duas partes fizeram parte da semana. O quarto montado num fim de semana e a lista na geladeira, não."
+        "why": "A foto com a banana, os momentos da ficha caindo na lista das primeiras vezes e o dia dividido em duas partes fizeram parte da semana. O quarto montado num fim de semana e a lista na geladeira, não."
       }
     ]
   },
   "147": {
-    "teach": "Semana 21: sobrancelhas e pálpebras formadas! Com cerca de 26,7 cm e 360 g, o tamanho de uma cenoura, a fruta da semana no app, o rostinho do bebê ganha esses dois detalhes delicados. As sobrancelhas ainda são fiozinhos finos e clarinhos: a cor do cabelo só começa a chegar mais adiante. Mesmo assim, já desenham uma moldura para o olhar. Aqui fora, as sobrancelhas têm dois trabalhos: desviar dos olhos as gotinhas de suor e de chuva e ajudar a mostrar o que a gente sente, da surpresa à concentração. As pálpebras, já formadas, continuam fechadinhas, enquanto os olhos seguem amadurecendo no seu tempo. E, desde a banana da semana passada, foram mais ou menos 1 cm e 60 g a mais. Que tal desenhar no diário esse rostinho, do jeito que você imagina?",
+    "teach": "Semana 21: sobrancelhas e pálpebras formadas! Com cerca de 26,7 cm e 360 g, o tamanho de uma cenoura, a fruta da semana no app, o rostinho do bebê está com esses dois detalhes delicados, que a tabela destaca nesta semana. As pálpebras cobrem os olhinhos desde o 1º trimestre e seguem fechadinhas, enquanto os olhos continuam amadurecendo no seu tempo. Já as sobrancelhas vão ganhando fiozinhos finos e clarinhos: a cor do cabelo só começa a chegar mais adiante. Mesmo assim, já desenham uma moldura para o olhar. Aqui fora, as sobrancelhas têm dois trabalhos: desviar dos olhos as gotinhas de suor e de chuva e ajudar a mostrar o que a gente sente, da surpresa à concentração. Que tal desenhar no diário esse rostinho, do jeito que você imagina?",
     "funFact": "As primeiras cenouras cultivadas eram roxas ou amarelas. A cenoura laranja, a mais comum hoje, só apareceu séculos depois, na Europa.",
     "questions": [
       {
@@ -2766,7 +2763,7 @@
           "Já tem o cabelo com a cor definitiva"
         ],
         "a": [0, 2, 3],
-        "why": "Com cerca de 26,7 cm e 360 g, o bebê já tem sobrancelhas e pálpebras formadas. Os olhos seguem fechadinhos, e a cor do cabelo chega mais adiante."
+        "why": "Com cerca de 26,7 cm e 360 g, o bebê está com sobrancelhas e pálpebras formadas. As pálpebras seguem fechadinhas, e a cor do cabelo chega mais adiante."
       },
       {
         "type": "choice",
@@ -2862,7 +2859,7 @@
     ]
   },
   "149": {
-    "teach": "A bolsa de passeio vai com vocês a todo lugar. Na hora de escolher, vale procurar uma com divisórias, para cada coisa ter o seu cantinho, e uma alça confortável para quem vai carregar, seja de ombro ou de mochila. Dentro dela entram os itens práticos: fraldas, lenços, uma muda de roupa, uma manta, um paninho de boca e saquinhos para guardar a roupinha suja até chegar em casa. O segredo para não virar correria é simples: deixar o kit sempre pronto e reabastecer na volta de cada passeio, repondo o que foi usado. Assim, na hora de sair, é só pegar a bolsa e ir. E uma listinha do kit, colada por dentro da bolsa, ajuda quem for passear com o bebê a saber o que repor.",
+    "teach": "A bolsa de passeio também entra no enxoval. Na hora de escolher, vale procurar uma com divisórias, para cada coisa ter o seu cantinho, e uma alça confortável, de ombro ou de mochila. A lista de itens práticos é curtinha: fraldas, lenços, uma muda de roupa, uma manta, um paninho de boca e saquinhos para separar a roupinha suja. Dá para ir montando aos poucos, conforme os itens chegam, e deixar o kit pronto num cantinho do armário. Uma listinha colada por dentro da bolsa, com o que vai em cada divisória, ajuda qualquer pessoa da casa a achar tudo rapidinho e a saber o que repor. Que tal escolher a bolsa junto com quem divide a espera com você?",
     "funFact": "Nos anos 1940, a americana Marion Donovan usou uma cortina de chuveiro para criar uma capa impermeável para fraldas, um dos passos que abriram caminho para as fraldas descartáveis.",
     "questions": [
       {
@@ -2893,23 +2890,23 @@
         "type": "choice",
         "q": "Para que servem os saquinhos da bolsa de passeio?",
         "o": [
-          "Para levar a roupinha suja para casa",
+          "Para separar a roupinha suja",
           "Para guardar as moedas",
-          "Para colecionar folhinhas e pedrinhas do passeio"
+          "Para guardar os documentos da casa"
         ],
         "a": 0,
-        "why": "Os saquinhos guardam a roupinha suja até chegar em casa, sem misturar com o resto da bolsa."
+        "why": "Os saquinhos servem para separar a roupinha suja do resto da bolsa."
       },
       {
         "type": "choice",
-        "q": "Qual é o segredo da aula para não virar correria na hora de sair?",
+        "q": "Como a aula sugeriu montar a bolsa de passeio?",
         "o": [
-          "Montar a bolsa inteira só na hora de sair de casa",
-          "Levar sempre o dobro de tudo, por via das dúvidas",
-          "Deixar o kit pronto e repor tudo na volta"
+          "Tudo de uma vez, numa compra só",
+          "Aos poucos, conforme os itens chegam",
+          "Só quando todo o enxoval estiver pronto"
         ],
-        "a": 2,
-        "why": "Com o kit sempre pronto e reabastecido na volta de cada passeio, na hora de sair é só pegar a bolsa e ir."
+        "a": 1,
+        "why": "Dá para ir montando aos poucos, conforme os itens chegam, e deixar o kit pronto num cantinho do armário."
       },
       {
         "type": "choice",
@@ -2921,7 +2918,7 @@
     ]
   },
   "150": {
-    "teach": "Carinho na barriga também é conversa. Um carinho em círculos, a mão parada por um tempinho, um tamborilar de leve com a ponta dos dedos: cada toque é um jeito de dizer 'estou aqui' sem precisar de palavras. E essa conversa pode ganhar mais participantes: o parceiro, a parceira, um irmão mais velho ou quem você convidar pode pôr a mão ali e entrar no papo. Num estudo de 2015, na Escócia, pesquisadores observaram bebês na barriga, entre 21 e 33 semanas, e notaram mais movimentos de braços, cabeça e boca enquanto a mãe fazia carinho na barriga. Para brincar, uma ideia: quando você sentir uma mexidinha, responda com um toquinho no mesmo lugar, no seu tempo e sem esperar resposta. A graça está no gesto, não no placar.",
+    "teach": "Carinho na barriga também é conversa. Um carinho em círculos, a mão parada por um tempinho, um tamborilar de leve com a ponta dos dedos: cada toque é um jeito de dizer 'estou aqui' sem precisar de palavras. E essa conversa pode ganhar mais participantes: o parceiro, a parceira, um irmão mais velho ou quem você convidar pode pôr a mão ali e entrar no papo. Para brincar, uma ideia: combinar um toque só da família, como três batidinhas de leve que querem dizer 'estou aqui', e ensinar a cada pessoa que entrar na conversa. Assim, todo mundo que ama vocês ganha o mesmo jeitinho de dizer que está por perto.",
     "funFact": "Cafuné, o carinho de passar os dedos no cabelo de alguém, é uma palavra bem brasileira, que veio do quimbundo, uma língua de Angola.",
     "questions": [
       {
@@ -2950,25 +2947,21 @@
       },
       {
         "type": "choice",
-        "q": "No estudo de 2015, na Escócia, o que os pesquisadores notaram enquanto a mãe fazia carinho na barriga?",
-        "o": [
-          "Mais movimentos de braços, cabeça e boca",
-          "Nenhuma diferença nos movimentos dos bebês",
-          "Os bebês ficavam totalmente parados"
-        ],
+        "q": "Verdadeiro ou falso: o carinho na barriga pode ganhar outros participantes, como o parceiro, a parceira ou um irmão mais velho.",
+        "o": ["Verdadeiro", "Falso"],
         "a": 0,
-        "why": "Os pesquisadores notaram mais movimentos de braços, cabeça e boca durante o carinho na barriga."
+        "why": "Verdadeiro! Quem você convidar pode pôr a mão ali e entrar nessa conversa sem palavras."
       },
       {
         "type": "choice",
-        "q": "Que brincadeira a aula sugeriu para quando você sentir uma mexidinha?",
+        "q": "Que brincadeira de família a aula sugeriu para o carinho na barriga?",
         "o": [
-          "Três palminhas perto da barriga",
-          "Um toquinho no mesmo lugar",
+          "Uma música nova para cantar a cada manhã da semana",
+          "Um toque só da família, de três batidinhas",
           "Uma foto da barriga na hora"
         ],
         "a": 1,
-        "why": "Um toquinho no mesmo lugar, no seu tempo e sem esperar resposta: a graça está no gesto, não no placar."
+        "why": "Três batidinhas de leve que querem dizer 'estou aqui': um toque só da família, para ensinar a cada pessoa que entrar na conversa."
       },
       {
         "type": "choice",
@@ -2984,7 +2977,7 @@
     ]
   },
   "151": {
-    "teach": "O cérebro do bebê está ganhando dobrinhas. Por fora, o cérebro é coberto por uma camada chamada córtex, palavra latina que quer dizer casca. Até pouco tempo, essa casquinha era lisinha; por volta desta fase, os primeiros sulcos vão aparecendo, como risquinhos desenhados na superfície. No 3º trimestre, as dobras vão se multiplicar, e é assim que muito mais cérebro cabe dentro da cabecinha, do jeito que uma folha amassada cabe numa caixa pequena. E esse cérebro em obras vai se preparando para um trabalho lindo: organizar o que chega dos sentidos lá dentro. O toque da mão no rosto, o giro de uma cambalhota percebido pelo labirinto, os sons abafados que atravessam a barriga: cada recado vai chegando, e o cérebro vai aprendendo a arrumar a casa.",
+    "teach": "O cérebro do bebê está ganhando dobrinhas. Por fora, o cérebro é coberto por uma camada chamada córtex, palavra latina que quer dizer casca. Até pouco tempo, essa casquinha era lisinha; por volta desta fase, os primeiros sulcos vão aparecendo, como risquinhos desenhados na superfície. No 3º trimestre, as dobras vão se multiplicar, e é assim que muito mais cérebro cabe dentro da cabecinha, do jeito que uma folha amassada cabe numa caixa pequena. E esse cérebro em obras vai se preparando para um trabalho lindo: organizar o que chega dos sentidos lá dentro. O toque da mão no rosto, o giro de uma cambalhota, que o labirinto vai se preparando para perceber, os sons abafados que atravessam a barriga: cada recado vai chegando, e o cérebro vai aprendendo a arrumar a casa.",
     "funFact": "Nem todo cérebro tem dobrinhas: o de um camundongo, por exemplo, é lisinho por fora a vida inteira.",
     "questions": [
       {
@@ -3035,7 +3028,7 @@
     ]
   },
   "152": {
-    "teach": "Todo nome tem uma história para contar. Que tal reservar uma página do diário ou do álbum para a história do nome do bebê? Vale anotar quem sugeriu o nome primeiro, como eram as listas, quais foram os finalistas e onde vocês estavam no momento da decisão. Guarde também os nomes que quase foram, aqueles que ficaram no páreo até o fim, e as histórias engraçadas do caminho: o parente que torcia por outro nome, a votação na mesa do almoço, o nome que apareceu numa música. E o apelido da barriga, se houver, também merece um parágrafo. Se o nome ainda não foi escolhido, tudo bem: registre o caminho até aqui e complete depois, com calma. Um dia, essa página pode responder à pergunta 'por que eu me chamo assim?'. E a história mais engraçada pode render uma boa conversa na Comunidade do app.",
+    "teach": "Todo nome tem uma história para contar. Que tal reservar uma página do diário ou do álbum para a história do nome do bebê? Vale anotar quem sugeriu o nome primeiro, como eram as listas, quais foram os finalistas e onde vocês estavam no momento da decisão. Guarde também os nomes que quase foram, aqueles que ficaram no páreo até o fim, e as histórias engraçadas do caminho: o parente que torcia por outro nome, a votação na mesa do almoço, o nome que apareceu numa música. E o apelido da barriga, se houver, também merece um parágrafo. Se o nome ainda não foi escolhido, tudo bem: registre o caminho até aqui e complete depois, com calma. Essa página guarda um pedaço bonito da espera: o caminho que o nome fez até chegar a vocês. E a história mais engraçada pode virar papo na Comunidade do app.",
     "funFact": "Na Grécia, muita gente comemora o 'dia do nome', a data do santo que tem o mesmo nome, às vezes com mais festa que o próprio aniversário.",
     "questions": [
       {
@@ -3098,8 +3091,8 @@
     ]
   },
   "153": {
-    "teach": "Revisão da semana 21, a semana da cenoura! O bebê chegou a cerca de 26,7 cm e 360 g, com sobrancelhas de fiozinhos clarinhos e pálpebras formadas, ainda fechadas. Você viu que alegria e saudade do antes cabem juntas, e que uma versão possível de hoje traz um pedacinho daquela rotina de volta. Na preparação, entrou em cena a bolsa de passeio, com divisórias e o kit sempre pronto. O carinho na barriga virou conversa sem palavras e, quando você sentir uma mexidinha, um toquinho no mesmo lugar pode ser a resposta, sem placar. Lá dentro, o córtex, a casquinha do cérebro, vai ganhando os primeiros sulcos, e o cérebro em obras vai aprendendo a arrumar os recados dos sentidos. E a história do nome ganhou uma página, com os finalistas e até os nomes que quase foram.",
-    "funFact": "Na semana que vem, a fruta do app vira a espiga de milho: com cerca de 27,8 cm, o bebê vai reconhecer sons externos.",
+    "teach": "Revisão da semana 21, a semana da cenoura! O bebê chegou a cerca de 26,7 cm e 360 g, com sobrancelhas de fiozinhos clarinhos e pálpebras formadas, que seguem fechadinhas. Você viu que alegria e saudade do antes cabem juntas, e que uma versão possível de hoje traz um pedacinho daquela rotina de volta. Na preparação, a bolsa de passeio entrou no enxoval, com divisórias e o kit montado aos poucos. O carinho na barriga virou conversa sem palavras, e um toque só da família, de três batidinhas, pode entrar nela. Lá dentro, o córtex, a casquinha do cérebro, vai ganhando os primeiros sulcos, e o cérebro em obras vai aprendendo a arrumar os recados dos sentidos. E a história do nome ganhou uma página, com os finalistas e até os nomes que quase foram.",
+    "funFact": "Na semana que vem, a figurinha do app vira a espiga de milho, que na tabela marca cerca de 27,8 cm, e a novidade é sobre os sons de fora.",
     "questions": [
       {
         "type": "choice",
@@ -3125,12 +3118,12 @@
         "o": [
           "Escolher o nome numa só tarde",
           "Guardar os nomes que quase foram",
-          "Deixar o kit da bolsa de passeio sempre pronto",
+          "Montar o kit da bolsa de passeio aos poucos",
           "Tirar uma foto da barriga todo dia",
-          "Responder a uma mexidinha com um toquinho no mesmo lugar"
+          "Combinar um toque só da família"
         ],
         "a": [1, 2, 4],
-        "why": "Os nomes que quase foram, o kit sempre pronto e o toquinho de resposta apareceram na semana. Escolher o nome numa só tarde e a foto diária, não."
+        "why": "Os nomes que quase foram, o kit montado aos poucos e o toque só da família apareceram na semana. Escolher o nome numa só tarde e a foto diária, não."
       },
       {
         "type": "choice",
@@ -3153,7 +3146,7 @@
     ]
   },
   "154": {
-    "teach": "Semana 22: os sons de fora chegam lá dentro. Com cerca de 27,8 cm e 430 g, o bebê tem o tamanho de uma espiga de milho, a fruta da semana no app. E a tabela do app traz um destaque para os ouvidos: o bebê reconhece sons externos. As conversas na sala, a música que toca na cozinha, o latido do cachorro, a campainha: os sons da casa atravessam a barriga e chegam lá dentro. O bebê reage aos sons que chegam, como quem presta atenção, e alguns deles vão ficando conhecidos. Há mais de 30 anos, um estudo mostrou que recém-nascidos cujas mães viam sempre a mesma novela durante a gestação ficavam mais quietinhos e atentos ao ouvir a música de abertura, como quem reconhece um som de casa. A trilha sonora da sua rotina já faz parte do mundo do bebê.",
+    "teach": "Semana 22: os sons de fora chegam lá dentro. Com cerca de 27,8 cm e 430 g, o bebê tem o tamanho de uma espiga de milho, a fruta da semana no app. E a tabela do app traz um destaque para os ouvidos: o bebê reconhece sons externos. As conversas na sala, a música que toca na cozinha, o latido do cachorro, a porta batendo: os sons da casa atravessam a barriga e chegam lá dentro, e alguns deles vão ficando conhecidos, como a trilha sonora de casa. Há mais de 30 anos, um estudo notou que recém-nascidos pareciam reconhecer a música de abertura de uma novela que tocava sempre em casa durante a espera. Cada som da rotina de vocês já faz parte do mundo do bebê.",
     "funFact": "Cada fio do 'cabelo' do milho está ligado a um grão da espiga: uma espiga bem cheia tem centenas de fios, um para cada grãozinho.",
     "questions": [
       {
@@ -3177,18 +3170,22 @@
           "Uma mensagem lida em silêncio",
           "As conversas na sala",
           "O latido do cachorro",
-          "A campainha",
+          "A porta batendo",
           "Um bilhete deixado na mesa"
         ],
         "a": [1, 2, 3],
-        "why": "Conversas, latidos e a campainha atravessam a barriga e chegam lá dentro. Uma mensagem lida em silêncio e um bilhete na mesa não fazem som nenhum."
+        "why": "Conversas, latidos e a porta batendo atravessam a barriga e chegam lá dentro. Uma mensagem lida em silêncio e um bilhete na mesa não fazem som nenhum."
       },
       {
         "type": "choice",
-        "q": "No estudo da novela, como ficavam os recém-nascidos ao ouvir a música de abertura?",
-        "o": ["Mais agitados", "Do mesmo jeito, sem reagir", "Mais quietinhos e atentos"],
-        "a": 2,
-        "why": "Os recém-nascidos cujas mães viam sempre a mesma novela ficavam mais quietinhos e atentos com a música de abertura, como quem reconhece um som de casa."
+        "q": "No estudo da novela, o que os recém-nascidos pareciam fazer ao ouvir a música de abertura?",
+        "o": [
+          "Estranhar um som que nunca tinham ouvido",
+          "Reconhecer um som de casa",
+          "Não perceber som nenhum"
+        ],
+        "a": 1,
+        "why": "Os recém-nascidos pareciam reconhecer a música de abertura da novela que tocava sempre em casa durante a espera: um som conhecido."
       },
       {
         "type": "choice",
@@ -3200,7 +3197,7 @@
     ]
   },
   "155": {
-    "teach": "A mãe suficientemente boa. Essa ideia nasceu com o psicanalista inglês Donald Winnicott, que dedicou a vida a entender os bebês e as famílias. No original, em inglês, a expressão é 'good enough mother', a mãe boa o bastante. Para Winnicott, o bebê não precisa de perfeição: precisa de alguém presente, que erra, acerta e tenta de novo, dia após dia. A ideia tira um peso das costas. Não existe a mãe perfeita, que sabe tudo e nunca se atrapalha: existe a mãe possível, do seu jeito, com o seu tempo e a sua história. E isso já vale agora, na espera. Nos dias em que a vontade de acertar tudo apertar, vale lembrar: suficientemente boa já é muito. Que tal escrever essa frase num papelzinho e guardar num lugar onde você possa reencontrá-la sempre que quiser?",
+    "teach": "A mãe suficientemente boa. Essa ideia nasceu com o psicanalista inglês Donald Winnicott, que dedicou a vida a entender os bebês e as famílias. No original, em inglês, a expressão é 'good enough mother', a mãe boa o bastante. Para Winnicott, nenhuma mãe precisa ser perfeita: cuidar é errar, acertar e tentar de novo, dia após dia. A ideia tira um peso das costas. Não existe a mãe perfeita, que sabe tudo e nunca se atrapalha: existe a mãe possível, do seu jeito, com o seu tempo e a sua história. E isso já vale agora, na espera. Nos dias em que a vontade de acertar tudo apertar, vale lembrar: suficientemente boa já é muito. Que tal escrever essa frase num papelzinho e guardar num lugar onde você possa reencontrá-la sempre que quiser?",
     "funFact": "Winnicott conversava com pais e mães em programas de rádio da BBC, nos anos 1940 e 1950, falando da vida de todo dia com os bebês.",
     "questions": [
       {
@@ -3212,14 +3209,14 @@
       },
       {
         "type": "choice",
-        "q": "Para Winnicott, do que o bebê precisa?",
+        "q": "Para Winnicott, como é cuidar?",
         "o": [
-          "De uma mãe perfeita, que nunca se atrapalha",
-          "De alguém presente, que erra, acerta e tenta de novo",
-          "De uma rotina sem nenhum imprevisto"
+          "Acertar tudo de primeira",
+          "Errar, acertar e tentar de novo",
+          "Seguir um manual sem nunca se atrapalhar"
         ],
         "a": 1,
-        "why": "Para Winnicott, o bebê não precisa de perfeição: precisa de alguém presente, que erra, acerta e tenta de novo."
+        "why": "Para Winnicott, nenhuma mãe precisa ser perfeita: cuidar é errar, acertar e tentar de novo, dia após dia."
       },
       {
         "type": "multi",
@@ -3228,11 +3225,11 @@
           "Não existe mãe perfeita",
           "A mãe precisa saber tudo desde o começo",
           "Existe a mãe possível, do seu jeito",
-          "Estar presente conta muito",
+          "Tentar de novo faz parte",
           "Errar uma vez estraga tudo"
         ],
         "a": [0, 2, 3],
-        "why": "Não existe mãe perfeita nem quem saiba tudo desde o começo: existe a mãe possível, presente do seu jeito. Errar e tentar de novo também fazem parte."
+        "why": "Não existe mãe perfeita nem quem saiba tudo desde o começo: existe a mãe possível, do seu jeito, e tentar de novo faz parte."
       },
       {
         "type": "choice",
@@ -3255,19 +3252,19 @@
     ]
   },
   "156": {
-    "teach": "Brincadeiras para animar o chá de bebê. Se o chá estiver nos seus planos, dá para separar desde já as brincadeiras. No barbante da barriga, cada convidado corta um pedaço de barbante do tamanho que acha que dá a volta na sua barriga, e ganha quem chegar mais perto; a barriga só entra na brincadeira se você topar, claro. Em 'De quem é esta foto?', cada um leva uma foto de quando era bebê, e a turma tenta adivinhar quem é quem. No bingo dos presentes, cada convidado aposta nos presentes que vão aparecer e marca a cartela enquanto os pacotes são abertos. E, no desafio da fralda, vence quem trocar a fralda de um boneco no menor tempo, de olhos vendados para os mais corajosos. Pequenos prêmios, como uma plantinha ou um ímã de geladeira, deixam a disputa ainda mais divertida.",
+    "teach": "Brincadeiras para animar o chá de bebê. Se o chá estiver nos seus planos, dá para separar desde já as brincadeiras. No 'Adivinhe a fruta', cada convidado aposta qual é a fruta do app na semana do chá, e ganha quem acertar. Em 'De quem é esta foto?', cada um leva uma foto de quando era bebê, e a turma tenta adivinhar quem é quem. No bingo dos presentes, cada convidado aposta nos presentes que vão aparecer e marca a cartela enquanto os pacotes são abertos. E, no desafio da fralda, vence quem trocar a fralda de um boneco no menor tempo, de olhos vendados para os mais corajosos. Pequenos prêmios, como uma plantinha ou um ímã de geladeira, deixam a disputa ainda mais divertida.",
     "funFact": "Antes de ser a do bebê, a palavra 'fralda' já nomeava a parte de baixo da camisa e até o pé de uma montanha: estar 'nas fraldas da serra' é estar ao pé da serra.",
     "questions": [
       {
         "type": "choice",
-        "q": "No barbante da barriga, quem ganha?",
+        "q": "No 'Adivinhe a fruta', quem ganha?",
         "o": [
-          "Quem cortar o barbante mais comprido",
-          "Quem chegar mais perto da volta da barriga",
-          "Quem terminar de cortar o barbante primeiro"
+          "Quem trouxer a fruta mais bonita da feira",
+          "Quem acertar a fruta do app na semana do chá",
+          "Quem desenhar a fruta mais bonita"
         ],
         "a": 1,
-        "why": "Ganha quem cortar o pedaço mais parecido com a volta da barriga. E a barriga só entra na brincadeira se você topar."
+        "why": "Cada convidado aposta qual é a fruta do app na semana do chá, e ganha quem acertar."
       },
       {
         "type": "choice",
@@ -3299,10 +3296,10 @@
           "O desafio da fralda",
           "De quem é esta foto?",
           "A corrida do ovo na colher",
-          "O barbante da barriga"
+          "Adivinhe a fruta"
         ],
         "a": [1, 2, 4],
-        "why": "O desafio da fralda, 'De quem é esta foto?' e o barbante da barriga estão na aula, junto com o bingo dos presentes. A dança das cadeiras e a corrida do ovo na colher ficaram de fora desta vez."
+        "why": "O desafio da fralda, 'De quem é esta foto?' e o 'Adivinhe a fruta' estão na aula, junto com o bingo dos presentes. A dança das cadeiras e a corrida do ovo na colher ficaram de fora desta vez."
       },
       {
         "type": "choice",
@@ -3314,7 +3311,7 @@
     ]
   },
   "157": {
-    "teach": "A melodia da casa: o sotaque da família. Quando alguém conversa perto da barriga, as palavras chegam abafadas lá dentro, mas a música da fala atravessa: o ritmo, as subidas e descidas da voz, o cantado de cada sotaque. É parecido com ouvir uma conversa do outro lado da parede: as palavras se perdem, a melodia fica. E cada família tem a sua. Tem o sotaque de quem cresceu no interior ou na capital e o jeito de dizer as expressões da família, como 'oxente', 'bah' e 'uai': as palavras ficam aqui fora, mas a música delas chega lá dentro. Em casas com duas línguas, cada uma traz a sua música, e as duas podem fazer parte da trilha sonora do bebê. Que tal contar na Comunidade do app uma expressão bem da sua região e conhecer as das outras gestantes?",
+    "teach": "A melodia da casa: o sotaque da família. Quando alguém conversa perto da barriga, as palavras chegam abafadas lá dentro, mas a música da fala atravessa: o ritmo, as subidas e descidas da voz, o cantado de cada sotaque. É parecido com ouvir uma conversa do outro lado da parede: as palavras se perdem, a melodia fica. E cada família tem a sua. Tem o sotaque de quem cresceu no interior ou na capital e o jeito de dizer as expressões da família, como 'oxente', 'bah' e 'uai': as palavras ficam aqui fora, mas a música delas chega lá dentro. Em casas com duas línguas, cada uma traz a sua música, e as duas podem fazer parte da trilha sonora do bebê. Que tal anotar no diário as expressões que só a sua família usa, e quem diz cada uma?",
     "funFact": "Num estudo de 2009, o choro de recém-nascidos franceses tendia a uma melodia que subia, e o de alemães, a uma que descia, como a melodia da língua que ouviram na barriga.",
     "questions": [
       {
@@ -3492,7 +3489,7 @@
     ]
   },
   "160": {
-    "teach": "Revisão da semana 22: dos sons à mãe escondida. Foi uma semana de sons, brincadeiras e encontros. O bebê, do tamanho de uma espiga de milho, reconhece sons externos: as conversas, a música e até a campainha da casa já fazem parte do mundo lá dentro. Você conheceu a mãe suficientemente boa, ideia do psicanalista Donald Winnicott: o bebê não precisa de perfeição, precisa de presença. Separou brincadeiras para o chá, do barbante da barriga à foto de quando cada um era bebê. Descobriu que a melodia da fala, com o ritmo e o sotaque da família, atravessa a barriga. Conheceu a propriocepção, que guia o dedo até o nariz de olhos fechados. E encontrou a mãe escondida das fotos do século 19, um lembrete para revezar a câmera e aparecer também. Pronta para revisar?",
+    "teach": "Revisão da semana 22: dos sons à mãe escondida. Foi uma semana de sons, brincadeiras e encontros. O bebê, do tamanho de uma espiga de milho, reconhece sons externos: as conversas, a música e até a porta batendo já fazem parte do mundo lá dentro. Você conheceu a mãe suficientemente boa, ideia do psicanalista Donald Winnicott: nenhuma mãe precisa ser perfeita, e cuidar é tentar de novo, do seu jeito. Separou brincadeiras para o chá, do 'Adivinhe a fruta' à foto de quando cada um era bebê. Descobriu que a melodia da fala, com o ritmo e o sotaque da família, atravessa a barriga. Conheceu a propriocepção, que guia o dedo até o nariz de olhos fechados. E encontrou a mãe escondida das fotos do século 19, um lembrete para revezar a câmera e aparecer também. Pronta para revisar?",
     "funFact": "Na semana que vem, a fruta do app vira uma manga grande, com cerca de 28,9 cm e 501 g, e a tabela lembra que o bebê pode soluçar lá dentro.",
     "questions": [
       {
@@ -3504,23 +3501,27 @@
       },
       {
         "type": "choice",
-        "q": "Na ideia da mãe suficientemente boa, o que conta mais do que a perfeição?",
-        "o": ["A presença", "A casa sempre arrumada", "Saber todas as respostas"],
-        "a": 0,
-        "why": "Para Winnicott, o bebê não precisa de perfeição: precisa de presença, de alguém que erra, acerta e tenta de novo."
+        "q": "Na ideia da mãe suficientemente boa, o que vale mais do que a perfeição?",
+        "o": [
+          "Ter a casa sempre arrumada",
+          "Saber todas as respostas",
+          "Tentar de novo, do seu jeito"
+        ],
+        "a": 2,
+        "why": "Para Winnicott, nenhuma mãe precisa ser perfeita: cuidar é errar, acertar e tentar de novo, do seu jeito."
       },
       {
         "type": "multi",
         "q": "Marque as ideias desta semana para o chá e para as fotos (marque todas):",
         "o": [
           "Ficar sempre de fora das fotos",
-          "O barbante da barriga",
+          "Adivinhe a fruta, com a fruta do app",
           "De quem é esta foto?",
           "A dança das cadeiras",
           "Revezar a câmera para você aparecer também"
         ],
         "a": [1, 2, 4],
-        "why": "O barbante da barriga e a foto de quando cada um era bebê animam o chá, e revezar a câmera tira você do lugar da mãe escondida. A dança das cadeiras não apareceu nesta semana."
+        "why": "O 'Adivinhe a fruta' e a foto de quando cada um era bebê animam o chá, e revezar a câmera tira você do lugar da mãe escondida. A dança das cadeiras não apareceu nesta semana."
       },
       {
         "type": "choice",
@@ -3543,8 +3544,8 @@
     ]
   },
   "161": {
-    "teach": "Semana 23: os soluços lá de dentro. Com cerca de 28,9 cm e 501 g, o bebê tem o tamanho de uma manga grande, a fruta da semana no app. E a tabela lembra uma curiosidade: o bebê pode soluçar dentro do útero. O soluço vem de longe: aparece ainda no 1º trimestre, por volta da semana 9, como um dos primeiros movimentos do bebê. Quem faz o soluço é o diafragma, aquele músculo dos ensaios de respiração, que se contrai de repente, num pulinho ritmado. Aqui fora, o soluço vem com o famoso 'hic'; lá dentro, é silencioso, feito só de pulinhos. Uma manga grande, cheia de pulinhos silenciosos.",
-    "funFact": "A manga é parente do caju e do pistache: os três são da mesma família de plantas, a das anacardiáceas.",
+    "teach": "Semana 23: os soluços lá de dentro. Com cerca de 28,9 cm e 501 g, o bebê tem o tamanho de uma manga grande, a fruta da semana no app. E a tabela lembra uma curiosidade: o bebê pode soluçar dentro do útero. O soluço vem de longe: aparece bem cedo, ainda no 1º trimestre, como um dos primeiros movimentos do bebê. Quem faz o soluço é o diafragma, aquele músculo dos ensaios de respiração, que se contrai de repente, num pulinho ritmado. Aqui fora, o soluço vem com o famoso 'hic'; lá dentro, é silencioso, feito só de pulinhos. Uma manga grande, cheia de pulinhos silenciosos.",
+    "funFact": "A manga veio da Índia, onde é a fruta nacional, e chegou ao Brasil trazida pelos portugueses.",
     "questions": [
       {
         "type": "multi",
@@ -3563,12 +3564,12 @@
         "type": "choice",
         "q": "Desde quando o bebê pode soluçar, segundo a aula?",
         "o": [
-          "Desde o 1º trimestre, por volta da semana 9",
+          "Desde o 1º trimestre, bem cedinho",
           "Só a partir desta semana 23",
           "Só depois de nascer, já aqui fora"
         ],
         "a": 0,
-        "why": "O soluço vem de longe: aparece ainda no 1º trimestre, por volta da semana 9, como um dos primeiros movimentos do bebê."
+        "why": "O soluço vem de longe: aparece bem cedo, ainda no 1º trimestre, como um dos primeiros movimentos do bebê."
       },
       {
         "type": "choice",
@@ -3586,15 +3587,19 @@
       },
       {
         "type": "choice",
-        "q": "Segundo a curiosidade da fruta, de quem a manga é parente?",
-        "o": ["Da maçã e da pera", "Do caju e do pistache", "Da banana e do abacaxi"],
+        "q": "Segundo a curiosidade, de onde veio a manga?",
+        "o": [
+          "Da Itália, junto com os imigrantes",
+          "Da Índia, onde é a fruta nacional",
+          "Do Japão, onde é a fruta do verão"
+        ],
         "a": 1,
-        "why": "Manga, caju e pistache são da mesma família de plantas, a das anacardiáceas."
+        "why": "A manga veio da Índia, onde é a fruta nacional, e chegou ao Brasil trazida pelos portugueses."
       }
     ]
   },
   "162": {
-    "teach": "Um projeto feito à mão para a espera. Crochê, tricô, bordado, pintura, colagem: um projeto feito à mão pode ser para o bebê, como uma mantinha ou um quadrinho para o cantinho, ou só para você, pelo gosto de criar. O crochê se faz com uma agulha só, de ponta curvinha; o tricô, com duas. E não precisa ficar perfeito: o pontinho torto, a cor que saiu diferente e a peça que levou o triplo do tempo também contam a história de quem fez, e é isso que deixa tudo especial. Quem nunca pegou numa agulha pode aprender junto, com uma avó, uma amiga ou um vídeo, e cada encontro vira programa, conversa e risada. Uma ideia: anotar num papelzinho quando você começou e quando terminou, e guardar junto com a peça, como a etiqueta da sua história.",
+    "teach": "Um projeto feito à mão para a espera. Crochê, tricô, bordado, pintura, colagem: um projeto feito à mão pode ser para o bebê, como uma mantinha ou um quadrinho para o cantinho do bebê, ou só para você, pelo gosto de criar. O crochê se faz com uma agulha só, de ponta curvinha; o tricô, com duas. E não precisa ficar perfeito: o pontinho torto, a cor que saiu diferente e a peça que levou o triplo do tempo também contam a história de quem fez, e é isso que deixa tudo especial. Quem nunca pegou numa agulha pode aprender junto, com uma avó, uma amiga ou um vídeo, e cada encontro vira programa, conversa e risada. Uma ideia: anotar num papelzinho quando você começou e quando terminou, e guardar junto com a peça, como a etiqueta da sua história.",
     "funFact": "'Crochê' vem do francês crochet, que quer dizer ganchinho: é o formato da ponta da agulha.",
     "questions": [
       {
@@ -3640,7 +3645,7 @@
   },
   "163": {
     "teach": "O guia da casa para quem vem ajudar. Se alguém vier dar uma mão depois da chegada do bebê, como a sua mãe, uma amiga ou um irmão, um guia da casa faz essa ajuda render sem mil perguntas. É uma folha simples, presa na porta da geladeira. Nela entra onde ficam as coisas do bebê, como as fraldas e as roupinhas, e as da casa, como as panelas, os panos de prato e a vassoura. Depois vêm os detalhes que poupam perguntas: a senha do wi-fi, o cantinho do café, o dia de pôr o lixo para fora, onde ficam as chaves. No topo da folha, um recadinho de boas-vindas, como 'que bom ter você aqui!', deixa quem chega à vontade desde o primeiro minuto. Escrito com calma agora, o guia fica prontinho para quando a casa estiver cheia de novidade.",
-    "funFact": "Em Portugal, a geladeira se chama frigorífico, e o ímã que segura os bilhetes na porta é chamado de íman.",
+    "funFact": "O amarelo dos post-its, os bloquinhos de recado que grudam e descolam, foi um acaso: o laboratório vizinho só tinha papel amarelo à mão.",
     "questions": [
       {
         "type": "choice",
@@ -3686,10 +3691,14 @@
       },
       {
         "type": "choice",
-        "q": "Como se chama a geladeira em Portugal?",
-        "o": ["Congelador", "Armário frio", "Frigorífico"],
-        "a": 2,
-        "why": "Em Portugal, a geladeira é o frigorífico, e o ímã da porta vira íman."
+        "q": "Segundo a curiosidade, por que os post-its nasceram amarelos?",
+        "o": [
+          "Porque o amarelo é a cor mais fácil de ler",
+          "Porque o laboratório vizinho só tinha papel amarelo",
+          "Porque um pintor famoso escolheu a cor"
+        ],
+        "a": 1,
+        "why": "Foi um acaso: o laboratório vizinho só tinha papel amarelo à mão, e o amarelo ficou."
       }
     ]
   },
@@ -3753,8 +3762,8 @@
     ]
   },
   "165": {
-    "teach": "Cada filhote espera num mundo diferente. O do seu bebê é a piscina lá de dentro, onde o bebê cresce a gestação inteira. Na natureza, há outros jeitos de esperar. O gambá, bicho bem conhecido no Brasil, é marsupial: o filhote nasce miudinho, do tamanho de uma abelha, sobe sozinho até a bolsa da mãe, o marsúpio, e termina de crescer ali, mamando, por algumas semanas. O pintinho cresce dentro do ovo e, um ou dois dias antes de sair, já pia lá dentro, e a galinha responde do lado de fora. E o ornitorrinco é um mamífero que põe ovos: quando os filhotes saem da casca, lambem o leite direto da pele da barriga da mãe. Piscina, bolsa ou ovo: cada filhote tem o seu primeiro mundo.",
-    "funFact": "O gambá muda de nome pelo Brasil: também é chamado de saruê, mucura ou timbu, conforme a região.",
+    "teach": "Cada filhote espera num mundo diferente. O do seu bebê é a piscina lá de dentro, onde o bebê cresce a gestação inteira. Na natureza, há outros jeitos de esperar. O gambá, bicho bem conhecido no Brasil, é marsupial: o filhote nasce miudinho, do tamanho de uma abelha, sobe sozinho até a bolsa da mãe, o marsúpio, e termina de crescer ali, mamando, por cerca de dois meses. O pintinho cresce dentro do ovo e, um ou dois dias antes de sair, já pia lá dentro, e a galinha responde do lado de fora. E o ornitorrinco é um mamífero que põe ovos: quando os filhotes saem da casca, lambem o leite direto da pele da barriga da mãe. Piscina, bolsa ou ovo: cada filhote tem o seu primeiro mundo.",
+    "funFact": "O pintinho nasce com um dente de ovo, uma pontinha dura no bico que ajuda a quebrar a casca e cai pouco tempo depois.",
     "questions": [
       {
         "type": "choice",
@@ -3772,7 +3781,7 @@
         "q": "Onde o filhote do gambá termina de crescer?",
         "o": ["Num ninho de folhas", "Num ovo enterrado", "Na bolsa da mãe, o marsúpio"],
         "a": 2,
-        "why": "O gambá é marsupial: o filhote sobe sozinho até a bolsa da mãe, o marsúpio, e termina de crescer ali, mamando."
+        "why": "O gambá é marsupial: o filhote sobe sozinho até a bolsa da mãe, o marsúpio, e termina de crescer ali, mamando, por cerca de dois meses."
       },
       {
         "type": "multi",
@@ -3800,15 +3809,19 @@
       },
       {
         "type": "choice",
-        "q": "Segundo a curiosidade, por quais outros nomes o gambá é chamado no Brasil?",
-        "o": ["Saruê, mucura e timbu", "Tatu, paca e cutia", "Capivara, quati e preá"],
+        "q": "Segundo a curiosidade, para que serve o dente de ovo do pintinho?",
+        "o": [
+          "Para quebrar a casca na hora de sair",
+          "Para mastigar os primeiros grãozinhos",
+          "Para piar mais alto dentro do ovo"
+        ],
         "a": 0,
-        "why": "Conforme a região, o gambá também é saruê, mucura ou timbu."
+        "why": "O dente de ovo é uma pontinha dura no bico que ajuda o pintinho a quebrar a casca, e cai pouco tempo depois."
       }
     ]
   },
   "166": {
-    "teach": "O livro de mensagens para o bebê. Escolha um caderno bonito e deixe que passe de mão em mão: no chá de bebê, nas visitas, nos encontros de família. Cada pessoa deixa ali um recado, um desenho ou um desejo para o futuro do bebê. A avó pode contar o passeio que sonha fazer junto, o tio pode desenhar a fruta da semana, uma amiga pode escrever a música que quer apresentar ao bebê. Para ficar organizado, vale reservar uma página por pessoa, sempre com o nome e a data, e prender uma caneta ao caderno, para ninguém precisar procurar. E o caderno não precisa parar por aí: pode voltar a circular a cada aniversário do bebê, ganhando páginas novas a cada ano. Um dia, folhear esse livro vai ser como reencontrar todas as vozes que esperaram com carinho.",
+    "teach": "O livro de mensagens para o bebê. Escolha um caderno bonito e deixe que passe de mão em mão: no chá de bebê, nas visitas, nos encontros de família. Cada pessoa deixa ali um recado, um desenho ou um carinho para o bebê. A avó pode contar como foi esperar os próprios filhos, o tio pode desenhar a fruta da semana, uma amiga pode copiar a letra de uma música que lembra vocês. Para ficar organizado, vale reservar uma página por pessoa, sempre com o nome e a data, e prender uma caneta ao caderno, para ninguém precisar procurar. E o caderno pode circular de novo em cada encontro da espera, como o chá ou um almoço de família, ganhando páginas novas. Folhear esse livro é reencontrar todas as vozes que esperaram com carinho.",
     "funFact": "No século 16, estudantes das universidades alemãs carregavam um 'album amicorum', o álbum dos amigos, em que colegas e professores deixavam recados, assinaturas e desenhos.",
     "questions": [
       {
@@ -3829,11 +3842,11 @@
           "Um recado",
           "Um ingresso de cinema",
           "Um desenho",
-          "Um desejo para o futuro do bebê",
+          "Um carinho para o bebê",
           "Uma moeda antiga"
         ],
         "a": [0, 2, 3],
-        "why": "Recados, desenhos e desejos para o futuro do bebê: cada página guarda o carinho de alguém. Ingressos e moedas não estavam entre as ideias da aula."
+        "why": "Recados, desenhos e carinhos para o bebê: cada página guarda o afeto de alguém. Ingressos e moedas não estavam entre as ideias da aula."
       },
       {
         "type": "choice",
@@ -3848,14 +3861,10 @@
       },
       {
         "type": "choice",
-        "q": "Quando o caderno pode voltar a circular?",
-        "o": [
-          "Só no Natal, com a família toda reunida",
-          "A cada aniversário do bebê",
-          "Só no Dia das Mães"
-        ],
+        "q": "O que vale prender ao caderno, segundo a aula?",
+        "o": ["Um cadeado pequenininho", "Uma caneta", "Um sininho"],
         "a": 1,
-        "why": "O caderno pode voltar a circular a cada aniversário do bebê, ganhando páginas novas a cada ano."
+        "why": "Uma caneta presa ao caderno poupa a procura: quem pegar o livro já pode escrever."
       },
       {
         "type": "choice",
@@ -3872,7 +3881,7 @@
   },
   "167": {
     "teach": "Revisão da semana 23: dos soluços aos recados. Foi uma semana de mãos ocupadas e de gente por perto. O bebê, do tamanho de uma manga grande, pode soluçar lá dentro, como faz desde o 1º trimestre: um pulinho ritmado do diafragma, silencioso. Você pensou num projeto feito à mão, em que o pontinho torto também conta a história. Preparou o guia da casa, com a senha do wi-fi e um recadinho de boas-vindas. Olhou para a rede do bairro, da vizinha ao pessoal da padaria, e pensou em chamar outra gestante de perto para as Amigas do app. Conheceu outros primeiros mundos: a bolsa do gambá, o ovo em que o pintinho já pia e o ornitorrinco, mamífero que põe ovos. E criou o livro de mensagens, que passa de mão em mão. Pronta para revisar?",
-    "funFact": "Na semana que vem, o milho volta à tela do app: com cerca de 30 cm e 600 g, o bebê vai ganhando peso e ficando mais forte a cada dia.",
+    "funFact": "Na semana que vem, o milho volta à tela do app: a figurinha da semana 24 marca cerca de 30 cm e 600 g na tabela.",
     "questions": [
       {
         "type": "choice",
@@ -3926,7 +3935,7 @@
     ]
   },
   "168": {
-    "teach": "Semana 24: mais forte a cada dia. O bebê tem cerca de 30 cm e 600 g, mais ou menos o tamanho de um milho, e, como o app conta nesta semana, está ganhando peso e ficando mais forte a cada dia. Os músculos vão ganhando força, e o corpinho, que até pouco tempo atrás era bem magrinho, começa a se preencher: por baixo da pele, uma camadinha de gordura vai se formando. Nas próximas semanas, essa camadinha vai deixando a pele menos transparente e as formas mais arredondadas. E chega uma novidade ao app: a partir desta semana, você encontra os Movimentos do bebê, para contar e guardar as mexidinhas quando quiser, do seu jeito e sem meta nenhuma. A ferramenta fica ali, à sua espera, para quando der vontade.",
+    "teach": "Semana 24: um corpinho que vai se preenchendo. O bebê tem cerca de 30 cm e 600 g, mais ou menos o tamanho de um milho, e, como o app conta nesta semana, está ganhando peso e ficando mais forte a cada dia. O corpinho, que até pouco tempo atrás era bem magrinho, começa a se preencher: por baixo da pele, uma camadinha de gordura vai se formando. Nas próximas semanas, essa camadinha vai deixando a pele menos transparente e as formas mais arredondadas. E chega uma novidade ao app: a partir desta semana, você encontra os Movimentos do bebê, para registrar as mexidinhas quando quiser, do seu jeito e sem meta nenhuma. A ferramenta fica ali, à sua espera, para quando der vontade.",
     "funFact": "Nem todo milho vira pipoca: só o grão do milho-pipoca tem uma casca dura que segura o vapor lá dentro até estourar.",
     "questions": [
       {
@@ -3934,20 +3943,20 @@
         "q": "Na semana 24, com cerca de 30 cm e 600 g, o bebê tem o tamanho de quê, no app?",
         "o": ["Uma manga", "Um milho", "Uma couve-flor"],
         "a": 1,
-        "why": "Na semana 24, o app mostra um milho: cerca de 30 cm e 600 g de bebê ficando mais forte a cada dia."
+        "why": "Na semana 24, o app mostra um milho: cerca de 30 cm e 600 g."
       },
       {
         "type": "multi",
         "q": "Marque tudo que a aula contou sobre o bebê nesta semana:",
         "o": [
           "Já pesa cerca de um quilo",
-          "Os músculos vão ganhando força",
+          "O corpinho, antes bem magrinho, começa a se preencher",
           "A pele já ficou lisinha e sem transparência",
           "Uma camadinha de gordura vai se formando por baixo da pele",
-          "Está ganhando peso a cada dia"
+          "As formas vão ficando mais arredondadas"
         ],
         "a": [1, 3, 4],
-        "why": "Os músculos ganham força, a camadinha de gordura vai se formando e o peso aumenta a cada dia. A pele ainda vai ficar menos transparente nas próximas semanas, e os cerca de 600 g estão longe de um quilo."
+        "why": "O corpinho começa a se preencher: a camadinha de gordura vai se formando e, nas próximas semanas, deixa as formas mais arredondadas. A pele ainda vai ficar menos transparente, e os cerca de 600 g estão longe de um quilo."
       },
       {
         "type": "choice",
@@ -3966,10 +3975,10 @@
         "o": [
           "Para escolher o nome do bebê com a família",
           "Para montar a lista do enxoval aos poucos",
-          "Para contar as mexidinhas quando você quiser"
+          "Para registrar as mexidinhas quando você quiser"
         ],
         "a": 2,
-        "why": "Nos Movimentos do bebê, você conta e guarda as mexidinhas quando quiser, do seu jeito e sem meta nenhuma."
+        "why": "Nos Movimentos do bebê, você registra as mexidinhas quando quiser, do seu jeito e sem meta nenhuma."
       },
       {
         "type": "choice",
@@ -4075,7 +4084,7 @@
           "Molduras da mesma cor, lado a lado"
         ],
         "a": 1,
-        "why": "Com o nome e o parentesco embaixo de cada foto, o mural fica pronto para você contar ao bebê quem é cada pessoa."
+        "why": "Com o nome e o parentesco embaixo de cada foto, cada rosto ganha a sua história e o seu laço."
       },
       {
         "type": "choice",
@@ -4098,19 +4107,15 @@
     ]
   },
   "171": {
-    "teach": "Como vamos dividir o cuidado? Essa é uma conversa gostosa de ter antes de o bebê chegar, com quem vai cuidar junto com você: o parceiro, a parceira, a avó, alguém da casa. Dá para começar listando as tarefas do dia a dia, como lavar as roupinhas, trocar fraldas, fazer o mercado, cuidar da louça e passear com o cachorro. Depois, cada um conta o que gosta de fazer e o que acha mais difícil: tem quem adore lavar roupinha e quem prefira cuidar das compras. Assim, a divisão nasce mais justa e mais leve para todo mundo. E nada fica gravado em pedra: os combinados podem ser revistos sempre que a rotina mudar. Uma ideia é registrar tudo numa nota compartilhada no celular e marcar uma conversa leve, uma vez por mês, para ajustar o que for preciso.",
+    "teach": "Como vamos dividir o cuidado? Essa é uma conversa gostosa de ter antes de o bebê chegar, com quem vai cuidar junto com você: o parceiro, a parceira, a avó, alguém da casa. Dá para começar listando as tarefas do dia a dia, como lavar as roupinhas, trocar fraldas, fazer o mercado, cuidar da louça e passear com o cachorro. Depois, cada um conta o que gosta de fazer e o que acha mais difícil: tem quem adore lavar roupinha e quem prefira cuidar das compras. Se o dia a dia vai ser mais seu, a mesma lista mostra em que a sua rede pode entrar. E nada fica gravado em pedra: os combinados podem ser revistos sempre que a rotina mudar. Uma ideia é registrar tudo numa nota compartilhada no celular e marcar uma conversa leve, uma vez por mês, para ajustar o que for preciso.",
     "funFact": "'Combinar' vem do latim combinare, palavra formada por com, que quer dizer junto, e bini, dois a dois. Ao pé da letra, combinar é juntar de dois em dois.",
     "questions": [
       {
         "type": "choice",
-        "q": "Com quem vale ter a conversa sobre dividir o cuidado?",
-        "o": [
-          "Só com quem já tem filhos",
-          "Com quem vai cuidar junto com você",
-          "Com ninguém: o melhor é decidir sozinha"
-        ],
-        "a": 1,
-        "why": "A conversa é com quem vai cuidar junto: o parceiro, a parceira, a avó ou alguém da casa."
+        "q": "Segundo a aula, quando vale ter essa conversa?",
+        "o": ["Antes de o bebê chegar", "Só se alguém reclamar", "Só com o enxoval pronto"],
+        "a": 0,
+        "why": "A conversa é gostosa de ter antes de o bebê chegar, com calma, e os combinados podem ser revistos sempre."
       },
       {
         "type": "multi",
@@ -4134,7 +4139,7 @@
           "O que gosta de fazer e o que acha difícil"
         ],
         "a": 2,
-        "why": "Contar o que gosta e o que acha difícil ajuda a divisão a nascer mais justa e mais leve."
+        "why": "Contar o que gosta e o que acha difícil ajuda a dividir o cuidado de um jeito mais justo e mais leve."
       },
       {
         "type": "multi",
@@ -4143,10 +4148,10 @@
           "Nunca mais mudar o que foi decidido",
           "Registrar tudo numa nota compartilhada no celular",
           "Marcar uma conversa leve, uma vez por mês",
-          "Deixar cada um decidir sozinho a sua parte"
+          "Guardar os combinados só de cabeça"
         ],
         "a": [1, 2],
-        "why": "A nota no celular guarda os combinados, e a conversa leve todo mês ajusta o que for preciso. A ideia é decidir junto e rever sempre que a rotina mudar."
+        "why": "A nota no celular guarda os combinados, e a conversa leve todo mês ajusta o que for preciso. Nada fica gravado em pedra, nem só de cabeça."
       },
       {
         "type": "choice",
@@ -4158,7 +4163,7 @@
     ]
   },
   "172": {
-    "teach": "O rostinho do bebê ensaia caretas. Lá dentro, pesquisadores observaram expressões variadas, e nesta fase tudo acontece de olhos fechados: a testa que franze, a boca que abre e fecha, os lábios que se mexem e, de vez em quando, algo parecido com um sorriso. E tem mais: o bebê também boceja e se espreguiça, esticando o corpinho como quem acaba de acordar. Espreguiçar, aliás, vem de preguiça: é como tirar a preguiça do corpo. O que essas caretas querem dizer, ninguém sabe ao certo. Uma boa aposta é que sejam treinos dos músculos do rosto, que aqui fora vão contar tudo sem precisar de palavras: a surpresa, a vontade de colo, a risada. Por enquanto, é um ensaio sem plateia: dá para imaginar cada careta aí dentro, no tempo do bebê.",
+    "teach": "O rostinho do bebê ensaia caretas. Lá dentro, pesquisadores observaram expressões variadas, e nesta fase tudo acontece de olhos fechados: a testa que franze, a boca que abre e fecha, os lábios que se mexem e, de vez em quando, algo parecido com um sorriso. E tem mais: o bebê também boceja e se espreguiça, esticando o corpinho como quem acaba de acordar. Espreguiçar, aliás, vem de preguiça: é como tirar a preguiça do corpo. O que essas caretas querem dizer, ninguém sabe ao certo. Uma boa aposta é que sejam treinos dos músculos do rosto, os mesmos que, na gente, contam tudo sem precisar de palavras: a surpresa, a dúvida, a risada. Por enquanto, é um ensaio sem plateia: dá para imaginar cada careta aí dentro, no tempo do bebê.",
     "funFact": "Bocejo pega: ver alguém bocejar, e às vezes até ler sobre bocejos, dá vontade de bocejar também. Se você bocejou agora, já sabe por quê.",
     "questions": [
       {
@@ -4196,7 +4201,7 @@
           "Ainda ninguém sabe ao certo"
         ],
         "a": 2,
-        "why": "Ninguém sabe ao certo. Uma boa aposta é que sejam treinos dos músculos do rosto, que aqui fora vão falar sem palavras."
+        "why": "Ninguém sabe ao certo. Uma boa aposta é que sejam treinos dos músculos do rosto, os mesmos que, na gente, falam sem palavras."
       },
       {
         "type": "choice",
@@ -4208,7 +4213,7 @@
     ]
   },
   "173": {
-    "teach": "Cada mês tem a sua pedra e a sua flor. A lista moderna das pedras do mês nasceu em 1912, quando uma associação de joalheiros dos Estados Unidos organizou as pedras de cada mês do ano: a granada é de janeiro, a esmeralda, de maio, e a safira, de setembro, por exemplo. As flores do mês costumam ser ligadas à linguagem das flores, que virou febre na Inglaterra da era vitoriana, no século 19, quando cada flor carregava um recado. Nas listas mais conhecidas, a violeta é de fevereiro e a rosa, de junho. Que tal pesquisar a pedra e a flor do mês em que vocês esperam o bebê, e as do mês vizinho também, para garantir? A pedra e a flor podem inspirar a paleta do cantinho, um quadrinho, o convite do chá de bebê ou um presente para guardar de lembrança.",
+    "teach": "Cada mês tem a sua pedra e a sua flor. A lista moderna das pedras do mês nasceu em 1912, quando uma associação de joalheiros dos Estados Unidos organizou as pedras de cada mês do ano: a granada é de janeiro, a esmeralda, de maio, e a safira, de setembro, por exemplo. As flores do mês costumam ser ligadas à linguagem das flores, que virou febre na Inglaterra da era vitoriana, no século 19, quando cada flor carregava um recado. Nas listas mais conhecidas, a violeta é de fevereiro e a rosa, de junho. Que tal pesquisar a pedra e a flor do mês em que vocês esperam o bebê, e as do mês vizinho também, para garantir? A pedra e a flor podem inspirar a paleta do cantinho do bebê, um quadrinho, o convite do chá de bebê ou um presente para guardar de lembrança.",
     "funFact": "A pérola, uma das pedras de junho, nem é pedra de verdade: nasce dentro de ostras e de outros moluscos, camada por camada.",
     "questions": [
       {
@@ -4247,11 +4252,11 @@
         "q": "Segundo a aula, o que a pedra e a flor do mês podem inspirar?",
         "o": [
           "A data de contar a novidade à família",
-          "O horário das visitas depois da chegada",
-          "A paleta do cantinho e o convite do chá"
+          "A ordem das brincadeiras do chá",
+          "A paleta do cantinho do bebê e o convite do chá"
         ],
         "a": 2,
-        "why": "A paleta do cantinho, o convite do chá, um quadrinho ou um presente para guardar ganham um toque especial com a pedra e a flor do mês."
+        "why": "A paleta do cantinho do bebê, o convite do chá, um quadrinho ou um presente para guardar ganham um toque especial com a pedra e a flor do mês."
       },
       {
         "type": "choice",
@@ -4267,12 +4272,12 @@
     ]
   },
   "174": {
-    "teach": "Revisão da semana 24: do milho às flores. O bebê chegou a cerca de 30 cm e 600 g, o tamanho de um milho, e segue ficando mais forte a cada dia, com uma camadinha de gordura se formando por baixo da pele. E você descobriu que nem todo milho vira pipoca. Ganhou o convite de fazer o retrato de um dia comum, à mão e cheio de detalhes pequenos, e soube que 'cotidiano' vem de quotidianus, de todos os dias. Pensou num mural de rostos queridos, com o nome e o parentesco embaixo de cada foto, e conheceu o sobreiro, a árvore da cortiça. Conversou sobre como dividir o cuidado, com combinados que podem ser revistos sempre. Espiou as caretas do bebê, que boceja e se espreguiça como quem acaba de acordar, e, para fechar, passeou pelas pedras do mês, da lista de 1912, e pela linguagem das flores.",
-    "funFact": "Na semana que vem, a fruta do app vira a couve-flor: o bebê terá cerca de 34,6 cm e 660 g, e o cabelo vai começar a ganhar cor.",
+    "teach": "Revisão da semana 24: do milho às flores. O bebê chegou a cerca de 30 cm e 600 g, o tamanho de um milho, com uma camadinha de gordura se formando por baixo da pele. E você descobriu que nem todo milho vira pipoca. Ganhou o convite de fazer o retrato de um dia comum, à mão e cheio de detalhes pequenos, e soube que 'cotidiano' vem de quotidianus, de todos os dias. Pensou num mural de rostos queridos, com o nome e o parentesco embaixo de cada foto, e conheceu o sobreiro, a árvore da cortiça. Conversou sobre como dividir o cuidado, com combinados que podem ser revistos sempre. Espiou as caretas do bebê, que boceja e se espreguiça como quem acaba de acordar, e, para fechar, passeou pelas pedras do mês, da lista de 1912, e pela linguagem das flores.",
+    "funFact": "Na semana que vem, a figurinha do app vira a couve-flor, que na tabela marca cerca de 34,6 cm e 660 g, e a novidade é a cor do cabelo.",
     "questions": [
       {
         "type": "choice",
-        "q": "Na revisão: o que começa a se formar por baixo da pele do bebê na semana 24?",
+        "q": "Na revisão: o que vai se formando por baixo da pele do bebê nesta fase?",
         "o": ["Uma camadinha de gordura", "Uma casquinha dura", "Uma camada de verniz cremoso"],
         "a": 0,
         "why": "Uma camadinha de gordura vai se formando por baixo da pele, e o corpinho vai se preenchendo."
@@ -4305,7 +4310,7 @@
         "type": "choice",
         "q": "Nesta semana, que movimentos do bebê lembraram alguém que acaba de acordar?",
         "o": [
-          "Os soluços e os chutinhos",
+          "Os soluços e os ensaios de respiração",
           "As viradas e as cambalhotas na piscina",
           "Os bocejos e as espreguiçadas"
         ],
@@ -4341,7 +4346,7 @@
           "O lanugo, a penugem fininha que cobre o corpo"
         ],
         "a": 0,
-        "why": "É a melanina, produzida aos pouquinhos na raiz de cada fio, que pinta o cabelo, a pele e os olhos."
+        "why": "É a melanina, produzida aos pouquinhos na raiz de cada fio, que pinta o cabelo; o mesmo pigmento dá cor à pele e aos olhos."
       },
       {
         "type": "multi",
@@ -4370,15 +4375,19 @@
     ]
   },
   "176": {
-    "teach": "Já pensou em escrever o manual de você? Além do seu rosto e da sua voz, o bebê vai conhecer o seu jeito: a sua risada, as suas manias, as músicas que você canta pela casa, as piadas que só a sua família entende. A ideia é um manual bem-humorado, para o bebê ler um dia, com capítulos como os de um manual de verdade: 'manias de fábrica', com o seu jeito de dobrar as meias ou de arrumar a cama; 'trilha sonora', com a música do chuveiro; 'como me fazer rir', com a piada que só você acha engraçada; e 'frases que eu sempre digo'. Vale pedir ajuda a quem conhece você bem, porque essa pessoa costuma se lembrar de uma mania que você nem notava. Escreva sem pressa, com o bom humor de quem se olha com carinho, e guarde junto com as cartas e as lembranças da espera.",
+    "teach": "Já pensou em escrever o manual de você? Nesta fase, com tanta coisa mudando, vale registrar o que é bem seu: a sua risada, as suas manias, as músicas que você canta pela casa, as piadas que só a sua família entende. A ideia é um manual bem-humorado do seu jeito, com capítulos como os de um manual de verdade: 'manias de fábrica', com o seu jeito de dobrar as meias ou de arrumar a cama; 'trilha sonora', com a música do chuveiro; 'como me fazer rir', com a piada que só você acha engraçada; e 'frases que eu sempre digo'. Vale pedir ajuda a quem conhece você bem, porque essa pessoa costuma se lembrar de uma mania que você nem notava. Escreva sem pressa, com o bom humor de quem se olha com carinho, e guarde junto com as cartas e as lembranças da espera.",
     "funFact": "A palavra 'humor' vem do latim umor, que quer dizer líquido: os antigos achavam que o temperamento das pessoas dependia dos líquidos do corpo. Daí nasceram o bom e o mau humor.",
     "questions": [
       {
         "type": "choice",
-        "q": "Além do rosto e da voz, o que o bebê vai conhecer de você, segundo a aula?",
-        "o": ["Só a sua letra", "O seu jeito de ser", "Só as suas roupas"],
+        "q": "Que tom a aula sugere para o manual de você?",
+        "o": [
+          "Sério, como um documento oficial",
+          "Bem-humorado, de quem se olha com carinho",
+          "Cheio de regras para todo mundo seguir"
+        ],
         "a": 1,
-        "why": "O bebê vai conhecer o seu jeito inteiro: a risada, as manias, as músicas da casa e as piadas da família."
+        "why": "A ideia é um manual bem-humorado, escrito sem pressa e com o carinho de quem se olha com bons olhos."
       },
       {
         "type": "multi",
@@ -4425,7 +4434,7 @@
         "type": "choice",
         "q": "O que é o trem de refeições?",
         "o": [
-          "Um passeio de trem para comemorar a chegada",
+          "Uma brincadeira de trenzinho no chá de bebê",
           "Um revezamento de refeições prontas",
           "Um caderno de receitas da família"
         ],
@@ -4470,7 +4479,7 @@
     ]
   },
   "178": {
-    "teach": "Agora é a sua vez de acolher quem chega. Com mais da metade do caminho andado, você já tem histórias para contar a quem está no comecinho da jornada e ainda vai colecionar os próprios momentos. Na Comunidade do app, dá para dividir as suas: a primeira roupinha que você comprou, uma brincadeira que deu certo com a família, o que fez você rir nesta semana. Para quem acabou de chegar, ler histórias assim é ganhar companhia para a estrada. E o jeito também acolhe: um momento seu contado com um 'comigo foi assim' abre a conversa, enquanto 'você tem que' fecha a porta. Cada gestante vive a espera do seu jeito, e a sua história fica ali como um exemplo possível, nunca como regra. Que tal, hoje, dar as boas-vindas a alguém que postou pela primeira vez? Você lembra bem como era ser a novata.",
+    "teach": "Agora é a sua vez de acolher quem chega. Com mais da metade do caminho andado, você já tem histórias para contar a quem está no comecinho da jornada. Na Comunidade do app, dá para dividir as suas: um jeitinho que a família inventou para conversar com a barriga, uma brincadeira que deu certo em casa, o que fez você rir nesta semana. Para quem acabou de chegar, ler histórias assim é ganhar companhia para a estrada. E o jeito também acolhe: um momento seu contado com um 'comigo foi assim' abre a conversa, enquanto 'você tem que' fecha a porta. Cada gestante vive a espera do seu jeito, e a sua história fica ali como um exemplo possível, nunca como regra. Que tal, hoje, dar as boas-vindas a alguém que contou que acabou de chegar? Você lembra bem como era ser a novata.",
     "funFact": "'Veterana' vem do latim veteranus, de vetus, que quer dizer velho, antigo. Em Roma, veteranos eram os soldados com muitos anos de serviço; hoje, a palavra vale para quem já tem estrada para contar.",
     "questions": [
       {
@@ -4478,13 +4487,13 @@
         "q": "Marque histórias que a aula sugere dividir na Comunidade (marque todas):",
         "o": [
           "Uma lista de regras para todas seguirem",
-          "A primeira roupinha que você comprou",
+          "Um jeitinho que a família inventou para conversar com a barriga",
           "Um passo a passo do que toda gestante deve fazer",
-          "Uma brincadeira que deu certo com a família",
+          "Uma brincadeira que deu certo em casa",
           "O que fez você rir nesta semana"
         ],
         "a": [1, 3, 4],
-        "why": "Roupinha, brincadeira e o que fez você rir são momentos que fazem companhia. Regras e passo a passo para todas não combinam com a Comunidade: cada uma vive a espera do seu jeito."
+        "why": "O jeitinho de conversar com a barriga, a brincadeira e o que fez você rir são momentos que fazem companhia. Regras e passo a passo para todas não combinam com a Comunidade: cada uma vive a espera do seu jeito."
       },
       {
         "type": "choice",
@@ -4514,7 +4523,7 @@
     ]
   },
   "179": {
-    "teach": "Debaixo das pálpebras, os olhinhos correm. Lembra que, por volta da semana 16, os olhos do bebê começaram a se mexer devagar, com as pálpebras fechadas? Agora esses movimentos lentos ganham companhia: por volta destas semanas, pesquisadores observaram também movimentos rápidos dos olhos, de um lado para o outro, sem que as pálpebras se abram. Esses movimentos rápidos lembram muito os dos olhos de quem está no sono em que a gente mais sonha. Será que o bebê sonha? Ninguém sabe, e talvez seja bonito deixar essa pergunta no ar, como um segredo só do bebê. O que dá para dizer é que, mesmo com as pálpebras fechadinhas, os olhinhos seguem nesse vaivém delicado, que ninguém de fora percebe.",
+    "teach": "Debaixo das pálpebras, os olhinhos correm. Lembra que, por volta da semana 16, os olhos do bebê começaram a se mexer devagar, com as pálpebras fechadas? Agora esses movimentos lentos ganham companhia: por volta destas semanas, pesquisadores observaram também movimentos rápidos dos olhos, de um lado para o outro, sem que as pálpebras se abram. Esses movimentos rápidos lembram muito os dos olhos de quem está no sono em que a gente mais sonha. Será que o bebê sonha? Ninguém sabe, e talvez seja bonito deixar essa pergunta no ar, como um segredo só do bebê. O que dá para dizer é que, mesmo com as pálpebras fechadinhas, os olhinhos seguem nesse vaivém delicado, no tempo do bebê.",
     "funFact": "A sigla REM, do sono em que a gente mais sonha, vem do inglês rapid eye movement, movimento rápido dos olhos. Esse sono foi descrito em 1953 pelos pesquisadores Eugene Aserinsky e Nathaniel Kleitman, nos Estados Unidos.",
     "questions": [
       {
@@ -4543,10 +4552,10 @@
           "Nesta semana, as pálpebras já estão abertas",
           "Os movimentos rápidos acontecem com as pálpebras fechadas",
           "Já se sabe com o que o bebê sonha",
-          "Dá para sentir de fora o vaivém dos olhinhos"
+          "Os movimentos rápidos já existem desde a semana 16"
         ],
         "a": [0, 2],
-        "why": "Os olhos se mexem devagar desde por volta da semana 16 e agora também depressa, sempre com as pálpebras fechadas. Se o bebê sonha ninguém sabe, e esse vaivém ninguém de fora percebe."
+        "why": "Os olhos se mexem devagar desde por volta da semana 16 e, agora, também depressa, sempre com as pálpebras fechadas. E se o bebê sonha, ninguém sabe."
       },
       {
         "type": "choice",
@@ -4562,7 +4571,7 @@
     ]
   },
   "180": {
-    "teach": "Uma lembrança viva, que cresce junto. Pode ser uma muda num vaso ou uma árvore no quintal da família, plantada nesta espera e crescendo devagarinho, como uma página viva da história de vocês. A escolha da planta pode ter significado: uma flor típica da cidade de vocês, uma das frutas da jornada, como a manga, o abacate ou o limão, ou a árvore preferida de alguém querido. Dá para escolher a planta desde já e chamar para o plantio quem tem mão boa para plantas. Se não houver quintal, um vaso na janela ou um cantinho no jardim dos avós também servem. E uma plaquinha com a data do plantio e um recadinho guarda o dia em que essa história começou a criar raízes.",
+    "teach": "Uma lembrança viva, que cresce devagarinho. Pode ser uma muda num vaso ou uma árvore no quintal da família, plantada nesta espera, como uma página viva da história de vocês. A escolha da planta pode ter significado: uma flor típica da cidade de vocês, uma das frutas da jornada, como a manga, o abacate ou o limão, ou a árvore preferida de alguém querido. Dá para escolher a planta desde já e chamar para o plantio quem tem mão boa para plantas. Se não houver quintal, um vaso na janela ou um cantinho no jardim dos avós também servem. E uma plaquinha com a data do plantio e um recadinho guarda o dia em que essa história começou a criar raízes.",
     "funFact": "O pau-brasil, cuja madeira cor de brasa deu nome ao país, foi declarado árvore nacional por lei em 1978.",
     "questions": [
       {
@@ -4611,14 +4620,14 @@
   },
   "181": {
     "teach": "Revisão da semana 25: do cabelinho à muda. O bebê chegou a cerca de 34,6 cm e 660 g, o tamanho de uma couve-flor, e o cabelo começou a ganhar cor, pintado pela melanina, o mesmo pigmento da pele e dos olhos. Você soube que couve-flor, brócolis, repolho e couve são da mesma espécie de planta. Ganhou a ideia de escrever o manual de você, com manias de fábrica, trilha sonora e piadas, e descobriu que 'humor' vem de umor, líquido. Conheceu o trem de refeições e os vales de ajuda, presentes de tempo para depois que o bebê chegar. Viu que um momento seu contado com um 'comigo foi assim' acolhe quem está chegando. Espiou os olhinhos que correm debaixo das pálpebras e terminou com uma lembrança viva, plantada nesta espera, e com o pau-brasil, a árvore nacional.",
-    "funFact": "Na semana que vem, a fruta do app vira um pé de alface: o bebê terá cerca de 35,6 cm e 760 g, e os olhinhos vão começar a abrir.",
+    "funFact": "Na semana que vem, a figurinha do app vira o pé de alface, que na tabela marca cerca de 35,6 cm e 760 g, e a novidade está nos olhinhos.",
     "questions": [
       {
         "type": "choice",
         "q": "Na revisão: quem pinta os fios do cabelo do bebê?",
         "o": ["O lanugo da pele", "O vernix cremoso", "A melanina dos fios"],
         "a": 2,
-        "why": "É a melanina, produzida na raiz de cada fio, que pinta o cabelo, a mesma que colore a pele e os olhos."
+        "why": "É a melanina, produzida na raiz de cada fio, que pinta o cabelo; o mesmo pigmento dá cor à pele e aos olhos."
       },
       {
         "type": "multi",
@@ -4736,7 +4745,7 @@
   },
   "184": {
     "teach": "Quem vai saber primeiro da chegada do bebê? Pensar nisso desde já deixa o grande dia mais leve. Comece por uma lista: quem recebe a notícia logo de cara, como os avós, os irmãos ou a amiga mais próxima, e quem fica encarregado de espalhar para o resto, como a tia que avisa o grupo da família ou a madrinha que conta para as amigas. Depois, deixe pronto um rascunho de mensagem ou de cartão de anúncio, com espaços para completar na hora: o nome, a data e uma foto. Pode ser uma frase simples, como 'chegou quem a gente tanto esperava', guardada no celular. Assim, no grande dia, ninguém precisa pensar em mil mensagens: a notícia segue a corrente combinada e, ao contrário do telefone sem fio, chega inteirinha a cada pessoa. E vocês ficam livres para viver o momento.",
-    "funFact": "Na família real britânica, a chegada de um bebê é anunciada, por tradição, com um aviso escrito colocado num cavalete, no pátio em frente ao Palácio de Buckingham.",
+    "funFact": "No Brasil, muitas famílias penduram na porta do quarto da maternidade um enfeite com o nome do bebê: é o primeiro aviso, para quem chega, de quem acabou de chegar.",
     "questions": [
       {
         "type": "choice",
@@ -4769,14 +4778,14 @@
       },
       {
         "type": "choice",
-        "q": "Como a família real britânica, por tradição, anuncia a chegada de um bebê?",
+        "q": "Segundo a curiosidade desta aula, o que muitas famílias brasileiras penduram na porta do quarto da maternidade?",
         "o": [
-          "Com um aviso num cavalete, diante do palácio",
-          "Com balões coloridos soltos sobre o rio Tâmisa",
-          "Com uma faixa pendurada na torre do relógio"
+          "Um enfeite com o nome do bebê",
+          "Uma foto da barriga da última semana",
+          "Um sininho para quem chegar tocar"
         ],
         "a": 0,
-        "why": "Por tradição, um aviso escrito é colocado num cavalete, no pátio em frente ao Palácio de Buckingham."
+        "why": "Muitas famílias penduram na porta do quarto um enfeite com o nome do bebê: o primeiro aviso, para quem chega, de quem acabou de chegar."
       }
     ]
   },
@@ -4810,16 +4819,20 @@
       },
       {
         "type": "choice",
-        "q": "Verdadeiro ou falso: vocês têm o direito de dizer 'agora não' a uma visita, com carinho.",
-        "o": ["Verdadeiro", "Falso"],
-        "a": 0,
-        "why": "Verdadeiro: o encontro fica para outro dia, e o afeto continua o mesmo."
+        "q": "Se alguém quiser ajudar, o que esta aula diz que já serve aqui também?",
+        "o": [
+          "Um presente para cada visita",
+          "O guia da casa e os vales de ajuda",
+          "Uma lista de espera para as visitas"
+        ],
+        "a": 1,
+        "why": "O guia da casa e os vales de ajuda, que você já conheceu, servem aqui também, para quem quiser dar uma mão."
       },
       {
         "type": "choice",
         "q": "Que ideia esta aula dá para organizar as visitas?",
         "o": [
-          "Uma lista de espera, por ordem de chegada",
+          "Um cartaz na porta com os horários livres",
           "Um dia fixo da semana só para visitas",
           "Uma pessoa de confiança cuidando da agenda"
         ],
@@ -4877,7 +4890,7 @@
     ]
   },
   "187": {
-    "teach": "Algumas lembranças cabem numa caixinha. No Japão, muitas famílias guardam um pedacinho seco do cordão umbilical numa caixinha de madeira, como lembrança da ligação entre a mãe e o bebê. Em muitos lugares, também é tradição guardar o primeiro cachinho de cabelo cortado, num envelope ou num potinho, com a data escrita à mão. Que tal escolher desde já a caixinha das primeiras lembranças do bebê? Pode ser de madeira, de papelão encapado ou uma lata bonita, decorada por você ou por alguém querido. Lá dentro vão caber o primeiro sapatinho, a pulseirinha da maternidade, o cachinho, quando chegar a hora, e o que mais contar a história dos primeiros dias. É uma prima da cápsula do tempo: lá, o mundo de hoje; aqui, os primeiros dias do bebê.",
+    "teach": "Algumas lembranças cabem numa caixinha. No Japão, muitas famílias guardam um pedacinho seco do cordão umbilical numa caixinha de madeira, como lembrança da ligação entre a mãe e o bebê. Em muitos lugares, também é tradição guardar o primeiro cachinho de cabelo cortado, num envelope ou num potinho, com a data escrita à mão. Que tal escolher desde já a caixinha das primeiras lembranças do bebê? Pode ser de madeira, de papelão encapado ou uma lata bonita, decorada por você ou por alguém querido. Lá dentro vão caber o primeiro sapatinho, a pulseirinha da maternidade, uma carta escrita na espera e o que mais contar a história dos primeiros dias. É uma prima da cápsula do tempo: lá, o mundo de hoje; aqui, os primeiros dias do bebê.",
     "funFact": "Em japonês, o cordão umbilical se chama heso no o, algo como 'o fio do umbigo'.",
     "questions": [
       {
@@ -4909,11 +4922,11 @@
           "O primeiro sapatinho",
           "A pulseirinha da maternidade",
           "Os brinquedos que não couberem no quarto",
-          "O cachinho, quando chegar a hora",
+          "Uma carta escrita na espera",
           "As fraldas que sobrarem"
         ],
         "a": [0, 1, 3],
-        "why": "O primeiro sapatinho, a pulseirinha da maternidade e o cachinho contam a história dos primeiros dias. Brinquedos e fraldas que sobram ficam para outro canto da casa."
+        "why": "O primeiro sapatinho, a pulseirinha da maternidade e uma carta escrita na espera contam a história do começo. Brinquedos e fraldas que sobram ficam para outro canto da casa."
       },
       {
         "type": "choice",
@@ -4926,18 +4939,18 @@
   },
   "188": {
     "teach": "Revisão da semana 26: os olhinhos se abrindo! Do tamanho de um pé de alface, com cerca de 35,6 cm e 760 g, o bebê começou a abrir os olhinhos, com uma cor que ainda pode mudar. Você conheceu a palavra da semana, um título para o que sentiu, e a roda das emoções, em que as emoções básicas se misturam como cores. Na preparação, entrou a notícia da chegada: quem sabe primeiro, quem espalha para o resto e um rascunho pronto para completar na hora. Depois vieram os combinados carinhosos para as visitas: avisar antes, visitas curtinhas, uma pessoa de confiança na agenda e o direito de dizer 'agora não'. No mundo do bebê, a mielina está deixando os recados dos nervos mais rápidos. E a semana fechou com a caixinha das lembranças, do cordão guardado no Japão ao primeiro cachinho.",
-    "funFact": "Na semana que vem, a fruta do app vira uma berinjela: com cerca de 36,6 cm e 875 g, o bebê reconhece a sua voz.",
+    "funFact": "Na semana que vem, a figurinha do app vira a berinjela, que na tabela marca cerca de 36,6 cm e 875 g, e a novidade é sobre a sua voz.",
     "questions": [
       {
         "type": "choice",
-        "q": "Qual destas novidades foi a do bebê na semana 26?",
+        "q": "Pela tabela do app, qual foi a novidade do bebê na semana 26?",
         "o": [
           "As sobrancelhas se formaram",
           "Os olhinhos começaram a abrir",
-          "O esqueleto começou a endurecer"
+          "O cabelo começou a ganhar cor"
         ],
         "a": 1,
-        "why": "Pela tabela do app, a novidade da semana 26 são os olhinhos começando a abrir. As sobrancelhas se formaram na semana 21, e o esqueleto começou a endurecer na 17."
+        "why": "Pela tabela do app, a novidade da semana 26 são os olhinhos começando a abrir. As sobrancelhas formadas foram o destaque da semana 21, e o cabelo ganhando cor, o da semana 25."
       },
       {
         "type": "multi",
@@ -4959,8 +4972,8 @@
           "Visitas de surpresa, sem avisar antes",
           "Uma lista de quem sabe primeiro e de quem espalha a notícia",
           "Uma pessoa de confiança cuidando da agenda das visitas",
-          "Uma festa no primeiro dia em casa, com toda a família",
-          "Uma caixinha para o primeiro cachinho e outras lembranças"
+          "Um mural com fotos de quem vem visitar",
+          "Uma caixinha para as primeiras lembranças do bebê"
         ],
         "a": [1, 2, 4],
         "why": "A lista da notícia, a pessoa de confiança na agenda das visitas e a caixinha das lembranças foram ideias da semana. Nos combinados, a visita sempre avisa antes."
@@ -5070,7 +5083,7 @@
     ]
   },
   "191": {
-    "teach": "Já pensou na roupinha da saída? No Brasil, escolher a roupa com que o bebê sai da maternidade é uma tradição cheia de carinho: é a roupa do primeiro passeio, e muitas famílias capricham na escolha. Uma dica prática é separar dois tamanhos, como o RN e o P, porque o tamanho certinho só se descobre na hora. Vale também escolher uma manta ou um casaquinho que combine com a roupinha: esse conjunto costuma aparecer em muitas fotos. Dá para escolher com calma, com quem está ao seu lado ou num passeio com uma amiga, e deixar tudo separado num saquinho, pronto para levar. Depois, muitas famílias guardam a roupinha junto com a foto do primeiro passeio, e o conjunto vira uma das lembranças mais bonitas dos primeiros dias.",
+    "teach": "Já pensou na roupinha da saída? No Brasil, escolher a roupa com que o bebê sai da maternidade é uma tradição cheia de carinho: é a roupa do primeiro passeio, e muitas famílias capricham na escolha. Uma dica prática é separar dois tamanhos, como o RN e o P, porque o tamanho certinho só se descobre na hora. Vale também escolher uma manta ou um casaquinho que combine com a roupinha. Dá para escolher com calma, com quem está ao seu lado ou num passeio com uma amiga, e deixar tudo separado num saquinho, pronto para levar. Depois, muitas famílias guardam a roupinha junto com a foto do primeiro passeio, e o conjunto vira uma das lembranças mais bonitas dos primeiros dias.",
     "funFact": "Nos Estados Unidos, a roupinha da saída também é tradição e tem nome próprio: coming home outfit, algo como 'a roupa de chegar em casa'.",
     "questions": [
       {
@@ -5079,7 +5092,7 @@
         "o": [
           "A roupa do primeiro passeio do bebê",
           "A roupa que você usa no chá de bebê",
-          "Uma fantasia para o primeiro aniversário"
+          "A fantasia da festa da metade"
         ],
         "a": 0,
         "why": "A roupinha da saída é a roupa com que o bebê sai da maternidade: a roupa do primeiro passeio."
@@ -5165,7 +5178,7 @@
     ]
   },
   "193": {
-    "teach": "Os sentidos do bebê amadurecem em fila. Cada um tem a sua vez, numa ordem que pesquisadores descrevem há décadas. O primeiro da fila é o tato, como você viu lá no 1º trimestre. Depois vem o equilíbrio, aquele do labirinto, que percebe os giros. Em seguida vêm o paladar e o olfato, quase juntinhos. Depois é a vez da audição, que neste trimestre foi ganhando espaço até o bebê reconhecer a sua voz. E a visão é a última a amadurecer: a luz já chegava de mansinho pelas pálpebras desde a semana 15, mas só agora, nesta reta final do trimestre, os olhinhos começaram a abrir. Que tal contar essa ordem nos dedos de uma mão? Tato, equilíbrio, paladar e olfato, audição e, no dedo mindinho, a visão.",
+    "teach": "Os sentidos do bebê amadurecem em fila. Cada um tem a sua vez, numa ordem que pesquisadores descrevem há décadas. O primeiro da fila é o tato, como você viu lá no 1º trimestre. Depois vem o equilíbrio, aquele do labirinto, que percebe os giros. Em seguida vêm o paladar e o olfato, quase juntinhos. Depois é a vez da audição, que neste trimestre foi ganhando espaço até o bebê reconhecer a sua voz. E a visão é a última a amadurecer: lá na semana 15, a tabela do app contou que o bebê pode sentir a luz através das pálpebras, mas só agora, nesta reta final do trimestre, os olhinhos começaram a abrir. Que tal contar essa ordem nos dedos de uma mão? Tato, equilíbrio, paladar e olfato, audição e, no dedo mindinho, a visão.",
     "funFact": "Em 1971, o psicólogo americano Gilbert Gottlieb notou que essa mesma ordem dos sentidos se repete em aves e em outros mamíferos.",
     "questions": [
       {
@@ -5173,7 +5186,7 @@
         "q": "Segundo esta aula, qual sentido é o último a amadurecer?",
         "o": ["A audição", "O tato", "A visão"],
         "a": 2,
-        "why": "A visão é a última a amadurecer: a luz já chegava pelas pálpebras, mas os olhinhos só agora começaram a abrir."
+        "why": "A visão é a última a amadurecer: a tabela já contava da luz através das pálpebras na semana 15, mas os olhinhos só agora começaram a abrir."
       },
       {
         "type": "choice",
@@ -5209,7 +5222,7 @@
     ]
   },
   "194": {
-    "teach": "Luz, câmera, entrevista do trimestre! A ideia é gravar, em vídeo ou em áudio, uma entrevista com você mesma. As perguntas são cinco. Que cor tem este trimestre? O que mais surpreendeu você? Qual é o apelido da barriga agora? Que música não sai da sua cabeça? Que lugar combina com esta fase? Quem está ao seu lado também pode responder. E o mais divertido vem depois: lá pela semana 37, o app traz as mesmas perguntas de volta, e dá para comparar as respostas, as caras e as risadas. Cada gravação vira uma lembrança de como vocês estavam naquele momento. E o fim do 2º trimestre merece festa: o app também celebra essa travessia, com um marco especial. Que tal deixar a câmera pronta?",
+    "teach": "Luz, câmera, entrevista do trimestre! A ideia é gravar, em vídeo ou em áudio, uma entrevista com você mesma. As perguntas são cinco. Que cor tem este trimestre? O que mais surpreendeu você? Qual é o apelido da barriga agora? Que música não sai da sua cabeça? Que lugar combina com esta fase? Quem está ao seu lado também pode responder. E o mais divertido vem depois: lá pela semana 37, vale gravar de novo, com as mesmas perguntas, e comparar as respostas, as caras e as risadas. Cada gravação vira uma lembrança de como vocês estavam naquele momento. E o fim do 2º trimestre merece festa: o app também celebra essa travessia, com um marco especial. Que tal deixar a câmera pronta?",
     "funFact": "Uma das gravações de voz mais antigas que se conhecem é de 1860: o francês Édouard-Léon Scott de Martinville registrou alguém cantando 'Au clair de la lune', e o som só pôde ser ouvido em 2008.",
     "questions": [
       {
@@ -5238,14 +5251,14 @@
       },
       {
         "type": "choice",
-        "q": "Além de você, quem esta aula sugere que também responda à entrevista?",
+        "q": "Em que formatos a aula sugere gravar a entrevista?",
         "o": [
-          "Só as amigas da Comunidade, por mensagem",
-          "Ninguém mais: a entrevista é só sua",
-          "Quem está ao seu lado"
+          "Só por escrito, num caderno",
+          "Só em fotos, uma por pergunta",
+          "Em vídeo ou em áudio"
         ],
         "a": 2,
-        "why": "Quem está ao seu lado também pode responder, e as respostas viram uma lembrança divertida de vocês."
+        "why": "A entrevista é gravada em vídeo ou em áudio, e cada gravação vira uma lembrança de como vocês estavam naquele momento."
       },
       {
         "type": "choice",
@@ -5261,8 +5274,8 @@
     ]
   },
   "195": {
-    "teach": "Revisão da semana 27: até logo, 2º trimestre! Do tamanho de uma berinjela, com cerca de 36,6 cm e 875 g, o bebê já reconhece a sua voz, de tanto ouvi-la. Foi semana de reler as três intenções da semana 14 e escolher uma para levar adiante, e de pensar na roupinha da saída, com dois tamanhos separados. Você viu que dá para inventar uma canção com o nome ou o apelido do bebê, verso por verso, e conheceu a ordem em que os sentidos amadurecem, do tato à visão. A entrevista do trimestre fechou a semana, com perguntas que voltam lá pela semana 37. Olhando para trás, foram 14 semanas de descobertas: do limão-siciliano à berinjela, das primeiras intenções às caixinhas de lembranças. Você atravessou uma fase inteira, um dia de cada vez. Na semana 28, começa o 3º trimestre. Vamos juntas?",
-    "funFact": "Pela tabela do app, do limão-siciliano da semana 14 à berinjela da semana 27, o peso do bebê ficou cerca de 20 vezes maior: de 43 g para 875 g.",
+    "teach": "Revisão da semana 27: até logo, 2º trimestre! Do tamanho de uma berinjela, com cerca de 36,6 cm e 875 g, o bebê já reconhece a sua voz, de tanto ouvi-la. Foi semana de reler as três intenções da semana 14 e escolher uma para levar adiante, e de pensar na roupinha da saída, com dois tamanhos separados. Você viu que dá para inventar uma canção com o nome ou o apelido do bebê, verso por verso, e conheceu a ordem em que os sentidos amadurecem, do tato à visão. E a semana fechou com a entrevista do trimestre: cinco perguntas para gravar agora e, lá pela semana 37, gravar de novo e comparar. Um fecho bonito para uma fase inteira, vivida um dia de cada vez. Vamos juntas para o 3º trimestre?",
+    "funFact": "Na semana que vem, a 28, começa o 3º trimestre, e a figurinha do app vira uma abóbora.",
     "questions": [
       {
         "type": "multi",
@@ -5272,10 +5285,10 @@
           "O bebê já reconhece a sua voz",
           "Quem mora longe pode mandar o seu verso por mensagem",
           "A entrevista do trimestre só pode ser gravada em vídeo",
-          "As perguntas da entrevista voltam lá pela semana 37"
+          "Lá pela semana 37, vale gravar a entrevista de novo"
         ],
         "a": [1, 2, 4],
-        "why": "O bebê reconhece a sua voz, a canção aceita versos mandados de longe e as perguntas da entrevista voltam lá pela semana 37. A canção não exige rima perfeita, e a entrevista pode ser em vídeo ou em áudio."
+        "why": "O bebê reconhece a sua voz, a canção aceita versos mandados de longe e, lá pela semana 37, vale gravar a entrevista de novo, com as mesmas perguntas. A canção não exige rima perfeita, e a entrevista pode ser em vídeo ou em áudio."
       },
       {
         "type": "multi",
