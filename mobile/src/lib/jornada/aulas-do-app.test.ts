@@ -22,7 +22,10 @@ const APP = { ...T1, ...T2 } as unknown as Record<string, DailyQuiz>;
  * Os trimestres já trocados: neles, o banco inteiro (app + o que ficou do site)
  * é cobrado. Entra aqui o trimestre cujas aulas chegaram ao banco do app.
  */
-const TROCADOS: readonly [number, number][] = [[7, 97]];
+const TROCADOS: readonly [number, number][] = [
+  [7, 97],
+  [98, 195],
+];
 
 const PROIBIDAS =
   /\b(m[eé]dic[oa]s?|rem[eé]dios?|suplement\w*|[aá]cido f[oó]lico|vitaminas?|vacinas?|exames?|ultrass\w*|consultas?|consultar|aborto|abortamento|riscos?|sangr\w*|enj[oô]o\w*|n[aá]usea\w*|azia|dietas?|[aá]lcool|cigarros?|fumar|cafe[ií]na|doen[cç]as?|infec[cç]\w*|pr[eé]-ecl[aâ]mpsia|diabetes|glicemia|press[aã]o arterial|press[aã]o alta|sintomas?|viabilidade|malforma\w*|hormon\w*|progesterona|hcg|beta-?hcg)\b/i;
@@ -86,6 +89,32 @@ describe("o banco de aulas do app", () => {
           comPalavra.push(`D${D}${APP[String(D)] ? "" : " (site)"}: ${[...new Set(m)].join(", ")}`);
       }
     expect(comPalavra).toEqual([]);
+  });
+
+  test("o tamanho da opção não entrega a resposta (no máximo 40% para cada lado, por trimestre)", () => {
+    /* A primeira leva do 2º trimestre tinha a certa como a opção mais longa em
+       dois terços das perguntas: dava para acertar sem ler a aula. Corrigida às
+       pressas, ela virou a mais curta — a mesma pista ao contrário. */
+    const acima: string[] = [];
+    for (const [de, ate] of TROCADOS) {
+      let escolhas = 0;
+      let longas = 0;
+      let curtas = 0;
+      for (let D = de; D <= ate; D++)
+        for (const q of APP[String(D)]?.questions ?? []) {
+          if (q.type !== "choice" || q.o.join("|").toLowerCase() === "verdadeiro|falso") continue;
+          escolhas++;
+          const t = q.o.map((o) => o.length);
+          const certa = t[q.a as number]!;
+          if (certa === Math.max(...t) && t.filter((x) => x === certa).length === 1) longas++;
+          if (certa === Math.min(...t) && t.filter((x) => x === certa).length === 1) curtas++;
+        }
+      if (longas > 0.4 * escolhas)
+        acima.push(`D${de}–${ate}: a mais longa em ${longas} de ${escolhas}`);
+      if (curtas > 0.4 * escolhas)
+        acima.push(`D${de}–${ate}: a mais curta em ${curtas} de ${escolhas}`);
+    }
+    expect(acima).toEqual([]);
   });
 
   test("nunca 'ele' ou 'ela' para o bebê nas aulas do app", () => {
