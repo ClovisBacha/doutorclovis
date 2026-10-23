@@ -4405,7 +4405,7 @@
       },
       {
         "type": "multi",
-        "q": "Marque o que apareceu nas aulas da semana 13 (marque todas):",
+        "q": "Marque as frases que estão de acordo com as aulas da semana 13 (marque todas):",
         "o": [
           "O bebê já escuta tudo o que acontece fora",
           "A mão pousada na barriga já é, de certo modo, um primeiro colo",
@@ -4414,7 +4414,7 @@
           "A cóclea é enroladinha como a concha de um caracol"
         ],
         "a": [1, 2, 4],
-        "why": "O primeiro colo da mão na barriga, os extensores de botão e a cóclea em formato de caracol foram temas da semana; a audição ainda vai despertar, e as cordas vocais esperam em silêncio."
+        "why": "A mão na barriga como primeiro colo, os extensores de botão e a cóclea enroladinha como a concha de um caracol estão de acordo com as aulas; já o bebê ainda não escuta, e as cordas vocais se formam em silêncio, sem vibrar."
       },
       {
         "type": "choice",
