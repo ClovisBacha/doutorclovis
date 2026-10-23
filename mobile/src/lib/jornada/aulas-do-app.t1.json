@@ -2725,34 +2725,35 @@
     ]
   },
   "62": {
-    "teach": "Revisão da semana 8! O embrião chegou a cerca de 1,6 cm e 1 g, o tamanho de uma framboesa. As mãozinhas, que pareciam remos, ganharam os sulcos dos dedinhos, que começam a se separar, e os braços passaram a dobrar nos cotovelos. Você viu que as redes mostram só um recorte, que cada gestação tem o próprio ritmo e que as histórias das outras podem inspirar sem virar régua. Em casa, a ideia foi destralhar aos poucos, uma gaveta por vez, doando, vendendo ou trocando. As crianças ganharam espaço com desenhos, cartinhas, livros e pequenas missões. Lá dentro, você descobriu um lugar quentinho e de penumbra, sem dia e noite, que recebe sinais do seu ritmo pela placenta. E viajou com o godh bharai da Índia, o hara-obi do Japão e a blessingway do povo navajo. Parabéns por mais uma semana!",
+    "teach": "Revisão da semana 8! O embrião chegou a cerca de 1,6 cm e 1 g, o tamanho de uma framboesa. As mãozinhas, que pareciam remos, ganharam os sulcos dos dedinhos, e os braços passaram a dobrar nos cotovelos. Você viu que as redes mostram só um recorte, que cada família e cada jornada têm o próprio ritmo e que as histórias das outras podem inspirar sem virar régua. Em casa, a ideia foi destralhar aos poucos, uma gaveta por vez. As crianças da família entraram na história com desenhos e cartinhas para o bebê, livros e pequenas missões. Lá dentro, você descobriu um lugar quentinho e de penumbra, sem dia nem noite, que recebe sinais do seu ritmo pela placenta, como a melatonina. E viajou com o godh bharai da Índia, o hara-obi do Japão e a blessingway do povo navajo. Parabéns por mais uma semana!",
     "funFact": "A framboesa, a fruta desta semana, é formada por dezenas de bolinhas grudadas, e cada bolinha guarda a sua própria sementinha.",
     "questions": [
       {
         "type": "choice",
         "q": "O que as mãozinhas do embrião ganharam na semana 8?",
-        "o": ["Os sulcos dos dedinhos", "Unhas compridas", "As linhas das digitais"],
-        "a": 0,
+        "o": ["Unhas compridas", "Os sulcos dos dedinhos", "As linhas das digitais"],
+        "a": 1,
         "why": "As mãozinhas, que pareciam remos, ganharam os sulcos que marcam onde vão ficar os dedinhos."
       },
       {
         "type": "multi",
         "q": "O que você viu nas aulas desta semana? (marque todas)",
         "o": [
+          "Cada família e cada jornada têm o próprio ritmo",
           "Lá dentro existe dia e noite, como aqui fora",
-          "As redes sociais mostram só um recorte da vida das outras",
           "As crianças ficam de fora até o bebê chegar",
-          "Destralhar dá certo aos poucos, uma gaveta por vez"
+          "Destralhar dá certo aos poucos, uma gaveta por vez",
+          "As redes sociais mostram só um recorte da vida das outras"
         ],
-        "a": [1, 3],
-        "why": "As redes mostram só um recorte, e destralhar dá certo aos poucos. Lá dentro não existe dia e noite, e as crianças ganharam pequenas missões para participar da espera."
+        "a": [0, 3, 4],
+        "why": "Cada família e cada jornada têm o próprio ritmo, as redes mostram só um recorte e destralhar dá certo aos poucos. Lá dentro não existe dia nem noite, e as crianças ganharam pequenas missões na espera."
       },
       {
         "type": "choice",
         "q": "Nas aulas desta semana, como você viu que é o lugar onde o bebê cresce?",
-        "o": ["Frio e bem iluminado", "Quentinho e de penumbra", "Muda de temperatura toda hora"],
-        "a": 1,
-        "why": "Lá dentro é quentinho, mais ou menos como o centro do seu corpo, com um calorzinho bem estável e pouca luz."
+        "o": ["Quentinho e de penumbra", "Frio e bem iluminado", "Fresquinho e cheio de sol"],
+        "a": 0,
+        "why": "Lá dentro é quentinho, mais ou menos como o centro do seu corpo, e é um lugar de penumbra, quase escuro."
       },
       {
         "type": "choice",
@@ -3344,7 +3345,7 @@
     ]
   },
   "76": {
-    "teach": "O bebê chegou a cerca de 3,1 cm e 4 g, o tamanho de um morango, com os órgãos principais formados e começando a trabalhar, os brotinhos dos dentes de leite escondidos na gengiva e o esqueleto endurecendo aos poucos. Você conheceu o microquimerismo: algumas células do bebê passam para o corpo da mãe e já foram encontradas décadas depois da gestação. Viu como montar um enxoval econômico com brechós, bazares, peças emprestadas e uma lista de presentes, e como escolher uma música da família, repetida ao longo dos meses até virar a trilha sonora da espera. Descobriu que o tato é o primeiro sentido a despertar, começando ao redor da boquinha. E viajou pelos sobrenomes, dos portugueses terminados em -es, que queriam dizer filho de alguém, aos islandeses com -son e -dóttir. Hora de revisar!",
+    "teach": "O bebê tem cerca de 3,1 cm e 4 g, o tamanho de um morango: os órgãos principais, já formados, começam a trabalhar, os brotinhos dos dentes de leite ficam escondidos na gengiva e o esqueleto endurece aos poucos. Você conheceu o microquimerismo: algumas células do bebê passam para o corpo da mãe. Viu como economizar no enxoval com brechós, bazares, empréstimos e lista de presentes, e como uma música repetida ao longo dos meses vira a trilha sonora da espera. Descobriu que o tato, primeiro sentido a despertar, começa pela boquinha. E na história das famílias, muitos sobrenomes portugueses terminados em -es queriam dizer filho de alguém, Pereira e Oliveira vêm de árvores, e em muitos países de língua espanhola cada pessoa costuma levar um sobrenome do pai e outro da mãe. Hora de revisar!",
     "funFact": "A quimera também virou palavra do dia a dia: em português, chamar algo de quimera é dizer que é um sonho fantasioso, quase impossível de alcançar.",
     "questions": [
       {
@@ -3383,10 +3384,14 @@
       },
       {
         "type": "choice",
-        "q": "O que quer dizer -dóttir nos sobrenomes da Islândia?",
-        "o": ["Filha", "Filho", "Família"],
+        "q": "Na aula dos sobrenomes, de onde vêm Pereira e Oliveira?",
+        "o": [
+          "Da árvore da pera e da árvore da azeitona",
+          "De nomes de reis antigos",
+          "De cidades da Espanha"
+        ],
         "a": 0,
-        "why": "Na Islândia, -dóttir quer dizer filha e -son quer dizer filho."
+        "why": "Pereira e Oliveira nasceram da natureza: a árvore da pera e a árvore da azeitona deram origem a esses sobrenomes."
       }
     ]
   },
@@ -3671,49 +3676,54 @@
     ]
   },
   "83": {
-    "teach": "Que semana! Na semana 11, o bebê está do tamanho de um figo, com cerca de 4,1 cm e 7 g: as unhas começam a se formar e a cabeça corresponde a cerca de metade do comprimento do corpo. Você conheceu a autocompaixão, que é tratar a si mesma com a gentileza que daria a uma amiga. Começou a imaginar o cantinho do bebê, que não precisa ser um quarto inteiro e pode nascer do que você já tem em casa. Viu que ler em voz alta é um ritual gostoso e que a primeira biblioteca pode reunir os livros da sua infância e os que chegarem de presente, com dedicatória. Descobriu que a piscina lá dentro se renova: o bebê engole pequenos goles, e o xixi volta para a bolsa. E viu que heranças afetivas, como uma manta da avó, carregam histórias, e que você também pode começar uma tradição nova.",
-    "funFact": "Na semana que vem, a fruta do app muda para o limão: com cerca de 5,4 cm e 14 g, surgem os reflexos e os dedinhos já abrem e fecham.",
+    "teach": "Na semana 11, o bebê está do tamanho de um figo, com cerca de 4,1 cm e 7 g. As unhas começam a se formar na pontinha dos dedinhos das mãos, as dos pés vêm um pouco depois, e a pele ainda é fininha e transparente. Você conheceu a autocompaixão, que é tratar a si mesma com a gentileza que daria a uma amiga. Começou a imaginar o cantinho do bebê, que não precisa ser um quarto inteiro e pode nascer do que você já tem em casa. Viu que ler em voz alta é um ritual gostoso e que a primeira biblioteca pode reunir os livros da sua infância e os que chegarem de presente, com dedicatória. Descobriu que a piscina lá dentro se renova, com goles do bebê e o xixi que volta para a bolsa. E viu que heranças afetivas, como uma manta da avó, carregam histórias, e que você pode começar uma tradição nova.",
+    "funFact": "Na semana que vem, a fruta do app muda para o limão. O bebê terá cerca de 5,4 cm e 14 g, e surgem os reflexos: os dedinhos já abrem e fecham.",
     "questions": [
       {
         "type": "choice",
-        "q": "Qual é o tamanho aproximado do bebê na semana 11, segundo o app?",
+        "q": "Por onde começam a se formar as unhas do bebê, segundo a aula da semana 11?",
         "o": [
-          "Cerca de 1,6 cm e 1 g, o tamanho de uma framboesa",
-          "Cerca de 5,4 cm e 14 g, o tamanho de um limão",
-          "Cerca de 4,1 cm e 7 g, o tamanho de um figo"
+          "Pela pontinha dos dedinhos dos pés",
+          "Pela pontinha dos dedinhos das mãos",
+          "Pelo meio da palma da mão"
         ],
-        "a": 2,
-        "why": "Na semana 11, o bebê tem cerca de 4,1 cm e 7 g, o tamanho de um figo. O limão chega na semana que vem."
+        "a": 1,
+        "why": "As unhas começam na pontinha dos dedinhos das mãos, e as dos pés seguem o mesmo caminho um pouco depois."
       },
       {
         "type": "multi",
-        "q": "Marque o que você aprendeu nesta semana (marque todas):",
+        "q": "Marque o que você reviu nesta semana 11 (marque todas):",
         "o": [
-          "As unhas do bebê já nascem prontas, até a ponta dos dedos",
-          "A piscina lá dentro se renova: o bebê engole goles, e o xixi volta para a bolsa",
+          "A pele do bebê ainda é fininha e transparente",
+          "As unhas já chegam à ponta dos dedos nesta semana",
           "Autocompaixão é tratar a si mesma como trataria uma amiga querida",
+          "O cantinho do bebê precisa ser um quarto inteiro decorado",
           "Uma herança afetiva pode começar nesta gestação"
         ],
-        "a": [1, 2, 3],
-        "why": "A piscina se renova, a autocompaixão é gentileza consigo e uma tradição nova pode nascer agora. Já as unhas estão só começando e crescem devagarinho."
+        "a": [0, 2, 4],
+        "why": "A pele é fininha, a autocompaixão é gentileza consigo e uma tradição nova pode nascer agora. Já as unhas crescem devagarinho até o fim da gestação, e um cantinho bem pensado já basta."
       },
       {
         "type": "choice",
-        "q": "Qual destas ideias combina com a aula sobre histórias em voz alta?",
+        "q": "O que a primeira biblioteca do bebê pode reunir, segundo a aula de leitura em voz alta?",
         "o": [
-          "Ler só depois que o bebê aprender a falar",
-          "Pedir livros infantis de presente, com dedicatória de quem ama o bebê",
-          "Ler sempre em silêncio, só com os olhos"
+          "Só livros lançados neste ano",
+          "Apenas livros escolhidos mais tarde pelo bebê",
+          "Os livros da sua infância e os que chegarem de presente, com dedicatória"
         ],
-        "a": 1,
-        "why": "Livros infantis são ótimos pedidos de presente, e a dedicatória de quem ama o bebê vira um recadinho para ler muitas vezes."
+        "a": 2,
+        "why": "Os livros da sua infância conectam gerações, e os que chegam de presente podem trazer uma dedicatória de quem ama o bebê."
       },
       {
         "type": "choice",
-        "q": "Verdadeiro ou falso: o cantinho do bebê pode começar pelo que você já tem em casa.",
-        "o": ["Verdadeiro", "Falso"],
+        "q": "Como a piscina do bebê se renova, segundo o que você viu nesta semana?",
+        "o": [
+          "Com goles do bebê e o xixi que volta para a bolsa",
+          "Com o ar que o bebê respira lá dentro",
+          "Não se renova, o líquido fica sempre igual"
+        ],
         "a": 0,
-        "why": "Verdadeiro. Começar pelo que você já tem economiza e dá personalidade, e tudo pode ser montado com calma nos próximos meses."
+        "why": "O bebê engole pequenos goles, os rins produzem xixi que volta para a bolsa e o seu corpo também produz o líquido: a piscina vai se renovando."
       }
     ]
   },
@@ -4379,32 +4389,43 @@
     ]
   },
   "97": {
-    "teach": "O bebê, do tamanho de uma vagem, está formando as cordas vocais, que esperam em silêncio porque lá dentro não há ar, e as linhas das impressões digitais começam a se desenhar, únicas até entre gêmeos idênticos. As orelhinhas seguem subindo até o lugar certo, enquanto por dentro se formam a cóclea e os ossinhos do ouvido; os sons, e a sua voz, ainda vão chegar. Em você, o útero começou a subir acima do osso púbico, e a barriga vai ganhando, no seu tempo, um formato todo seu, que merece entrar na série de fotos. No guarda-roupa, entraram os extensores de botão e as trocas com amigas. Nas amizades, vale conversar sobre tudo, não só a gestação, e a Comunidade soma sem substituir ninguém. E, para fechar o primeiro trimestre, um ritual com a sua cara e o desfile das frutas, da papoula à vagem.",
+    "teach": "O bebê, do tamanho de uma vagem, está formando as cordas vocais, que esperam em silêncio porque lá dentro não há ar, e as linhas das impressões digitais começam a se desenhar, únicas até entre gêmeos idênticos. As orelhinhas seguem subindo, e por dentro se formam a cóclea e os ossinhos do ouvido; os sons, e a sua voz, ainda vão chegar. Em você, a mão que pousa sozinha na barriga já é um primeiro colo, e tudo bem sentir encanto, estranheza ou os dois diante da nova silhueta. No guarda-roupa, vale usar o que você já tem, os extensores de botão e as trocas com amigas. Nas amizades, vale conversar sobre tudo, não só a gestação, e a Comunidade soma sem substituir ninguém. E, para fechar o primeiro trimestre, um ritual com a sua cara e o desfile das frutas, da papoula à vagem.",
     "funFact": "As linhas que formam as digitais não ficam só nas pontinhas dos dedos: também desenham as palmas das mãos e as solas dos pés.",
     "questions": [
       {
         "type": "choice",
         "q": "Qual destas frases sobre o bebê da semana 13 está certa?",
         "o": [
+          "As digitais começam a se desenhar",
           "As cordas vocais já fazem o bebê chorar lá dentro",
-          "As orelhas já nasceram no lugar definitivo",
-          "As digitais começam a se desenhar"
+          "As orelhas já apareceram no lugar definitivo"
         ],
-        "a": 2,
+        "a": 0,
         "why": "As linhas das digitais começam a se desenhar e são únicas; as cordas vocais se formam em silêncio, e as orelhas seguem subindo."
       },
       {
         "type": "multi",
-        "q": "Marque o que você viu nas aulas desta semana (marque todas):",
+        "q": "Marque o que apareceu nas aulas da semana 13 (marque todas):",
         "o": [
-          "O útero começa a subir acima do osso púbico",
-          "Extensores de botão ajudam a prolongar o uso das calças",
           "O bebê já escuta tudo o que acontece fora",
-          "A cóclea é enroladinha como a concha de um caracol",
-          "As cordas vocais do bebê já vibram lá dentro"
+          "A mão pousada na barriga já é, de certo modo, um primeiro colo",
+          "Extensores de botão aumentam a cintura da calça",
+          "As cordas vocais do bebê já vibram lá dentro",
+          "A cóclea é enroladinha como a concha de um caracol"
         ],
-        "a": [0, 1, 3],
-        "why": "Útero subindo, extensores de botão e a cóclea em formato de caracol foram temas da semana; a audição ainda vai despertar, e as cordas vocais esperam em silêncio."
+        "a": [1, 2, 4],
+        "why": "O primeiro colo da mão na barriga, os extensores de botão e a cóclea em formato de caracol foram temas da semana; a audição ainda vai despertar, e as cordas vocais esperam em silêncio."
+      },
+      {
+        "type": "choice",
+        "q": "Na aula sobre a nova silhueta, o que foi dito sobre se ver no espelho?",
+        "o": [
+          "Que é preciso gostar de tudo logo de primeira",
+          "Que o melhor é evitar o espelho até a barriga aparecer bem",
+          "Que tudo bem sentir encanto, estranheza ou os dois"
+        ],
+        "a": 2,
+        "why": "O olhar pode levar um tempinho para acompanhar o corpo, e o que você sente ao se ver pode mudar com as semanas."
       },
       {
         "type": "choice",
@@ -4420,16 +4441,9 @@
       {
         "type": "choice",
         "q": "Qual fruta da jornada marcou o fim do primeiro trimestre?",
-        "o": ["O figo", "O morango", "A vagem"],
-        "a": 2,
-        "why": "Na semana 13, a última do primeiro trimestre, o app mostra a vagem."
-      },
-      {
-        "type": "choice",
-        "q": "Verdadeiro ou falso: na série de fotos da barriga, vale repetir a mesma pose e o mesmo ângulo.",
-        "o": ["Verdadeiro", "Falso"],
+        "o": ["A vagem", "O figo", "O morango"],
         "a": 0,
-        "why": "Repetindo pose e ângulo, lá na frente você vê, foto a foto, como a barriga foi ganhando formato."
+        "why": "Na semana 13, a última do primeiro trimestre, o app mostra a vagem, fechando o desfile que começou na sementinha de papoula."
       }
     ]
   }
