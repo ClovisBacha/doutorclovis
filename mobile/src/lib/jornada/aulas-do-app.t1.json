@@ -644,7 +644,7 @@
     ]
   },
   "19": {
-    "teach": "Que tal montar uma cápsula do tempo para o bebê? É uma caixa com lembranças de hoje que, no futuro, vai mostrar ao bebê como era o mundo quando a espera começou. Vale guardar a notícia do dia, impressa ou recortada do jornal, o nome da música do momento, o preço de algumas coisas, como o pão, o sorvete ou a passagem de ônibus, e uma foto da sua rua, que daqui a alguns anos pode estar bem diferente. Dá para incluir também um bilhete seu, um desenho de alguém da família ou o print de uma conversa engraçada. A família pode escolher uma data especial para abrir a caixa, como um aniversário marcante de 10, 15 ou 18 anos, e escrever essa data bem grande na tampa. Guardada num lugar seco e longe do sol, a caixa vira um pequeno tesouro esperando o dia certo.",
+    "teach": "Que tal montar uma cápsula do tempo para o bebê? É uma caixa com lembranças de hoje que, no futuro, vai mostrar ao bebê como era o mundo quando a espera começou. Vale guardar a notícia do dia, impressa ou recortada do jornal, o nome da música do momento, o preço de algumas coisas, como o pão, o sorvete ou a passagem de ônibus, e uma foto da sua rua, que daqui a alguns anos pode estar bem diferente. Dá para incluir também um bilhete seu, um desenho de alguém da família ou o print de uma conversa engraçada. A família pode escolher uma data especial para abrir a caixa e escrever essa data bem grande na tampa. Guardada num lugar seco e longe do sol, a caixa vira um pequeno tesouro esperando o dia certo.",
     "funFact": "O nome 'cápsula do tempo' foi criado para uma cápsula enterrada em Nova York em 1938, no terreno da Feira Mundial de 1939, com abertura marcada para o ano 6939.",
     "questions": [
       {
@@ -675,12 +675,12 @@
         "type": "choice",
         "q": "Quando a família pode abrir a caixa?",
         "o": [
-          "Numa data especial, como os 15 anos",
+          "Numa data especial escolhida pela família",
           "Logo no dia seguinte, assim que fechar",
           "Nunca: a caixa fica fechada para sempre"
         ],
         "a": 0,
-        "why": "A família escolhe uma data especial, como um aniversário de 10, 15 ou 18 anos, e escreve na tampa."
+        "why": "A família escolhe uma data especial e escreve a data bem grande na tampa."
       },
       {
         "type": "choice",
@@ -3908,7 +3908,7 @@
     ]
   },
   "88": {
-    "teach": "Os olhinhos do bebê já se formaram e, por volta desta fase, recebem uma proteção delicada: as pálpebras se fecham por cima dos olhos, como uma cortininha. E ficam assim até o começo do terceiro trimestre, quando voltam a se abrir. Enquanto a cortina está fechada, o trabalho continua por dentro: a retina, a parte do olho que um dia vai captar a luz, segue amadurecendo no seu tempo. É como um cinema sendo montado com as cortinas fechadas, antes da estreia. Lá na frente, quando as pálpebras se abrirem, o bebê vai poder perceber a diferença entre o claro e o escuro. E, depois do nascimento, a visão continua se desenvolvendo aos pouquinhos nos primeiros meses, com o rosto de quem cuida como uma das paisagens favoritas.",
+    "teach": "Os olhinhos do bebê já se formaram e, por volta desta fase, recebem uma proteção delicada: as pálpebras se fecham por cima dos olhos, como uma cortininha. E ficam assim até o começo do terceiro trimestre, quando voltam a se abrir. Enquanto a cortina está fechada, o trabalho continua por dentro: a retina, a parte do olho que um dia vai captar a luz, segue amadurecendo no seu tempo. É como um cinema sendo montado com as cortinas fechadas, antes da estreia. E, depois do nascimento, a visão continua se desenvolvendo aos pouquinhos nos primeiros meses, com o rosto de quem cuida como uma das paisagens favoritas.",
     "funFact": "Logo depois de nascer, o bebê enxerga melhor o que está a uns 20 a 30 cm de distância, mais ou menos o caminho entre o colo e o rosto de quem segura.",
     "questions": [
       {
@@ -4049,7 +4049,7 @@
     ]
   },
   "91": {
-    "teach": "Semana 13! Com cerca de 7,4 cm e 23 g, o tamanho de uma vagem, o bebê está formando as cordas vocais. Na verdade, são duas dobrinhas na garganta. Um dia, essas dobrinhas vão vibrar com a passagem do ar para virar choro, gargalhada e, quem sabe, as primeiras palavras. Só que lá dentro não há ar: o bebê vive mergulhado no líquido da bolsa. Por isso, as cordas vocais se formam em silêncio, guardadas para quando o ar chegar. E tem outra novidade nas pontinhas dos dedos: por volta desta fase, começam a se desenhar as linhas que vão virar as impressões digitais. Esse desenho é único, só do seu bebê: nem gêmeos idênticos têm as mesmas digitais, porque o desenho também depende de pequenos detalhes lá dentro, como a posição e o toque de cada bebê.",
+    "teach": "Semana 13! Com cerca de 7,4 cm e 23 g, o tamanho de uma vagem, o bebê está formando as cordas vocais. Na verdade, são duas dobrinhas na garganta. São elas que, com a passagem do ar, vibram para fazer a voz. Só que lá dentro não há ar: o bebê vive mergulhado no líquido da bolsa. Por isso, as cordas vocais se formam em silêncio, guardadas para quando o ar chegar. E tem outra novidade nas pontinhas dos dedos: por volta desta fase, começam a se desenhar as linhas que vão virar as impressões digitais. Esse desenho é único, só do seu bebê: nem gêmeos idênticos têm as mesmas digitais, porque o desenho também depende de pequenos detalhes lá dentro, como a posição e o toque de cada bebê.",
     "funFact": "Curiosidade da fruta da semana: a vagem é o feijão colhido ainda verdinho, antes de os grãos amadurecerem. Os feijõezinhos estão lá dentro, pequenininhos.",
     "questions": [
       {

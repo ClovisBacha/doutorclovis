@@ -5,7 +5,8 @@ import { bebeDaSemana, DESCRICAO_NO_APP, retaFinalNoApp } from "~/lib/bebe-da-se
 import { FRASES_FORA_DO_APP, fraseDoDiaNoApp } from "~/lib/frase-do-dia";
 
 /** O que o app não diz mais (21/10/2026: rede social + gamificação, não conselho médico). */
-const CLINICO = /aborto|viabilidade|acompanhamento|equipe|cardioto|líquido|indução|médic/i;
+const CLINICO =
+  /aborto|viabilidade|acompanhamento|equipe|cardioto|líquido|indução|médic|sentir os movimentos/i;
 
 describe("o bebê da semana no app", () => {
   test("as trocadas ainda são, no site, o texto que foi trocado", () => {
@@ -22,7 +23,8 @@ describe("o bebê da semana no app", () => {
 
   test("o resto da semana é o do site", () => {
     expect(bebeDaSemana(24).fruit).toBe(babyForWeek(24).fruit);
-    expect(bebeDaSemana(20)).toEqual(babyForWeek(20));
+    expect(bebeDaSemana(21)).toEqual(babyForWeek(21));
+    expect(bebeDaSemana(20).size).toBe(babyForWeek(20).size);
   });
 });
 
