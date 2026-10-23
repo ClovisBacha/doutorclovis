@@ -1664,7 +1664,7 @@
     ]
   },
   "128": {
-    "teach": "A lista de presentes, agora na prática. O primeiro segredo é variar os valores: misturar coisas mais em conta, como pacotes de fraldas, meias, toalhinhas e livrinhos de pano, com itens maiores, que podem até virar um presente coletivo de um grupo de amigas. Assim, cada pessoa encontra algo que cabe no bolso. O segundo segredo é ter um lugar só: escolha uma loja, uma lista on-line ou um documento compartilhado e mande sempre o mesmo link, para a lista não se espalhar em mil mensagens. O terceiro é ir marcando o que já chegou. Um risquinho ao lado de cada item, ou a opção de marcar como comprado, evita ganhar três mantinhas iguais. E deixe espaço para a surpresa: tem gente que gosta de fugir da lista com algo feito à mão, e esse presente costuma chegar cheio de história.",
+    "teach": "A lista de presentes, agora na prática. O primeiro segredo é variar os valores: misturar coisas mais em conta, como pacotes de fraldas, meias e toalhinhas, com itens maiores, que podem até virar um presente coletivo de um grupo de amigas. Assim, cada pessoa encontra algo que cabe no bolso. O segundo segredo é ter um lugar só: escolha uma loja, uma lista on-line ou um documento compartilhado e mande sempre o mesmo link, para a lista não se espalhar em mil mensagens. O terceiro é aproveitar a lista do que já chegou: na lista de presentes, um risquinho ao lado de cada item, ou a opção de marcar como comprado, evita ganhar três mantinhas iguais. E deixe espaço para a surpresa: tem gente que gosta de fugir da lista com algo feito à mão, e esse presente costuma chegar cheio de história.",
     "funFact": "A ideia de deixar uma lista de presentes numa loja nasceu em 1924, numa loja de departamentos de Chicago, nos Estados Unidos, e no começo era só para noivas.",
     "questions": [
       {
@@ -1723,7 +1723,7 @@
     ]
   },
   "129": {
-    "teach": "Uma carta para o bebê, escrita a quatro mãos. Desta vez, quem escreve com você é quem está ao seu lado nesta espera: o parceiro, a parceira, uma avó, uma amiga querida. Há dois jeitos gostosos de fazer. No primeiro, vocês dividem o mesmo papel e vão alternando os parágrafos, cada um continuando de onde o outro parou. No segundo, cada um escreve a sua parte, e depois um responde à carta do outro, como numa troca de correspondência. Se a folha em branco travar a mão, vale começar por uma destas frases: 'o que eu senti quando soube', 'o que eu já amo em você' ou 'uma promessa boba e uma séria'. No fim, a data e a assinatura de cada um. Duas letras diferentes lado a lado, uma mais redondinha, outra mais apressada, já contam muito sobre quem espera o bebê.",
+    "teach": "Uma carta para o bebê, escrita a quatro mãos. Desta vez, quem escreve com você é quem está ao seu lado nesta espera: o parceiro, a parceira, uma avó, uma amiga querida. Há dois jeitos gostosos de fazer. No primeiro, vocês dividem o mesmo papel e vão alternando os parágrafos, cada um continuando de onde o outro parou. No segundo, cada um escreve a sua parte, e depois um responde à carta do outro, como numa troca de correspondência. Se a folha em branco travar a mão, vale começar por uma destas frases: 'o que eu senti quando soube', 'o que eu já amo em você' ou 'uma bobagem e uma coisa séria que eu quero te contar'. No fim, a data e a assinatura de cada um. Duas letras diferentes lado a lado, uma mais redondinha, outra mais apressada, já contam muito sobre quem espera o bebê.",
     "funFact": "Na música, uma peça 'a quatro mãos' é tocada por duas pessoas, lado a lado, no mesmo piano, cada uma cuidando de uma parte.",
     "questions": [
       {
@@ -1755,12 +1755,12 @@
         "o": [
           "O dia em que a gente se conheceu",
           "O que eu senti quando soube",
-          "Uma promessa boba e uma séria",
+          "Uma bobagem e uma coisa séria para contar",
           "O que eu já amo em você",
           "Tudo o que já compramos para você"
         ],
         "a": [1, 2, 3],
-        "why": "'O que eu senti quando soube', 'o que eu já amo em você' e 'uma promessa boba e uma séria' foram as sugestões para quando a folha em branco trava a mão."
+        "why": "'O que eu senti quando soube', 'o que eu já amo em você' e 'uma bobagem e uma coisa séria que eu quero te contar' foram as sugestões para quando a folha em branco trava a mão."
       },
       {
         "type": "choice",
@@ -2083,14 +2083,14 @@
         "type": "multi",
         "q": "Marque os acessórios que a aula sugeriu para contar a história nas fotos (marque todas):",
         "o": [
-          "Uma plaquinha com o número da semana",
+          "Um guarda-chuva colorido aberto",
           "Um par de sapatinhos",
           "As letras do nome ou do apelido",
           "O primeiro bichinho de pelúcia do bebê",
           "Um buquê de balões coloridos"
         ],
         "a": [1, 2, 3],
-        "why": "Sapatinhos, as letras do nome ou do apelido, flores e o primeiro bichinho de pelúcia foram as sugestões; a plaquinha e os balões não entraram nesta lista."
+        "why": "Sapatinhos, as letras do nome ou do apelido, flores e o primeiro bichinho de pelúcia foram as sugestões; o guarda-chuva e os balões não entraram nesta lista."
       },
       {
         "type": "multi",
@@ -2429,14 +2429,14 @@
       },
       {
         "type": "choice",
-        "q": "Segundo a aula, de que jeito a ficha cai?",
+        "q": "Segundo a aula, como pode ser a ficha caindo em dias alternados?",
         "o": [
-          "Sempre de uma vez só, logo no dia do positivo",
-          "Só no fim da espera, quando o enxoval fica pronto",
-          "De vários jeitos, e todos valem"
+          "Sempre do mesmo jeito, do começo ao fim",
+          "Num dia tudo parece real, no outro, sonho",
+          "Só nos dias em que a barriga é fotografada"
         ],
-        "a": 2,
-        "why": "Para algumas, a ficha cai de uma vez; para outras, aos pouquinhos ou em dias alternados. Todos esses jeitos valem."
+        "a": 1,
+        "why": "Em dias alternados, num dia tudo parece real e, no outro, parece sonho. E tudo bem viver assim."
       },
       {
         "type": "choice",
@@ -2742,7 +2742,7 @@
     ]
   },
   "147": {
-    "teach": "Semana 21: sobrancelhas e pálpebras formadas! Com cerca de 26,7 cm e 360 g, o tamanho de uma cenoura, a fruta da semana no app, o rostinho do bebê está com esses dois detalhes delicados, que a tabela destaca nesta semana. As pálpebras cobrem os olhinhos desde o 1º trimestre e seguem fechadinhas, enquanto os olhos continuam amadurecendo no seu tempo. Já as sobrancelhas vão ganhando fiozinhos finos e clarinhos: a cor do cabelo só começa a chegar mais adiante. Mesmo assim, já desenham uma moldura para o olhar. Aqui fora, as sobrancelhas têm dois trabalhos: desviar dos olhos as gotinhas de suor e de chuva e ajudar a mostrar o que a gente sente, da surpresa à concentração. Que tal desenhar no diário esse rostinho, do jeito que você imagina?",
+    "teach": "Semana 21: sobrancelhas e pálpebras formadas! Com cerca de 26,7 cm e 360 g, o tamanho de uma cenoura, a fruta da semana no app, o bebê tem no rostinho esses dois detalhes delicados, que a tabela destaca nesta semana. As pálpebras cobrem os olhinhos desde o 1º trimestre e seguem fechadinhas, enquanto os olhos continuam amadurecendo no seu tempo. Já as sobrancelhas vão ganhando fiozinhos finos e clarinhos: a cor do cabelo só começa a chegar mais adiante. Mesmo assim, já desenham uma moldura para o olhar. Aqui fora, as sobrancelhas têm dois trabalhos: desviar dos olhos as gotinhas de suor e de chuva e ajudar a mostrar o que a gente sente, da surpresa à concentração. Que tal desenhar no diário esse rostinho, do jeito que você imagina?",
     "funFact": "As primeiras cenouras cultivadas eram roxas ou amarelas. A cenoura laranja, a mais comum hoje, só apareceu séculos depois, na Europa.",
     "questions": [
       {
@@ -3312,7 +3312,7 @@
   },
   "157": {
     "teach": "A melodia da casa: o sotaque da família. Quando alguém conversa perto da barriga, as palavras chegam abafadas lá dentro, mas a música da fala atravessa: o ritmo, as subidas e descidas da voz, o cantado de cada sotaque. É parecido com ouvir uma conversa do outro lado da parede: as palavras se perdem, a melodia fica. E cada família tem a sua. Tem o sotaque de quem cresceu no interior ou na capital e o jeito de dizer as expressões da família, como 'oxente', 'bah' e 'uai': as palavras ficam aqui fora, mas a música delas chega lá dentro. Em casas com duas línguas, cada uma traz a sua música, e as duas podem fazer parte da trilha sonora do bebê. Que tal anotar no diário as expressões que só a sua família usa, e quem diz cada uma?",
-    "funFact": "Num estudo de 2009, o choro de recém-nascidos franceses tendia a uma melodia que subia, e o de alemães, a uma que descia, como a melodia da língua que ouviram na barriga.",
+    "funFact": "O português é língua oficial em nove países, espalhados por quatro continentes, e cada lugar canta as mesmas palavras do seu jeito.",
     "questions": [
       {
         "type": "choice",
@@ -3356,14 +3356,10 @@
       },
       {
         "type": "choice",
-        "q": "No estudo de 2009, o que se notou no choro dos recém-nascidos franceses e alemães?",
-        "o": [
-          "Um choro igualzinho nos dois países",
-          "Só uma diferença no volume do choro",
-          "Melodias que tendiam a lembrar a da própria língua"
-        ],
-        "a": 2,
-        "why": "O choro dos franceses tendia a uma melodia que subia, e o dos alemães, a uma que descia, como a melodia da língua de cada um."
+        "q": "Em quantos continentes o português é língua oficial, segundo a curiosidade?",
+        "o": ["Um só", "Quatro", "Dois"],
+        "a": 1,
+        "why": "O português é língua oficial em nove países, espalhados por quatro continentes, cada um com a sua melodia."
       }
     ]
   },
@@ -3490,7 +3486,7 @@
   },
   "160": {
     "teach": "Revisão da semana 22: dos sons à mãe escondida. Foi uma semana de sons, brincadeiras e encontros. O bebê, do tamanho de uma espiga de milho, reconhece sons externos: as conversas, a música e até a porta batendo já fazem parte do mundo lá dentro. Você conheceu a mãe suficientemente boa, ideia do psicanalista Donald Winnicott: nenhuma mãe precisa ser perfeita, e cuidar é tentar de novo, do seu jeito. Separou brincadeiras para o chá, do 'Adivinhe a fruta' à foto de quando cada um era bebê. Descobriu que a melodia da fala, com o ritmo e o sotaque da família, atravessa a barriga. Conheceu a propriocepção, que guia o dedo até o nariz de olhos fechados. E encontrou a mãe escondida das fotos do século 19, um lembrete para revezar a câmera e aparecer também. Pronta para revisar?",
-    "funFact": "Na semana que vem, a fruta do app vira uma manga grande, com cerca de 28,9 cm e 501 g, e a tabela lembra que o bebê pode soluçar lá dentro.",
+    "funFact": "Na semana que vem, a figurinha do app vira a manga grande, que na tabela marca cerca de 28,9 cm e 501 g, e a novidade é sobre os soluços.",
     "questions": [
       {
         "type": "choice",
@@ -4049,7 +4045,7 @@
     ]
   },
   "170": {
-    "teach": "Que tal montar um mural de rostos queridos? Separe fotos de quem faz parte da história de vocês: avós, tios, amigas, padrinhos e até o pet da casa. Imprima as fotos e prenda num varal de barbante, com pregadores, ou num quadro de cortiça, numa parede da sala ou do corredor. O segredo fica embaixo de cada foto: o nome e o parentesco e, se quiser, um detalhe carinhoso, como 'Vó Lúcia, que conta as melhores histórias' ou 'Tio Rafa, o rei do violão'. Assim, o mural vira o quem é quem da família, pronto para você contar ao bebê, um dia, quem é cada pessoa e de onde vem cada laço. Deixe espaço sobrando: o mural pode crescer junto com a família e ganhar rostos novos com o tempo.",
+    "teach": "Que tal montar um mural de rostos queridos? Separe fotos de quem faz parte da história de vocês: avós, tios, amigas, padrinhos e até o pet da casa. Imprima as fotos e prenda num varal de barbante, com pregadores, ou num quadro de cortiça, numa parede da sala ou do corredor. O segredo fica embaixo de cada foto: o nome e o parentesco e, se quiser, um detalhe carinhoso, como 'Vó Lúcia, que conta as melhores histórias' ou 'Tio Rafa, o rei do violão'. Assim, o mural vira o quem é quem da família, e cada rosto ganha a sua história e o seu laço. Deixe espaço sobrando: sempre cabe mais um rosto querido.",
     "funFact": "A cortiça é a casca do sobreiro, uma árvore que volta a criar casca depois da colheita, sem precisar ser cortada. Portugal produz cerca de metade da cortiça do mundo.",
     "questions": [
       {
@@ -4091,11 +4087,11 @@
         "q": "Segundo a aula, por que vale deixar espaço sobrando no mural?",
         "o": [
           "Para pendurar as contas da casa e os recados",
-          "Para o mural crescer junto com a família",
+          "Para sempre caber mais um rosto querido",
           "Para o mural ficar mais barato"
         ],
         "a": 1,
-        "why": "Com espaço sobrando, o mural ganha rostos novos com o tempo e cresce junto com a família."
+        "why": "Com espaço sobrando, sempre cabe mais um rosto querido no mural."
       },
       {
         "type": "choice",
@@ -4163,7 +4159,7 @@
     ]
   },
   "172": {
-    "teach": "O rostinho do bebê ensaia caretas. Lá dentro, pesquisadores observaram expressões variadas, e nesta fase tudo acontece de olhos fechados: a testa que franze, a boca que abre e fecha, os lábios que se mexem e, de vez em quando, algo parecido com um sorriso. E tem mais: o bebê também boceja e se espreguiça, esticando o corpinho como quem acaba de acordar. Espreguiçar, aliás, vem de preguiça: é como tirar a preguiça do corpo. O que essas caretas querem dizer, ninguém sabe ao certo. Uma boa aposta é que sejam treinos dos músculos do rosto, os mesmos que, na gente, contam tudo sem precisar de palavras: a surpresa, a dúvida, a risada. Por enquanto, é um ensaio sem plateia: dá para imaginar cada careta aí dentro, no tempo do bebê.",
+    "teach": "O rostinho do bebê ensaia caretas. Lá dentro, pesquisadores observaram expressões variadas, e nesta fase tudo acontece de olhos fechados: a testa que franze, a boca que abre e fecha, os lábios que se mexem e, de vez em quando, algo parecido com um sorriso. E tem mais: o bebê também boceja e se espreguiça, esticando o corpinho como quem acaba de acordar. Espreguiçar, aliás, vem de preguiça: é como tirar a preguiça do corpo. O que essas caretas querem dizer, ninguém sabe ao certo. Uma boa aposta é que sejam treinos dos músculos do rosto, os mesmos que, na gente, contam tudo sem precisar de palavras: a surpresa, a dúvida, a risada. É um ensaio só do bebê: dá para imaginar cada careta aí dentro, no tempo do bebê.",
     "funFact": "Bocejo pega: ver alguém bocejar, e às vezes até ler sobre bocejos, dá vontade de bocejar também. Se você bocejou agora, já sabe por quê.",
     "questions": [
       {
@@ -4197,7 +4193,7 @@
         "q": "Segundo a aula, o que as caretas do bebê querem dizer?",
         "o": [
           "Que o bebê está com fome",
-          "Que o bebê vai ser risonho",
+          "Que o bebê está imitando quem conversa com a barriga",
           "Ainda ninguém sabe ao certo"
         ],
         "a": 2,
@@ -4280,7 +4276,7 @@
         "q": "Na revisão: o que vai se formando por baixo da pele do bebê nesta fase?",
         "o": ["Uma camadinha de gordura", "Uma casquinha dura", "Uma camada de verniz cremoso"],
         "a": 0,
-        "why": "Uma camadinha de gordura vai se formando por baixo da pele, e o corpinho vai se preenchendo."
+        "why": "Uma camadinha de gordura vai se formando por baixo da pele; o verniz cremoso, da semana 19, fica por fora, cobrindo a pele."
       },
       {
         "type": "multi",
@@ -4428,7 +4424,7 @@
   },
   "177": {
     "teach": "O trem de refeições: um revezamento de carinho. Nos Estados Unidos, a ideia se chama meal train: um calendário em que amigos e família se revezam para levar uma refeição pronta nas primeiras semanas depois que o bebê chegar. A cada dia combinado, um vagão diferente chega à sua porta, e ninguém da casa precisa pensar no jantar enquanto todo mundo se ajusta à novidade. Junto com o trem, entram os vales de ajuda, presentes de tempo em vez de objetos: vale-faxina, vale-passeio com o cachorro, vale-ida ao mercado, vale-companhia para uma tarde de conversa. Para organizar tudo, um documento compartilhado ou um grupo de mensagens mostra quem ajuda em que dia, sem ninguém se repetir. E uma dica prática: pedir que a comida venha em potes que não precisem ser devolvidos.",
-    "funFact": "A palavra 'marmita' vem do francês marmite, que quer dizer panela: a comida que viaja na marmita carrega no nome a panela de onde saiu.",
+    "funFact": "Em Mumbai, na Índia, os dabbawalas levam todo dia, desde o fim do século 19, marmitas feitas em casa até o trabalho de milhares de pessoas, de bicicleta e de trem.",
     "questions": [
       {
         "type": "choice",
@@ -4467,14 +4463,14 @@
       },
       {
         "type": "choice",
-        "q": "De onde vem a palavra 'marmita'?",
+        "q": "Segundo a curiosidade, o que fazem os dabbawalas de Mumbai?",
         "o": [
-          "Do tupi, nome de uma fruta do mato",
-          "Do francês, palavra para panela",
-          "Do inglês, nome de um trem"
+          "Vendem comida pronta nas estações de trem",
+          "Levam marmitas de casa até o trabalho",
+          "Cozinham para as festas de casamento"
         ],
         "a": 1,
-        "why": "Marmita vem do francês marmite, panela: a comida que viaja carrega no nome a panela de onde saiu."
+        "why": "Os dabbawalas levam, de bicicleta e de trem, as marmitas feitas em casa até o trabalho de milhares de pessoas."
       }
     ]
   },
