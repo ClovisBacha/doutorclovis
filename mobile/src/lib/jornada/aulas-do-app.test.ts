@@ -4,6 +4,7 @@ import type { DailyQuiz, QuizQuestion } from "@/lib/daily-quizzes";
 import { carregarAulaDoDia, DIAS_COM_AULA_DO_APP } from "~/lib/jornada/aulas-do-app";
 import T1 from "~/lib/jornada/aulas-do-app.t1.json";
 import T2 from "~/lib/jornada/aulas-do-app.t2.json";
+import T3 from "~/lib/jornada/aulas-do-app.t3.json";
 
 /**
  * O BANCO DE AULAS DO APP (fase 2: o app não é conselho médico).
@@ -16,7 +17,7 @@ import T2 from "~/lib/jornada/aulas-do-app.t2.json";
  */
 
 const SITE = SITE_BRUTO as unknown as Record<string, DailyQuiz>;
-const APP = { ...T1, ...T2 } as unknown as Record<string, DailyQuiz>;
+const APP = { ...T1, ...T2, ...T3 } as unknown as Record<string, DailyQuiz>;
 
 /**
  * Os trimestres já trocados: neles, o banco inteiro (app + o que ficou do site)
