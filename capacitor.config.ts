@@ -52,7 +52,8 @@ const config: CapacitorConfig = {
   appName: "Obstétrica",
 
   /* Existe mesmo com `server.url`: o Capacitor exige a pasta, e é ela que
-     aparece quando a rede falha. Ver `native/shell/index.html`. */
+     aparece quando a rede falha — DESDE QUE `server.errorPath` aponte para o
+     arquivo (abaixo). Ver `native/shell/index.html`. */
   webDir: "native/shell",
 
   server: {
@@ -69,6 +70,14 @@ const config: CapacitorConfig = {
        terminava. É a mesma árvore de decisão do site, e ela é a única — escrever
        uma segunda só para a casca seria criar duas verdades sobre quem é quem. */
     url: "https://www.obstetrica.com.br/auth",
+    /* ⚠️ SEM ISTO A TELA OFFLINE ERA INALCANÇÁVEL. `webDir` sozinho não faz o
+       WebView mostrar nada quando o site não responde: sem `errorPath`, o que
+       aparecia depois dos 6 s de splash era a página de erro do WebKit (ou o
+       fundo rosa vazio) — num app de gestação de alto risco, com SOS. A
+       própria tela tem o botão de tentar de novo e volta sozinha quando a
+       rede retorna; a URL para onde ela volta é ESTA `url`, e o teste
+       `casca-ios.test.ts` cobra que as duas não divirjam. */
+    errorPath: "index.html",
     /* Só HTTPS. `cleartext: true` abriria o app para conteúdo sem criptografia,
        e isto carrega dado de saúde de gestante. */
     cleartext: false,
@@ -89,8 +98,10 @@ const config: CapacitorConfig = {
        print — no PWA isso dependia de o iOS obedecer a uma meta tag; aqui é
        configuração do contêiner. */
     contentInset: "never",
-    /* Rolagem elástica desligada na raiz: com ela, puxar a página revela o fundo
-       do WebView acima do conteúdo — exatamente a faixa clara que aparecia. */
+    /* `scrollEnabled: true` é a rolagem da PÁGINA — desligar aqui travaria o app
+       inteiro, não só a elástica. O puxão que revelava o fundo do WebView acima
+       do conteúdo é contido no CSS (`overscroll-behavior`) e pela cor de fundo
+       abaixo, que é a mesma da página. */
     scrollEnabled: true,
     backgroundColor: "#FEE2EA",
   },

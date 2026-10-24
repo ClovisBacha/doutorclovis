@@ -189,7 +189,7 @@ export function AssinaturaTab({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-3xl border border-border bg-card p-5">
+      <div className="rounded-3xl card-material p-5">
         <div className="flex items-start gap-3">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/12">
             <CreditCard className="h-[21px] w-[21px] text-primary" strokeWidth={1.9} />
@@ -200,7 +200,7 @@ export function AssinaturaTab({
             </p>
             {st && (
               <span
-                className="mt-1.5 inline-block rounded-full px-2.5 py-1 text-[12px] font-bold"
+                className="mt-1.5 inline-block rounded-full px-2.5 py-1 text-xs font-bold"
                 style={{ background: st.fundo, color: st.cor }}
               >
                 {st.rotulo}
@@ -294,7 +294,7 @@ export function AssinaturaTab({
                 {abrindo ? "Abrindo…" : ativa ? "Gerenciar ou cancelar" : "Reativar assinatura"}
                 {!abrindo && <ExternalLink className="h-4 w-4" strokeWidth={2.2} />}
               </button>
-              <p className="mt-2 text-center text-[11.5px] leading-snug text-muted-foreground">
+              <p className="mt-2 text-center text-xs leading-snug text-muted-foreground">
                 {ativa
                   ? "Abre a área segura de pagamento, onde você troca o cartão, vê as faturas ou cancela quando quiser."
                   : "Abre a área segura de pagamento. Sua assinatura volta a renovar e você não perde nada do que já tem."}
@@ -320,7 +320,7 @@ export function AssinaturaTab({
                 {(viva?.source ?? "").toLowerCase().includes("google") ? "Play Store" : "App Store"}
                 <ExternalLink className="h-4 w-4" strokeWidth={2.2} />
               </a>
-              <p className="mt-2 text-center text-[11.5px] leading-snug text-muted-foreground">
+              <p className="mt-2 text-center text-xs leading-snug text-muted-foreground">
                 Esta assinatura foi feita pela loja do seu celular — por regra dela, é lá que se
                 troca o pagamento ou se cancela.
               </p>
@@ -373,14 +373,14 @@ export function AssinaturaTab({
       {/* ⚠️ ESTA CAIXA NÃO É ENFEITE. É a frase que a paciente procura quando
           está insegura sobre um débito recorrente, e ela precisa estar na
           mesma tela do botão — não num link de termos. */}
-      <div className="flex items-start gap-3 rounded-3xl border border-border bg-card p-4">
+      <div className="flex items-start gap-3 rounded-3xl card-material p-4">
         <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" strokeWidth={1.9} />
         {/* ⚠️ A PRIMEIRA FRASE SÓ APARECE PARA QUEM PAGA. "Cancelar é imediato"
             não diz nada a quem nunca assinou — e uma tela que responde a uma
             pergunta que a pessoa não fez ensina que o texto daqui é enfeite. A
             SEGUNDA frase fica sempre: é o limite ético do produto, e ela vale
             ainda mais para quem está decidindo se assina. */}
-        <p className="text-[12.5px] leading-relaxed text-muted-foreground">
+        <p className="text-xs leading-relaxed text-muted-foreground">
           {ativa &&
             origem !== "presente" &&
             "Cancelar é imediato e você mantém o acesso até o fim do período já pago. "}

@@ -103,7 +103,7 @@ export function HeartbeatFeel({
   const beatSeconds = 60 / bpm;
 
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+    <div className="relative overflow-hidden rounded-3xl card-material p-6">
       <style>{`
         @keyframes hb-lubdub {
           0% { transform: scale(1); }
@@ -119,9 +119,7 @@ export function HeartbeatFeel({
 
       <div className="flex flex-col items-center text-center">
         {!compact && (
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-            Sinta na palma da mão
-          </p>
+          <p className="font-serif text-[15px] font-semibold text-primary">Sinta na palma da mão</p>
         )}
         <p className="mt-2 font-serif text-2xl">
           {babyName ? `O coração de ${babyName}` : "O coração do bebê"}
@@ -164,7 +162,7 @@ export function HeartbeatFeel({
           <button
             type="button"
             onClick={() => (playing ? stop() : start(bpm))}
-            className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+            className="btn-3d press inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
           >
             {playing ? (
               <>
@@ -180,7 +178,7 @@ export function HeartbeatFeel({
             type="button"
             onClick={() => setSound((s) => !s)}
             aria-label={sound ? "Desligar som" : "Ligar som"}
-            className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground"
+            className="pill-3d press inline-flex min-h-11 items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold text-muted-foreground"
           >
             {sound ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
             {sound ? "Som ligado" : "Som desligado"}

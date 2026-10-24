@@ -68,6 +68,33 @@ export function registrarVoltar(fn: Handler): () => void {
 }
 
 /**
+ * Registra o ÚLTIMO a ser consultado — a rede de segurança da tela inteira.
+ *
+ * ⚠️ Ele existe por causa da ORDEM EM QUE O REACT RODA OS EFEITOS: o efeito do
+ * FILHO roda antes do efeito do PAI. Registrada com `registrarVoltar`, a
+ * subida de aba de `minha-conta` (o pai) entraria na pilha DEPOIS da
+ * Comunidade (o filho) — ou seja, ACIMA dela — e engoliria todo voltar antes
+ * de a aba ter a vez. De dentro de um perfil aberto, o voltar sairia da
+ * Comunidade inteira em vez de devolver o feed.
+ *
+ * Quem chama isto está dizendo "só me chame se ninguém mais quiser", e por
+ * isso ele entra na BASE, independentemente de quando montou.
+ *
+ * ⚠️ Vale para UM handler de cada vez, por convenção: dois "fundos" na mesma
+ * árvore seriam dois donos da mesma decisão, e a ordem entre eles voltaria a
+ * ser a ordem dos efeitos — que é justamente o que este registro existe para
+ * não depender.
+ */
+export function registrarVoltarDeFundo(fn: Handler): () => void {
+  pilha.unshift(fn);
+  ligarTeclado();
+  return () => {
+    const i = pilha.indexOf(fn);
+    if (i >= 0) pilha.splice(i, 1);
+  };
+}
+
+/**
  * Executa o voltar. Do topo para a base, o primeiro que assumir vence.
  *
  * `"vazio"` significa que ninguém quis — e aí quem chamou decide o que fazer

@@ -86,9 +86,31 @@ describe("a criação do convite", () => {
     expect(CONTA).toContain("album_token: albumToken,");
   });
 
-  test("⚠️ o link do álbum é montado com `album_token`", () => {
+  test("⚠️ o link do álbum NUNCA carrega o token do acompanhante", () => {
+    /* ⚠️ **ESTA ASSERÇÃO JÁ MENTIU, e ela guardava exatamente este defeito.**
+     *
+     * Ela era `slice(i, i + 90)).toContain("album_token")` — e o código
+     * defeituoso era `${invites[0].album_token ?? invites[0].token}`, que
+     * CONTÉM a string "album_token". O teste passava verde sobre o vazamento
+     * que ele existia para impedir: o link que ela cola no grupo da família
+     * carregando o token que abre o SOS com latitude e longitude.
+     *
+     * Duas lições, e as duas já estão catalogadas no CLAUDE.md:
+     * "outra ocorrência do mesmo nome" e "cobre a GARANTIA, nunca a grafia".
+     * Aqui elas se somaram — e o custo foi um teste com o nome certo dando
+     * cobertura a um defeito de privacidade em produção.
+     *
+     * Hoje o que se cobra é o que importa: o `token` do acompanhante não pode
+     * chegar à URL do álbum, por caminho nenhum. */
     const i = CONTA.indexOf("/album/${");
     expect(i).toBeGreaterThan(-1);
-    expect(CONTA.slice(i, i + 90)).toContain("album_token");
+    const naUrl = CONTA.slice(i, CONTA.indexOf("`", i + 9));
+    expect(naUrl).not.toMatch(/invites\[0\]\.token/);
+    expect(naUrl).not.toMatch(/\?\?/);
+
+    /* E o valor que ENTRA na URL tem de vir de `album_token`, direto. */
+    const bloco = CONTA.slice(CONTA.indexOf('.from("companion_invites")'), i);
+    expect(bloco).toMatch(/album_token/);
+    expect(bloco).not.toMatch(/\.select\("token"\)/);
   });
 });

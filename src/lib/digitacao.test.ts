@@ -17,7 +17,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
-const tela = readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8");
+const tela = readFileSync("src/components/chat-tab.tsx", "utf8");
 const codigo = tela.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*/g, "");
 
 /** O mesmo passo que a tela usa. Copiado de propósito: é a regra sob teste. */
@@ -197,8 +197,21 @@ describe("o texto final é o texto completo", () => {
     /* Se a bolha terminasse com `alvo.slice(0, mostrado)`, um arredondamento
        do passo poderia comer o último caractere — e ninguém notaria, porque a
        frase continuaria fazendo sentido. */
-    const fim = codigo.slice(codigo.indexOf("streamAbertoRef.current = false;"));
-    expect(fim).toContain("content: acc }");
+    /* ⚠️ A asserção antiga procurava "content: acc }" do primeiro
+       `streamAbertoRef.current = false;` até o FIM do arquivo — e passava
+       graças ao chat da NUTRIÇÃO, que vinha depois no mesmo arquivo e tem essa
+       string. Quando o ChatTab saiu para o arquivo próprio, ela ficou vermelha
+       sobre código correto: a armadilha de substring, mais uma vez. Hoje ancora
+       no fecho do stream (o último `= false` antes do `catch`) e cobra a escrita
+       final com o acumulado INTEIRO. */
+    const fecho = codigo.lastIndexOf(
+      "streamAbertoRef.current = false;",
+      codigo.indexOf("} catch (e)"),
+    );
+    expect(fecho).toBeGreaterThan(0);
+    const fim = codigo.slice(fecho, codigo.indexOf("} catch (e)"));
+    expect(fim).toContain("escreverNaBolha(acc, houveErro ? { error: true } : undefined)");
+    expect(fim).not.toContain("alvo.slice(0, mostrado)");
   });
 });
 

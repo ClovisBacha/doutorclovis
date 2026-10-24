@@ -26,6 +26,9 @@ export const Route = createFileRoute("/preview-rede")({
        segunda passada chega `null`. Mesma armadilha de `preview-saude`. */
     pedidos: q.pedidos == null ? 0 : Number(q.pedidos) || 0,
     luto: q.luto == null ? false : !!q.luto,
+    /* ⚠️ A pausa nasce do servidor e exige sessão — sem a bancada, o cartão só
+       se via com o interruptor ligado numa conta de verdade. */
+    pausada: q.pausada == null ? false : !!q.pausada,
   }),
 });
 
@@ -40,7 +43,9 @@ const PERFIL: PerfilNaTela = {
   meuVinculo: null,
   souEu: true,
   silenciado: false,
-  meusSeguidores: 137,
+  favorita: false,
+  seguidores: 137,
+  seguindo: 64,
   euSigo: 64,
   seloSemana: "32 semanas",
   seloBebe: "Helena",
@@ -49,6 +54,8 @@ const PERFIL: PerfilNaTela = {
   possoAplicarOCodigo: false,
   mostrarSemana: true,
   mostrarBebe: true,
+  linhaDosFilhos: "Mãe da Helena, 3 meses",
+  feedSoSeguindo: false,
   aceitaPerguntas: true,
   /* ⚠️ A chave da vitrine nasce DESLIGADA — é o estado real de toda paciente,
      e a bancada tem de abrir no caso comum, nunca no raro. O endereço aparece
@@ -68,7 +75,7 @@ const PERFIL: PerfilNaTela = {
 };
 
 function Bancada() {
-  const { pedidos, luto } = Route.useSearch();
+  const { pedidos, luto, pausada } = Route.useSearch();
 
   const fila = Array.from({ length: Math.max(0, Math.min(pedidos, 8)) }, (_, i) => ({
     id: `q${i}`,
@@ -78,7 +85,7 @@ function Bancada() {
 
   return (
     <div className="mx-auto max-w-md px-4 py-6">
-      <ConfiguracoesDoPerfil careMode={luto} bancada={{ perfil: PERFIL, pedidos: fila }} />
+      <ConfiguracoesDoPerfil careMode={luto} bancada={{ perfil: PERFIL, pedidos: fila, pausada }} />
     </div>
   );
 }

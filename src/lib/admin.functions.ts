@@ -539,17 +539,54 @@ export const marcarConsultaNoDia = createServerFn({ method: "POST" })
        para pegar também o choque por SOBREPOSIÇÃO: 10:00–10:30 marcado, 10:15
        pedido agora, hora diferente e mesmo assim colide. */
     const { minutosDesdeMeiaNoite, DURACAO_PADRAO_MINUTOS } = await import("./agenda-unificada");
-    const { data: doDia } = await scopedBy(
-      (supabaseAdmin as any)
-        .from("appointment_requests")
-        .select("id, patient_name, confirmed_time, duration_minutes")
-        .eq("status", "confirmed")
-        .eq("confirmed_date", data.dia),
-      scope,
-    );
+    /**
+     * ⚠️ **A LEITURA DO DIA FALHA FECHADA — antes ela falhava ABERTA.**
+     *
+     * O `error` era descartado e o resultado ia para `(doDia ?? [])`: qualquer
+     * falha — rede, tempo esgotado, ou `duration_minutes` faltando num banco
+     * que ainda não rodou `APLICAR_DURACAO_DA_CONSULTA.sql` — devolvia lista
+     * vazia, `choque` ficava `undefined`, e **a consulta era marcada por cima
+     * de outra**.
+     *
+     * ⚠️ E o backstop do banco NÃO cobre isto. O índice único parcial
+     * (`appt_confirmed_slot`) pega o INSTANTE exato; a sobreposição
+     * (10:00–10:30 marcado, 10:15 pedido agora) passa por ele. A única coisa
+     * entre duas pacientes na mesma sala era exatamente esta leitura.
+     *
+     * O degrau existe pela mesma razão que o INSERT já tem um: sem
+     * `duration_minutes`, ler sem a coluna e usar a duração padrão é melhor que
+     * recusar toda marcação num banco atrasado.
+     */
+    const lerODia = (colunas: string) =>
+      scopedBy(
+        (supabaseAdmin as any)
+          .from("appointment_requests")
+          .select(colunas)
+          .eq("status", "confirmed")
+          .eq("confirmed_date", data.dia),
+        scope,
+      );
+    let doDia: any[] | null = null;
+    {
+      const cheio = await lerODia("id, patient_name, confirmed_time, duration_minutes");
+      if (!cheio.error) doDia = cheio.data as any[];
+      else {
+        const magro = await lerODia("id, patient_name, confirmed_time");
+        if (!magro.error) doDia = magro.data as any[];
+      }
+    }
+    if (doDia === null) {
+      /* ⚠️ RECUSA, e com o motivo. "Não consegui conferir a agenda" é um
+         recado que ele entende e refaz em dez segundos; marcar às cegas é duas
+         pacientes na mesma sala, que ele só descobre no dia. */
+      return {
+        ok: false as const,
+        error: "Não foi possível conferir a agenda do dia. Tente de novo antes de marcar.",
+      };
+    }
     const inicioNovo = minutosDesdeMeiaNoite(data.hora);
     const fimNovo = inicioNovo + data.duracaoMinutos;
-    const choque = ((doDia ?? []) as any[]).find((c) => {
+    const choque = (doDia as any[]).find((c) => {
       /* `confirmed_time` é TEXTO e já aceitou "manhã" nesta base — o valor não
          vira número, `NaN < x` é sempre falso, e a linha simplesmente não
          colide (nem colidia antes, com a igualdade exata). */
@@ -615,10 +652,13 @@ export const marcarConsultaNoDia = createServerFn({ method: "POST" })
        É `PGRST204` e não `42703`: aquele é erro do Postgres em SELECT, e
        escrito aqui seria um recuo que nunca roda. */
     const { colunaAusente } = await import("./postgrest");
+    /* O recuo passa a LEMBRAR o que descartou — ver o comentario do retorno. */
+    const descartadas: string[] = [];
     for (const coluna of ["patient_user_id", "duration_minutes"] as const) {
       if (!error || !colunaAusente(error)) break;
       if (!(coluna in linha)) continue;
       delete linha[coluna];
+      descartadas.push(coluna);
       ({ data: nova, error } = await gravar());
     }
 
@@ -678,7 +718,36 @@ export const marcarConsultaNoDia = createServerFn({ method: "POST" })
     /* `avisou` sobe para a tela porque "marcada ✓" e "marcada, mas ela não foi
        avisada" são dois desfechos diferentes — e o segundo é o que faz ele
        pegar o telefone. Sem `RESEND_API_KEY` o envio é no-op silencioso. */
-    return { ok: true as const, id: nova.id as string, avisou, error: null };
+    /* ─── A DURACAO NAO FICOU, E ELE PRECISA SABER ──────────────────────────
+     *
+     * ⚠️ **Medido contra o banco de PRODUCAO (ago/2026): `duration_minutes` NAO
+     * EXISTE la.** Das 63 levas de SQL, e a unica coluna faltando — e o recuo
+     * acima a descartava EM SILENCIO.
+     *
+     * A conta do estrago: ele marca 60 minutos para uma primeira consulta ou um
+     * caso dificil, a tela responde "consulta marcada", a coluna e jogada fora,
+     * e a leitura devolve `DURACAO_PADRAO_MINUTOS`. Trinta minutos depois o
+     * horario volta a parecer livre — e `validarNovaConsulta`, que compara
+     * FAIXA, autoriza a segunda paciente em cima da segunda metade da primeira.
+     * **Duas pacientes na mesma sala, com o app tendo dito "pronto" as duas.**
+     *
+     * ⚠️ **So avisa quando MUDA alguma coisa.** Se ele escolheu exatamente a
+     * duracao padrao, descartar a coluna nao altera nada, e o aviso seria ruido
+     * numa tela que ele usa dezenas de vezes por dia — a mesma disciplina do
+     * "botao que nao muda nada ensina que os botoes desta tela nao valem".
+     *
+     * A consulta NAO e desfeita: ela esta na agenda dele, que e o que ele pediu.
+     * O que muda e ele saber que a duracao vale 30 min ate o SQL rodar. */
+    const duracaoNaoFicou =
+      descartadas.includes("duration_minutes") && data.duracaoMinutos !== DURACAO_PADRAO_MINUTOS;
+    return {
+      ok: true as const,
+      id: nova.id as string,
+      avisou,
+      duracaoNaoFicou,
+      duracaoQueValeu: duracaoNaoFicou ? DURACAO_PADRAO_MINUTOS : data.duracaoMinutos,
+      error: null,
+    };
   });
 
 /**

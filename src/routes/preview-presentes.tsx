@@ -27,6 +27,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ListaDePresentesPublica } from "@/components/lista-de-presentes-publica";
 import { ChaDeBebe } from "@/components/cha-de-bebe";
+import { CabecalhoDaPorta } from "@/components/comunidade";
 import { faixaDe, metaDeFraldas, TAMANHOS } from "@/lib/fraldas";
 import type { ItemDaLista } from "@/lib/presentes";
 import type { ListaPublica } from "@/lib/presentes.functions";
@@ -120,7 +121,12 @@ function Bancada() {
        FORMULÁRIO (a caixa de cotas, o campo de valor, as sugestões de divisão e
        o piso de R$ 25), que é o que não existia. */
     return (
-      <ChaDeBebe bancada={{ lista: { ...lista, token: "bancada", reservas: [] }, guardados: 2 }} />
+      <div className="space-y-5">
+        <CabecalhoDaPorta chave="cha" />
+        <ChaDeBebe
+          bancada={{ lista: { ...lista, token: "bancada", reservas: [] }, guardados: 2 }}
+        />
+      </div>
     );
   }
 
