@@ -121,7 +121,7 @@
       },
       {
         "type": "choice",
-        "q": "Se o nome ainda não foi escolhido, o que a aula sugere?",
+        "q": "Para quem ainda está entre alguns nomes, qual é a ideia da aula?",
         "o": [
           "Esperar a escolha para fazer a atividade",
           "Escrever os finalistas ou o apelido da barriga",
@@ -144,7 +144,7 @@
     ]
   },
   "199": {
-    "teach": "Um post com os capítulos da sua espera. Lembra do livro da espera, com um título para cada capítulo? O sumário pode virar um post gostoso na Comunidade: conte os títulos que você deu ao 1º e ao 2º trimestres e, se quiser, a história por trás de cada um. Se os títulos ainda não saíram, tudo bem: dá para inventar agora mesmo, ou contar o tema do cantinho do bebê, se já houver um, com as cores e a ideia que você escolheu. Depois, vale passear pelos posts das outras gestantes e deixar um comentário carinhoso. Dizer qual título fez você sorrir, ou que detalhe do cantinho do bebê de alguém você achou lindo, é um jeito simples de fazer companhia a quem está do outro lado da tela. Cada espera é uma história, e é bonito descobrir quanta gente está escrevendo a sua, cada uma do seu jeito.",
+    "teach": "Um post com os capítulos da sua espera. Lembra do livro da espera, com um título para cada capítulo? O sumário pode virar um post gostoso na Comunidade: conte os títulos que você deu ao 1º e ao 2º trimestres e, se quiser, a história por trás de cada um. Se os títulos ainda não saíram, tudo bem: dá para inventar agora mesmo, ou contar só a música ou a frase que marcou cada fase. Depois, vale passear pelos posts das outras gestantes e deixar um comentário carinhoso. Dizer qual título fez você sorrir, ou que história por trás de um título tocou você, é um jeito simples de fazer companhia a quem está do outro lado da tela. Cada espera é uma história, e é bonito descobrir quanta gente está escrevendo a sua, cada uma do seu jeito.",
     "funFact": "A palavra 'comunidade' vem do latim communitas, de communis, que quer dizer comum, o que é de todos.",
     "questions": [
       {
@@ -167,7 +167,7 @@
           "Só vale postar com os três títulos prontos"
         ],
         "a": 1,
-        "why": "Tudo bem: dá para inventar os títulos agora mesmo, ou contar o tema do cantinho do bebê."
+        "why": "Tudo bem: dá para inventar os títulos agora mesmo, ou contar só a música ou a frase que marcou cada fase."
       },
       {
         "type": "multi",
@@ -175,12 +175,12 @@
         "o": [
           "Dizer qual título fez você sorrir",
           "Comentar só quando conhecer a pessoa",
-          "Elogiar um detalhe do cantinho do bebê de alguém",
+          "Contar qual história tocou você",
           "Deixar um comentário carinhoso",
           "Corrigir os títulos que achar estranhos"
         ],
         "a": [0, 2, 3],
-        "why": "Um comentário carinhoso, dizendo qual título fez você sorrir ou que detalhe do cantinho do bebê achou lindo, faz companhia a quem está do outro lado da tela. Não precisa conhecer a pessoa, e cada título é do jeito de quem escreveu."
+        "why": "Um comentário carinhoso, dizendo qual título fez você sorrir ou que história por trás de um título tocou você, faz companhia a quem está do outro lado da tela. Não precisa conhecer a pessoa, e cada título é do jeito de quem escreveu."
       },
       {
         "type": "choice",
@@ -238,7 +238,7 @@
     ]
   },
   "201": {
-    "teach": "A volta ao redor da lareira, na Grécia antiga. Em Atenas, poucos dias depois do nascimento, as famílias faziam a anfidromia, nome que quer dizer algo como 'correr em volta'. O bebê era levado numa volta ao redor da lareira, que era o coração da casa: ali a família se aquecia, cozinhava e se reunia. Parentes e amigos mandavam presentes e, por volta do décimo dia, vinha outra festa, em que o bebê costumava receber o nome. Era um jeito antigo de dizer que o bebê passava a fazer parte da casa. Hoje quase ninguém tem lareira, mas toda casa continua tendo um coração, aquele lugar onde todo mundo acaba se encontrando: a mesa da cozinha, o sofá da sala, a varanda. Qual é o coração da sua casa? Que tal fotografar esse canto hoje, do jeitinho que está nesta espera?",
+    "teach": "A volta ao redor da lareira, na Grécia antiga. Em Atenas, poucos dias depois do nascimento, as famílias faziam a anfidromia, nome que quer dizer algo como 'correr em volta'. O bebê era levado numa volta ao redor da lareira, que era o coração da casa: ali a família se aquecia, cozinhava e se reunia. Parentes e amigos mandavam presentes para a família. Era um jeito antigo de dizer que o bebê passava a fazer parte da casa. Hoje quase ninguém tem lareira, mas toda casa continua tendo um coração, aquele lugar onde todo mundo acaba se encontrando: a mesa da cozinha, o sofá da sala, a varanda. Qual é o coração da sua casa? Que tal fotografar esse canto hoje, do jeitinho que está nesta espera?",
     "funFact": "Na Grécia antiga, a lareira tinha até uma deusa só para ela: Héstia, que os romanos chamavam de Vesta.",
     "questions": [
       {
@@ -264,13 +264,13 @@
         "q": "Marque o que fazia parte das boas-vindas ao bebê em Atenas (marque todas):",
         "o": [
           "Presentes de parentes e amigos",
-          "Uma festa por volta do décimo dia",
+          "Uma serenata na janela",
           "Um bolo com uma velinha",
           "A volta ao redor da lareira",
           "Um passeio pelo mercado"
         ],
-        "a": [0, 1, 3],
-        "why": "A volta ao redor da lareira, os presentes de parentes e amigos e, por volta do décimo dia, a festa em que o bebê costumava receber o nome faziam parte dessas boas-vindas."
+        "a": [0, 3],
+        "why": "A volta ao redor da lareira e os presentes de parentes e amigos faziam parte dessas boas-vindas. Serenata, bolo e passeio pelo mercado não estavam na aula."
       },
       {
         "type": "choice",
@@ -282,7 +282,7 @@
     ]
   },
   "202": {
-    "teach": "Revisão da semana 28: o 3º trimestre começou! Do tamanho de uma abóbora, com cerca de 37,6 cm e 1 kg, o bebê já abre e fecha os olhinhos, com cílios enfeitando a beirinha das pálpebras. Você abriu o trimestre com o livro da espera, dando um título a cada capítulo vivido e deixando a linha do terceiro em branco. Viu como escrever o nome do bebê do jeitinho que vai ficar, com a grafia, os acentos e a ordem dos sobrenomes, e que os títulos da espera, ou o tema do cantinho do bebê, podem virar um post na Comunidade. Conheceu a história antiga da piscina: o âmnio existe há mais de 300 milhões de anos e dá nome aos amniotas, o grupo que reúne répteis, aves e mamíferos, como nós. E a semana fechou em Atenas, com a anfidromia, a volta ao redor da lareira que dava boas-vindas ao bebê.",
+    "teach": "Revisão da semana 28: o 3º trimestre começou! Do tamanho de uma abóbora, com cerca de 37,6 cm e 1 kg, o bebê já abre e fecha os olhinhos, com cílios enfeitando a beirinha das pálpebras. Você abriu o trimestre com o livro da espera, dando um título a cada capítulo vivido e deixando a linha do terceiro em branco. Viu como escrever o nome do bebê do jeitinho que vai ficar, com a grafia, os acentos e a ordem dos sobrenomes, e que os títulos da espera podem virar um post na Comunidade. Conheceu a história antiga da piscina: o âmnio existe há mais de 300 milhões de anos e dá nome aos amniotas, o grupo que reúne répteis, aves e mamíferos, como nós. E a semana fechou em Atenas, com a anfidromia, a volta ao redor da lareira que dava boas-vindas ao bebê.",
     "funFact": "Na semana que vem, a figurinha do app vira o repolho, que na tabela marca cerca de 38,6 cm e 1,15 kg, e a novidade é sobre os músculos e os pulmões.",
     "questions": [
       {
@@ -305,11 +305,11 @@
           "Um título só para a espera inteira",
           "Um título para cada capítulo já vivido",
           "O nome escrito com a grafia, os acentos e os sobrenomes",
-          "Um post com os títulos ou com o tema do cantinho do bebê",
+          "Um post com os títulos dos capítulos",
           "Um post só depois de ter os três títulos prontos"
         ],
         "a": [1, 2, 3],
-        "why": "Um título para cada capítulo, o nome escrito do jeitinho que vai ficar e o post com os títulos ou com o cantinho do bebê foram ideias da semana. O terceiro título vai se escrevendo pelo caminho, sem esperar por ele para postar."
+        "why": "Um título para cada capítulo, o nome escrito do jeitinho que vai ficar e o post com os títulos foram ideias da semana. O terceiro título vai se escrevendo pelo caminho, sem esperar por ele para postar."
       },
       {
         "type": "choice",
@@ -336,7 +336,7 @@
     ]
   },
   "203": {
-    "teach": "Semana 29: músculos e pulmões amadurecem. Com cerca de 38,6 cm e 1,15 kg, o bebê tem o tamanho de um repolho, a figurinha da semana no app, e a tabela conta que os músculos e os pulmões estão amadurecendo. Dentro do peito, há um desenho bonito: os tubinhos dos pulmões, que vêm se ramificando desde o 1º trimestre, lembram uma árvore, com um tronco que se divide em galhos, e galhos que se dividem em galhinhos cada vez mais finos. Nas pontinhas dos galhinhos, nesta fase, vão surgindo saquinhos minúsculos, que darão origem aos alvéolos. Alvéolo é a mesma palavra que batiza as casinhas do favo de mel, e a comparação é bonita: são cantinhos pequenininhos, um ao lado do outro. E os alvéolos seguem se formando por anos depois do nascimento. Uma árvore crescendo galho por galho, no tempo do bebê.",
+    "teach": "Semana 29: músculos e pulmões amadurecem. Com cerca de 38,6 cm e 1,15 kg, o bebê tem o tamanho de um repolho, a figurinha da semana no app, e a tabela conta que os músculos e os pulmões estão amadurecendo. Dentro do peito, há um desenho bonito: os tubinhos dos pulmões, que vêm se ramificando desde o 1º trimestre, lembram uma árvore, com um tronco que se divide em galhos, e galhos que se dividem em galhinhos cada vez mais finos. Nas pontinhas dos galhinhos, nesta fase, vão surgindo saquinhos minúsculos, que darão origem aos alvéolos. Um ao lado do outro, esses saquinhos lembram as casinhas de um favo de mel. E os alvéolos seguem se formando por anos depois do nascimento. Uma árvore crescendo galho por galho, no tempo do bebê.",
     "funFact": "Na França, contava-se às crianças que os bebês nasciam dentro dos repolhos.",
     "questions": [
       {
@@ -363,23 +363,23 @@
         "o": [
           "Os tubinhos são retinhos, sem nenhum galho",
           "Os tubinhos vêm se ramificando desde o 1º trimestre",
-          "Nas pontinhas dos galhinhos surgem saquinhos",
+          "Os saquinhos lembram as casinhas de um favo de mel",
           "Os pulmões só começam a se formar agora",
           "Os alvéolos seguem se formando depois do nascimento"
         ],
         "a": [1, 2, 4],
-        "why": "Os tubinhos vêm se ramificando desde o 1º trimestre, como galhos de uma árvore, e nas pontinhas surgem os saquinhos que darão origem aos alvéolos, que seguem se formando por anos depois do nascimento."
+        "why": "Os tubinhos vêm se ramificando desde o 1º trimestre, como galhos de uma árvore, e os saquinhos que surgem nas pontinhas lembram as casinhas de um favo de mel. Os alvéolos seguem se formando por anos depois do nascimento."
       },
       {
         "type": "choice",
-        "q": "Que outra coisa a palavra 'alvéolo' também batiza?",
+        "q": "Nesta fase, onde vão surgindo os saquinhos minúsculos dos pulmões?",
         "o": [
-          "Os gomos de uma laranja",
-          "As casinhas do favo de mel",
-          "As escamas de um peixe grande"
+          "No tronco, bem no comecinho",
+          "Nas pontinhas dos galhinhos",
+          "Entre um pulmão e o outro"
         ],
         "a": 1,
-        "why": "Alvéolo também é o nome das casinhas do favo de mel: cantinhos pequenininhos, um ao lado do outro."
+        "why": "Nas pontinhas dos galhinhos vão surgindo os saquinhos minúsculos que darão origem aos alvéolos."
       },
       {
         "type": "choice",
@@ -469,9 +469,9 @@
         "type": "choice",
         "q": "Por que vale fotografar a mala aberta, depois de arrumada?",
         "o": [
-          "Serve para comparar com a mala de outra gestante",
+          "Serve para lembrar o preço de cada peça",
           "Vira lembrança e ainda mostra onde ficou cada coisa",
-          "Ajuda a conferir se ainda cabe mais alguma peça"
+          "Serve para mostrar à loja e trocar as peças"
         ],
         "a": 1,
         "why": "A foto vira lembrança da espera e ainda mostra, a quem for ajudar, onde ficou cada coisa."
@@ -555,14 +555,10 @@
     "questions": [
       {
         "type": "choice",
-        "q": "Lembra da semana 12? O que os dedinhos do bebê já faziam?",
-        "o": [
-          "Ficavam o tempo todo bem fechadinhos",
-          "Abriam e fechavam, ensaiando agarrar",
-          "Ainda estavam grudadinhos uns nos outros"
-        ],
+        "q": "Segundo a aula, até onde a lagartixa consegue andar?",
+        "o": ["Só no chão", "Até no teto", "Só em paredes molhadas"],
         "a": 1,
-        "why": "Lá na semana 12, os dedinhos já abriam e fechavam, como quem ensaia agarrar, e esse gesto segue fazendo parte dos movimentos lá dentro."
+        "why": "Com os pelinhos finíssimos da sola dos dedos, a lagartixa anda até no teto, sem cola nenhuma."
       },
       {
         "type": "choice",
@@ -586,10 +582,14 @@
       },
       {
         "type": "choice",
-        "q": "Nas pontinhas dos dedinhos do bebê, o que já forma um desenho único?",
-        "o": ["Os pelinhos que grudam", "As linhas das digitais", "As ventosas dos dedos"],
-        "a": 1,
-        "why": "As linhas das digitais, que começaram a se desenhar por volta da semana 13, já formam um desenho único nas pontinhas dos dedos. Pelinhos que grudam são coisa da lagartixa."
+        "q": "Na comparação do fim da aula, o que fazem os dedinhos do bebê e os da lagartixa?",
+        "o": [
+          "Os do bebê fecham, e os da lagartixa grudam",
+          "Os do bebê grudam, e os da lagartixa fecham",
+          "Os dois grudam na parede do mesmo jeito"
+        ],
+        "a": 0,
+        "why": "Dedinhos que fecham, dedinhos que grudam: os do bebê se fecham, como quem ensaia agarrar, e os da lagartixa grudam com pelinhos finíssimos."
       },
       {
         "type": "choice",
@@ -605,7 +605,7 @@
     ]
   },
   "208": {
-    "teach": "Um cartão-postal para a sua própria casa. A ideia é mandar pelo correio, para o seu próprio endereço, um cartão-postal contando como está a espera nesta semana. Pode ser um cartão comprado na banca ou na papelaria, ou um feito em casa, com um desenho na frente. No verso cabem poucas linhas, e é aí que mora a graça: escolher o que contar. Vale a figurinha da semana no app, a música do momento, uma frase que alguém disse, o tempo lá fora. Depois, é só colar o selo, escrever o seu endereço e pôr no correio. Quando o cartão chegar, alguns dias depois, aquela semana já terá virado lembrança, com selo e tudo. Guarde no diário ou no álbum, junto com as outras recordações da espera.",
+    "teach": "Um cartão-postal para a sua própria casa. Lembra da carta para você mesma, uma das ideias do fim do 1º trimestre? Desta vez, o recado é curtinho e vai pelo correio: um cartão-postal para o seu próprio endereço, contando como está a espera nesta semana. Pode ser um cartão comprado na banca ou na papelaria, ou um feito em casa, com um desenho na frente. No verso cabem poucas linhas, e é aí que mora a graça: escolher o que contar. Vale a figurinha da semana no app, a música do momento, uma frase que alguém disse, o tempo lá fora. Depois, é só colar o selo, escrever o seu endereço e pôr no correio. E o mais gostoso vem depois: a espera de alguns dias. Quando o cartão chegar, com o selo e, muitas vezes, um carimbo do correio, aquela semana já terá virado lembrança. Guarde no diário ou no álbum.",
     "funFact": "O cartão-postal mais antigo que se conhece é de 1840 e foi endereçado ao escritor inglês Theodore Hook, que, ao que tudo indica, o mandou para si mesmo.",
     "questions": [
       {
@@ -640,7 +640,7 @@
           "Porque o carteiro escreve uma mensagem"
         ],
         "a": 1,
-        "why": "Quando o cartão chega, alguns dias depois, aquela semana já passou e virou lembrança, com selo e tudo."
+        "why": "Quando o cartão chega, alguns dias depois, aquela semana já passou e virou lembrança."
       },
       {
         "type": "choice",
@@ -1000,7 +1000,7 @@
     ]
   },
   "215": {
-    "teach": "Namkaran: o nome dito ao ouvido. Na tradição hindu, a cerimônia em que o bebê recebe o nome se chama namkaran, um dos ritos que marcam as passagens da vida, e costuma acontecer por volta do 12º dia. A família se reúne, e chega o momento mais delicado: antes de ser anunciado a todos, o nome é sussurrado pela primeira vez ao ouvido do bebê, por alguém da família. Só depois todo mundo ouve. É bonito pensar nesse primeiro sussurro: antes de ser de todos, o nome é um segredo dito bem de pertinho. Um nome é um dos primeiros presentes que alguém recebe, e o namkaran o entrega com cuidado, como quem embrulha uma coisa preciosa. E por aqui? Se quiser, faça como no namkaran: diga o nome, ou o apelido, bem baixinho, só para a barriga.",
+    "teach": "Namkaran: o nome dito ao ouvido. Na tradição hindu, a cerimônia em que o bebê recebe o nome se chama namkaran, um dos ritos que marcam as passagens da vida, e costuma acontecer por volta do 12º dia. A família se reúne, e chega o momento mais delicado: antes de ser anunciado a todos, o nome é sussurrado pela primeira vez ao ouvido do bebê, por alguém da família. Só depois todo mundo ouve. É bonito pensar nesse primeiro sussurro: antes de ser de todos, o nome é um segredo dito bem de pertinho. Um nome é um dos primeiros presentes que alguém recebe, e o namkaran o entrega com cuidado, como quem embrulha uma coisa preciosa.",
     "funFact": "A palavra namkaran junta duas do sânscrito: nama, nome, e karan, fazer. E nama é parente do nosso 'nome', que veio do latim nomen: as duas descendem de uma mesma língua muito antiga.",
     "questions": [
       {
@@ -1047,14 +1047,14 @@
       },
       {
         "type": "choice",
-        "q": "Segundo a aula, como fazer por aqui do jeito do namkaran?",
+        "q": "Com que imagem a aula descreve o jeito como o namkaran entrega o nome?",
         "o": [
-          "Anunciar o nome numa festa, para todos de uma vez",
-          "Dizer o nome, ou o apelido, baixinho para a barriga",
-          "Escrever o nome num papel e guardar num envelope"
+          "Como quem escreve um nome na areia",
+          "Como quem embrulha uma coisa preciosa",
+          "Como quem acende uma vela na janela"
         ],
         "a": 1,
-        "why": "Do jeito do namkaran, o convite é dizer o nome, ou o apelido, bem baixinho, só para a barriga."
+        "why": "Um nome é um dos primeiros presentes que alguém recebe, e o namkaran o entrega com cuidado, como quem embrulha uma coisa preciosa."
       }
     ]
   },
@@ -1296,7 +1296,7 @@
     ]
   },
   "220": {
-    "teach": "Alguém vem passar uns dias? Se uma pessoa querida, da família ou do coração, vier ficar com vocês depois da chegada do bebê, vale uma conversa antes, com calma, enquanto a espera ainda corre. De um lado, o que cada um imagina desses dias: o que essa pessoa espera viver aí, o que vocês gostariam de pedir e o que preferem fazer do seu jeito. Do outro, o lado de quem vem: do que essa pessoa gosta, que programa não perde na TV, que cantinho da casa vai ser dela, se quer um tempo para passear ou rever amigos na cidade. É um jeito de receber bem, como quem prepara a casa para uma visita querida: quem chega para ajudar também merece ser bem cuidado. E, se ninguém vier ficar, tudo bem: a mesma conversa serve para quem vem dar uma mão por algumas horas.",
+    "teach": "Alguém vem passar uns dias? Quem vem para ajudar também merece ser bem recebido. Se uma pessoa querida, da família ou do coração, vier ficar com você depois da chegada do bebê, vale uma conversa antes, com calma, enquanto a espera ainda corre, começando pelo lado de quem chega: do que essa pessoa gosta, que programa não perde na TV, que cantinho da casa vai ser dela, se quer um tempo para passear ou rever amigos na cidade. Depois, entra o que cada um imagina desses dias: o que essa pessoa espera viver aí, o que você gostaria de pedir e o que prefere fazer do seu jeito. É como preparar a casa para uma visita querida. E, se ninguém vier ficar, tudo bem: a mesma conversa serve para quem vem dar uma mão por algumas horas.",
     "funFact": "Entre os igbos, um dos maiores povos da Nigéria, existe o omugwo: em geral, a mãe da nova mãe passa um tempo na casa da filha, ajudando com o bebê e com a casa.",
     "questions": [
       {
@@ -1305,10 +1305,10 @@
         "o": [
           "Um contrato assinado com os combinados",
           "Uma reforma no quarto onde a pessoa vai ficar",
-          "Uma conversa sobre o que cada um imagina"
+          "Uma conversa com calma, ainda na espera"
         ],
         "a": 2,
-        "why": "O novo é a conversa antes, com calma, sobre o que cada um imagina desses dias."
+        "why": "Vale uma conversa antes, com calma, enquanto a espera ainda corre: primeiro o lado de quem chega, depois o que cada um imagina desses dias."
       },
       {
         "type": "multi",
@@ -1316,24 +1316,24 @@
         "o": [
           "Que roupa a pessoa vai trazer na mala",
           "O que essa pessoa espera viver aí",
-          "O que vocês gostariam de pedir",
+          "O que você gostaria de pedir",
           "Quais fotos vão para o álbum da família",
-          "O que vocês preferem fazer do seu jeito"
+          "O que você prefere fazer do seu jeito"
         ],
         "a": [1, 2, 4],
-        "why": "O que a pessoa espera, o que vocês gostariam de pedir e o que preferem fazer do seu jeito entram na conversa. A mala e o álbum não eram o assunto."
+        "why": "O que essa pessoa espera viver aí, o que você gostaria de pedir e o que prefere fazer do seu jeito entram na conversa. A mala e o álbum não eram o assunto."
       },
       {
         "type": "multi",
         "q": "Marque o que a aula sugeriu conhecer do lado de quem vem (marque todas):",
         "o": [
           "Que programa não perde na TV",
-          "Que lembrança quer levar na volta",
+          "Quanto custou a passagem",
           "Que cantinho da casa vai ser dela",
-          "Que cor prefere para as toalhas"
+          "Que horas sai o ônibus dela"
         ],
         "a": [0, 2],
-        "why": "Do lado de quem vem, entram o programa que a pessoa não perde na TV, o cantinho da casa que vai ser dela e se quer um tempo para passear ou rever amigos."
+        "why": "Do lado de quem chega, entram do que essa pessoa gosta, o programa que não perde na TV, o cantinho da casa que vai ser dela e se quer um tempo para passear. O preço da passagem e o horário do ônibus não eram o assunto."
       },
       {
         "type": "choice",
@@ -1415,7 +1415,7 @@
     ]
   },
   "222": {
-    "teach": "Ovos coloridos: a pêssanka. Na Ucrânia, uma tradição antiga da primavera, ligada à Páscoa, é a pêssanka: um ovo decorado com cera e tinta, em linhas, estrelas, flores e espigas que passam de geração em geração. A cera cobre o que deve ficar de uma cor, o ovo vai mergulhando em tintas cada vez mais escuras e, no fim, a cera é derretida e o desenho aparece inteiro. A tradição veio para o Brasil com as famílias ucranianas, e no Paraná, em cidades como Prudentópolis, as pêssankas seguem enfeitando as casas. Que tal criar a de vocês num ovo de madeira, com tinta ou canetinha? Cada desenho pode guardar uma lembrança desta espera: a fruta da semana em que você soube, a primeira letra do apelido da barriga, uma linha para cada pessoa da casa. Depois, escreva a data embaixo e deixe na estante.",
+    "teach": "Ovos coloridos: a pêssanka. Na Ucrânia, uma tradição antiga da primavera, ligada à Páscoa, é a pêssanka: um ovo decorado com cera e tinta, em linhas, estrelas, flores e espigas que passam de geração em geração. A cera cobre o que deve ficar de uma cor, o ovo vai mergulhando em tintas cada vez mais escuras e, no fim, a cera é derretida e o desenho aparece inteiro. A tradição veio para o Brasil com as famílias ucranianas, e no Paraná, em cidades como Prudentópolis, as pêssankas seguem enfeitando as casas. Que tal criar a sua num ovo de madeira, com tinta ou canetinha? Cada desenho pode guardar uma lembrança desta espera: a fruta da semana em que você soube, a primeira letra do apelido da barriga, uma linha para cada pessoa querida. Depois, escreva a data embaixo e deixe na estante.",
     "funFact": "O nome pêssanka vem de pysaty, verbo ucraniano que quer dizer escrever: os desenhos não são pintados com pincel, e sim escritos com cera.",
     "questions": [
       {
@@ -1445,7 +1445,7 @@
       },
       {
         "type": "multi",
-        "q": "Marque as ideias desta aula para a pêssanka de vocês (marque todas):",
+        "q": "Marque as ideias desta aula para a sua pêssanka (marque todas):",
         "o": [
           "Usar um ovo de madeira",
           "Guardar lembranças desta espera nos desenhos",
@@ -1459,7 +1459,7 @@
       {
         "type": "choice",
         "q": "O que quer dizer pysaty, o verbo ucraniano que deu nome à pêssanka?",
-        "o": ["Pintar", "Enfeitar", "Escrever", "Colorir"],
+        "o": ["Cantar", "Guardar", "Escrever", "Plantar"],
         "a": 2,
         "why": "Pysaty quer dizer escrever: os desenhos da pêssanka não são pintados com pincel, e sim escritos com cera."
       }
@@ -1491,14 +1491,14 @@
       },
       {
         "type": "choice",
-        "q": "Na conversa com quem vem passar uns dias, qual é o assunto?",
+        "q": "Na revisão: o que entra na conversa com quem vem passar uns dias?",
         "o": [
-          "Os presentes que a pessoa vai trazer",
+          "Os presentes que a pessoa vai trazer para o bebê",
           "As fotos que vão para o álbum",
-          "O que cada um imagina desses dias"
+          "O lado de quem chega e o que cada um imagina"
         ],
         "a": 2,
-        "why": "A conversa é sobre o que cada um imagina desses dias: o que a pessoa espera, o que vocês gostariam de pedir e o que preferem fazer do seu jeito."
+        "why": "A conversa começa pelo lado de quem chega, do que essa pessoa gosta ao cantinho que vai ser dela, e segue pelo que cada um imagina desses dias."
       },
       {
         "type": "choice",
@@ -1577,22 +1577,22 @@
     ]
   },
   "225": {
-    "teach": "Um haicai para a barriga. O haicai é um poeminha japonês bem curtinho, de três versos: o primeiro com cinco sílabas, o segundo com sete e o terceiro com cinco de novo. Não precisa rimar nem contar uma história inteira: guarda só um instante, como uma foto feita de palavras. O mais famoso de todos, escrito em 1686 pelo poeta Matsuo Bashô, fala de um velho tanque, de uma rã que pula e do barulhinho da água. Só isso, e cabe um mundo inteiro ali. Que tal escrever um haicai sobre a barriga ou sobre o bebê? Vale um instante bem simples da sua semana: o carinho da manhã na barriga, o apelido dito baixinho, a fruta nova no app. E não precisa acertar a conta das sílabas: o que importa é o instante guardado. Se quiser, mostre o seu num post da Comunidade e leia os das outras gestantes.",
+    "teach": "Um haicai para a barriga. O haicai é um poeminha japonês curtinho, em três partes: a primeira com cinco sons, a segunda com sete e a terceira com cinco de novo. Em português, as partes viraram versos, e os sons, sílabas. Não precisa rimar nem contar uma história inteira: guarda só um instante, como uma foto feita de palavras. O mais famoso de todos, escrito em 1686 pelo poeta Matsuo Bashô, fala de um velho tanque, de uma rã que pula e do barulhinho da água. Que tal escrever um haicai sobre a barriga ou sobre o bebê? Vale um instante bem simples: o carinho da manhã na barriga, o apelido dito baixinho, a fruta nova no app. E não precisa acertar a conta das sílabas: o que importa é o instante guardado. Se quiser, mostre o seu num post da Comunidade e leia os das outras gestantes.",
     "funFact": "No haicai tradicional japonês, costuma aparecer um kigo, uma palavra que lembra a estação do ano. No poema de Bashô, o kigo é a rã, que no haicai indica a primavera.",
     "questions": [
       {
         "type": "choice",
-        "q": "Quantos versos tem um haicai?",
-        "o": ["Dois versos", "Três versos", "Quatro versos"],
+        "q": "Em quantas partes o haicai se divide?",
+        "o": ["Duas partes", "Três partes", "Quatro partes"],
         "a": 1,
-        "why": "O haicai tem três versos, e cada um guarda um pedacinho do instante."
+        "why": "O haicai se divide em três partes, que em português viraram três versos, e cada uma guarda um pedacinho do instante."
       },
       {
         "type": "choice",
-        "q": "Como fica a conta de sílabas do haicai, verso por verso?",
+        "q": "Como fica a conta do haicai, parte por parte?",
         "o": ["Sete, cinco e sete", "Cinco, sete e cinco", "Cinco, cinco e cinco"],
         "a": 1,
-        "why": "O primeiro verso tem cinco sílabas, o segundo tem sete e o terceiro, cinco de novo."
+        "why": "A primeira parte tem cinco sons, a segunda tem sete e a terceira, cinco de novo. Em português, os sons viraram sílabas."
       },
       {
         "type": "choice",
@@ -1632,7 +1632,7 @@
     ]
   },
   "226": {
-    "teach": "A sua mala e a de quem vai junto. A mala da maternidade também tem a sua parte, com o que faz você se sentir em casa: um carregador de fio comprido, porque a tomada nem sempre fica pertinho, o celular com espaço livre para muitas fotos, uma fronha trazida de casa, um chinelo, um livro e uma roupa de que você goste, para as fotos. Quem for com você também leva uma mochila própria: carregador, um casaco, um lanchinho, uma muda de roupa e algo para passar o tempo, como um fone de ouvido. Para fechar, vale um combinado simples: quem leva a mala e onde ela fica guardada, para todo mundo saber onde achar. Pode ser no armário do quarto, com a mochila ao lado. Uma mala pensada com carinho também leva um pedacinho de casa.",
+    "teach": "A sua mala e a de quem vai junto. A mala da maternidade também tem a sua parte, com o que faz você se sentir em casa: um carregador de fio comprido, porque a tomada nem sempre fica pertinho, o celular com espaço livre para muitas fotos, uma fronha trazida de casa, um chinelo, um livro e uma roupa de que você goste, para as fotos. Quem for com você também leva uma mochila própria: carregador, um casaco, um lanchinho, uma muda de roupa e algo de que goste, como um fone de ouvido. Para fechar, vale combinar quem leva a mala e esconder na mochila de quem vai junto um bilhetinho seu, de surpresa. Uma mala pensada com carinho também leva um pedacinho de casa.",
     "funFact": "A mala de rodinhas parece invenção antiga, mas só começou a fazer sucesso nos anos 1970: em 1972, o americano Bernard Sadow patenteou a sua.",
     "questions": [
       {
@@ -1668,18 +1668,18 @@
           "Balões e uma faixa de boas-vindas"
         ],
         "a": 1,
-        "why": "A mochila de quem vai junto leva carregador, casaco, lanchinho, uma muda de roupa e algo para passar o tempo."
+        "why": "A mochila de quem vai junto leva carregador, casaco, lanchinho, uma muda de roupa e algo de que a pessoa goste, como um fone de ouvido."
       },
       {
         "type": "choice",
-        "q": "Que combinado a aula sugeriu para a mala?",
+        "q": "Segundo a aula, o que vale esconder na mochila de quem vai junto?",
         "o": [
-          "Quem desfaz a mala na volta para casa",
-          "Quem leva a mala e onde ela fica",
-          "Que cor vão ter a mala e a mochila"
+          "Um bilhetinho seu, de surpresa",
+          "Os presentes de quem vier visitar",
+          "A lista do que ainda falta comprar"
         ],
-        "a": 1,
-        "why": "Combinar quem leva a mala e onde ela fica guardada ajuda todo mundo a saber onde achar."
+        "a": 0,
+        "why": "Um bilhetinho seu, escondido na mochila de quem vai junto, é um carinho de surpresa para a pessoa achar."
       },
       {
         "type": "choice",
@@ -1801,7 +1801,7 @@
     ]
   },
   "229": {
-    "teach": "A camiseta assinada da espera. Sabe as camisetas que a turma assina no último dia de aula, todo mundo junto, no mesmo dia? Dá para fazer uma assim para esta fase. Escolha uma camiseta branca, coloque um papelão por dentro, para a tinta não passar para as costas, e separe canetas para tecido de várias cores. Num encontro só, como o chá de bebê ou uma tarde com as amigas, deixe a camiseta aberta numa mesa, com as canetas ao lado. Cada pessoa que chegar assina e faz um desenho pequenininho: um coração, um solzinho, uma carinha sorrindo. Não precisa de frase nenhuma: a graça está em ver todos os nomes juntos, espalhados pela camiseta inteira. Quando a tinta secar, vista a camiseta para uma foto da barriga, cercada de nomes queridos.",
+    "teach": "A camiseta assinada da espera. Sabe as camisetas que a turma assina no último dia de aula, todo mundo junto, no mesmo dia? Dá para fazer uma assim para esta fase. Escolha uma camiseta branca, coloque um papelão por dentro, para a tinta não passar para as costas, e separe canetas para tecido de várias cores. Num encontro só, numa tarde com as amigas ou numa reunião de família, deixe a camiseta aberta numa mesa. Cada pessoa que chegar assina e faz um desenho pequenininho: um coração, um solzinho, uma carinha sorrindo. Não precisa de frase nenhuma: a graça está em ver todos os nomes juntos, espalhados pela camiseta inteira. Quando a tinta secar, é só vestir: na foto da barriga, você aparece cercada de nomes queridos, como num abraço de todo mundo ao mesmo tempo.",
     "funFact": "Em inglês, a camiseta se chama T-shirt porque, esticada sobre a mesa, tem o formato da letra T.",
     "questions": [
       {
@@ -1817,14 +1817,14 @@
       },
       {
         "type": "choice",
-        "q": "Por que colocar um papelão por dentro da camiseta?",
+        "q": "O que a aula sugere fazer quando a tinta secar?",
         "o": [
-          "Para a tinta secar mais depressa",
-          "Para a camiseta não amassar na gaveta",
-          "Para a tinta não passar para as costas"
+          "Guardar a camiseta numa caixa, sem usar",
+          "Dar a camiseta a quem assinou primeiro",
+          "Vestir a camiseta numa foto da barriga"
         ],
         "a": 2,
-        "why": "O papelão por dentro segura a tinta das canetas, que assim não passa para as costas da camiseta."
+        "why": "Quando a tinta secar, é só vestir: na foto da barriga, você aparece cercada de nomes queridos."
       },
       {
         "type": "choice",
@@ -1864,7 +1864,7 @@
     ]
   },
   "230": {
-    "teach": "Revisão da semana 32: das unhas à camiseta. Do tamanho de um aipo, com cerca de 42,4 cm e 1,7 kg, o bebê está com as unhas dos pés formadinhas, feitas de queratina, a proteína dos cabelos, num caminho que começou lá pela semana 11. Você conheceu o haicai, o poeminha japonês de cinco, sete e cinco sílabas que guarda só um instante. Na preparação, entrou a sua parte da mala, com o carregador de fio comprido e a fronha de casa, e a mochila de quem vai junto. Depois vieram as cartas do 'abra quando', escritas pela rede e guardadas numa caixa bonita, sem conselho, só carinho. No mundo do bebê, o fundo do mar mostrou que o escuro também brilha, com bichos que fazem a própria luz. E a semana fechou com a camiseta assinada num encontro só, cheia de nomes e desenhos de quem espera com você.",
+    "teach": "Revisão da semana 32: das unhas à camiseta. Do tamanho de um aipo, com cerca de 42,4 cm e 1,7 kg, o bebê está com as unhas dos pés formadinhas, feitas de queratina, a proteína dos cabelos, num caminho que começou lá pela semana 11. Você conheceu o haicai, o poeminha japonês de cinco, sete e cinco sons que guarda só um instante. Na preparação, entrou a sua parte da mala, com o carregador de fio comprido e a fronha de casa, e a mochila de quem vai junto. Depois vieram as cartas do 'abra quando', escritas pela rede e guardadas numa caixa bonita, sem conselho, só carinho. No mundo do bebê, o fundo do mar mostrou que o escuro também brilha, com bichos que fazem a própria luz. E a semana fechou com a camiseta assinada num encontro só, para vestir numa foto da barriga, cercada de nomes queridos.",
     "funFact": "Na semana que vem, a figurinha do app vira o abacaxi, que na tabela marca cerca de 43,7 cm e 1,9 kg, e a novidade é sobre o sistema imunológico.",
     "questions": [
       {
@@ -1889,14 +1889,14 @@
         "type": "multi",
         "q": "Marque o que esta semana contou sobre o haicai e sobre o fundo do mar (marque todas):",
         "o": [
-          "O haicai tem três versos",
+          "O haicai tem três partes",
           "O haicai precisa rimar",
           "Muitos bichos do fundo do mar fazem luz",
           "Lá no fundo do mar, o sol chega forte",
           "O haicai guarda um instante, como uma foto"
         ],
         "a": [0, 2, 4],
-        "why": "O haicai tem três versos e guarda um instante, sem precisar rimar. E, no fundo do mar, onde o sol não chega, muitos bichos fazem a própria luz."
+        "why": "O haicai tem três partes e guarda um instante, sem precisar rimar. E, no fundo do mar, onde o sol não chega, muitos bichos fazem a própria luz."
       },
       {
         "type": "multi",
@@ -2681,7 +2681,7 @@
         "type": "choice",
         "q": "Quem fez os desenhos do livro 'Kids Say the Darndest Things', de 1957?",
         "o": [
-          "Walt Disney, o criador do Mickey",
+          "Hergé, o criador do Tintim",
           "Charles Schulz, o criador do Snoopy",
           "Mauricio de Sousa, o criador da Mônica"
         ],
@@ -2743,19 +2743,19 @@
     ]
   },
   "248": {
-    "teach": "Um passeio falado pela casa. Que tal um passeio pela casa a dois, cada um narrando um cômodo para a barriga? Você começa, por exemplo, pela cozinha, quem está ao seu lado continua na sala, e vocês vão se revezando até o fim. Cada um conta do seu jeito: tem quem faça como guia de museu, apontando cada detalhe, e quem narre como num jogo de futebol, com direito a grito de gol na chegada ao cantinho do bebê. Na sua vez, cada um escolhe o que mostrar: o sofá dos filmes de domingo, a janela de onde se vê a rua, a planta que já cresceu tanto. Ninguém precisa caprichar: errar o caminho e cair na risada também faz parte. E, se você mora sozinha, o passeio pode ser só seu, ou ganhar companhia por chamada de vídeo.",
+    "teach": "Um passeio falado pela casa. Que tal narrar a casa para a barriga num revezamento com alguém querido, ao vivo ou por chamada de vídeo? É como a cartinha do pet da semana 17, que contava ao bebê como é a casa, só que agora em voz alta e em revezamento: você começa, por exemplo, pela cozinha, a outra pessoa continua na sala, e vocês vão se alternando até o fim. Cada um conta do seu jeito: tem quem faça como guia de museu, apontando cada detalhe, e quem narre como num jogo de futebol, com direito a grito de gol na chegada ao cantinho do bebê. Na sua vez, cada um escolhe o que mostrar: o sofá dos filmes de domingo, a janela de onde se vê a rua, a planta que já cresceu tanto. Ninguém precisa caprichar: errar o caminho e cair na risada também faz parte. E, se preferir, o passeio pode ser só seu, no seu ritmo.",
     "funFact": "O Guia Michelin nasceu em 1900, na França, criado pelos irmãos donos de uma fábrica de pneus: era distribuído de graça para quem tinha carro, com mapas e dicas de como trocar um pneu.",
     "questions": [
       {
         "type": "choice",
-        "q": "Como funciona o passeio falado a dois?",
+        "q": "Como funciona o passeio falado em revezamento?",
         "o": [
-          "Os dois falam juntos, ao mesmo tempo",
-          "Cada um conta um cômodo, e vocês se revezam",
+          "Vocês falam juntos, ao mesmo tempo",
+          "Cada um narra um cômodo, e vocês se alternam",
           "Um fala, e o outro só grava"
         ],
         "a": 1,
-        "why": "Você começa por um cômodo, quem está ao seu lado continua no outro, e vocês vão se revezando até o fim."
+        "why": "Você começa por um cômodo, a outra pessoa continua no outro, ao vivo ou por chamada de vídeo, e vocês vão se alternando até o fim."
       },
       {
         "type": "multi",
@@ -2791,7 +2791,7 @@
   },
   "249": {
     "teach": "Um bebê feito de água, na água. Nesta reta da gestação, mais de três quartos do corpinho do bebê são água. É mais, em proporção, do que no corpo de um adulto, que tem um pouco mais da metade. Essa água está por toda parte: dentro de cada célula, entre uma célula e outra, nos olhinhos, nos músculos que se espreguiçam. E o bebê ainda vive mergulhado na piscina, um líquido que também é quase só água. Água dentro e água fora: um bebê feito de água, vivendo na água, quentinho no seu mundo. Da próxima vez que você ouvir a chuva caindo ou o barulhinho de uma cachoeira, lembre do bebê aí dentro, boiando no mundo de água em que cresce.",
-    "funFact": "Na natureza, há quem vá ainda mais longe: o corpo da água-viva tem cerca de 95% de água.",
+    "funFact": "Na natureza, há quem vá ainda mais longe: o pepino, figurinha da semana 30 no app, tem cerca de 95% de água.",
     "questions": [
       {
         "type": "choice",
@@ -2826,10 +2826,10 @@
       },
       {
         "type": "choice",
-        "q": "Segundo a curiosidade da aula, qual bicho tem cerca de 95% do corpo feito de água?",
-        "o": ["O polvo", "A água-viva", "O cavalo-marinho"],
+        "q": "Segundo a curiosidade da aula, qual figurinha do app tem cerca de 95% de água?",
+        "o": ["O abacate", "O pepino", "A banana"],
         "a": 1,
-        "why": "A água-viva vai ainda mais longe que o bebê: cerca de 95% do seu corpo é água."
+        "why": "O pepino, figurinha da semana 30, tem cerca de 95% de água: vai ainda mais longe que o corpinho do bebê."
       }
     ]
   },
@@ -2882,7 +2882,7 @@
     ]
   },
   "251": {
-    "teach": "Revisão da semana 35: da pele ao som da casa. Do tamanho de um melão honeydew, o 'orvalho de mel', com cerca de 46,2 cm e 2,4 kg, o bebê está com a pele mais madura e resistente, e as células de fora se arrumam como tijolinhos numa parede. Foi semana de colecionar as pérolas da espera, as frases que fizeram você rir, com quem disse e onde. Depois do chá, ou dos carinhos que chegaram de outro jeito, vieram três passos: agradecer, guardar e contar. Com quem está ao seu lado, a casa ganhou um passeio falado, de cômodo em cômodo, cada um com o seu jeito de contar. No mundo do bebê, você viu que mais de três quartos do corpinho são água, num mundo também de água. E a semana fechou com um minuto de gravação: o retrato sonoro da casa de agora.",
+    "teach": "Revisão da semana 35: da pele ao som da casa. Do tamanho de um melão honeydew, o 'orvalho de mel', com cerca de 46,2 cm e 2,4 kg, o bebê está com a pele mais madura e resistente, e as células de fora se arrumam como tijolinhos numa parede. Foi semana de colecionar as pérolas da espera, as frases que fizeram você rir, com quem disse e onde. Depois do chá, ou dos carinhos que chegaram de outro jeito, vieram três passos: agradecer, guardar e contar. Com alguém querido, ao vivo ou por chamada de vídeo, a casa ganhou um passeio falado em revezamento, de cômodo em cômodo, cada um com o seu jeito de contar. No mundo do bebê, você viu que mais de três quartos do corpinho são água, num mundo também de água. E a semana fechou com um minuto de gravação: o retrato sonoro da casa de agora.",
     "funFact": "Na semana que vem, a figurinha do app vira o mamão, que na tabela marca cerca de 47,4 cm e 2,6 kg, e a novidade é sobre as orelhinhas.",
     "questions": [
       {
@@ -2916,7 +2916,7 @@
         "q": "Marque o que entrou no pós-chá e no passeio pela casa (marque todas):",
         "o": [
           "Mandar um bilhete ou um áudio de agradecimento",
-          "Revezar os cômodos com quem está ao seu lado",
+          "Revezar os cômodos com alguém querido",
           "Fazer o passeio só por escrito, sem voz",
           "Guardar os cartõezinhos que vieram com os presentes",
           "Agradecer só a quem deu um presente grande"
@@ -3125,32 +3125,43 @@
     ]
   },
   "256": {
-    "teach": "A obra escondida na crisálida. Presa a um galho ou a uma folha, a crisálida parece parada, quase uma pedrinha. Mas é ali dentro, longe dos olhos, que a lagarta se reorganiza quase por inteiro, numa das obras mais escondidas da natureza. Grupinhos de células que ela trazia guardados desde cedo vão ganhando forma de antenas, patas e asas, tudo bem dobradinho e em silêncio. Por fora, quase nada muda; por dentro, a obra não para. A obra do bebê também acontece em segredo, semana a semana, aí dentro: nesta semana, por exemplo, são as orelhinhas que ganham firmeza. Ninguém vê de perto, e mesmo assim o trabalho segue, no seu ritmo. E cada figurinha nova do app conta um pedacinho dessa obra.",
+    "teach": "A grande reforma da crisálida. Presa a um galho ou a uma folha, a crisálida guarda uma das maiores reformas da natureza: lá dentro, a lagarta se reorganiza quase por inteiro. E a reforma não começa do zero. Desde cedo, a lagarta já trazia grupinhos de células guardados para essa hora, e são eles que vão ganhando forma de antenas, patas e asas, tudo bem dobradinho. No bebê, a obra é de outro jeito. As partes principais do corpinho se formaram nas primeiras semanas da gestação, e desde então tudo vai crescendo e amadurecendo, um detalhe somado ao outro, sem precisar se refazer. Nesta semana, por exemplo, é a cartilagem das orelhinhas que fica mais firme. E cada figurinha nova do app conta um pedacinho dessa obra.",
     "funFact": "Crisálida não é casulo: casulo é a capinha de seda que muitas mariposas tecem, como o bicho-da-seda, que faz o seu com um fio só, de centenas de metros.",
     "questions": [
       {
         "type": "choice",
-        "q": "Segundo a aula, o que acontece dentro da crisálida?",
+        "q": "Segundo a aula, de onde vêm as antenas, as patas e as asas que se formam na crisálida?",
         "o": [
-          "A lagarta só descansa, sem mudar nada por dentro",
-          "A lagarta se reorganiza quase por inteiro",
-          "A lagarta tece um fio de seda, sem parar"
+          "De um fio de seda tecido ali dentro",
+          "De grupinhos de células guardados desde cedo",
+          "De pedacinhos de folha guardados lá dentro"
         ],
         "a": 1,
-        "why": "Por fora a crisálida parece parada, mas lá dentro a lagarta se reorganiza quase por inteiro."
+        "why": "A reforma não começa do zero: grupinhos de células que a lagarta trazia guardados desde cedo vão ganhando forma de antenas, patas e asas."
       },
       {
         "type": "multi",
-        "q": "Marque o que a aula contou sobre a obra na crisálida (marque todas):",
+        "q": "Marque o que a aula contou sobre a crisálida (marque todas):",
         "o": [
-          "Acontece longe dos olhos, em silêncio",
           "Dura só alguns minutos",
-          "Usa grupinhos de células guardados desde cedo",
-          "Por fora, quase nada muda",
-          "Acontece sempre debaixo da terra"
+          "Fica presa a um galho ou a uma folha",
+          "Guarda uma das maiores reformas da natureza",
+          "Lá dentro, a lagarta se reorganiza quase por inteiro",
+          "É feita de fio de seda, como o casulo"
         ],
-        "a": [0, 2, 3],
-        "why": "A obra acontece longe dos olhos, em silêncio, com grupinhos de células que a lagarta trazia guardados desde cedo, e por fora quase nada muda. A crisálida da aula fica presa a um galho ou a uma folha."
+        "a": [1, 2, 3],
+        "why": "A crisálida fica presa a um galho ou a uma folha e guarda uma das maiores reformas da natureza: lá dentro, a lagarta se reorganiza quase por inteiro. A crisálida não é de seda; o casulo, sim."
+      },
+      {
+        "type": "choice",
+        "q": "E no bebê, como a aula contou que a obra acontece?",
+        "o": [
+          "O corpinho se refaz por inteiro, como a lagarta",
+          "As partes se formaram cedo e vão amadurecendo",
+          "Tudo começa a se formar só nesta semana"
+        ],
+        "a": 1,
+        "why": "As partes principais do corpinho se formaram nas primeiras semanas, e desde então tudo vai crescendo e amadurecendo, sem precisar se refazer."
       },
       {
         "type": "choice",
@@ -3162,17 +3173,6 @@
         ],
         "a": 0,
         "why": "Crisálida não é casulo: o casulo é a capinha de seda que muitas mariposas tecem, como o bicho-da-seda."
-      },
-      {
-        "type": "choice",
-        "q": "Na aula, que parte da obra do bebê nesta semana foi lembrada?",
-        "o": [
-          "As orelhinhas ganhando firmeza",
-          "As unhas começando a aparecer",
-          "Os primeiros fios de cabelo surgindo"
-        ],
-        "a": 0,
-        "why": "Nesta semana, a obra do bebê aparece nas orelhinhas, que ganham firmeza, como a tabela do app destaca."
       }
     ]
   },
@@ -3225,7 +3225,7 @@
     ]
   },
   "258": {
-    "teach": "Revisão da semana 36! Com cerca de 47,4 cm e 2,6 kg, o tamanho de um mamão, o bebê teve uma semana de orelhinhas mais firmes: a cartilagem delas ganha consistência e, diferente de boa parte do esqueleto, continua cartilagem a vida inteira. Você fez a lista das forças que já mostrou na espera, como pedir ajuda e refazer um plano, e conheceu o molde de gesso da barriga, uma lembrança para decorar com calma. Na rede de apoio, a corrente do bem levou uma gentileza pequena de mão em mão. No mundo do bebê, a crisálida mostrou uma obra escondida, que acontece longe dos olhos, como a do bebê aí dentro. E a semana fechou com um retrato seu, desenhado à mão, com a data e o nome de quem desenhou. Uma semana de detalhes firmes e de gestos que passam adiante.",
+    "teach": "Revisão da semana 36! Com cerca de 47,4 cm e 2,6 kg, o tamanho de um mamão, o bebê teve uma semana de orelhinhas mais firmes: a cartilagem delas ganha consistência e, diferente de boa parte do esqueleto, continua cartilagem a vida inteira. Você fez a lista das forças que já mostrou na espera, como pedir ajuda e refazer um plano, e conheceu o molde de gesso da barriga, uma lembrança para decorar com calma. Na rede de apoio, a corrente do bem levou uma gentileza pequena de mão em mão. No mundo do bebê, a crisálida mostrou uma das maiores reformas da natureza, e o bebê, uma obra que vai somando detalhes, sem precisar se refazer. E a semana fechou com um retrato seu, desenhado à mão, com a data e o nome de quem desenhou. Uma semana de detalhes firmes e de gestos que passam adiante.",
     "funFact": "Na semana que vem, a figurinha do app vira a acelga, que na tabela marca cerca de 48,6 cm e 2,9 kg, e a novidade é sobre a cabeça e o corpinho.",
     "questions": [
       {
@@ -3278,8 +3278,8 @@
     ]
   },
   "259": {
-    "teach": "Semana 37: a cabeça, um quarto do corpinho. É essa a proporção que a tabela do app destaca nesta semana, em que o bebê mede cerca de 48,6 cm e pesa por volta de 2,9 kg, mais ou menos o tamanho de uma acelga, a fruta da semana no app. Lá pela semana 11, a cabeça chegava a quase metade do comprimento do corpo. De lá para cá, ela continuou crescendo, mas o resto cresceu ainda mais depressa: o tronco se alongou, as perninhas esticaram, e o corpinho foi alcançando a cabeça, semana a semana. Essa mudança segue depois do nascimento, até a idade adulta: num adulto, a cabeça fica perto de um oitavo da altura, uma régua que muitos desenhistas usam para desenhar gente. Ninguém percebe de um dia para o outro, mas, somadas, as semanas mudaram o desenho inteiro do corpinho.",
-    "funFact": "A 'acelga' das feiras brasileiras costuma ser, na verdade, a couve-chinesa; a acelga verdadeira, de folhas verde-escuras, é parente da beterraba.",
+    "teach": "Semana 37: a cabeça, um quarto do corpinho. É a proporção que a tabela do app destaca nesta semana, em que o bebê mede cerca de 48,6 cm e pesa por volta de 2,9 kg, mais ou menos o tamanho de uma acelga, a fruta da semana no app. Lá pela semana 11, quando a tabela ainda media o corpinho da cabeça ao bumbum, a cabeça chegava a quase metade dessa medida. De lá para cá, ela continuou crescendo, mas o resto cresceu ainda mais depressa: o tronco se alongou, as perninhas esticaram, e o corpinho foi alcançando a cabeça, semana a semana. Essa mudança segue depois do nascimento: num adulto, a cabeça fica perto de um oitavo da altura, uma régua que muitos desenhistas usam para desenhar gente. É uma mudança feita devagarinho, semana somada a semana, que foi redesenhando o corpinho inteiro.",
+    "funFact": "Curiosidade da fruta: a acelga das feiras cresce bem fechadinha, com as folhas de fora abraçando as de dentro; como a luz quase não chega ao miolo, as folhas do centro ficam clarinhas.",
     "questions": [
       {
         "type": "choice",
@@ -3297,10 +3297,10 @@
       },
       {
         "type": "choice",
-        "q": "Lá pela semana 11, quanto do comprimento do corpo a cabeça chegava a ter?",
+        "q": "Lá pela semana 11, quando a tabela media da cabeça ao bumbum, que parte dessa medida era a cabeça?",
         "o": ["Só um quinto", "Quase metade", "Menos de um décimo"],
         "a": 1,
-        "why": "Lá pela semana 11, a cabeça chegava a quase metade do comprimento do corpo. Depois, o resto do corpinho cresceu mais depressa."
+        "why": "Lá pela semana 11, com a medida da cabeça ao bumbum, a cabeça chegava a quase metade. Depois, o resto do corpinho cresceu mais depressa."
       },
       {
         "type": "multi",
@@ -3317,10 +3317,14 @@
       },
       {
         "type": "choice",
-        "q": "Segundo a curiosidade da aula, o que costuma ser a 'acelga' das feiras brasileiras?",
-        "o": ["Uma couve-chinesa", "Uma alface-americana", "Uma couve-manteiga"],
+        "q": "Segundo a curiosidade da fruta, por que as folhas do miolo da acelga ficam clarinhas?",
+        "o": [
+          "Porque a luz quase não chega lá",
+          "Porque são as folhas mais velhas",
+          "Porque guardam mais água que as outras"
+        ],
         "a": 0,
-        "why": "A 'acelga' das feiras costuma ser couve-chinesa; a acelga verdadeira é parente da beterraba."
+        "why": "As folhas de fora abraçam as de dentro, e como a luz quase não chega ao miolo, as folhas do centro ficam clarinhas."
       }
     ]
   },
@@ -3461,7 +3465,7 @@
     ]
   },
   "263": {
-    "teach": "O bagre sente gosto com o corpo todo. Nós guardamos os botões do gosto na boca, a maior parte deles na língua. O bagre foi mais longe: tem botões do gosto espalhados pela pele inteira, da cabeça à cauda, e muitos nos barbilhões, aqueles fios compridos que parecem bigodes. Assim, só de nadar por perto, o bagre sente o gosto do que está na água e encontra o que procura até no escuro do fundo do rio. Não é à toa que há cientistas que chamam o bagre de 'uma língua que nada'. No bebê, como em nós, os botões do gosto ficam na boquinha, a maior parte na linguinha: são aqueles botões escondidos nas papilas, que você conheceu na semana 16, e que seguem amadurecendo aí dentro, no tempo deles.",
+    "teach": "O bagre sente gosto com o corpo todo. Nós guardamos os botões do gosto na boca, a maior parte deles na língua. O bagre foi mais longe: tem botões do gosto espalhados pela pele inteira, da cabeça à cauda, e muitos nos barbilhões, os fios que ficam em volta da boca. Assim, só de nadar por perto, o bagre sente o gosto do que está na água e encontra o que procura. Não é à toa que há cientistas que chamam o bagre de 'uma língua que nada'. No bebê, como em nós, os botões do gosto ficam na boquinha, a maior parte na linguinha: são aqueles botões escondidos nas papilas, que você conheceu na semana 16, e que seguem amadurecendo aí dentro, no tempo deles.",
     "funFact": "No Brasil, os bagres entram no time dos 'peixes de couro', porque não têm escamas: o pintado, o jaú e o mandi são da mesma turma.",
     "questions": [
       {
@@ -3483,17 +3487,17 @@
           "Só sente gosto quando abre a boca",
           "Sente o gosto do que está na água só de nadar perto",
           "Há cientistas que o chamam de 'uma língua que nada'",
-          "Precisa de luz para encontrar o que procura"
+          "Tem o corpo coberto de escamas grandes"
         ],
         "a": [0, 2, 3],
-        "why": "Os barbilhões são cheios de botões do gosto, e o bagre sente o gosto da água só de nadar perto, até no escuro: por isso há quem o chame de 'uma língua que nada'."
+        "why": "Os barbilhões são cheios de botões do gosto, e o bagre sente o gosto da água só de nadar perto: por isso há quem o chame de 'uma língua que nada'. Escamas, o bagre não tem."
       },
       {
         "type": "choice",
-        "q": "Com o que a aula comparou os barbilhões do bagre?",
-        "o": ["Com nadadeiras", "Com antenas", "Com bigodes"],
-        "a": 2,
-        "why": "Os barbilhões são aqueles fios compridos que parecem bigodes, e é neles que o bagre guarda muitos botões do gosto."
+        "q": "Segundo a aula, onde ficam os barbilhões do bagre?",
+        "o": ["Na cauda", "Em volta da boca", "Em cima das nadadeiras"],
+        "a": 1,
+        "why": "Os barbilhões são os fios que ficam em volta da boca do bagre, cheios de botões do gosto."
       },
       {
         "type": "choice",
@@ -3510,7 +3514,7 @@
   },
   "264": {
     "teach": "A entrevista do trimestre está de volta! Na semana 27, a ideia foi gravar, em vídeo ou em áudio, uma entrevista com você mesma, com o convite de repetir lá pela semana 37. As perguntas são as mesmas cinco. Que cor tem este trimestre? O que mais surpreendeu você? Qual é o apelido da barriga agora? Que música não sai da sua cabeça? Que lugar combina com esta fase? Responda do jeito que vier, sem ensaiar, e chame quem está ao seu lado para responder também. Se você gravou na semana 27, ponha as duas gravações lado a lado e repare no que mudou e no que ficou igual: a cor, o apelido, a música, as caras e as risadas. Se não gravou, tudo bem: grave agora e guarde, e, se quiser, compare com o que você lembra daquela fase. Não tem resposta certa nem placar, só lembranças.",
-    "funFact": "Em 1964, um documentário britânico entrevistou crianças de 7 anos e voltou a ouvi-las a cada 7 anos, até 2019: é a série 'Up', que acompanhou as mesmas pessoas por mais de meio século.",
+    "funFact": "Em 1964, um documentário britânico entrevistou crianças de 7 anos e voltou a ouvi-las a cada 7 anos: é a série 'Up', que acompanhou as mesmas pessoas por mais de meio século.",
     "questions": [
       {
         "type": "multi",
@@ -3552,12 +3556,12 @@
         "q": "Na série britânica 'Up', de quanto em quanto tempo as mesmas pessoas voltavam a ser entrevistadas?",
         "o": ["Todo ano", "A cada 7 anos", "Toda década"],
         "a": 1,
-        "why": "A série começou em 1964, com crianças de 7 anos, e voltou a ouvi-las a cada 7 anos, até 2019."
+        "why": "A série começou em 1964, com crianças de 7 anos, e voltou a ouvi-las a cada 7 anos."
       }
     ]
   },
   "265": {
-    "teach": "Revisão da semana 37! Com cerca de 48,6 cm e 2,9 kg, o tamanho de uma acelga, o bebê está com a cabeça perto de um quarto do corpinho; lá pela semana 11, a cabeça chegava a quase metade, e o resto do corpo foi crescendo mais depressa. Você descobriu que 'provável' vem do latim probabilis e que a data provável é uma estimativa, um palpite bem pensado, e não um encontro marcado. Conheceu o ex-libris, a marca 'dos livros de' para os livrinhos do cantinho do bebê, e a noite de jogos com as pessoas queridas, com o placar guardado. No mundo do bebê, o bagre mostrou que dá para ter botões do gosto pela pele inteira. E a entrevista do trimestre voltou, com as mesmas cinco perguntas, para comparar com a semana 27 ou gravar pela primeira vez. Uma semana de palavras antigas, risadas e lembranças.",
+    "teach": "Revisão da semana 37! Com cerca de 48,6 cm e 2,9 kg, o tamanho de uma acelga, o bebê está com a cabeça perto de um quarto do corpinho; lá pela semana 11, da cabeça ao bumbum, a cabeça chegava a quase metade, e o resto do corpo foi crescendo mais depressa. Você descobriu que 'provável' vem do latim probabilis e que a data provável é uma estimativa, um palpite bem pensado, e não um encontro marcado. Conheceu o ex-libris, a marca 'dos livros de' para os livrinhos, e a noite de jogos com as pessoas queridas, com o placar guardado. No mundo do bebê, o bagre mostrou que dá para ter botões do gosto pela pele inteira. E a entrevista do trimestre voltou, com as mesmas cinco perguntas, para comparar com a semana 27 ou gravar pela primeira vez. Uma semana de palavras antigas, risadas e lembranças.",
     "funFact": "Na semana que vem, a figurinha do app vira o alho-poró, que na tabela marca cerca de 49,8 cm e 3,1 kg, e a novidade é sobre as bochechas.",
     "questions": [
       {
@@ -3649,7 +3653,7 @@
     ]
   },
   "267": {
-    "teach": "Uma frase carinhosa só sua. Toda família tem as suas: um 'meu amor' dito de um jeito único, um apelido que ninguém mais usa, uma piada antiga que faz todo mundo rir. Qual é a frase carinhosa que você quer que o bebê ouça muitas e muitas vezes de você? Pode ser curtinha, de duas palavras, e não precisa ser bonita para os outros nem caber num cartão: basta ter a sua cara. Talvez essa frase já exista, escondida no que você diz para a barriga sem pensar; talvez venha de um carinho que alguém dizia para você quando era pequena. A sua voz já é um som conhecido aí dentro, e a frase pode começar a morar nela desde já, nas conversas do dia a dia com a barriga. Escreva num papelzinho e guarde onde possa reler. E, se quiser, quem está ao seu lado pode escolher uma frase também.",
+    "teach": "Uma frase carinhosa só sua. Toda família tem as suas: um 'meu amor' dito de um jeito único, um apelido que ninguém mais usa, uma piada antiga que faz todo mundo rir. Qual é a frase carinhosa que você quer que more nas suas conversas com a barriga? Pode ser curtinha, de duas palavras, e não precisa ser bonita para os outros nem caber num cartão: basta ter a sua cara. Talvez essa frase já exista, escondida no que você diz para a barriga sem pensar; talvez venha de um carinho que alguém dizia para você quando era pequena. A sua voz já é um som conhecido aí dentro, e a frase pode começar desde já, nas conversas do dia a dia. Escreva num papelzinho e guarde onde possa reler. E, se quiser, quem está ao seu lado pode escolher uma frase também.",
     "funFact": "A primeira mensagem de texto enviada a um celular, em 1992, no Reino Unido, saiu de um computador e tinha só duas palavras: 'Merry Christmas', feliz Natal.",
     "questions": [
       {
@@ -3685,7 +3689,7 @@
           "Só depois de escolher o nome"
         ],
         "a": 0,
-        "why": "A sua voz já é um som conhecido aí dentro, e a frase pode começar a morar nela desde já, nas conversas do dia a dia com a barriga."
+        "why": "A sua voz já é um som conhecido aí dentro, e a frase pode começar desde já, nas conversas do dia a dia com a barriga."
       },
       {
         "type": "choice",
@@ -3702,7 +3706,7 @@
     ]
   },
   "268": {
-    "teach": "A agenda leve: o que pode esperar. Nesta fase, a lista do que fazer pode parecer sem fim, e um jeito de deixá-la mais leve é escrever outra lista, com um título bem claro: 'pode esperar'. A faxina geral, a arrumação do armário, os móveis que você queria trocar de lugar, as fotos antigas para organizar, aquela pilha de papéis da gaveta: muita coisa pode ficar para depois das primeiras semanas com o bebê, e a casa continua de pé. Depois, abra a agenda e deixe alguns espaços em branco de propósito, sem compromisso nenhum: dia livre também é plano. Quem está ao seu lado pode fazer a própria lista, e vale comparar as duas, porque às vezes o que pesava para um nem passava pela cabeça do outro. Guarde a folha num lugar fácil de achar e, quando a lista principal apertar, leia o título de novo.",
+    "teach": "A agenda leve: o que pode esperar. Nesta fase, a lista do que fazer pode parecer sem fim, e um jeito de deixá-la mais leve é escrever outra lista, com um título bem claro: 'pode esperar'. As fotos antigas para organizar, aquela pilha de papéis da gaveta, a caixa de cartas para reler, as mensagens que você quer responder com calma: muita coisa pode ficar para depois das primeiras semanas com o bebê, e a casa continua de pé. Depois, abra a agenda e deixe alguns espaços em branco de propósito, sem compromisso nenhum: dia livre também é plano. Quem está ao seu lado pode fazer a própria lista, e vale comparar as duas, porque às vezes o que pesava para um nem passava pela cabeça do outro. Guarde a folha num lugar fácil de achar e, quando a lista principal apertar, leia o título de novo.",
     "funFact": "Num discurso de 1954, o presidente americano Dwight Eisenhower citou a frase de um ex-reitor de universidade: 'tenho dois tipos de problema, os urgentes e os importantes'. A ideia virou a 'matriz de Eisenhower', que separa um do outro.",
     "questions": [
       {
@@ -3727,9 +3731,13 @@
       {
         "type": "choice",
         "q": "Segundo a aula, o que também é plano?",
-        "o": ["Um dia livre na agenda", "A faxina geral da casa", "A pilha de papéis da gaveta"],
+        "o": [
+          "Um dia livre na agenda",
+          "A caixa de cartas para reler",
+          "A pilha de papéis da gaveta"
+        ],
         "a": 0,
-        "why": "Deixar espaços em branco de propósito também é planejar: dia livre também é plano. A faxina e a pilha de papéis estão na lista do que pode esperar."
+        "why": "Deixar espaços em branco de propósito também é planejar: dia livre também é plano. As cartas e a pilha de papéis estão na lista do que pode esperar."
       },
       {
         "type": "choice",
@@ -3790,7 +3798,7 @@
     ]
   },
   "270": {
-    "teach": "As abelhas que conversam dançando. Quando uma abelha-europeia encontra um bom lugar com flores, volta para a colmeia e conta às companheiras o caminho sem dizer uma palavra: dança. Anda em linha reta requebrando o corpinho, faz uma curva para um lado, requebra de novo e faz a curva para o outro, desenhando um oito. A direção do requebrado aponta o caminho em relação ao sol, e quanto mais dura o requebrado, mais longe estão as flores. Quem decifrou esse recado foi o austríaco Karl von Frisch, que ganhou o Prêmio Nobel em 1973. As nossas abelhas sem ferrão, como a jataí, não fazem essa dança. Aí dentro, o bebê também tem os seus gestos sem palavras, como as caretas, os bocejos e as espreguiçadas que você conheceu na semana 24. Esses gestos não pedem tradução: são jeitos do bebê, no tempo do bebê.",
+    "teach": "As abelhas que conversam dançando. Quando uma abelha-europeia encontra um bom lugar com flores, volta para a colmeia e conta às companheiras o caminho sem dizer uma palavra: dança. Anda em linha reta requebrando o corpinho, faz uma curva para um lado, requebra de novo e faz a curva para o outro, desenhando um oito. A direção do requebrado aponta o caminho em relação ao sol, e quanto mais dura o requebrado, mais longe estão as flores. Quem decifrou o recado foi o austríaco Karl von Frisch, que ganhou o Prêmio Nobel em 1973. As nossas abelhas sem ferrão, como a jataí, não fazem essa dança. Aí dentro, o bebê também tem gestos sem palavras, como as caretas, os bocejos e as espreguiçadas que você conheceu na semana 24. Esses gestos não pedem tradução: são jeitos do bebê, no tempo do bebê.",
     "funFact": "A dança acontece no escuro da colmeia, e as companheiras acompanham o recado de pertinho, tocando a dançarina com as antenas.",
     "questions": [
       {
@@ -3802,7 +3810,7 @@
           "Quantas abelhas assistem à dança"
         ],
         "a": 0,
-        "why": "Quanto mais tempo dura o requebrado, mais longe estão as flores; a direção do requebrado aponta o caminho em relação ao sol."
+        "why": "Quanto mais tempo dura o requebrado, mais longe estão as flores."
       },
       {
         "type": "multi",
@@ -3830,15 +3838,19 @@
       },
       {
         "type": "choice",
-        "q": "Verdadeiro ou falso: segundo a aula, é preciso decifrar o que as caretas do bebê querem dizer.",
-        "o": ["Verdadeiro", "Falso"],
+        "q": "Na dança da abelha-europeia, o que a direção do requebrado aponta?",
+        "o": [
+          "A colmeia mais próxima dali",
+          "O caminho em relação ao sol",
+          "A flor de cor mais forte por perto"
+        ],
         "a": 1,
-        "why": "Falso: as caretas, os bocejos e as espreguiçadas do bebê não pedem tradução. São jeitos do bebê, no tempo do bebê."
+        "why": "A direção do requebrado aponta o caminho das flores em relação ao sol, e o tempo do requebrado conta se elas estão perto ou longe."
       }
     ]
   },
   "271": {
-    "teach": "As mãos da família numa folha só. Separe uma folha grande de papel, um pouco de tinta guache e um pincel, e chame quem mora com você e quem mais quiser entrar: a amiga de sempre, a madrinha, a vizinha querida. Cada pessoa escolhe uma cor, pinta a palma da mão e carimba a folha. Ao lado de cada mão vão o nome e a data de hoje. Quem não gosta de tinta pode contornar a mão com lápis de cor e pintar por dentro, e a marca fica igualmente bonita. As mãos de tamanhos e cores diferentes, lado a lado, viram um retrato da família de agora, do jeito que ela é nesta espera. Depois de seca, a folha pode ir para uma moldura na parede ou para uma pasta, junto com as outras lembranças desta fase.",
+    "teach": "As mãos da família numa folha só. Separe uma folha grande de papel, um pouco de tinta guache e um pincel, e chame quem você quiser: a amiga de sempre, a madrinha, a vizinha querida e, se for o caso, quem mora com você. Cada pessoa escolhe uma cor, pinta a palma da mão e carimba a folha. Ao lado de cada mão vão o nome e a data de hoje. Quem não gosta de tinta pode contornar a mão com lápis de cor e pintar por dentro, e a marca fica igualmente bonita. As mãos de tamanhos e cores diferentes, lado a lado, viram um retrato da família de agora, do jeito que ela é nesta espera. Depois de seca, a folha pode ir para uma moldura na parede ou para uma pasta, junto com as outras lembranças desta fase.",
     "funFact": "Na Cueva de las Manos, na Patagônia argentina, há centenas de mãos pintadas na pedra, as mais antigas com mais de 9 mil anos. Muitas são contornos: a tinta era soprada em volta da mão apoiada na parede.",
     "questions": [
       {
@@ -3858,7 +3870,7 @@
           "Todas as mãos levam a mesma cor de tinta"
         ],
         "a": [0, 2],
-        "why": "Cada pessoa escolhe a sua cor, e quem não gosta de tinta contorna a mão com lápis. E entra também quem não mora na mesma casa: quem mais quiser."
+        "why": "Cada pessoa escolhe a sua cor, e quem não gosta de tinta contorna a mão com lápis. E não precisa morar na mesma casa: entra quem você quiser."
       },
       {
         "type": "choice",
@@ -3935,7 +3947,7 @@
   },
   "273": {
     "teach": "Semana 39: a penugem se despede. O bebê mede cerca de 50,7 cm e pesa por volta de 3,3 kg, mais ou menos o tamanho de uma melancia pequena, a figurinha da semana no app. E a tabela traz a notícia da semana: a penugem do corpinho quase toda já caiu. Lembra do casaquinho de penugem, na semana 18? O 2º trimestre contou que o casaquinho sairia de cena quase inteiro ainda aí dentro, depois de cumprir o seu papel, e foi o que aconteceu, devagarinho, nas semanas que passaram. Mas nem todo fio foi embora. Os fios da cabeça, das sobrancelhas e dos cílios não fazem parte do casaquinho: são de outro tipo, e ficam. Dá para imaginar: a pele do corpinho agora quase sem penugem, e o rostinho emoldurado pelas sobrancelhas e pelos cílios.",
-    "funFact": "A melancia veio da África e já aparece em pinturas do Egito antigo, feitas há mais de 4 mil anos.",
+    "funFact": "A melancia veio da África, e pinturas do Egito antigo, de mais de 4 mil anos, já mostram uma fruta grande e listrada parecida com a melancia.",
     "questions": [
       {
         "type": "choice",
@@ -3974,14 +3986,14 @@
       },
       {
         "type": "choice",
-        "q": "Segundo a curiosidade, onde a melancia já aparece há mais de 4 mil anos?",
+        "q": "Segundo a curiosidade, onde aparece, há mais de 4 mil anos, uma fruta listrada parecida com a melancia?",
         "o": [
           "Em cerâmicas do povo inca",
           "Em gravuras de livros chineses",
           "Em pinturas do Egito antigo"
         ],
         "a": 2,
-        "why": "A melancia veio da África e já aparece em pinturas do Egito antigo, feitas há mais de 4 mil anos."
+        "why": "Pinturas do Egito antigo, de mais de 4 mil anos, já mostram uma fruta grande e listrada parecida com a melancia, que veio da África."
       }
     ]
   },
@@ -4034,48 +4046,44 @@
     ]
   },
   "275": {
-    "teach": "Estrelinhas de papel num potinho. Um passatempo gostoso e sem pressa nenhuma: dobrar estrelinhas de papel, uma de cada vez. A estrelinha mais conhecida começa com uma tirinha comprida: um nó numa ponta vira um pentágono, a tirinha dá voltas e mais voltas em torno dele, e, no fim, um apertãozinho em cada lado faz a estrela estufar. Quem preferir pode dobrar passarinhos, barquinhos ou o que souber. Servem papel colorido, páginas de revista e até sobras de papel de presente. As estrelinhas vão para um pote transparente na estante do cantinho do bebê, e o pote não precisa encher: cada estrelinha já enfeita do seu jeito. Dá para dobrar ouvindo uma música, conversando com a barriga ou junto com quem passar por perto e quiser aprender.",
+    "teach": "Barquinhos de papel na estante. Um passatempo gostoso e sem pressa nenhuma: dobrar barquinhos de papel, um de cada vez. O barquinho mais conhecido começa com uma folha retangular dobrada ao meio. As pontas de cima descem até a linha do meio, as abas de baixo sobem, e a folha vira um chapéu, aquele chapéu de jornal das brincadeiras de criança. Depois, o chapéu se abre, ganha mais umas dobras e, puxado pelas pontas, vira barco. Quem souber outras dobraduras pode fazer as suas também. Servem papel colorido, páginas de revista e até sobras de papel de presente. Os barquinhos vão para a estante do cantinho do bebê, enfileirados, e não precisam ser muitos: um barquinho sozinho já enfeita. Dá para dobrar ouvindo uma música, conversando com a barriga ou com quem quiser aprender junto.",
     "funFact": "'Origami' junta duas palavras japonesas: ori, de dobrar, e kami, papel. Em português, essa arte também tem nome próprio: dobradura.",
     "questions": [
       {
         "type": "choice",
-        "q": "Como começa a estrelinha de papel mais conhecida, segundo a aula?",
-        "o": [
-          "Com um quadrado dobrado ao meio várias vezes",
-          "Com uma tirinha comprida e um nó numa ponta",
-          "Com um círculo recortado em cinco pontas"
-        ],
+        "q": "Segundo a aula, em que a folha se transforma antes de virar barquinho?",
+        "o": ["Num leque sanfonado", "Num chapéu de jornal", "Num aviãozinho de papel"],
         "a": 1,
-        "why": "A estrelinha começa com uma tirinha comprida: o nó numa ponta vira um pentágono, a tirinha dá voltas em torno dele e um apertãozinho faz a estrela estufar."
+        "why": "Dobrada ao meio, com as pontas de cima descendo e as abas de baixo subindo, a folha vira um chapéu de jornal; depois, o chapéu se abre e vira barco."
       },
       {
         "type": "multi",
-        "q": "Marque o que a aula sugere para as estrelinhas de papel (marque todas):",
+        "q": "Marque o que a aula sugere para os barquinhos de papel (marque todas):",
         "o": [
           "Usar só papel novo, comprado para isso",
-          "Dobrar uma de cada vez, sem pressa",
-          "Encher o pote até a boca",
+          "Dobrar um de cada vez, sem pressa",
+          "Fazer uma frota bem grande",
           "Aproveitar sobras de papel de presente",
-          "Seguir só o modelo de passarinho"
+          "Fazer só barquinhos, nada de outras dobraduras"
         ],
         "a": [1, 3],
-        "why": "Uma de cada vez, sem pressa, e com o papel que tiver à mão, até sobras de papel de presente. O pote não precisa encher, e vale dobrar o modelo que você souber."
+        "why": "Um de cada vez, sem pressa, e com o papel que tiver à mão, até sobras de papel de presente. Um barquinho sozinho já enfeita, e vale fazer outras dobraduras que você souber."
       },
       {
         "type": "choice",
-        "q": "O que faz a estrela estufar no fim da dobradura?",
+        "q": "Como começa a dobradura do barquinho, segundo a aula?",
         "o": [
-          "Um sopro forte dentro da tirinha",
-          "Uma gota de cola em cada ponta",
-          "Um apertãozinho em cada lado"
+          "Com uma folha retangular dobrada ao meio",
+          "Com um quadrado cortado em quatro partes",
+          "Com um rolinho de papel bem apertado"
         ],
-        "a": 2,
-        "why": "No fim, um apertãozinho em cada lado do pentágono faz a estrela estufar."
+        "a": 0,
+        "why": "O barquinho mais conhecido começa com uma folha retangular dobrada ao meio, que depois vira chapéu e, por fim, barco."
       },
       {
         "type": "choice",
         "q": "O que querem dizer ori e kami, as palavras japonesas que formam 'origami'?",
-        "o": ["Dobrar e papel", "Cortar e colar", "Mão e arte", "Estrela e céu"],
+        "o": ["Dobrar e papel", "Cortar e colar", "Mão e arte", "Linha e agulha"],
         "a": 0,
         "why": "Ori vem de dobrar, e kami quer dizer papel: origami é a arte de dobrar papel, que em português também se chama dobradura."
       }
@@ -4126,87 +4134,87 @@
     ]
   },
   "277": {
-    "teach": "As formigas fazem mapas de cheiro. Quando uma formiga encontra comida, volta para o formigueiro deixando no chão, pelo caminho, uma trilha de cheiro. As companheiras seguem esse rastro com as antenas, que fazem o papel de nariz, e chegam direto ao lugar certo. Cada formiga que volta com comida reforça o cheiro, e o caminho fica cada vez mais marcado. Quando a comida acaba, ninguém mais reforça, o cheiro some aos pouquinhos, e o mapa se apaga sozinho. É um mapa invisível, desenhado por muitas formigas juntas, sem que nenhuma precisasse planejar. Aí dentro, o narizinho do bebê, que você conheceu na semana 17, segue amadurecendo no seu tempo, junto com o sentido dos cheiros.",
-    "funFact": "Um estudo de 2022 estimou que vivem na Terra cerca de 20 quatrilhões de formigas: umas 2,5 milhões para cada pessoa.",
+    "teach": "O cheiro de chuva tem nome. Aquele cheiro que sobe da terra quando a chuva chega depois de dias secos se chama petricor. Quem batizou foram dois cientistas australianos, Isabel Joy Bear e Richard Thomas, em 1964. A palavra junta duas do grego: petra, que quer dizer pedra, e ichor, o líquido que, nos mitos, corria no corpo dos deuses. E o cheiro tem uma história bonita: nos dias secos, algumas plantas soltam óleos que ficam guardados na terra e nas pedras, e, quando as primeiras gotas caem, esse cheiro guardado sobe para o ar. É um cheiro que espera a chuva para aparecer. Aí dentro, o narizinho do bebê, que você conheceu na semana 17, segue amadurecendo no seu tempo, junto com o sentido dos cheiros.",
+    "funFact": "Em 2015, cientistas do MIT, nos Estados Unidos, filmaram com câmeras superrápidas gotas de chuva caindo na terra: cada gota solta no ar bolhinhas minúsculas, que podem levar o cheiro.",
     "questions": [
       {
         "type": "choice",
-        "q": "Segundo a aula, com o que as formigas seguem a trilha de cheiro?",
-        "o": [
-          "Com os olhos, que enxergam as marcas no chão",
-          "Com as antenas, que fazem o papel de nariz",
-          "Com a boca, que prova o chão a cada passo"
-        ],
-        "a": 1,
-        "why": "As formigas seguem a trilha com as antenas, que fazem o papel de nariz."
+        "q": "Como se chama o cheiro que sobe da terra quando a chuva chega depois de dias secos?",
+        "o": ["Maresia", "Serração", "Petricor", "Sereno"],
+        "a": 2,
+        "why": "É o petricor, nome dado em 1964 por dois cientistas australianos. Maresia é o cheiro do mar, e serração e sereno são neblina e umidade da noite."
       },
       {
         "type": "multi",
-        "q": "Marque o que a aula contou sobre a trilha das formigas (marque todas):",
+        "q": "Marque o que a aula contou sobre o petricor (marque todas):",
         "o": [
-          "É feita de folhinhas enfileiradas no chão",
-          "Quem acha comida marca a volta com cheiro",
-          "Quem volta com comida reforça o cheiro",
-          "Sem comida, o cheiro some aos pouquinhos",
-          "Fica marcada no chão para sempre, mesmo sem comida"
+          "Ganhou o nome em 1964, de dois cientistas australianos",
+          "Só aparece em dias de muito sol, sem chuva",
+          "Vem de óleos das plantas guardados na terra",
+          "Ganhou o nome de um rei da Grécia antiga",
+          "Precisa da chuva para subir no ar"
         ],
-        "a": [1, 2, 3],
-        "why": "A trilha é feita de cheiro: quem acha comida marca a volta, quem volta com comida reforça e, sem comida, o cheiro some e o mapa se apaga."
+        "a": [0, 2, 4],
+        "why": "O nome veio em 1964, de dois cientistas australianos, e o cheiro vem de óleos das plantas guardados na terra e nas pedras, que sobem para o ar quando a chuva chega."
       },
       {
         "type": "choice",
-        "q": "Segundo a aula, como está o narizinho do bebê, que você conheceu na semana 17?",
+        "q": "De onde vem a palavra 'petricor'?",
         "o": [
-          "Já parou de crescer, desde a semana 17",
-          "Segue amadurecendo no seu tempo",
-          "Só começa a se formar agora, na semana 39"
+          "Do latim: terra molhada e chuva fina",
+          "Do grego: pedra e o líquido dos deuses",
+          "Do tupi: o cheiro do mato depois da chuva"
         ],
         "a": 1,
-        "why": "O narizinho do bebê, que você conheceu na semana 17, segue amadurecendo no seu tempo, junto com o sentido dos cheiros."
+        "why": "Petricor junta o grego petra, pedra, e ichor, o líquido que, nos mitos, corria no corpo dos deuses."
       },
       {
         "type": "choice",
-        "q": "Segundo um estudo de 2022, quantas formigas vivem na Terra, mais ou menos?",
-        "o": ["Cerca de 20 bilhões", "Cerca de 20 quatrilhões", "Cerca de 20 milhões"],
+        "q": "Segundo a curiosidade, o que cada gota de chuva solta no ar ao bater na terra?",
+        "o": ["Faíscas de luz", "Bolhinhas minúsculas", "Sementinhas de plantas"],
         "a": 1,
-        "why": "O estudo de 2022 estimou cerca de 20 quatrilhões de formigas na Terra, umas 2,5 milhões para cada pessoa."
+        "why": "Filmadas com câmeras superrápidas, as gotas de chuva soltam no ar bolhinhas minúsculas, que podem levar o cheiro."
       }
     ]
   },
   "278": {
-    "teach": "Um brasão para a sua família. Que tal inventar o símbolo de vocês? Desenhe um escudo numa folha e divida em pedaços, um para cada pessoa da casa: o pet, se tiver, pode virar uma patinha, quem ama cozinhar ganha uma colher, quem vive cantando, uma notinha musical. O bebê também ganha o seu, escolhido por vocês: um sol, um barquinho, um desenho que lembre o apelido da barriga. Embaixo, numa faixa, vai o lema, uma frase curtinha que diga o jeito da família, como 'devagar e juntos' ou 'rir é de família'. Se a família for você e o bebê, o escudo fica com dois pedaços, e já é uma família inteira. Pinte com as cores de que vocês mais gostam e pendure na porta, na estante ou no cantinho do bebê.",
+    "teach": "Um lema para a sua família. Muitas cidades e famílias antigas têm um lema, uma frase curtinha que diz o seu jeito. Que tal inventar o de vocês? Cada pessoa da casa sugere uma frase, sem medo de parecer boba: 'devagar e juntos', 'rir é de família', 'cada um do seu jeito, todos juntos'. Depois, leiam todas em voz alta e escolham uma, ou juntem pedaços de duas. A frase escolhida pode ganhar uma moldura simples: um escudo desenhado à mão, com o lema numa faixa embaixo, pendurado na porta ou na estante do cantinho do bebê. Se a família for você e o bebê, o lema pode falar de vocês, e já é o lema de uma família inteira. Guarde também as outras sugestões, num envelope: elas contam como cada um enxerga a casa.",
     "funFact": "Os brasões surgiram na Idade Média, para que os cavaleiros, de rosto escondido pelo elmo, fossem reconhecidos de longe nos torneios. E o lema de Paris, 'Fluctuat nec mergitur', quer dizer 'balança nas ondas, mas não afunda'.",
     "questions": [
       {
         "type": "choice",
-        "q": "O que vai na faixa embaixo do escudo, segundo a aula?",
-        "o": ["O endereço completo da casa", "A data de hoje", "O lema, uma frase curtinha"],
+        "q": "O que a aula propõe que vocês inventem juntos?",
+        "o": [
+          "Uma senha secreta para a casa",
+          "Um hino com várias estrofes",
+          "Um lema para a família"
+        ],
         "a": 2,
-        "why": "Na faixa de baixo vai o lema, uma frase curtinha que diga o jeito da família, como 'devagar e juntos'."
+        "why": "A ideia é inventar um lema, uma frase curtinha que diga o jeito da família, como 'devagar e juntos'."
       },
       {
         "type": "multi",
-        "q": "Marque os símbolos que a aula deu como exemplo para o brasão (marque todas):",
+        "q": "Marque o que combina com a escolha do lema, segundo a aula (marque todas):",
         "o": [
-          "Um leão para quem é mais velho",
-          "Uma colher para quem ama cozinhar",
-          "Uma coroa para quem manda na casa",
-          "Um relógio para quem nunca se atrasa",
-          "Uma notinha musical para quem vive cantando"
+          "Vale só a frase de quem é mais velho",
+          "Cada pessoa da casa sugere uma frase",
+          "Ler todas as sugestões em voz alta",
+          "Jogar fora as sugestões que sobrarem",
+          "Juntar pedaços de duas frases, se quiser"
         ],
-        "a": [1, 4],
-        "why": "A colher de quem ama cozinhar e a notinha musical de quem vive cantando foram exemplos da aula, junto com a patinha do pet. Leão, coroa e relógio não estavam nela."
+        "a": [1, 2, 4],
+        "why": "Cada um sugere a sua frase, todas são lidas em voz alta e dá para juntar pedaços de duas. As que sobram vão para um envelope, porque contam como cada um enxerga a casa."
       },
       {
         "type": "choice",
-        "q": "Segundo a aula, como fica o escudo quando a família é você e o bebê?",
+        "q": "Segundo a aula, o que vale quando a família é você e o bebê?",
         "o": [
-          "Sem lema, só com as cores de que você gosta",
-          "Com dois pedaços: uma família inteira",
-          "Só com o símbolo do bebê, bem no meio"
+          "O lema precisa levar o sobrenome inteiro",
+          "Já é uma família inteira, com lema e tudo",
+          "É melhor pular a atividade desta vez"
         ],
         "a": 1,
-        "why": "Se a família for você e o bebê, o escudo fica com dois pedaços, e já é uma família inteira."
+        "why": "Se a família for você e o bebê, o lema pode falar de vocês, e já é o lema de uma família inteira."
       },
       {
         "type": "choice",
@@ -4222,8 +4230,8 @@
     ]
   },
   "279": {
-    "teach": "Revisão da semana 39: da penugem ao brasão. Do tamanho de uma melancia pequena, com cerca de 50,7 cm e 3,3 kg, o bebê está com a penugem do corpinho quase toda caída; os fios da cabeça, das sobrancelhas e dos cílios ficam, porque são de outro tipo. Você pensou num recado para quem você era no comecinho, escrito ou em áudio, do jeito que sair, e dobrou estrelinhas de papel sem pressa e sem meta, com o papel que tiver à mão. Na Comunidade, a troca foi de filmes e séries, sem estragar o final. Com as formigas, veio um mapa de cheiro, seguido com as antenas, reforçado por quem volta com comida e apagado quando a comida acaba; e o narizinho do bebê segue amadurecendo no seu tempo. E a semana fechou com um brasão inventado, um símbolo para cada pessoa e um lema curtinho, como 'devagar e juntos'.",
-    "funFact": "Lembra das curiosidades? A melancia já aparece em pinturas do Egito antigo, origami junta as palavras japonesas para dobrar e papel, e a primeira sessão de cinema no Brasil foi em 1896, no Rio de Janeiro.",
+    "teach": "Revisão da semana 39: da penugem ao lema. Do tamanho de uma melancia pequena, com cerca de 50,7 cm e 3,3 kg, o bebê está com a penugem do corpinho quase toda caída; os fios da cabeça, das sobrancelhas e dos cílios ficam, porque são de outro tipo. Você pensou num recado para quem você era no comecinho, escrito ou em áudio, do jeito que sair, e dobrou barquinhos de papel, um de cada vez e sem meta, com o papel que tiver à mão. Na Comunidade, a troca foi de filmes e séries, sem estragar o final. O cheiro de chuva ganhou nome, petricor, e vem de óleos das plantas guardados na terra; e o narizinho do bebê segue amadurecendo no seu tempo. E a semana fechou com o lema da família, uma frase curtinha sugerida e escolhida por todos, como 'devagar e juntos'.",
+    "funFact": "Lembra das curiosidades? Uma fruta parecida com a melancia já aparece em pinturas do Egito antigo, origami junta as palavras japonesas para dobrar e papel, e a primeira sessão de cinema no Brasil foi em 1896, no Rio de Janeiro.",
     "questions": [
       {
         "type": "choice",
@@ -4241,30 +4249,30 @@
         "q": "Marque as ideias para você desta semana (marque todas):",
         "o": [
           "Um recado para quem você era no comecinho",
-          "Estrelinhas dobradas sem pressa e sem meta",
-          "Estrelinhas só de papel novo, comprado para isso",
+          "Barquinhos dobrados sem pressa e sem meta",
+          "Barquinhos só de papel novo, comprado para isso",
           "Um recado gravado em áudio, se preferir",
           "Um recado só quando estiver perfeito"
         ],
         "a": [0, 1, 3],
-        "why": "O recado vai do jeito que sair, escrito ou em áudio, e as estrelinhas são dobradas sem pressa e sem meta, com o papel que tiver à mão. Papel novo e recado perfeito ficaram de fora."
+        "why": "O recado vai do jeito que sair, escrito ou em áudio, e os barquinhos são dobrados sem pressa e sem meta, com o papel que tiver à mão. Papel novo e recado perfeito ficaram de fora."
       },
       {
         "type": "multi",
-        "q": "Marque o que esta semana trouxe sobre filmes e formigas (marque todas):",
+        "q": "Marque o que esta semana trouxe sobre filmes e o cheiro de chuva (marque todas):",
         "o": [
           "Ao indicar um filme, nada de estragar o final",
-          "A trilha das formigas fica marcada para sempre",
-          "As formigas seguem a trilha com as antenas",
-          "Quem volta com comida reforça a trilha de cheiro",
+          "O cheiro de chuva se chama maresia",
+          "O cheiro de chuva se chama petricor",
+          "O petricor vem de óleos das plantas guardados na terra",
           "Na Comunidade, a troca foi de livros de cabeceira"
         ],
         "a": [0, 2, 3],
-        "why": "Na troca de filmes e séries, nada de estragar o final; e a trilha das formigas é seguida com as antenas, reforçada por quem volta com comida e apagada quando a comida acaba."
+        "why": "Na troca de filmes e séries, nada de estragar o final; e o cheiro de chuva se chama petricor, que vem de óleos das plantas guardados na terra."
       },
       {
         "type": "choice",
-        "q": "No brasão desta semana, qual destes foi dado como exemplo de lema?",
+        "q": "Na aula do lema da família, qual destes foi dado como exemplo?",
         "o": ["'Cada um por si, sempre'", "'Quem manda aqui sou eu'", "'Devagar e juntos'"],
         "a": 2,
         "why": "'Devagar e juntos' foi um dos lemas de exemplo, uma frase curtinha que diz o jeito da família."
@@ -4355,19 +4363,19 @@
     ]
   },
   "282": {
-    "teach": "A casa pronta para receber vocês. Nesta fase, um combinado gostoso é imaginar como vocês querem encontrar a casa quando voltarem e dividir desde já as tarefas com quem pode dar uma mão. Quem deixa tudo arrumadinho, com a louça lavada e o chão varrido? Quem troca a roupa de cama pelo jogo de lençóis de que você mais gosta? Quem põe uma flor na mesa ou abre as cortinas para a luz entrar? Vale anotar os combinados e deixar a chave com a pessoa certa. E tem uma parte que dá para fazer agora mesmo, com calma: uma plaquinha de boas-vindas para a porta, com um 'bem-vindos' caprichado, de papel, tecido, madeira ou do que tiver em casa. Pode ficar guardada ou já pendurada, dando um ar de festa à espera. Assim, a volta começa antes: num combinado carinhoso e numa porta que já sabe receber.",
+    "teach": "A casa pronta para receber vocês. Nesta fase, uma ideia gostosa é imaginar como vocês querem encontrar a casa quando voltarem e combinar, com calma, quem pode dar uma mão. Quem deixa tudo arrumadinho, com a louça lavada e o chão varrido? Quem troca a roupa de cama pelo jogo de lençóis de que você mais gosta? Quem põe uma flor na mesa ou abre as cortinas para a luz entrar? Vale anotar os combinados. E tem uma parte que dá para fazer agora: uma plaquinha de boas-vindas para a porta, com um 'bem-vindos' caprichado, de papel, tecido, madeira ou do que tiver em casa. Pode ficar guardada ou já pendurada, dando um ar de festa à espera. Assim, a volta começa antes: num combinado carinhoso e numa porta que já sabe receber.",
     "funFact": "Entrar com o pé direito é costume antigo: no Satiricon, livro da Roma antiga escrito por Petrônio, um criado grita aos convidados de um banquete que entrem com o pé direito.",
     "questions": [
       {
         "type": "choice",
-        "q": "Segundo a aula, o que vale combinar desde já?",
+        "q": "Segundo a aula, o que vale imaginar e combinar com calma?",
         "o": [
           "Uma reforma completa da cozinha e do banheiro",
           "A troca dos móveis da sala",
           "Como vocês querem encontrar a casa quando voltarem"
         ],
         "a": 2,
-        "why": "A ideia é imaginar como vocês querem encontrar a casa quando voltarem e dividir as tarefas desde já com quem pode dar uma mão."
+        "why": "A ideia é imaginar como vocês querem encontrar a casa quando voltarem e combinar, com calma, quem pode dar uma mão."
       },
       {
         "type": "multi",
@@ -4384,14 +4392,14 @@
       },
       {
         "type": "choice",
-        "q": "O que dá para fazer agora mesmo, com calma, segundo a aula?",
+        "q": "O que dá para fazer agora, segundo a aula?",
         "o": [
           "Um quadro novo para pendurar acima do sofá",
           "Uma plaquinha de boas-vindas",
           "Uma lista de compras para o mês inteiro"
         ],
         "a": 1,
-        "why": "A plaquinha de boas-vindas, com um 'bem-vindos' caprichado, pode ser feita agora e ficar guardada ou pendurada desde já."
+        "why": "A plaquinha de boas-vindas, com um 'bem-vindos' caprichado, pode ser feita agora e ficar guardada ou já pendurada."
       },
       {
         "type": "choice",
@@ -4403,39 +4411,39 @@
     ]
   },
   "283": {
-    "teach": "Um oi carinhoso para a sua rede. As pessoas queridas pensam em você com carinho nesta fase, e um recado seu, quando der vontade, aproxima quem está perto e quem está longe. A ideia é simples: escolher uma foto de agora, como a vista da janela, você com o pet ou o seu lugar preferido da casa, e mandar com uma frase leve, do seu jeito: 'olha a vista daqui de casa', 'hoje o dia foi de sol e de música', 'lembrei de você', 'mandando um beijo daqui'. Pode ir para o grupo da família, para as amigas, para quem mora em outra cidade. Se preferir, grave um áudio curtinho, com a sua voz contando algo bom do dia. O recado não precisa ser comprido nem caprichado: o que vale é o gesto de lembrar de alguém porque deu vontade, na hora que for boa para você. É um jeito leve de manter a rede pertinho.",
+    "teach": "Uma lembrança boa para alguém querido. Tem recado que é um presente e começa assim: 'lembra daquele dia em que…'. A ideia de hoje é escolher uma pessoa querida e mandar para ela uma lembrança boa que vocês viveram: a risada que não acabava, o bolo que queimou numa festa, a música que vocês cantavam bem alto, a fantasia de carnaval que deu tudo errado. Pode ser por mensagem, num bilhete ou num cartão, do seu jeito, curtinho ou comprido. Não precisa de motivo nem de data especial: lembrar junto já é um carinho. Muitas vezes, a pessoa responde com outra lembrança, e a conversa vira um passeio pelas histórias de vocês. É um jeito leve de manter a rede pertinho, falando do que vocês têm de bom.",
     "funFact": "Antigamente, muitas notícias de família viajavam por telegrama, cobrado por palavra: por isso, as mensagens eram curtinhas, e o ponto final virava duas letras, PT.",
     "questions": [
       {
         "type": "choice",
-        "q": "Que tipo de recado esta aula sugere mandar para a rede?",
+        "q": "Como começa o recado que a aula sugere mandar?",
         "o": [
-          "Uma frase leve com uma foto de agora",
-          "Uma lista de tarefas para cada pessoa",
-          "Um texto comprido contando tudo"
+          "'Você pode me fazer um favor?'",
+          "'Viu a minha foto nova?'",
+          "'Lembra daquele dia em que…'"
         ],
-        "a": 0,
-        "why": "A ideia é uma frase leve, do seu jeito, com uma foto de agora, como 'hoje o dia foi de sol e de música'."
+        "a": 2,
+        "why": "O recado começa com 'lembra daquele dia em que…' e leva para a pessoa querida uma lembrança boa que vocês viveram."
       },
       {
         "type": "multi",
-        "q": "Marque as fotos de agora que a aula deu como ideia (marque todas):",
+        "q": "Marque as lembranças que a aula deu como exemplo (marque todas):",
         "o": [
-          "A vista da janela",
-          "Você com o pet",
-          "Uma foto antiga da escola",
-          "O seu lugar preferido da casa",
-          "Um meme que circula na internet"
+          "A risada que não acabava",
+          "O bolo que queimou numa festa",
+          "Um dia de chuva no trânsito",
+          "A fantasia de carnaval que deu tudo errado",
+          "A nota de uma prova difícil"
         ],
         "a": [0, 1, 3],
-        "why": "A vista da janela, você com o pet e o seu lugar preferido da casa foram as ideias de foto de agora."
+        "why": "A risada que não acabava, o bolo que queimou e a fantasia de carnaval que deu errado foram os exemplos da aula: lembranças boas, vividas junto."
       },
       {
         "type": "choice",
-        "q": "Segundo a aula, quando vale mandar o recado?",
-        "o": ["Todo dia, no mesmo horário", "Nos fins de semana, à noite", "Quando der vontade"],
-        "a": 2,
-        "why": "O recado vai quando der vontade, na hora que for boa para você: é um gesto leve, sem regra."
+        "q": "Verdadeiro ou falso: segundo a aula, a lembrança só vale se for mandada numa data especial.",
+        "o": ["Verdadeiro", "Falso"],
+        "a": 1,
+        "why": "Falso: não precisa de motivo nem de data especial. Lembrar junto já é um carinho."
       },
       {
         "type": "choice",
@@ -4451,50 +4459,46 @@
     ]
   },
   "284": {
-    "teach": "Um bebê feito de poeira de estrelas. O átomo que mais aparece no corpinho do bebê é o hidrogênio, que vem do comecinho do Universo. Quase todos os outros, como o carbono e o nitrogênio, foram forjados há bilhões de anos em estrelas, muito antes de existir a Terra. Lá dentro delas, num calor imenso, átomos mais leves foram se juntando e virando outros, mais pesados. Ao longo de bilhões de anos, as estrelas espalharam esse material pelo espaço, e dele, com o tempo, nasceram o Sol, a Terra, as plantas, os bichos e as pessoas. O astrônomo americano Carl Sagan gostava de dizer que somos feitos de matéria de estrelas. Aí dentro, essa matéria antiquíssima vai virando bebê, célula por célula, no tempo do bebê.",
-    "funFact": "A luz de Alfa do Centauro, uma das estrelas mais brilhantes do céu do Brasil, leva mais de quatro anos para chegar até aqui: olhar o céu é ver um pouquinho do passado.",
+    "teach": "A casa do bebê em outras línguas. O lugar onde o bebê cresce, o útero, ganhou pelo mundo nomes que parecem poesia. Em chinês, o útero se chama zigong, escrito com dois caracteres: o primeiro quer dizer criança, e o segundo, palácio. Ao pé da letra, o palácio da criança. O japonês escreve a palavra com esses mesmos dois caracteres, e o coreano tem uma palavra que nasceu deles. Já em hebraico e em árabe, a palavra para útero vem da mesma raiz da palavra para compaixão, aquele carinho que acolhe e cuida: em hebraico, rehem e rahamim; em árabe, rahim e rahma. Um palácio, um lugar de compaixão: cada língua do seu jeito, todas falando de uma casa feita para acolher. E aí dentro, nesta fase, o bebê segue no seu palácio, quentinho, no tempo do bebê.",
+    "funFact": "Em chinês, o caractere que quer dizer 'bom' junta dois desenhos: o de uma mulher e o de uma criança. O desenho da criança é o mesmo que abre o 'palácio da criança'.",
     "questions": [
       {
         "type": "choice",
-        "q": "Segundo a aula, onde foram forjados quase todos os átomos do corpinho do bebê, fora o hidrogênio?",
-        "o": [
-          "Nos vulcões da Terra",
-          "No fundo do mar, há milhões de anos",
-          "Em estrelas, há bilhões de anos"
-        ],
+        "q": "Ao pé da letra, como o chinês chama o lugar onde o bebê cresce?",
+        "o": ["Jardim do bebê", "Ninho de seda", "Palácio da criança"],
         "a": 2,
-        "why": "Fora o hidrogênio, quase todos os átomos do corpinho foram forjados há bilhões de anos em estrelas, muito antes de existir a Terra."
-      },
-      {
-        "type": "choice",
-        "q": "E o hidrogênio do corpinho, de onde vem?",
-        "o": [
-          "Do comecinho do Universo",
-          "De uma estrela que nasceu este ano",
-          "Do Sol, há poucos anos"
-        ],
-        "a": 0,
-        "why": "O hidrogênio, o átomo que mais aparece no corpinho, é ainda mais antigo que as estrelas: vem do comecinho do Universo."
+        "why": "Em chinês, o útero se chama zigong: um caractere quer dizer criança, e o outro, palácio. É o palácio da criança."
       },
       {
         "type": "multi",
-        "q": "Marque o que esta aula contou sobre os átomos e as estrelas (marque todas):",
+        "q": "Marque o que esta aula contou sobre os nomes da casa do bebê (marque todas):",
         "o": [
-          "O hidrogênio é o átomo que mais aparece no corpinho",
-          "Dentro das estrelas, átomos leves viram outros, mais pesados",
-          "As estrelas surgiram depois da Terra",
-          "Carl Sagan dizia que somos feitos de matéria de estrelas",
-          "A luz das estrelas chega aqui na mesma hora"
+          "Em chinês, o nome tem um caractere só",
+          "Em japonês, a palavra usa os mesmos caracteres do chinês",
+          "Em hebraico, útero quer dizer palácio",
+          "Em hebraico, útero e compaixão vêm da mesma raiz",
+          "Em árabe, rahim e rahma são da mesma família"
         ],
-        "a": [0, 1, 3],
-        "why": "O hidrogênio é o átomo que mais aparece no corpinho; nas estrelas, átomos leves viram outros, mais pesados; e Sagan dizia que somos feitos de matéria de estrelas. As estrelas são bem mais antigas que a Terra, e a luz delas demora a chegar."
+        "a": [1, 3, 4],
+        "why": "O japonês usa os mesmos dois caracteres do chinês, e em hebraico e em árabe útero e compaixão vêm da mesma raiz. Palácio é o sentido do nome chinês, que tem dois caracteres."
       },
       {
         "type": "choice",
-        "q": "Quanto tempo a luz de Alfa do Centauro leva para chegar até aqui?",
-        "o": ["Cerca de um segundo", "Mais de quatro anos", "Cerca de um mês"],
+        "q": "Em hebraico e em árabe, a palavra para útero vem da mesma raiz de qual palavra?",
+        "o": ["Compaixão", "Liberdade", "Amizade"],
+        "a": 0,
+        "why": "Em hebraico e em árabe, útero e compaixão vêm da mesma raiz: rehem e rahamim; rahim e rahma."
+      },
+      {
+        "type": "choice",
+        "q": "Segundo a curiosidade, o caractere chinês que quer dizer 'bom' junta os desenhos de quê?",
+        "o": [
+          "De um sol e de uma árvore",
+          "De uma mulher e uma criança",
+          "De uma casa com um jardim florido"
+        ],
         "a": 1,
-        "why": "A luz de Alfa do Centauro leva mais de quatro anos para chegar: olhar o céu é ver um pouquinho do passado."
+        "why": "O caractere chinês para 'bom' junta o desenho de uma mulher e o de uma criança, o mesmo desenho que abre o palácio da criança."
       }
     ]
   },
@@ -4547,7 +4551,7 @@
     ]
   },
   "286": {
-    "teach": "Revisão da semana 40: no tempo do bebê. Na semana da abóbora moranga, com cerca de 51,2 cm e 3,4 kg, a tabela trouxe uma frase carinhosa: no tempo do bebê, o encontro de vocês se aproxima. Nos olhinhos, você descobriu o desenho da íris, de risquinhos e dobrinhas, diferente em cada olho. Conheceu duas palavras gregas para o tempo: chronos, o do relógio, e kairós, a ocasião, que hoje muita gente usa para os momentos vividos por inteiro. Na preparação, a ideia foi combinar como encontrar a casa na volta, com uma plaquinha de boas-vindas. Depois, veio a ideia de um oi carinhoso, com uma foto de agora. Você viu que, fora o hidrogênio, que vem do comecinho do Universo, quase todos os átomos do corpinho foram forjados em estrelas. E a semana fechou com a ideia de um cartaz de palavras.",
+    "teach": "Revisão da semana 40: no tempo do bebê. Na semana da abóbora moranga, com cerca de 51,2 cm e 3,4 kg, a tabela trouxe uma frase carinhosa: no tempo do bebê, o encontro de vocês se aproxima. Nos olhinhos, descobriu o desenho da íris, de risquinhos e dobrinhas, diferente em cada olho. Conheceu duas palavras gregas para o tempo: chronos, o do relógio, e kairós, a ocasião, que hoje muita gente usa para os momentos vividos por inteiro. Na preparação, a ideia foi combinar como encontrar a casa na volta, com uma plaquinha de boas-vindas. Depois, a de mandar uma lembrança boa para alguém querido. Aprendeu também nomes lindos para a casa do bebê: o palácio da criança, em chinês, e uma palavra parente de compaixão, em hebraico e em árabe. E a semana fechou com a ideia de um cartaz de palavras.",
     "funFact": "Lembra das curiosidades? A abóbora é um tipo de baga, entrar com o pé direito já aparece num livro da Roma antiga e os telegramas eram cobrados por palavra.",
     "questions": [
       {
@@ -4557,11 +4561,11 @@
           "O desenho da íris é igual nos dois olhos",
           "A figurinha da semana é a abóbora moranga",
           "A íris tem risquinhos e dobrinhas",
-          "Fora o hidrogênio, quase todos os átomos vieram de estrelas",
-          "Os átomos do corpinho surgiram todos nesta semana"
+          "Em chinês, a casa do bebê é o palácio da criança",
+          "Em hebraico, útero quer dizer palácio"
         ],
         "a": [1, 2, 3],
-        "why": "A abóbora moranga, a íris de risquinhos e dobrinhas, diferente em cada olho, e os átomos forjados em estrelas, fora o hidrogênio, foram as descobertas da semana. Esses átomos têm bilhões de anos."
+        "why": "A abóbora moranga, a íris de risquinhos e dobrinhas, diferente em cada olho, e o palácio da criança, do chinês, foram as descobertas da semana. Em hebraico, útero é parente de compaixão."
       },
       {
         "type": "choice",
@@ -4576,12 +4580,12 @@
         "o": [
           "Uma lista de convidados para um almoço",
           "Uma plaquinha de boas-vindas para a porta",
-          "Um oi carinhoso com uma foto de agora",
+          "Uma lembrança boa para alguém querido",
           "Uma reforma no quarto do bebê",
           "Um cartaz com as palavras da espera"
         ],
         "a": [1, 2, 4],
-        "why": "A plaquinha de boas-vindas, o oi carinhoso com uma foto de agora e o cartaz de palavras foram ideias da semana."
+        "why": "A plaquinha de boas-vindas, a lembrança boa para alguém querido e o cartaz de palavras foram ideias da semana."
       },
       {
         "type": "choice",
@@ -4654,61 +4658,57 @@
     ]
   },
   "288": {
-    "teach": "Um quebra-cabeça sem pressa. Cada quebra-cabeça tem os seus prazeres: escolher a imagem, separar as peças por cor, ver o desenho aparecer, peça por peça. A escolha já é metade da graça: uma paisagem de que você gosta, o seu quadro preferido ou até uma foto querida, que muitas lojas e sites transformam em quebra-cabeça. Muita gente começa pelas bordas, as peças de lado reto, que formam a moldura; depois, o miolo vai se completando por cores e detalhes, como uma pintura que aparece aos poucos. Não precisa ter meta: o quebra-cabeça pode morar numa tábua ou num canto da mesa e esperar, sem cobrar nada. Enquanto as mãos trabalham, os pensamentos ficam mais leves, e cada peça que completa o desenho vira um pequeno sorriso do dia. Depois de montado, se você quiser, pode até virar quadro.",
-    "funFact": "Um dos primeiros quebra-cabeças de que se tem notícia foi feito por volta de 1766 pelo inglês John Spilsbury: um mapa colado em madeira e recortado, para ensinar geografia.",
+    "teach": "De repente, barrigas por toda parte. Desde que a espera começou, talvez você repare em coisas que antes passavam batido: outras barrigas na rua, sapatinhos numa vitrine, um nome de que você gosta aparecendo em todo canto, as frutas da tabela do app na feira. Não é que o mundo mudou de uma hora para outra: mudou a sua atenção. Quando uma coisa ganha importância para a gente, o olhar passa a encontrá-la em todo lugar, e parece até que ela se multiplicou. Esse efeito tem nome: ilusão de frequência. Que tal fazer disso uma brincadeira? Anote no diário as coisas em que você passou a reparar nesta fase, das mais fofas às mais curiosas. A lista conta, do seu jeito, o que anda ocupando os seus pensamentos.",
+    "funFact": "A ilusão de frequência junta dois truques da cabeça: a atenção seletiva, que destaca o que importa para a gente no meio de tudo, e o costume de reparar mais nos casos que confirmam o que já notamos.",
     "questions": [
       {
         "type": "choice",
-        "q": "Segundo a aula, por onde muita gente começa o quebra-cabeça?",
-        "o": [
-          "Pelas peças do meio",
-          "Pela peça mais escura",
-          "Pelas bordas, as peças de lado reto"
-        ],
-        "a": 2,
-        "why": "Muita gente começa pelas bordas, as peças de lado reto, que formam a moldura; depois, o miolo vai se completando por cores e detalhes."
+        "q": "Segundo a aula, por que agora você repara em barrigas por toda parte?",
+        "o": ["Porque mudou a sua atenção", "Porque o mundo mudou", "Porque há mais vitrines"],
+        "a": 0,
+        "why": "Não é que o mundo mudou: mudou a sua atenção. Quando uma coisa ganha importância para a gente, o olhar passa a encontrá-la em todo lugar."
       },
       {
         "type": "multi",
-        "q": "Marque os prazeres do quebra-cabeça que a aula citou (marque todas):",
+        "q": "Marque as coisas que a aula diz que você pode passar a reparar (marque todas):",
         "o": [
-          "Montar tudo de uma vez só",
-          "Escolher a imagem",
-          "Separar as peças por cor",
-          "Trocar peças com as amigas",
-          "Ver o desenho aparecer, peça por peça"
+          "Outras barrigas na rua",
+          "Os cachorros da vizinhança",
+          "Sapatinhos numa vitrine",
+          "As frutas da tabela do app na feira",
+          "As notícias do jornal"
         ],
-        "a": [1, 2, 4],
-        "why": "Escolher a imagem, separar as peças por cor e ver o desenho aparecer, peça por peça, são os prazeres da aula, que não pede pressa nem meta."
+        "a": [0, 2, 3],
+        "why": "Outras barrigas, sapatinhos numa vitrine e as frutas do app na feira foram os exemplos da aula, junto com um nome de que você gosta aparecendo em todo canto."
       },
       {
         "type": "choice",
-        "q": "Que imagens a aula dá como ideia para o quebra-cabeça?",
+        "q": "Como se chama o efeito de passar a notar uma coisa em todo lugar?",
+        "o": ["Efeito borboleta", "Memória de elefante", "Ilusão de frequência"],
+        "a": 2,
+        "why": "O efeito se chama ilusão de frequência: a coisa parece ter se multiplicado, mas o que mudou foi a atenção."
+      },
+      {
+        "type": "choice",
+        "q": "Segundo a curiosidade, o que faz a atenção seletiva?",
         "o": [
-          "Uma paisagem, um quadro ou uma foto querida",
-          "Letras e números coloridos",
-          "Personagens de desenho animado"
-        ],
-        "a": 0,
-        "why": "A aula sugere uma paisagem de que você gosta, o seu quadro preferido ou até uma foto querida transformada em quebra-cabeça."
-      },
-      {
-        "type": "choice",
-        "q": "Verdadeiro ou falso: segundo a aula, depois de montado, o quebra-cabeça pode virar quadro.",
-        "o": ["Verdadeiro", "Falso"],
-        "a": 0,
-        "why": "Verdadeiro: depois de montado, se você quiser, o quebra-cabeça pode até virar quadro."
-      },
-      {
-        "type": "choice",
-        "q": "O que era o quebra-cabeça de John Spilsbury, por volta de 1766?",
-        "o": [
-          "Um retrato da família real pintado em vidro",
-          "Um mapa colado em madeira e recortado",
-          "Uma paisagem impressa em papelão"
+          "Apaga as lembranças mais antigas",
+          "Destaca o que importa para a gente",
+          "Deixa tudo com a mesma importância"
         ],
         "a": 1,
-        "why": "O quebra-cabeça de Spilsbury era um mapa colado em madeira e recortado, feito para ensinar geografia."
+        "why": "A atenção seletiva destaca, no meio de tudo, o que importa para a gente; junto com o costume de reparar nos casos que confirmam o que já notamos, ela explica a ilusão de frequência."
+      },
+      {
+        "type": "choice",
+        "q": "O que a aula sugere anotar no diário?",
+        "o": [
+          "Os nomes das ruas do bairro",
+          "As compras que ainda faltam",
+          "As coisas em que você passou a reparar"
+        ],
+        "a": 2,
+        "why": "A ideia é anotar no diário as coisas em que você passou a reparar nesta fase, das mais fofas às mais curiosas."
       }
     ]
   },
@@ -4821,9 +4821,9 @@
         "type": "choice",
         "q": "Que costume do interior do Brasil a curiosidade contou?",
         "o": [
-          "Tocar o sino da igreja ao meio-dia",
+          "Tomar o chá das cinco, à moda inglesa",
           "Pôr cadeiras na calçada no fim da tarde",
-          "Fazer a feira na praça aos domingos"
+          "Usar tamancos de madeira, como na Holanda"
         ],
         "a": 1,
         "why": "Em muitas cidades do interior, as cadeiras vão para a calçada no fim da tarde, e a conversa com os vizinhos chega sem hora marcada."
@@ -4869,7 +4869,7 @@
         "type": "choice",
         "q": "Segundo a aula, como está o rostinho do bebê aí dentro?",
         "o": [
-          "Parado, do mesmo jeito há muitas semanas",
+          "Desenhado de uma vez, numa semana só",
           "Segue se desenhando, no seu tempo",
           "Igualzinho ao de um desenho animado"
         ],
@@ -4945,7 +4945,7 @@
     ]
   },
   "293": {
-    "teach": "Revisão da semana 41: colinho e lembranças. Na semana da jaca pequena, com cerca de 51,7 cm e 3,6 kg, o bebê segue no colinho aí dentro, e a patela dos joelhinhos, a rótula, ainda é de cartilagem: um ossinho sesamoide, que fica dentro de um tendão. Você conheceu os prazeres de um quebra-cabeça sem pressa, das bordas ao desenho que aparece, e o mapa recortado de John Spilsbury. Na preparação, veio a ideia de um livrinho de fotos com legendas. Viu que a companhia pode chegar de mansinho, num suco à tarde ou numa ligação curtinha, e que o ritmo quem escolhe é você. Descobriu como o Mickey foi ganhando olhos maiores e testa mais redonda, enquanto o rostinho do bebê segue se desenhando. E conheceu o herbário, flores guardadas num livro, como Emily Dickinson fez ainda adolescente.",
+    "teach": "Revisão da semana 41: colinho e lembranças. Na semana da jaca pequena, com cerca de 51,7 cm e 3,6 kg, o bebê segue no colinho aí dentro, e a patela dos joelhinhos, a rótula, ainda é de cartilagem: um ossinho sesamoide, que fica dentro de um tendão. Você conheceu a ilusão de frequência, que explica por que, de repente, barrigas parecem estar por toda parte. Na preparação, veio a ideia de um livrinho de fotos com legendas. Viu que a companhia pode chegar de mansinho, num suco à tarde ou numa ligação curtinha, e que o ritmo quem escolhe é você. Descobriu como o Mickey foi ganhando olhos maiores e testa mais redonda, enquanto o rostinho do bebê segue se desenhando. E conheceu o herbário, flores guardadas num livro, como Emily Dickinson fez ainda adolescente.",
     "funFact": "Lembra das curiosidades? A jaca nasce direto no tronco, 'legenda' quer dizer 'o que deve ser lido' e, no interior, as cadeiras vão para a calçada no fim da tarde.",
     "questions": [
       {
@@ -4959,14 +4959,14 @@
         "type": "multi",
         "q": "Marque as ideias da semana 41 (marque todas):",
         "o": [
-          "Um quebra-cabeça montado sem pressa",
+          "Anotar as coisas em que você passou a reparar",
           "Um enxoval inteiro bordado à mão",
           "Um livrinho com as fotos da espera",
           "Uma colcha de retalhos para o quarto",
           "Flores secas guardadas num livro"
         ],
         "a": [0, 2, 4],
-        "why": "O quebra-cabeça sem pressa, o livrinho de fotos e as flores secas no livro foram as ideias da semana."
+        "why": "Anotar o que você passou a reparar, o livrinho de fotos e as flores secas no livro foram as ideias da semana."
       },
       {
         "type": "choice",
@@ -4992,17 +4992,17 @@
         "o": [
           "A jaca nasce direto no tronco da árvore",
           "'Legenda' quer dizer 'o que deve ser lido'",
-          "Spilsbury fez o primeiro quebra-cabeça com fotos",
+          "A ilusão de frequência só acontece na gravidez",
           "Emily Dickinson montou um herbário na adolescência",
           "As cadeiras na calçada são um costume do Japão"
         ],
         "a": [0, 1, 3],
-        "why": "A jaca no tronco, a legenda que deve ser lida e o herbário de Emily Dickinson estavam na semana. O de Spilsbury era um mapa em madeira, e as cadeiras na calçada são do interior do Brasil."
+        "why": "A jaca no tronco, a legenda que deve ser lida e o herbário de Emily Dickinson estavam na semana. A ilusão de frequência acontece com qualquer pessoa, e as cadeiras na calçada são do interior do Brasil."
       }
     ]
   },
   "294": {
-    "teach": "Semana 42: ossinhos do ouvido quase de adulto. Com cerca de 52,2 cm e 3,7 kg, o bebê está na semana da abóbora grande, a figurinha do app, e a tabela diz que o encontro de vocês está pertinho. A curiosidade de hoje mora dentro do ouvido, logo atrás do tímpano, nos três ossinhos que a aula da semana 13 apresentou: o martelo, a bigorna e o estribo, o menor osso do corpo. Juntos, eles formam uma correntinha que leva as vibrações do som até a parte mais funda do ouvido. E têm uma particularidade: enquanto quase todos os outros ossos ainda vão crescer por muitos anos, esses três já estão quase do tamanho que vão ter na vida adulta. Não é novidade desta semana: eles vêm se formando e ficando firmes há muito tempo. O estribo de um bebê nesta fase e o de um adulto têm quase o mesmo tamanho: pecinhas minúsculas que, aí dentro, já quase não precisam crescer.",
+    "teach": "Semana 42: ossinhos do ouvido como os seus. Com cerca de 52,2 cm e 3,7 kg, o bebê está na semana da abóbora grande, a figurinha do app, e a tabela diz que o encontro de vocês está pertinho. A curiosidade de hoje mora dentro do ouvido, logo atrás do tímpano, nos três ossinhos que a aula da semana 13 apresentou: o martelo, a bigorna e o estribo, o menor osso do corpo. Juntos, eles formam uma correntinha que leva as vibrações do som até a parte mais funda do ouvido. E guardam uma surpresa: já têm quase o mesmo tamanho dos seus. O estribo do bebê e o seu são quase iguais, duas pecinhas minúsculas, uma aí dentro e outra no seu ouvido. Não é novidade desta semana: eles vêm se formando e ficando firmes há muito tempo.",
     "funFact": "A abóbora está entre as plantas cultivadas mais antigas das Américas: sementes achadas numa caverna do México mostram que já era plantada ali há cerca de 10 mil anos.",
     "questions": [
       {
@@ -5018,10 +5018,10 @@
         "o": [
           "Ainda são feitos só de cartilagem molinha",
           "Começaram a se formar nesta semana",
-          "Já estão quase do tamanho de adulto"
+          "Já têm quase o mesmo tamanho dos seus"
         ],
         "a": 2,
-        "why": "Enquanto quase todos os outros ossos ainda vão crescer por muitos anos, o martelo, a bigorna e o estribo já estão quase do tamanho que vão ter na vida adulta."
+        "why": "O martelo, a bigorna e o estribo do bebê já têm quase o mesmo tamanho dos seus: o estribo do bebê e o seu são quase iguais."
       },
       {
         "type": "multi",
@@ -5029,18 +5029,18 @@
         "o": [
           "Ficam na parte de fora da orelha",
           "Formam uma correntinha que leva as vibrações do som",
-          "Ainda vão crescer muito durante a infância",
-          "Vêm se formando há muito tempo, aos pouquinhos"
+          "São os maiores ossos do corpinho",
+          "Vêm se formando há muito tempo"
         ],
         "a": [1, 3],
-        "why": "Os três ossinhos ficam dentro do ouvido, logo atrás do tímpano, formam uma correntinha que leva as vibrações do som e vêm se formando há muito tempo. Quase não precisam mais crescer."
+        "why": "Os três ossinhos ficam dentro do ouvido, logo atrás do tímpano, formam uma correntinha que leva as vibrações do som e vêm se formando há muito tempo. E o estribo é o menor osso do corpo, não o maior."
       },
       {
         "type": "choice",
-        "q": "Verdadeiro ou falso: o estribo de um bebê nesta fase é bem menor que o de um adulto.",
+        "q": "Verdadeiro ou falso: o estribo de um bebê nesta fase é bem menor que o seu.",
         "o": ["Verdadeiro", "Falso"],
         "a": 1,
-        "why": "Falso: o estribo de um bebê nesta fase e o de um adulto têm quase o mesmo tamanho."
+        "why": "Falso: o estribo do bebê nesta fase e o seu são quase iguais, duas pecinhas minúsculas."
       },
       {
         "type": "choice",
@@ -5113,7 +5113,7 @@
     ]
   },
   "296": {
-    "teach": "Bandeirinhas para o cantinho do bebê. Na semana 16, as bandeirolas de tecido apareceram entre as ideias de decoração do cantinho do bebê; hoje elas viram um projeto de papel, feito à mão, do molde ao cordão. Comece pelo molde: num pedaço de papelão, desenhe e recorte um triângulo ou a bandeirinha clássica das festas juninas, com o recorte em V embaixo. Depois, use o molde para riscar e recortar os papéis que você tiver: cartolina colorida, mapas velhos, retalhos de papel de parede, papel kraft com desenhos feitos à mão. Para montar, dobre a parte de cima de cada bandeirinha por cima do barbante e cole, deixando um espacinho entre uma e outra. Com o cordão montado, é só prender as pontas na parede do cantinho do bebê, com fita ou ganchinhos. E repare: cada bandeirinha leva junto o papel de onde veio, e o cordão vira um retrato colorido da sua casa.",
+    "teach": "Bandeirinhas de papel, do molde ao cordão. Na semana 16, as bandeirolas de tecido apareceram entre as ideias de decoração do cantinho do bebê; hoje elas viram um projeto feito à mão. Comece pelo molde: num pedaço de papelão, desenhe e recorte um triângulo ou a bandeirinha clássica das festas juninas, com o recorte em V embaixo. Depois, use o molde para riscar e recortar os papéis que você tiver: cartolina colorida, mapas velhos, retalhos de papel de parede, papel kraft com desenhos feitos à mão. Para montar, dobre a parte de cima de cada bandeirinha por cima do barbante e cole, deixando um espacinho entre uma e outra. Com o cordão montado, escolha onde pendurá-lo: na janela, na sala ou onde você quiser; se for no cantinho do bebê, as bandeirinhas podem entrar no lugar de um enfeite que já está lá. E repare: cada bandeirinha leva junto o papel de onde veio, e o cordão vira um retrato colorido da sua casa.",
     "funFact": "Alfredo Volpi, pintor ítalo-brasileiro que cresceu em São Paulo, ficou conhecido como o pintor das bandeirinhas: as das festas juninas viraram tema dos quadros dele a partir dos anos 1950.",
     "questions": [
       {
@@ -5168,7 +5168,7 @@
     ]
   },
   "297": {
-    "teach": "Um obrigado para a Comunidade. Desde que você chegou ao app, talvez alguém da Comunidade tenha deixado a sua espera mais leve: quem contou uma história que fez você rir, quem dividiu uma ideia que você copiou, quem escreveu uma frase que ficou com você. Hoje o convite é fazer um post de agradecimento para essas pessoas, sem precisar citar nomes: 'obrigada a quem contou a história do gato no cesto de roupinhas, ri o dia todo', 'foi lendo vocês que eu me animei a montar o cantinho do bebê'. O segredo é dizer o que aquilo significou, e não só 'obrigada a todas'. E vale também para quem mais lê do que escreve: ler já é fazer parte, e sempre tem um post para lembrar. O agradecimento fica ali, um carinho de volta para quem passar. E a curiosidade de hoje conta que, numa carta de agradecimento, quem escreve costuma imaginar menos alegria do que a que chega do outro lado.",
+    "teach": "Um obrigado para a Comunidade. Talvez alguém da Comunidade já tenha deixado a sua espera mais leve: quem contou uma história que fez você rir, quem dividiu uma ideia que você copiou, quem escreveu uma frase que ficou com você. Hoje o convite é fazer um post de agradecimento para essas pessoas, sem precisar citar nomes: 'obrigada a quem contou a história do gato no cesto de roupinhas, ri o dia todo', 'foi lendo vocês que eu me animei a montar o cantinho do bebê'. O segredo é dizer o que aquilo significou, e não só 'obrigada a todas'. E vale também para quem mais lê do que escreve: ler já é fazer parte, e sempre tem um post para lembrar. O agradecimento fica ali, um carinho de volta para quem passar. E a curiosidade de hoje conta que, numa carta de agradecimento, quem escreve costuma imaginar menos alegria do que a que chega do outro lado.",
     "funFact": "Num estudo de 2018, nos Estados Unidos, quem escreveu uma carta de agradecimento imaginou que a carta traria menos alegria do que de fato trouxe a quem a recebeu.",
     "questions": [
       {
@@ -5340,7 +5340,7 @@
     ]
   },
   "300": {
-    "teach": "Revisão da semana 42, com carinho. Na semana da abóbora grande, os ossinhos do ouvido, com o estribo, o menor osso do corpo, já estão quase do tamanho de adulto. Você foi convidada a escrever a história que contavam para você, começando com 'era uma vez', e a recortar um cordão de bandeirinhas de papel para o cantinho do bebê, como as dos quadros de Volpi. Na Comunidade, a ideia foi um post de agradecimento a quem deixou a sua espera mais leve. Depois vieram o sabiá-laranjeira, símbolo das aves do Brasil, e a 'Canção do Exílio', onde canta um sabiá, com versos que foram parar no Hino. E veio a ideia de refazer uma foto antiga da família e guardar as duas lado a lado. Esta revisão fecha as aulas da gestação no app, e cada curiosidade, cada atividade e cada sementinha do caminho continua com você; a Comunidade está aqui, cheia de companhia. Que a espera siga leve, do seu jeito, no tempo do bebê.",
+    "teach": "Revisão da semana 42, com carinho. Na semana da abóbora grande, os ossinhos do ouvido, com o estribo, o menor osso do corpo, já têm quase o mesmo tamanho dos seus. Você foi convidada a escrever a história que contavam para você, começando com 'era uma vez', e a recortar um cordão de bandeirinhas de papel, como as dos quadros de Volpi. Na Comunidade, a ideia foi um post de agradecimento a quem deixou a sua espera mais leve. Depois vieram o sabiá-laranjeira, símbolo das aves do Brasil, e a 'Canção do Exílio', onde canta um sabiá, com versos que foram parar no Hino. E veio a ideia de refazer uma foto antiga da família e guardar as duas lado a lado. Cada curiosidade, cada atividade e cada sementinha do caminho continua com você, e a Comunidade está aqui, cheia de companhia. Que a espera siga leve, do seu jeito, no tempo do bebê.",
     "funFact": "As curiosidades desta semana foram da terra à poesia: a abóbora plantada há cerca de 10 mil anos, o 'era uma vez' pelo mundo, as bandeirinhas de Volpi, a carta de agradecimento, a 'Canção do Exílio' no Hino e as fotos refeitas de Irina Werning.",
     "questions": [
       {
@@ -5348,23 +5348,23 @@
         "q": "Pela aula do bebê desta semana, o que é verdade sobre os ossinhos do ouvido?",
         "o": [
           "Só começaram a se formar nesta semana",
-          "Ainda vão dobrar de tamanho na infância",
-          "Já estão quase do tamanho de um adulto"
+          "São os maiores ossos do corpinho",
+          "Já têm quase o mesmo tamanho dos seus"
         ],
         "a": 2,
-        "why": "O martelo, a bigorna e o estribo vêm se formando há muito tempo e já estão quase do tamanho que vão ter na vida adulta."
+        "why": "O martelo, a bigorna e o estribo vêm se formando há muito tempo e já têm quase o mesmo tamanho dos seus; o estribo é o menor osso do corpo."
       },
       {
         "type": "multi",
         "q": "Marque as atividades que esta semana sugeriu (marque todas):",
         "o": [
           "Escrever a história que contavam para você",
-          "Pintar a parede inteira do cantinho do bebê",
+          "Pintar um mural inteiro na parede",
           "Recortar bandeirinhas de papel para um cordão",
           "Decorar a história para recitar de cor"
         ],
         "a": [0, 2],
-        "why": "Escrever a história da infância, começando com 'era uma vez', e recortar o cordão de bandeirinhas foram atividades da semana. Pintar a parede e decorar a história não."
+        "why": "Escrever a história da infância, começando com 'era uma vez', e recortar o cordão de bandeirinhas foram atividades da semana. Pintar um mural e decorar a história não."
       },
       {
         "type": "choice",
