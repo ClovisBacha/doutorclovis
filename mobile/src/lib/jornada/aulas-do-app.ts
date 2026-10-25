@@ -20,7 +20,8 @@ import AULAS_DO_3O_TRIMESTRE from "./aulas-do-app.t3.json";
  * nunca seria paga. `aulas-do-app.test.ts` confere dia a dia.
  *
  * Por trimestre, um arquivo: o 1º (D 7–97) saiu em 23/10/2026; o 2º (D 98–195),
- * logo depois; o 3º (D 196–300) vem a seguir.
+ * logo depois; o 3º (D 196–300), em seguida. Com os três, nenhum dia da
+ * gestação cai mais na aula do site.
  */
 const AULAS_DO_APP: Readonly<Record<string, DailyQuiz>> = {
   ...(AULAS_DO_1O_TRIMESTRE as unknown as Record<string, DailyQuiz>),

@@ -26,6 +26,7 @@ const APP = { ...T1, ...T2, ...T3 } as unknown as Record<string, DailyQuiz>;
 const TROCADOS: readonly [number, number][] = [
   [7, 97],
   [98, 195],
+  [196, 300],
 ];
 
 const PROIBIDAS =
@@ -143,10 +144,12 @@ describe("o banco de aulas do app", () => {
     expect(repetidos).toEqual([]);
   });
 
-  test("o carregador dá a aula do app no dia trocado e a do site no resto", async () => {
-    const D = DIAS_COM_AULA_DO_APP[0];
-    if (D != null) expect((await carregarAulaDoDia(D))?.teach).toBe(APP[String(D)]!.teach);
-    expect((await carregarAulaDoDia(200))?.teach).toBe(SITE["200"]!.teach);
+  test("o banco do app cobre a gestação inteira, e o carregador dá a aula dele", async () => {
+    /* Com os três trimestres trocados, nenhum dia de 7 a 300 cai na aula do
+       site: o banco do site só responderia fora da faixa. */
+    expect(DIAS_COM_AULA_DO_APP).toEqual(Array.from({ length: 294 }, (_, i) => i + 7));
+    for (const D of [7, 98, 200, 300])
+      expect((await carregarAulaDoDia(D))?.teach).toBe(APP[String(D)]!.teach);
     expect(await carregarAulaDoDia(301)).toBeNull();
   });
 });
