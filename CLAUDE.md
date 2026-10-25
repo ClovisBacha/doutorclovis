@@ -33,6 +33,15 @@ guardar da saúde para o SOS e o acompanhamento do Bebê."
   da gestação, o nascimento e os movimentos do bebê.
 - A auditoria do que foge disso e o plano estão no diário
   (`docs/diario/2026-out.md`, "21/10 — auditoria").
+- **As aulas do dia no app são do app**, não do site: os 294 dias da gestação
+  (D 7–300) moram em `mobile/src/lib/jornada/aulas-do-app.t1/t2/t3.json`, com o
+  número de perguntas do site em cada dia (o servidor paga por acerto até ele).
+  A catraca (`aulas-do-app.test.ts`) cobra o formato, nenhuma palavra de
+  conduta, nenhum "ele/ela/dele/dela" para o bebê, nenhuma pergunta repetida em
+  14 dias e que o tamanho da opção não entregue a resposta. As regras de
+  conteúdo (o depois do nascimento só de leve, o que ela sente das mexidinhas
+  fora das aulas, nenhuma "novidade" que começou antes) estão no diário,
+  "25/10 — build 33".
 
 ## Stack
 

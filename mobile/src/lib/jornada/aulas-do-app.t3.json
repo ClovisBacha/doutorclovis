@@ -931,7 +931,7 @@
       {
         "type": "choice",
         "q": "Segundo a curiosidade, que outro nome essa brincadeira tem em várias regiões do Brasil?",
-        "o": ["Amigo da onça", "Amigo do peito", "Amigo oculto"],
+        "o": ["Amigo de infância", "Amigo do peito", "Amigo oculto"],
         "a": 2,
         "why": "Em várias regiões do Brasil, a brincadeira se chama amigo oculto. Em inglês, é Secret Santa."
       }
@@ -1240,14 +1240,14 @@
         "type": "multi",
         "q": "Marque o que esta aula sugeriu deixar no piloto automático (marque todas):",
         "o": [
-          "Uma reforma da cozinha antes da chegada",
+          "A conversa com quem vem passar uns dias",
           "As contas fixas, no débito automático",
           "As compras do mês, com entrega programada",
-          "A troca de todos os móveis de lugar",
+          "A escolha das roupinhas da mala",
           "Os presentes de quem faz aniversário em breve"
         ],
         "a": [1, 2, 4],
-        "why": "Contas no débito automático, compras com entrega programada e presentes de aniversário comprados antes foram ideias da aula. Reforma e troca de móveis não estavam nela."
+        "why": "Contas no débito automático, compras com entrega programada e presentes de aniversário comprados antes foram ideias da aula. A conversa com quem vem e as roupinhas da mala são de outras aulas."
       },
       {
         "type": "choice",
@@ -1333,7 +1333,7 @@
           "Que horas sai o ônibus dela"
         ],
         "a": [0, 2],
-        "why": "Do lado de quem chega, entram do que essa pessoa gosta, o programa que não perde na TV, o cantinho da casa que vai ser dela e se quer um tempo para passear. O preço da passagem e o horário do ônibus não eram o assunto."
+        "why": "Do lado de quem chega, entram os gostos dessa pessoa, o programa que ela não perde na TV, o cantinho da casa que vai ser dela e a vontade de passear. O preço da passagem e o horário do ônibus não eram o assunto."
       },
       {
         "type": "choice",
@@ -1482,12 +1482,12 @@
         "o": [
           "Escrever os planos a lápis, com espaço para surpresas",
           "Um arquivo com as contas já pagas",
-          "Uma faxina geral antes da chegada",
+          "Um calendário com as visitas da semana",
           "A lista do piloto automático da casa",
           "As contas fixas no débito automático"
         ],
         "a": [0, 3, 4],
-        "why": "Os planos a lápis, a lista do piloto automático e as contas no débito automático foram ideias desta semana. O arquivo de contas pagas e a faxina geral não estavam nas aulas."
+        "why": "Os planos a lápis, a lista do piloto automático e as contas no débito automático foram ideias desta semana. O arquivo de contas pagas e o calendário de visitas não estavam nas aulas."
       },
       {
         "type": "choice",
@@ -1632,7 +1632,7 @@
     ]
   },
   "226": {
-    "teach": "A sua mala e a de quem vai junto. A mala da maternidade também tem a sua parte, com o que faz você se sentir em casa: um carregador de fio comprido, porque a tomada nem sempre fica pertinho, o celular com espaço livre para muitas fotos, uma fronha trazida de casa, um chinelo, um livro e uma roupa de que você goste, para as fotos. Quem for com você também leva uma mochila própria: carregador, um casaco, um lanchinho, uma muda de roupa e algo de que goste, como um fone de ouvido. Para fechar, vale combinar quem leva a mala e esconder na mochila de quem vai junto um bilhetinho seu, de surpresa. Uma mala pensada com carinho também leva um pedacinho de casa.",
+    "teach": "A sua mala e a de quem vai junto. A mala da maternidade também tem a sua parte, com o que faz você se sentir em casa: um carregador de fio comprido, porque a tomada nem sempre fica pertinho, o celular com espaço livre para muitas fotos, uma fronha trazida de casa, um chinelo, um livro e uma roupa de que você goste, para as fotos. Quem for com você também leva uma mochila própria: carregador, um casaco, um lanchinho, uma muda de roupa e algo de que goste, como um fone de ouvido. Para fechar, vale combinar quem leva a mala e esconder na mochila de quem vai junto uma surpresa pequena escolhida por você, como um chaveiro ou um adesivo bonito. Uma mala pensada com carinho também leva um pedacinho de casa.",
     "funFact": "A mala de rodinhas parece invenção antiga, mas só começou a fazer sucesso nos anos 1970: em 1972, o americano Bernard Sadow patenteou a sua.",
     "questions": [
       {
@@ -1674,12 +1674,12 @@
         "type": "choice",
         "q": "Segundo a aula, o que vale esconder na mochila de quem vai junto?",
         "o": [
-          "Um bilhetinho seu, de surpresa",
+          "Uma surpresa pequena escolhida por você",
           "Os presentes de quem vier visitar",
           "A lista do que ainda falta comprar"
         ],
         "a": 0,
-        "why": "Um bilhetinho seu, escondido na mochila de quem vai junto, é um carinho de surpresa para a pessoa achar."
+        "why": "Uma surpresa pequena escolhida por você, como um chaveiro ou um adesivo, escondida na mochila de quem vai junto, é um carinho para a pessoa achar."
       },
       {
         "type": "choice",
@@ -2743,7 +2743,7 @@
     ]
   },
   "248": {
-    "teach": "Um passeio falado pela casa. Que tal narrar a casa para a barriga num revezamento com alguém querido, ao vivo ou por chamada de vídeo? É como a cartinha do pet da semana 17, que contava ao bebê como é a casa, só que agora em voz alta e em revezamento: você começa, por exemplo, pela cozinha, a outra pessoa continua na sala, e vocês vão se alternando até o fim. Cada um conta do seu jeito: tem quem faça como guia de museu, apontando cada detalhe, e quem narre como num jogo de futebol, com direito a grito de gol na chegada ao cantinho do bebê. Na sua vez, cada um escolhe o que mostrar: o sofá dos filmes de domingo, a janela de onde se vê a rua, a planta que já cresceu tanto. Ninguém precisa caprichar: errar o caminho e cair na risada também faz parte. E, se preferir, o passeio pode ser só seu, no seu ritmo.",
+    "teach": "Um passeio falado pela casa. Que tal narrar a casa para a barriga num revezamento com alguém querido, ao vivo ou por chamada de vídeo? É como a cartinha do pet da semana 17, que contava ao bebê como é a casa, só que agora em voz alta e em revezamento: você começa, por exemplo, pela cozinha, a outra pessoa continua na sala, e vocês vão se alternando até o fim; por chamada de vídeo, quem está longe narra o que aparece na tela enquanto você caminha com o celular. Cada um conta do seu jeito: tem quem faça como guia de museu, apontando cada detalhe, e quem narre como num jogo de futebol, com direito a grito de gol na chegada ao cantinho do bebê. Ninguém precisa caprichar: errar o caminho e cair na risada também faz parte. E, se preferir, o passeio pode ser só seu, no seu ritmo.",
     "funFact": "O Guia Michelin nasceu em 1900, na França, criado pelos irmãos donos de uma fábrica de pneus: era distribuído de graça para quem tinha carro, com mapas e dicas de como trocar um pneu.",
     "questions": [
       {
@@ -2755,7 +2755,7 @@
           "Um fala, e o outro só grava"
         ],
         "a": 1,
-        "why": "Você começa por um cômodo, a outra pessoa continua no outro, ao vivo ou por chamada de vídeo, e vocês vão se alternando até o fim."
+        "why": "Vocês se alternam de cômodo em cômodo; por vídeo, quem está longe narra o que vê na tela."
       },
       {
         "type": "multi",
@@ -3373,7 +3373,7 @@
     ]
   },
   "261": {
-    "teach": "Um ex-libris para os livrinhos. Se a biblioteca do bebê já começou, com livros da sua infância ou que chegaram de presente, os livrinhos podem ganhar uma marca só da família: o ex-libris, um carimbo ou uma etiqueta que vai na parte de dentro da capa. A expressão é latina e quer dizer 'dos livros de': avisa, a quem abrir, de quem é aquele livro. O desenho fica por conta de vocês: a fruta preferida da jornada, uma estrelinha, o bichinho da casa, as iniciais. O nome também: o do bebê, se já estiver escolhido, o apelido da barriga ou o sobrenome da família, como em 'Dos livros da família Souza'. Dá para encomendar um carimbo, imprimir etiquetas ou desenhar à mão, uma por uma. Depois, é só marcar cada livro, sem pressa, e a estante do cantinho do bebê vira uma coleção com a cara de vocês.",
+    "teach": "Um ex-libris para os livrinhos. Se a biblioteca do bebê já começou, com livros da sua infância ou que chegaram de presente, os livrinhos podem ganhar uma marca só da família: o ex-libris, um carimbo ou uma etiqueta que vai na parte de dentro da capa. A expressão é latina e quer dizer 'dos livros de': avisa, a quem abrir, de quem é aquele livro. O desenho fica por conta de vocês: a fruta preferida da jornada, um coraçãozinho, o bichinho da casa, as iniciais. O nome também: o do bebê, se já estiver escolhido, o apelido da barriga ou o sobrenome da família, como em 'Dos livros da família Souza'. Dá para encomendar um carimbo, imprimir etiquetas ou desenhar à mão, uma por uma. Depois, é só marcar cada livro, sem pressa, e a estante do cantinho do bebê vira uma coleção com a cara de vocês.",
     "funFact": "O ex-libris também virou coleção: em vários países há clubes de colecionadores que trocam essas marquinhas entre si, como quem troca figurinhas.",
     "questions": [
       {
@@ -4135,7 +4135,7 @@
   },
   "277": {
     "teach": "O cheiro de chuva tem nome. Aquele cheiro que sobe da terra quando a chuva chega depois de dias secos se chama petricor. Quem batizou foram dois cientistas australianos, Isabel Joy Bear e Richard Thomas, em 1964. A palavra junta duas do grego: petra, que quer dizer pedra, e ichor, o líquido que, nos mitos, corria no corpo dos deuses. E o cheiro tem uma história bonita: nos dias secos, algumas plantas soltam óleos que ficam guardados na terra e nas pedras, e, quando as primeiras gotas caem, esse cheiro guardado sobe para o ar. É um cheiro que espera a chuva para aparecer. Aí dentro, o narizinho do bebê, que você conheceu na semana 17, segue amadurecendo no seu tempo, junto com o sentido dos cheiros.",
-    "funFact": "Em 2015, cientistas do MIT, nos Estados Unidos, filmaram com câmeras superrápidas gotas de chuva caindo na terra: cada gota solta no ar bolhinhas minúsculas, que podem levar o cheiro.",
+    "funFact": "Num estudo de 2015, cientistas do MIT, nos Estados Unidos, filmaram com câmeras superrápidas gotas caindo em terra seca: muitas prendem bolhinhas de ar que estouram e soltam no ar gotinhas minúsculas, que podem levar o cheiro.",
     "questions": [
       {
         "type": "choice",
@@ -4170,10 +4170,10 @@
       },
       {
         "type": "choice",
-        "q": "Segundo a curiosidade, o que cada gota de chuva solta no ar ao bater na terra?",
-        "o": ["Faíscas de luz", "Bolhinhas minúsculas", "Sementinhas de plantas"],
+        "q": "Segundo a curiosidade, o que as bolhinhas de ar soltam quando estouram?",
+        "o": ["Faíscas de luz", "Gotinhas minúsculas", "Sementinhas de plantas"],
         "a": 1,
-        "why": "Filmadas com câmeras superrápidas, as gotas de chuva soltam no ar bolhinhas minúsculas, que podem levar o cheiro."
+        "why": "Filmadas com câmeras superrápidas, muitas gotas prendem bolhinhas de ar que estouram e soltam no ar gotinhas minúsculas, que podem levar o cheiro."
       }
     ]
   },
@@ -4459,7 +4459,7 @@
     ]
   },
   "284": {
-    "teach": "A casa do bebê em outras línguas. O lugar onde o bebê cresce, o útero, ganhou pelo mundo nomes que parecem poesia. Em chinês, o útero se chama zigong, escrito com dois caracteres: o primeiro quer dizer criança, e o segundo, palácio. Ao pé da letra, o palácio da criança. O japonês escreve a palavra com esses mesmos dois caracteres, e o coreano tem uma palavra que nasceu deles. Já em hebraico e em árabe, a palavra para útero vem da mesma raiz da palavra para compaixão, aquele carinho que acolhe e cuida: em hebraico, rehem e rahamim; em árabe, rahim e rahma. Um palácio, um lugar de compaixão: cada língua do seu jeito, todas falando de uma casa feita para acolher. E aí dentro, nesta fase, o bebê segue no seu palácio, quentinho, no tempo do bebê.",
+    "teach": "A casa do bebê em outras línguas. Lá na semana 1, você viu que o português antigo chamava o útero de madre ou matriz. Pelo mundo, a casa do bebê ganhou outros nomes que parecem poesia. Em chinês, o útero se chama zigong, escrito com dois caracteres: o primeiro quer dizer criança, e o segundo, palácio. Ao pé da letra, o palácio da criança. O japonês escreve a palavra com esses mesmos dois caracteres, e o coreano tem uma palavra que nasceu deles. Já em hebraico e em árabe, a palavra para útero vem da mesma raiz da palavra para compaixão, aquele carinho que acolhe e cuida: em hebraico, rehem e rahamim; em árabe, rahim e rahma. Um palácio, um lugar de compaixão: cada língua do seu jeito, todas falando de uma casa feita para acolher. E aí dentro, nesta fase, o bebê segue no seu palácio, quentinho, no tempo do bebê.",
     "funFact": "Em chinês, o caractere que quer dizer 'bom' junta dois desenhos: o de uma mulher e o de uma criança. O desenho da criança é o mesmo que abre o 'palácio da criança'.",
     "questions": [
       {
@@ -4551,7 +4551,7 @@
     ]
   },
   "286": {
-    "teach": "Revisão da semana 40: no tempo do bebê. Na semana da abóbora moranga, com cerca de 51,2 cm e 3,4 kg, a tabela trouxe uma frase carinhosa: no tempo do bebê, o encontro de vocês se aproxima. Nos olhinhos, descobriu o desenho da íris, de risquinhos e dobrinhas, diferente em cada olho. Conheceu duas palavras gregas para o tempo: chronos, o do relógio, e kairós, a ocasião, que hoje muita gente usa para os momentos vividos por inteiro. Na preparação, a ideia foi combinar como encontrar a casa na volta, com uma plaquinha de boas-vindas. Depois, a de mandar uma lembrança boa para alguém querido. Aprendeu também nomes lindos para a casa do bebê: o palácio da criança, em chinês, e uma palavra parente de compaixão, em hebraico e em árabe. E a semana fechou com a ideia de um cartaz de palavras.",
+    "teach": "Revisão da semana 40: no tempo do bebê. Na semana da abóbora moranga, com cerca de 51,2 cm e 3,4 kg, a tabela trouxe uma frase carinhosa: no tempo do bebê, o encontro de vocês se aproxima. Nos olhinhos, você descobriu o desenho da íris, de risquinhos e dobrinhas, diferente em cada olho. Conheceu duas palavras gregas para o tempo: chronos, o do relógio, e kairós, a ocasião, que hoje muita gente usa para os momentos vividos por inteiro. Na preparação, a ideia foi combinar como encontrar a casa na volta, com uma plaquinha de boas-vindas. Depois, a de mandar uma lembrança boa para alguém querido. Aprendeu também nomes lindos para a casa do bebê: o palácio da criança, em chinês, e uma palavra parente de compaixão, em hebraico e em árabe. E a semana fechou com a ideia de um cartaz de palavras.",
     "funFact": "Lembra das curiosidades? A abóbora é um tipo de baga, entrar com o pé direito já aparece num livro da Roma antiga e os telegramas eram cobrados por palavra.",
     "questions": [
       {
@@ -4658,7 +4658,7 @@
     ]
   },
   "288": {
-    "teach": "De repente, barrigas por toda parte. Desde que a espera começou, talvez você repare em coisas que antes passavam batido: outras barrigas na rua, sapatinhos numa vitrine, um nome de que você gosta aparecendo em todo canto, as frutas da tabela do app na feira. Não é que o mundo mudou de uma hora para outra: mudou a sua atenção. Quando uma coisa ganha importância para a gente, o olhar passa a encontrá-la em todo lugar, e parece até que ela se multiplicou. Esse efeito tem nome: ilusão de frequência. Que tal fazer disso uma brincadeira? Anote no diário as coisas em que você passou a reparar nesta fase, das mais fofas às mais curiosas. A lista conta, do seu jeito, o que anda ocupando os seus pensamentos.",
+    "teach": "De repente, barrigas por toda parte. Desde que a espera começou, talvez você repare em coisas que antes passavam batido: outras barrigas na rua, sapatinhos numa vitrine, um nome de que você gosta aparecendo em todo canto, as frutas da tabela do app na feira. Não é que o mundo mudou de uma hora para outra: mudou a sua atenção. Quando uma coisa ganha importância para a gente, o olhar passa a encontrá-la em todo lugar, e parece até que ela se multiplicou. Esse efeito tem nome: ilusão de frequência. Que tal brincar disso com quem está ao seu lado ou com uma amiga? Cada uma conta o que passou a ver em todo canto nesta fase, das coisas mais fofas às mais curiosas. A lista conta, do seu jeito, o que anda ocupando os seus pensamentos.",
     "funFact": "A ilusão de frequência junta dois truques da cabeça: a atenção seletiva, que destaca o que importa para a gente no meio de tudo, e o costume de reparar mais nos casos que confirmam o que já notamos.",
     "questions": [
       {
@@ -4701,14 +4701,14 @@
       },
       {
         "type": "choice",
-        "q": "O que a aula sugere anotar no diário?",
+        "q": "O que a aula sugere fazer com essas descobertas?",
         "o": [
-          "Os nomes das ruas do bairro",
-          "As compras que ainda faltam",
-          "As coisas em que você passou a reparar"
+          "Guardar só para você, sem contar a ninguém",
+          "Contar para alguém querido e comparar",
+          "Fotografar cada uma delas"
         ],
-        "a": 2,
-        "why": "A ideia é anotar no diário as coisas em que você passou a reparar nesta fase, das mais fofas às mais curiosas."
+        "a": 1,
+        "why": "A ideia é brincar disso com alguém querido: cada uma conta o que passou a ver em todo canto nesta fase."
       }
     ]
   },
@@ -4890,7 +4890,7 @@
     ]
   },
   "292": {
-    "teach": "Flores da espera guardadas num livro. Cada momento desta espera pode ter a sua flor: a do chá de bebê, se teve, a do vaso da sala, a que alguém querido trouxe de presente, a que você ganhou num dia especial. Que tal guardar algumas delas num herbário, um caderno de plantas secas? O jeito é simples: escolha flores sequinhas por fora, sem gotinhas de água, ponha cada uma entre duas folhas de papel, bem esticadinha, dentro de um livro grosso, com outros livros pesados por cima, e espere com calma. Quando estiver bem seca, cole numa página bonita com fitinhas adesivas e escreva ao lado de onde a flor veio e uma frase sobre aquele dia. Página por página, o caderno vira um jardim de lembranças que não murcha. E, se quiser, mostre uma página num post da Comunidade do app.",
+    "teach": "Flores da espera guardadas num livro. Cada momento desta espera pode ter a sua flor: a do chá de bebê, se teve, a do vaso da sala, a que alguém querido trouxe de presente, a que você ganhou num dia especial. Que tal guardar algumas delas num herbário, um caderno de plantas secas? O jeito é simples: escolha flores sequinhas por fora, sem gotinhas de água, ponha cada uma entre duas folhas de papel, bem esticadinha, dentro de um livro grosso, com outros livros pesados por cima, e espere com calma. Quando estiver bem seca, cole numa página bonita com fitinhas adesivas e, ao lado, escreva de onde ela veio e uma frase sobre aquele dia. Página por página, o caderno vira um jardim de lembranças que não murcha. E, se quiser, mostre uma página num post da Comunidade do app.",
     "funFact": "A poeta americana Emily Dickinson montou, ainda adolescente, um herbário com mais de 400 plantas, hoje guardado na Universidade Harvard.",
     "questions": [
       {
@@ -4959,14 +4959,14 @@
         "type": "multi",
         "q": "Marque as ideias da semana 41 (marque todas):",
         "o": [
-          "Anotar as coisas em que você passou a reparar",
+          "Contar o que você passou a ver em todo canto",
           "Um enxoval inteiro bordado à mão",
           "Um livrinho com as fotos da espera",
           "Uma colcha de retalhos para o quarto",
           "Flores secas guardadas num livro"
         ],
         "a": [0, 2, 4],
-        "why": "Anotar o que você passou a reparar, o livrinho de fotos e as flores secas no livro foram as ideias da semana."
+        "why": "Contar o que você passou a ver em todo canto, o livrinho de fotos e as flores secas no livro foram as ideias da semana."
       },
       {
         "type": "choice",
