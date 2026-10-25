@@ -121,9 +121,11 @@ describe("o banco de aulas do app", () => {
 
   test("nunca 'ele' ou 'ela' para o bebê nas aulas do app", () => {
     /* "quando ELA ainda é um bebê na barriga da própria mãe" fala da mulher, e
-       não do bebê: por isso o "ainda" não entra na lista de verbos. */
+       não do bebê: por isso o "ainda" não entra na lista de verbos. "O estribo
+       dele" passou por um rascunho do 3º trimestre sem a regra pegar: por isso
+       o "dele/dela" depois de "bebê". */
     const achou = DIAS_COM_AULA_DO_APP.filter((D) =>
-      /\bo bebê\b[^.!?]{0,60}\b(ele|ela)\b|\b(ele|ela) (já|vai|está|começa|consegue|ouve|sente|mexe)\b/i.test(
+      /\bo bebê\b[^.!?]{0,60}\b(ele|ela)\b|\b(ele|ela) (já|vai|está|começa|consegue|ouve|sente|mexe)\b|\bbebê\b[^.!?;:]{0,60}\b(dele|dela|nele|nela)\b/i.test(
         textoDa(APP[String(D)]!),
       ),
     );
