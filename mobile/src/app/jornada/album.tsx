@@ -15,7 +15,7 @@ import {
   diasDoPosFechados,
   figurinhaDoPos,
   figurinhasDoPos,
-  orientacaoDoPos,
+  nestaSemanaDoPos,
   SEMANAS_DO_POS,
   semanaDeVida,
 } from "~/lib/jornada/pos-parto";
@@ -26,7 +26,7 @@ import { cor, espaco, fonte, raio } from "~/tema";
  * o álbum da gestação, que o site guardava "para sempre" depois do parto
  * (`Álbum da gestação 💝`). Tocar numa semana da gestação abre a página dela
  * (o que acontecia com o bebê, o tamanho, o peso); numa semana de vida, a
- * orientação daquela semana e os dias completos.
+ * o texto daquela semana e os dias completos.
  *
  * Bancada: /jornada/album?bancada=1&pos=1 [&idade=40]
  */
@@ -237,10 +237,10 @@ function FolhaDaSemanaDeVida({
         </View>
         <View style={{ borderRadius: 18, backgroundColor: "#effaff", padding: espaco.lg, gap: 4 }}>
           <Text style={{ fontFamily: fonte.titulo, fontSize: 13, color: "#0369a1" }}>
-            O que valia nessa semana
+            Nessa semana
           </Text>
           <Text style={{ fontFamily: fonte.media, fontSize: 15, lineHeight: 22, color: "#0c3a5a" }}>
-            {orientacaoDoPos(semana)}
+            {nestaSemanaDoPos(semana)}
           </Text>
         </View>
         <BotaoDaAtividade cor="#0284c7" rotulo="Fechar" aoTocar={aoFechar} />

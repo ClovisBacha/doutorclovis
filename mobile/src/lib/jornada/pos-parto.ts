@@ -2,9 +2,20 @@
  * O 4º TRIMESTRE — as 12 primeiras semanas de vida do bebê, a régua do
  * `PosPartoJourney` do site (src/components/gestacao-path.tsx), em puro.
  *
- * As tabelas (fases, figurinhas, orientação da semana) moram num COMPONENTE do
- * site, que não dá para importar. A catraca `pos-parto.test.ts` lê o fonte do
- * site e cobra que as daqui sejam as mesmas de lá.
+ * As fases e as figurinhas moram num COMPONENTE do site, que não dá para
+ * importar. A catraca `pos-parto.test.ts` lê o fonte do site e cobra que as
+ * daqui sejam as mesmas de lá.
+ *
+ * ⚠️ O desafio do dia e o texto da semana são do APP (`pos-parto.do-app.json`),
+ * e não do site (decisão do dono, 21/10/2026: rede social + gamificação, não
+ * conselho médico). Os do site eram um roteiro clínico — contar mamadas, olhar
+ * os lóquios e o coto, vacinas, consulta puerperal, contracepção, "marcos
+ * esperados" — e iam parar na tela Hoje, na trilha, no álbum e nas
+ * notificações. Os desafios do app são vínculo, memória, rede de apoio e
+ * Comunidade; o texto da semana, "O que esperar com o bebê" (o plano aprovado),
+ * é um fato gentil do mundo do bebê — os sentidos, o corpinho —, e nunca um
+ * marco com prazo: no pós-parto ela VÊ o bebê, e "o sorriso chega por volta da
+ * 6ª semana" seria lido como régua por quem ainda não viu sorriso nenhum.
  *
  * ── O dia do pós-parto ──
  *   dc-path-pos-day-<D>    = { humor?, desafio?, leitura?, w_meditation?, … }
@@ -13,15 +24,14 @@
  *
  * D = idade do bebê em dias + 7, preso em 90 (o site prende a idade em 83: as
  * 12 semanas completas encerram a trilha). O dia fecha com as três tarefas do
- * site — o check-in de humor, o desafio e a leitura da orientação da semana —
- * e não com os cinco momentos da gestação: no pós-parto, o essencial é pouco,
+ * site — o check-in de humor, o desafio e a leitura da semana — e não com os
+ * cinco momentos da gestação: no pós-parto, o essencial é pouco,
  * de propósito. As atividades (respirar, gratidão…) acendem a chama e não
  * entram na conta do dia.
  *
  * Sem react-native aqui: é testado pelo bun.
  */
 
-import { posChallenge } from "@/lib/daily-challenges";
 import { tomDeHex, type Fase, type Tom } from "~/lib/jornada/caminho";
 import { MESES } from "~/lib/jornada/hoje";
 import {
@@ -31,6 +41,7 @@ import {
   type Blob,
   type FlagsDoDia,
 } from "~/lib/jornada/momentos";
+import DO_APP from "./pos-parto.do-app.json";
 
 /* ── As tabelas do site ─────────────────────────────────────────────────── */
 
@@ -58,72 +69,18 @@ export const FIGURINHAS_DO_POS: Readonly<Record<number, string>> = {
   12: "🎓",
 };
 
-/** O que vale em cada semana de vida (`POS_GUIDANCE`). */
-export const ORIENTACAO_DO_POS: Readonly<Record<number, string>> = {
-  1: "Descanso e amamentação em livre demanda. Teste do pezinho entre o 3º e o 5º dia. Agende a revisão pós-parto (7–10 dias).",
-  2: "Atenção aos sinais de alerta: febre, sangramento intenso, dor forte ou tristeza persistente. Se a amamentação doer, procure ajuda com a pega.",
-  3: "Baby blues costuma passar até aqui. Se a tristeza persistir ou piorar, faça o check-in emocional e fale com o seu médico — você não está sozinha.",
-  4: "Agende a consulta puerperal completa (30–40 dias): revisão geral, contracepção e liberação de atividades.",
-  5: "As vacinas de 2 meses do bebê estão chegando — deixe agendadas (penta, VIP, pneumo 10, rotavírus).",
-  6: "Consulta puerperal em dia? É nela que se libera exercício físico e se define contracepção. Cuide também do seu sono.",
-  7: "Crie pequenos rituais de rotina para o bebê: banho, mamada, soneca. A previsibilidade acalma vocês dois.",
-  8: "Semana das vacinas de 2 meses. Febre baixa e irritação no dia seguinte podem acontecer — mantenha o bebê hidratado.",
-  9: "Se liberada na consulta puerperal, retome exercícios leves de forma gradual. Assoalho pélvico primeiro.",
-  10: "Autocuidado não é luxo: reserve um tempo seu por dia. Mãe cuidada cuida melhor.",
-  11: "Marcos esperados: sorriso social e mais firmeza no pescoço. Cada bebê tem seu ritmo — registre os do seu.",
-  12: "Fim do 4º trimestre! Vacina de meningo C aos 3 meses. Parabéns por chegar até aqui — jornada completa. 🎓",
-};
+/* ── O desafio e a semana, do app ──────────────────────────────────────── */
 
-/* ── O desafio do dia ───────────────────────────────────────────────────── */
+/** Um desafio por dia, de 7 a 90 (as 12 semanas de vida). */
+export const DESAFIOS_DO_POS: Readonly<Record<string, { emoji: string; label: string }>> =
+  DO_APP.desafios;
 
-/**
- * Os desafios do pós-parto que mandam para telas que o app não tem — o Álbum
- * de fotos, o Diário, a aba Pós-parto e as vacinas em Saúde. O texto é do site
- * (congelado); aqui ele vira o gesto que o app consegue acompanhar (a agenda,
- * o álbum de vocês, uma foto no celular). A catraca de `pos-parto.test.ts`
- * confere que o texto do site ainda é o que foi trocado.
- */
-export const DESAFIOS_DO_POS_NO_APP: Readonly<Record<number, { site: string; app: string }>> = {
-  27: {
-    site: "Feche a semana 3 com uma foto no Álbum",
-    app: "Feche a semana 3 com uma foto de vocês dois",
-  },
-  41: {
-    site: "Escreva no Diário 3 coisas que você aprendeu",
-    app: "Anote 3 coisas que você aprendeu nestas semanas",
-  },
-  48: {
-    site: "Feche as 6 semanas: registre no Pós-parto",
-    app: "Feche as 6 semanas: ponha a consulta puerperal na agenda",
-  },
-  55: {
-    site: "Anote no Diário a rotina que já funciona",
-    app: "Anote a rotina que já funciona para vocês",
-  },
-  62: {
-    site: "Registre em Saúde as vacinas de 2 meses",
-    app: "Ponha na agenda as vacinas de 2 meses",
-  },
-  75: {
-    site: "Escreva no Diário como você está de verdade",
-    app: "Escreva como você está de verdade, só para você",
-  },
-  83: {
-    site: "Guarde no Álbum a cabecinha mais firme",
-    app: "Guarde uma foto da cabecinha mais firme",
-  },
-  90: {
-    site: "Releia o Diário e celebre o 4º trimestre",
-    app: "Abra o álbum de vocês e celebre o 4º trimestre",
-  },
-};
+/** O texto de "O que esperar com o bebê", da semana de vida 1 à 12. */
+export const NESTA_SEMANA_DO_POS: Readonly<Record<string, string>> = DO_APP.semana;
 
-/** O desafio do dia D do pós-parto, como o app o mostra (`null` depois do dia 90). */
+/** O desafio do dia D do pós-parto (`null` fora de 7–90). */
 export function desafioDoPos(D: number): { emoji: string; label: string } | null {
-  const c = posChallenge(D);
-  if (!c) return null;
-  const troca = DESAFIOS_DO_POS_NO_APP[D];
-  return { emoji: c.emoji, label: troca && troca.site === c.label ? troca.app : c.label };
+  return DESAFIOS_DO_POS[String(D)] ?? null;
 }
 
 /* ── As chaves do blob ──────────────────────────────────────────────────── */
@@ -160,8 +117,9 @@ export function figurinhaDoPos(semana: number): string {
   return FIGURINHAS_DO_POS[semana] ?? "🍼";
 }
 
-export function orientacaoDoPos(semana: number): string {
-  return ORIENTACAO_DO_POS[semana] ?? ORIENTACAO_DO_POS[12]!;
+/** O texto da semana de vida (a 12 depois dela). A primeira frase vira o aviso da semana nova. */
+export function nestaSemanaDoPos(semana: number): string {
+  return NESTA_SEMANA_DO_POS[String(semana)] ?? NESTA_SEMANA_DO_POS["12"]!;
 }
 
 /* ── As três tarefas do dia ─────────────────────────────────────────────── */
@@ -300,7 +258,7 @@ export const HUMORES_DO_POS: readonly { emoji: string; label: string }[] = [
   { emoji: "😢", label: "Triste" },
 ];
 
-/** O humor que abre o cartão de apoio (fale com o seu médico · CVV 188). */
+/** O humor que abre o cartão de apoio (o CVV e o SOS). */
 export function humorPedeApoio(label: string | null | undefined): boolean {
   return label === "Triste";
 }

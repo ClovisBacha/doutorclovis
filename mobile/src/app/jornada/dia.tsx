@@ -7,7 +7,7 @@ import Svg, { Path } from "react-native-svg";
 import { tituloCurtoDaAula } from "~/lib/jornada/aula";
 import { temQuizNoDia, type DailyQuiz } from "@/lib/daily-quizzes";
 import { carregarAulaDoDia } from "~/lib/jornada/aulas-do-app";
-import { recadoDaBolha } from "@/lib/recado-da-bolha";
+import { recadoDaBolhaNoApp } from "~/lib/recado-da-bolha";
 import { Carregando, toque } from "~/componentes/base";
 import { corCaminho, META_DAS_ATIVIDADES } from "~/componentes/caminho/cores";
 import { EstrelaDoDia, IconeDaAtividade } from "~/componentes/caminho/pecas";
@@ -101,7 +101,7 @@ export default function FolhaDoDia() {
   const feitos = contarMomentos(flags);
   const nomeDoBebe = (dia.perfil.baby_name ?? "").trim() || null;
   const hora = new Date().getHours();
-  const recado = recadoDaBolha({
+  const recado = recadoDaBolhaNoApp({
     feitos,
     total: TOTAL_DO_DIA,
     dia: D,

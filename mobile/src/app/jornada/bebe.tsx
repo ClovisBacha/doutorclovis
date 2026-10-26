@@ -266,9 +266,7 @@ export default function Bebe() {
     return (
       <Tela bordas={["top", "bottom"]}>
         <BarraDoTopo titulo="Jornada" />
-        <T>
-          Hoje a jornada é sobre cuidar de você. Respirar, mexer devagar e escrever continuam aqui.
-        </T>
+        <T>Hoje a jornada é sobre cuidar de você. Respirar e escrever continuam aqui.</T>
         <BotaoDaAtividade cor={corJornada.roxo} rotulo="Voltar" aoTocar={voltarParaJornada} />
       </Tela>
     );

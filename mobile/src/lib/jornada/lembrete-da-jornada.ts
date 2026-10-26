@@ -9,7 +9,7 @@
  *     nos dias seguintes, ele fala do que o dia traz (a aula, o desafio);
  *   · a SEMANA NOVA, às 9h do dia em que ela começa ("Semana 25 começou! 🌱",
  *     o push semanal do site) — e, no pós-parto, cada semana de vida, com a
- *     orientação da semana.
+ *     primeira frase do texto da semana.
  *
  * No app eles são notificações LOCAIS (o push do servidor depende da conta
  * Apple): o iPhone agenda os próximos 14 dias, e o app refaz a agenda sempre
@@ -23,7 +23,7 @@
  */
 
 import { bebeDaSemana } from "~/lib/bebe-da-semana";
-import { orientacaoDoPos, ULTIMA_IDADE_DA_TRILHA } from "~/lib/jornada/pos-parto";
+import { nestaSemanaDoPos, ULTIMA_IDADE_DA_TRILHA } from "~/lib/jornada/pos-parto";
 
 export const DIAS_AGENDADOS = 14;
 /** A hora que já vem marcada no convite: de noite, ainda dá tempo de cuidar. */
@@ -79,14 +79,14 @@ function noDia(agora: Date, mais: number, h: number, m: number): Date {
 
 const maiuscula = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-/** A primeira frase de um texto (a orientação da semana é longa para um aviso). */
+/** A primeira frase de um texto (o texto da semana é longo para um aviso). */
 export function primeiraFrase(texto: string): string {
   const m = /^(.+?[.!?])(\s|$)/.exec(texto.trim());
   return m ? m[1] : texto.trim();
 }
 
 const CUIDADO: readonly [string, string][] = [
-  ["Um minuto para você 💜", "Respirar, mexer devagar ou escrever uma linha — no seu tempo."],
+  ["Um minuto para você 💜", "Respirar ou escrever uma linha — no seu tempo."],
   ["Um momento seu 💜", "Sem placar e sem pressa. Só um momento seu."],
   ["Estou aqui 💜", "Hoje, cuidar de você já basta."],
 ];
@@ -190,7 +190,7 @@ export function textoDaSemanaNova(
     const semanaDeVida = Math.min(12, semanas + 1);
     return {
       titulo: `${quem} completa ${semanas} ${semanas === 1 ? "semana" : "semanas"} 💜`,
-      corpo: primeiraFrase(orientacaoDoPos(semanaDeVida)),
+      corpo: primeiraFrase(nestaSemanaDoPos(semanaDeVida)),
     };
   }
   return null;

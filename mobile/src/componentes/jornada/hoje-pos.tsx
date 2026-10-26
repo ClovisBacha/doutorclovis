@@ -28,7 +28,7 @@ import {
   figurinhaDoPos,
   HUMORES_DO_POS,
   humorPedeApoio,
-  orientacaoDoPos,
+  nestaSemanaDoPos,
   TAREFAS_DO_POS,
   tarefasFeitas,
 } from "~/lib/jornada/pos-parto";
@@ -39,7 +39,7 @@ import { cor, espaco, fonte } from "~/tema";
  * HOJE, NO 4º TRIMESTRE — a mesma tela do cuidado diário, agora com o bebê no
  * colo: o céu da hora, o recém-nascido enrolado na manta (e não mais o feto da
  * semana), e o dia do `PosPartoJourney` do site — TRÊS tarefas que fecham o
- * dia (como você está, o desafio, a orientação da semana) e ganham a
+ * dia (como você está, o desafio, a leitura da semana) e ganham a
  * figurinha da semana de vida. Respirar, o momento com o bebê e a gratidão
  * ficam "para quando sobrar um minuto": acendem a chama e não cobram nada.
  *
@@ -93,7 +93,7 @@ export function TelaDoQuartoTrimestre({
   extra,
   aoMarcarHumor,
   aoFazerDesafio,
-  aoLerOrientacao,
+  aoLerASemana,
   aoAbrir,
   aoVerTrilha,
   aoVerAlbum,
@@ -125,7 +125,7 @@ export function TelaDoQuartoTrimestre({
   extra?: ReactNode;
   aoMarcarHumor: (humor: string) => void;
   aoFazerDesafio: () => void;
-  aoLerOrientacao: () => void;
+  aoLerASemana: () => void;
   aoAbrir: (a: AtividadeDoPos) => void;
   aoVerTrilha: () => void;
   aoVerAlbum: () => void;
@@ -136,7 +136,7 @@ export function TelaDoQuartoTrimestre({
   const feitos = tarefasFeitas(flags);
   const total = TAREFAS_DO_POS.length;
   const { pulso, brilho, festa } = useMomentoDoDia(D, feitos, total, "pos", pronto);
-  const [orientacao, setOrientacao] = useState(false);
+  const [semanaAberta, setSemanaAberta] = useState(false);
   const fase = faseDoPos(semana);
   const humorDaBolha: HumorDaArte =
     feitos >= total ? "orgulhosa" : humorPedeApoio(humorDeHoje) ? "apaixonado" : "feliz";
@@ -339,10 +339,10 @@ export function TelaDoQuartoTrimestre({
               <TarefaDoDia
                 emoji="📖"
                 eyebrow={`Semana ${semana} de vida`}
-                titulo="O que vale nesta semana"
+                titulo="O que esperar com o bebê"
                 feito={!!flags.leitura}
                 rotulo="Ler"
-                aoTocar={() => setOrientacao(true)}
+                aoTocar={() => setSemanaAberta(true)}
               />
             </>
           )}
@@ -451,14 +451,14 @@ export function TelaDoQuartoTrimestre({
         </View>
       </ScrollView>
       {festa ? <Confete pecas={60} /> : null}
-      <FolhaDaOrientacao
-        aberta={orientacao}
+      <FolhaDaSemana
+        aberta={semanaAberta}
         semana={semana}
         lida={!!flags.leitura}
-        aoFechar={() => setOrientacao(false)}
+        aoFechar={() => setSemanaAberta(false)}
         aoLer={() => {
-          aoLerOrientacao();
-          setOrientacao(false);
+          aoLerASemana();
+          setSemanaAberta(false);
         }}
       />
     </View>
@@ -602,7 +602,7 @@ function Apoio() {
   );
 }
 
-/** Uma das três tarefas (o desafio, a orientação). */
+/** Uma das três tarefas (o desafio, a leitura da semana). */
 function TarefaDoDia({
   emoji,
   eyebrow,
@@ -885,8 +885,8 @@ function Formatura({ quem }: { quem: string }) {
   );
 }
 
-/** A orientação da semana — a terceira tarefa. "Entendi" é o que a marca. */
-function FolhaDaOrientacao({
+/** O texto da semana — a terceira tarefa. "Li" é o que a marca. */
+function FolhaDaSemana({
   aberta,
   semana,
   lida,
@@ -940,14 +940,14 @@ function FolhaDaOrientacao({
           accessibilityRole="header"
           style={{ fontFamily: fonte.titulo, fontSize: 22, color: "#3a2230" }}
         >
-          Nesta semana
+          O que esperar com o bebê
         </Text>
         <Text style={{ fontFamily: fonte.media, fontSize: 16, lineHeight: 24, color: "#3a2230" }}>
-          {orientacaoDoPos(semana)}
+          {nestaSemanaDoPos(semana)}
         </Text>
         <BotaoDaAtividade
           cor="#0284c7"
-          rotulo={lida ? "Fechar" : "Entendi ✓"}
+          rotulo={lida ? "Fechar" : "Li ✓"}
           aoTocar={lida ? aoFechar : aoLer}
         />
       </View>

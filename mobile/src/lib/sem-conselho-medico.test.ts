@@ -77,6 +77,20 @@ describe("o app não dá conselho médico", () => {
        ("Começar o ácido fólico", "Zerar o álcool"…) só chegava a ela pela
        notificação. Saiu: nada no app lê o desafio da gestação do site. */
     expect(ondeAparece(/\bgestChallenge\b/)).toEqual([]);
+    /* No pós-parto, o desafio e o texto da semana do site eram um roteiro
+       clínico (mamadas, lóquios, vacinas, consulta puerperal): os dois são do
+       app agora (`pos-parto.do-app.json`). E o recado da bolha passa pela troca
+       do app ("cuidar DELE também", "alongar"). */
+    expect(ondeAparece(/\bposChallenge\b|from "@\/lib\/daily-challenges"/)).toEqual([]);
+    expect(ondeAparece(/from "@\/lib\/recado-da-bolha"/, ["lib/recado-da-bolha.ts"])).toEqual([]);
+  });
+
+  test("o Modo Cuidado não oferece mais mexer o corpo", () => {
+    /* O "Mexer devagar" saiu do Modo Cuidado e do pós-parto: no site ele vinha
+       "só se o médico já liberou", e o app não tem médico para liberar. A
+       cartela ficou dizendo "Três cuidados" com dois, e o Início, a carta e o
+       aviso do dia seguiram oferecendo "mexer devagar". */
+    expect(ondeAparece(/mexer devagar/i, ["app/jornada/mexer.tsx"])).toEqual([]);
   });
 
   test("nenhuma frase promete um médico que a v1 não tem, nem dá régua", () => {

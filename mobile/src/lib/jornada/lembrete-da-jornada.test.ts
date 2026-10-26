@@ -7,6 +7,7 @@ import {
   textoDoCuidado,
   type ContextoDoLembrete,
 } from "~/lib/jornada/lembrete-da-jornada";
+import { nestaSemanaDoPos } from "~/lib/jornada/pos-parto";
 
 /* Terça, 20 de outubro de 2026, 15:00 (fuso dos testes: São Paulo). */
 const AGORA = new Date(2026, 9, 20, 15, 0);
@@ -102,13 +103,14 @@ describe("a semana nova", () => {
     ]);
   });
 
-  test("no pós-parto, cada semana de vida, com a primeira frase da orientação", () => {
+  test("no pós-parto, cada semana de vida, com a primeira frase do texto da semana que começa", () => {
+    /* O aviso era a orientação do site: "Agende a consulta puerperal completa
+       (30–40 dias): revisão geral, contracepção…". Agora é o texto do app. */
     const pos = gest({ modo: "pos", D: 27, idadeDias: 20, totalDoDia: 3 });
     const t = textoDaSemanaNova(pos, 1)!;
     expect(t.titulo).toBe("Helena completa 3 semanas 💜");
-    expect(t.corpo).toBe(
-      "Agende a consulta puerperal completa (30–40 dias): revisão geral, contracepção e liberação de atividades.",
-    );
+    expect(t.corpo).toBe(primeiraFrase(nestaSemanaDoPos(4)));
+    expect(t.corpo).not.toBe(primeiraFrase(nestaSemanaDoPos(3)));
     expect(textoDaSemanaNova(pos, 2)).toBeNull();
   });
 

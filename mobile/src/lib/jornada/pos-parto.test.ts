@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { posChallenge } from "@/lib/daily-challenges";
 import { join } from "node:path";
+import { primeiraFrase } from "~/lib/jornada/lembrete-da-jornada";
 import {
   abreFestaDoNascimento,
   CHAVE_FEITOS_POS,
@@ -9,7 +9,7 @@ import {
   comprimentoPorExtenso,
   coresDaSemanaDoPos,
   desafioDoPos,
-  DESAFIOS_DO_POS_NO_APP,
+  DESAFIOS_DO_POS,
   diaNaTrilhaDoPos,
   estadoDoNoDoPos,
   FASES_DO_POS,
@@ -26,7 +26,8 @@ import {
   medidasPorExtenso,
   nascimentoPorExtenso,
   marcarTarefaDoPos,
-  ORIENTACAO_DO_POS,
+  NESTA_SEMANA_DO_POS,
+  nestaSemanaDoPos,
   pesoPorExtenso,
   recusaDoNascimento,
   resumoDaGestacao,
@@ -39,7 +40,7 @@ const SITE = readFileSync(
 );
 
 describe("o 4º trimestre do app é o do site", () => {
-  test("as fases, as figurinhas e a orientação de cada semana são as mesmas", () => {
+  test("as fases e as figurinhas de cada semana são as mesmas", () => {
     for (const f of FASES_DO_POS) {
       expect(SITE).toContain(
         `{ n: ${f.n}, from: ${f.from}, to: ${f.to}, emoji: "${f.emoji}", name: "${f.name}" }`,
@@ -47,9 +48,6 @@ describe("o 4º trimestre do app é o do site", () => {
     }
     for (const [semana, emoji] of Object.entries(FIGURINHAS_DO_POS))
       expect(SITE).toContain(`  ${semana}: "${emoji}",`);
-    for (const [semana, texto] of Object.entries(ORIENTACAO_DO_POS))
-      expect(SITE).toContain(`  ${semana}: "${texto}",`);
-    expect(Object.keys(ORIENTACAO_DO_POS)).toHaveLength(12);
   });
 
   test("as cores das semanas são as do posMeta", () => {
@@ -204,20 +202,74 @@ describe("o nascimento", () => {
   });
 });
 
-describe("os desafios do pós-parto no app", () => {
-  test("os trocados ainda são, no site, o texto que foi trocado", () => {
-    for (const [D, t] of Object.entries(DESAFIOS_DO_POS_NO_APP)) {
-      expect(posChallenge(Number(D))?.label).toBe(t.site);
-      expect(desafioDoPos(Number(D))?.label).toBe(t.app);
+/* O que o desafio e o texto da semana não dizem (21/10/2026: rede social +
+   gamificação, não conselho médico) — o roteiro clínico do site, palavra por
+   palavra: mamadas, lóquios, coto, vacinas, consulta puerperal, contracepção,
+   "marcos esperados". "Banho" entra só como o do bebê: um banho sem pressa é
+   gentileza com ela. */
+const CONDUTA =
+  /\b(m[eé]dic[oa]s?|pediatra|consultas?|exames?|vacinas?|rem[eé]dios?|suplement\w*|vitaminas?|puerp\w*|amament\w*|mamadas?|mamar|peito|leite|pega|mamilos?|ordenh\w*|mastite|mamadeiras?|banho (do|no) beb[eê]|dar banho|coto|umbig\w*|c[oó]licas?|febre|icter[ií]cia|chupeta|ber[cç]o|cadeirinha|bru[cç]os|teste do \w+|l[oó]quios?|sangr\w*|pontos|cicatriz\w*|assoalho|p[eé]lvic\w*|abd[oô]m\w*|contracep\w*|anticoncep\w*|exerc[ií]cios?|treinar|treino|liberad[oa]|liberou|recupera\w*|baby blues|depress\w*|ansiedade|tristeza|psic[oó]\w*|terapia|procure|diagn[oó]stic\w*|ferro|nutri\w*|dieta|hidrat\w*|dormir|durma|sono|soneca|cochil\w*|acalm\w*|ninar|normal|esperad[oa]s?|deveria|desenvolvimento|peso|gramas?|quilos?)\b/i;
+
+const TODOS_OS_TEXTOS = [
+  ...Object.entries(DESAFIOS_DO_POS).map(([D, d]) => [`D${D}`, d.label] as const),
+  ...Object.entries(NESTA_SEMANA_DO_POS).map(([s, t]) => [`semana ${s}`, t] as const),
+];
+
+describe("os desafios e o texto da semana do pós-parto são do app", () => {
+  test("um desafio por dia de 7 a 90, curto, com emoji, sem repetir e sem o mesmo emoji em dias seguidos", () => {
+    expect(Object.keys(DESAFIOS_DO_POS).map(Number)).toEqual(
+      Array.from({ length: 84 }, (_, i) => i + 7),
+    );
+    expect(desafioDoPos(6)).toBeNull();
+    expect(desafioDoPos(91)).toBeNull();
+    const vistos = new Set<string>();
+    for (let D = 7; D <= 90; D++) {
+      const d = desafioDoPos(D)!;
+      expect(d.emoji.trim()).not.toBe("");
+      expect(d.label.length).toBeLessThanOrEqual(50);
+      const chave = d.label
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N} ]/gu, "")
+        .trim();
+      expect(vistos.has(chave)).toBe(false);
+      vistos.add(chave);
+      if (D > 7) expect(d.emoji).not.toBe(desafioDoPos(D - 1)!.emoji);
     }
   });
 
-  test("nenhum desafio do app manda para tela que o app não tem", () => {
-    for (let D = 7; D <= 90; D++) {
-      const d = desafioDoPos(D);
-      expect(d).not.toBeNull();
-      expect(d!.label).not.toMatch(/Álbum\b|Diário|no Pós-parto|em Saúde/);
+  test("o texto de cada semana: até 200 caracteres, sem emoji, e a primeira frase diz algo sozinha", () => {
+    /* A primeira frase vira o corpo do aviso da semana nova ("Helena completa
+       3 semanas 💜"): "Terceira semana." sozinha não diria nada. */
+    expect(Object.keys(NESTA_SEMANA_DO_POS).map(Number)).toEqual(
+      Array.from({ length: 12 }, (_, i) => i + 1),
+    );
+    for (let s = 1; s <= 12; s++) {
+      const t = nestaSemanaDoPos(s);
+      expect(t.length).toBeLessThanOrEqual(200);
+      expect(t).not.toMatch(/\p{Extended_Pictographic}/u);
+      expect(primeiraFrase(t).split(/\s+/).length).toBeGreaterThanOrEqual(6);
     }
-    expect(desafioDoPos(91)).toBeNull();
+    expect(nestaSemanaDoPos(13)).toBe(nestaSemanaDoPos(12));
+  });
+
+  test("nenhum desafio nem texto da semana é conduta, dá gênero ao bebê ou manda para tela que o app não tem", () => {
+    const fora = TODOS_OS_TEXTOS.flatMap(([onde, t]) => {
+      const m = [
+        ...(t.match(new RegExp(CONDUTA.source, "gi")) ?? []),
+        ...(t.match(/\b(ele|ela|dele|dela|nele|nela)\b/gi) ?? []),
+        ...(t.match(
+          /Álbum\b|Diário|no Pós-parto|em Saúde|Alertas|Consultas|Meditações|Bem-estar/g,
+        ) ?? []),
+      ];
+      return m.length ? [`${onde}: ${[...new Set(m)].join(", ")}`] : [];
+    });
+    expect(fora).toEqual([]);
+  });
+
+  test("o app de verdade: post se reage (não se curte) e o cartão não mostra quantos comentários tem", () => {
+    const fora = TODOS_OS_TEXTOS.filter(([, t]) =>
+      /\bcurt\w*\b[^.]{0,20}\bposts?\b|sem coment[aá]rios?/i.test(t),
+    ).map(([onde]) => onde);
+    expect(fora).toEqual([]);
   });
 });

@@ -170,7 +170,7 @@ export default function Inicio() {
         titulo="Sua jornada do dia"
         texto={
           cuidado
-            ? "Respirar, mexer devagar e escrever — no seu tempo."
+            ? "Respirar e escrever — no seu tempo."
             : nascido
               ? "O desafio do dia, uma respiração e um momento de gratidão."
               : "A aula de hoje, cinco momentos e as suas sementinhas."

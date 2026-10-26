@@ -33,7 +33,7 @@ import {
   FASES_DO_POS,
   figurinhaDoPos,
   figurinhasDoPos,
-  orientacaoDoPos,
+  nestaSemanaDoPos,
   TAREFAS_DO_POS,
 } from "~/lib/jornada/pos-parto";
 import { ALVO_MINIMO, cor, espaco, fonte } from "~/tema";
@@ -46,8 +46,8 @@ import { ALVO_MINIMO, cor, espaco, fonte } from "~/tema";
  *
  * Mais simples que o Caminho da gestação, de propósito: sem enfeites nem loja
  * (o site também não os punha aqui). Hoje leva de volta à tela Hoje, onde as
- * três tarefas moram; um dia que passou abre o que foi feito e a orientação
- * da semana; um dia que vem diz quando abre.
+ * três tarefas moram; um dia que passou abre o que foi feito e o texto da
+ * semana; um dia que vem diz quando abre.
  */
 export function TrilhaDoPosParto({
   hojeD,
@@ -597,7 +597,7 @@ function NoDoDiaDoPos({
   );
 }
 
-/** Um dia que passou: o que foi feito e a orientação da semana. */
+/** Um dia que passou: o que foi feito e o texto da semana. */
 function FolhaDoDiaDoPos({
   D,
   blob,
@@ -613,7 +613,7 @@ function FolhaDoDiaDoPos({
   const linhas: { chave: string; texto: string }[] = [
     { chave: "humor", texto: "Como você estava" },
     { chave: "desafio", texto: "O desafio do dia" },
-    { chave: "leitura", texto: "A orientação da semana" },
+    { chave: "leitura", texto: "A leitura da semana" },
   ];
   const fechado = diasDoPosFechados(blob).includes(D);
   return (
@@ -675,10 +675,10 @@ function FolhaDoDiaDoPos({
         </View>
         <View style={{ borderRadius: 18, backgroundColor: "#effaff", padding: espaco.lg, gap: 4 }}>
           <Text style={{ fontFamily: fonte.titulo, fontSize: 13, color: "#0369a1" }}>
-            O que valia nessa semana
+            Nessa semana
           </Text>
           <Text style={{ fontFamily: fonte.media, fontSize: 15, lineHeight: 22, color: "#0c3a5a" }}>
-            {orientacaoDoPos(semana)}
+            {nestaSemanaDoPos(semana)}
           </Text>
         </View>
         <BotaoDaAtividade cor="#0284c7" rotulo="Fechar" aoTocar={aoFechar} />

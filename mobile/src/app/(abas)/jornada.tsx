@@ -66,7 +66,7 @@ import {
   type ChaveDoCuidado,
 } from "~/lib/jornada/hoje";
 import { primeiroNome } from "~/lib/gestacao";
-import { recadoDaBolha } from "@/lib/recado-da-bolha";
+import { recadoDaBolhaNoApp } from "~/lib/recado-da-bolha";
 import { BarraDoTopo, voltarParaJornada } from "~/componentes/jornada/pecas";
 import { useSessao } from "~/lib/sessao";
 import { montarGrade, paraResgatar, placar as placarDasConquistas } from "~/lib/jornada/conquistas";
@@ -394,7 +394,7 @@ export function JornadaDaGestacao({
           faltam={diasQueFaltam(D)}
           hora={hora}
           cuidados={cuidados}
-          recado={recadoDaBolha({
+          recado={recadoDaBolhaNoApp({
             feitos,
             total: 5,
             dia: D,
@@ -696,7 +696,7 @@ export function JornadaDoPosParto({
         flags={flags}
         humorDeHoje={humorDeHoje}
         desafio={terminou ? null : desafioDoPos(D)}
-        recado={recadoDaBolha({
+        recado={recadoDaBolhaNoApp({
           feitos,
           total: 3,
           dia: D,
@@ -729,7 +729,7 @@ export function JornadaDoPosParto({
           marcarNoPos(D, "humor");
         }}
         aoFazerDesafio={() => marcarNoPos(D, "desafio")}
-        aoLerOrientacao={() => marcarNoPos(D, "leitura")}
+        aoLerASemana={() => marcarNoPos(D, "leitura")}
         aoAbrir={(a) => ir(ROTA_DO_CUIDADO[a])}
         aoVerTrilha={() => ir("/jornada/trilha")}
         aoVerAlbum={() => ir("/jornada/album")}
@@ -797,9 +797,9 @@ function JornadaDoCuidado({ uid }: { uid: string }) {
       />
       <CartaoDoDia
         sobre={dataPorExtenso(new Date())}
-        titulo="Três cuidados com você"
+        titulo="Dois cuidados com você"
         feitos={0}
-        total={3}
+        total={2}
         itens={itens}
         mostrarEstrelas={false}
       />
@@ -824,8 +824,8 @@ function JornadaSemData({ uid }: { uid: string }) {
           Falta saber de quantas semanas você está
         </T>
         <T tipo="apagado">
-          A aula de cada dia, os desafios e a trilha seguem a sua gestação. Assim que o seu perfil
-          tiver a data da última menstruação ou a do ultrassom, a jornada se monta sozinha.
+          A aula de cada dia e a trilha seguem a sua gestação. Assim que o seu perfil tiver a data
+          da última menstruação ou a do ultrassom, a jornada se monta sozinha.
         </T>
         <Botao
           rotulo="Informar a data"
