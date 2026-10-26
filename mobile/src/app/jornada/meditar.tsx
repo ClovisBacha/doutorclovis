@@ -27,6 +27,7 @@ import { DENSIDADES, falaNoCiclo, type Densidade, type Plano } from "@/lib/medit
 import { sequenciaDeDatas } from "@/lib/sequencia";
 import { familiasDeSom, type SomKey } from "@/lib/som-receitas";
 import { ROTULO_DO_SOM_NO_APP } from "~/lib/jornada/sons";
+import { casalAberto } from "~/lib/jornada/casal";
 import { Carregando, Tela, toque } from "~/componentes/base";
 import {
   BolhaComBalao,
@@ -604,9 +605,10 @@ export default function Meditar() {
 
         {/* Coisas que ela pode querer EM VEZ da sessão de hoje — não são
             escolhas desta meditação. "Para vocês dois" é preparação para o
-            parto: some no Modo Cuidado e no pós-parto. */}
+            parto: só na gestação, fora do Modo Cuidado, da 28ª semana em
+            diante (`casalAberto`). */}
         <View style={{ marginTop: espaco.xxl, gap: espaco.md }}>
-          {!at.cuidado && !at.pos ? (
+          {casalAberto({ cuidado: at.cuidado, posParto: at.pos, semana: at.semana }) ? (
             <EscolhaComLegenda
               paleta={PALETA}
               titulo="Para vocês dois"

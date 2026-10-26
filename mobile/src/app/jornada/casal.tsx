@@ -14,6 +14,7 @@ import { useDiaDaJornada } from "~/componentes/jornada/usarJornada";
 import { useMovimentoReduzido } from "~/componentes/movimento";
 import { pararCanal, tocarVoz } from "~/lib/audio/voz";
 import { VOZ_DA_NOITE } from "~/lib/audio/vozes";
+import { casalAberto, SEMANA_DO_CASAL } from "~/lib/jornada/casal";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { easeInOut } from "~/lib/jornada/figura";
 import { ALVO_MINIMO, espaco, fonte } from "~/tema";
@@ -29,9 +30,12 @@ import { ALVO_MINIMO, espaco, fonte } from "~/tema";
  * minuto, é uma contração inteira ensaiada). A tela fica acesa — os dois estão
  * olhando para ela, é o oposto da história para dormir.
  *
- * Fora do Modo Cuidado e do pós-parto: é preparação para o parto.
+ * Fora do Modo Cuidado e do pós-parto, e só da 28ª semana em diante
+ * (`casalAberto`, decisão do dono de 26/10/2026): é preparação para o parto, e
+ * a voz gravada diz que o bebê "já reconhece a sua voz há semanas".
  *
- * Bancada: /jornada/casal?bancada=1 [&bloco=<n>] [&fim=1] [&pausado=1]
+ * Bancada: /jornada/casal?bancada=1&semana=30 [&bloco=<n>] [&fim=1] [&pausado=1]
+ * (sem `&semana`, a semana da bancada é antes da 28ª: a tela diz quando abre)
  */
 export default function Casal() {
   const dia = useDiaDaJornada();
@@ -88,12 +92,20 @@ export default function Casal() {
   }
 
   /* Sem conseguir ler o perfil, a sessão abre: ela não depende de dado nenhum. */
-  const foraDaJornada = dia.modo === "pos" || (dia.modo !== "falhou" && dia.cuidado);
-  if (foraDaJornada) {
+  const aberta =
+    dia.modo === "falhou" ||
+    (dia.modo === "gestacao" &&
+      casalAberto({ cuidado: dia.cuidado, posParto: false, semana: dia.semana }));
+  if (!aberta) {
+    const aindaVem = (dia.modo === "gestacao" || dia.modo === "sem-data") && !dia.cuidado;
     return (
       <Tela bordas={["top", "bottom"]}>
         <BarraDoTopo titulo="Jornada" />
-        <T>Esta sessão não faz parte da sua jornada de hoje. Respirar e escrever continuam aqui.</T>
+        <T>
+          {aindaVem
+            ? `Esta sessão abre na ${SEMANA_DO_CASAL}ª semana, quando o parto já está mais perto.`
+            : "Esta sessão não faz parte da sua jornada de hoje. Respirar e escrever continuam aqui."}
+        </T>
         <Botao rotulo="Voltar" aoTocar={voltarParaJornada} corFundo={corJornada.roxo} />
       </Tela>
     );
