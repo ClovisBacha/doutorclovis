@@ -100,8 +100,8 @@ export function GanheMais({
               color: corRecompensas.ardosia600,
             }}
           >
-            Sementinhas compram só enfeites do Meu Cantinho. Nenhuma aula, exame, alerta ou
-            orientação do seu médico depende delas.
+            Sementinhas compram só enfeites do Meu Cantinho. Nenhuma aula e nada do SOS dependem
+            delas.
           </Text>
         </View>
       ) : null}

@@ -18,8 +18,6 @@
  * Sem react-native aqui: é testado pelo bun.
  */
 
-import { orientacaoDoPos } from "~/lib/jornada/pos-parto";
-
 export const CHAVE_AGENDA = "dc-path-agenda";
 
 export type TipoDeCompromisso = "consulta" | "ultrassom" | "exame" | "vacina" | "outro";
@@ -269,35 +267,6 @@ export function contagemPorDia(lista: readonly Compromisso[]): Map<string, numbe
   const m = new Map<string, number>();
   for (const c of lista) m.set(ymdDe(c.quando), (m.get(ymdDe(c.quando)) ?? 0) + 1);
   return m;
-}
-
-/* ── O que marcar no pós-parto ──────────────────────────────────────────── */
-
-/**
- * ⚠️ 21/10/2026: a "dica da fase" da AGENDA saiu (era o calendário de exames
- * do site, e o app não é conselho médico). Isto sobrevive só para o botão
- * "Pôr na agenda" da leitura da semana do pós-parto, que a fase 2 reescreve.
- *
- * O que marcar em cada semana de vida, tirado da orientação da semana do site:
- * a revisão pós-parto, a consulta puerperal e as vacinas do bebê. Nas outras
- * semanas a dica é só leitura — não há o que pôr na agenda.
- */
-const AGENDA_DO_POS: Readonly<Record<number, { tipo: TipoDeCompromisso; titulo: string }>> = {
-  1: { tipo: "consulta", titulo: "Revisão pós-parto" },
-  4: { tipo: "consulta", titulo: "Consulta puerperal" },
-  5: { tipo: "vacina", titulo: "Vacinas de 2 meses do bebê" },
-  6: { tipo: "consulta", titulo: "Consulta puerperal" },
-  8: { tipo: "vacina", titulo: "Vacinas de 2 meses do bebê" },
-  12: { tipo: "vacina", titulo: "Vacina meningo C do bebê" },
-};
-
-export function sugestaoDoPosParto(semanaDeVida: number): {
-  texto: string;
-  tipo: TipoDeCompromisso | null;
-  titulo: string | null;
-} {
-  const a = AGENDA_DO_POS[semanaDeVida];
-  return { texto: orientacaoDoPos(semanaDeVida), tipo: a?.tipo ?? null, titulo: a?.titulo ?? null };
 }
 
 /** Id curto e único o bastante para a agenda de uma pessoa. */

@@ -6,7 +6,8 @@ import { toque } from "~/componentes/base";
 import { sombraDe } from "~/componentes/jornada/atividade";
 import type { DiaDaJornada } from "~/componentes/jornada/usarJornada";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
-import { desafioDaGestacao } from "~/lib/jornada/desafios-no-app";
+import { tituloCurtoDaAula } from "~/lib/jornada/aula";
+import { aulaDoAppNoDia } from "~/lib/jornada/aulas-do-app";
 import {
   HORA_PADRAO_DA_JORNADA,
   horaValida,
@@ -72,7 +73,14 @@ export function contextoDoLembrete(
     chama: chama(blob, dia.D).dias,
     feitosHoje: contarMomentos(flagsDoDia(blob, dia.D)),
     totalDoDia: 5,
-    desafio: (D) => desafioDaGestacao(D)?.label ?? null,
+    /* Na gestação não há desafio: todo dia de 7 a 300 tem aula do app, e o
+       aviso fala do assunto dela — o desafio do site levava conduta clínica
+       para a notificação. */
+    desafio: () => null,
+    aula: (D) => {
+      const a = aulaDoAppNoDia(D);
+      return a ? tituloCurtoDaAula(a.teach) : null;
+    },
   };
 }
 

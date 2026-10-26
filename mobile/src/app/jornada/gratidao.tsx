@@ -101,7 +101,7 @@ function exemplosDaBancada(): Gratidao[] {
   return [
     { texto: "O Rafael fez um chá e ficou comigo no sofá.", quando: dias(1) },
     { texto: "Senti o bebê mexer no meio da reunião.", quando: dias(3) },
-    { texto: "A consulta foi tranquila e o coração está forte.", quando: dias(5) },
+    { texto: "As amigas do grupo mandaram um áudio cantando.", quando: dias(5) },
     { texto: "Consegui dormir a tarde inteira.", quando: dias(26) },
     { texto: "Minha mãe veio almoçar e trouxe bolo de fubá.", quando: dias(40) },
   ];
@@ -196,7 +196,7 @@ export default function GratidaoTela() {
     if (e === "lista" || e === "resumo") setEtapa(e);
     if (e === "guardado") {
       const m = Number(parametroDaBancada("marco") ?? 0) || null;
-      setTexto("A consulta de hoje foi tranquila.");
+      setTexto("Hoje o dia teve sol e uma conversa boa.");
       setMarco(at.cuidado ? null : m);
       setTotal(m ?? t);
       setCartaNova(!at.cuidado && parametroDaBancada("carta") === "1");
@@ -209,7 +209,7 @@ export default function GratidaoTela() {
       });
     }
     if (e === "erro") {
-      setTexto("A consulta de hoje foi tranquila.");
+      setTexto("Hoje o dia teve sol e uma conversa boa.");
       setErro(true);
     }
   }, [at.pronto, at.cuidado, at.pos, aplicouBancada]);

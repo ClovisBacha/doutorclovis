@@ -1,5 +1,5 @@
 import { router, useFocusEffect } from "expo-router";
-import { Award, ChevronRight, Footprints, PenLine, Wind } from "lucide-react-native";
+import { Award, ChevronRight, PenLine, Wind } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -67,8 +67,6 @@ import {
 } from "~/lib/jornada/hoje";
 import { primeiroNome } from "~/lib/gestacao";
 import { recadoDaBolha } from "@/lib/recado-da-bolha";
-import { desafioDaGestacao } from "~/lib/jornada/desafios-no-app";
-import { temQuizNoDia } from "@/lib/daily-quizzes";
 import { BarraDoTopo, voltarParaJornada } from "~/componentes/jornada/pecas";
 import { useSessao } from "~/lib/sessao";
 import { montarGrade, paraResgatar, placar as placarDasConquistas } from "~/lib/jornada/conquistas";
@@ -374,7 +372,6 @@ export function JornadaDaGestacao({
       flags,
       semana,
       nomeDoBebe,
-      desafio: temQuizNoDia(D) ? null : (desafioDaGestacao(D)?.label ?? null),
     });
     const feitos = cuidados.filter((c) => c.feito).length;
     return (
@@ -781,15 +778,6 @@ function JornadaDoCuidado({ uid }: { uid: string }) {
       feito: feitos.has("meditation"),
       rotuloDoFeito: "Feito hoje",
       aoTocar: () => ir("/jornada/meditar"),
-    },
-    {
-      chave: "mexer",
-      titulo: "Mexer devagar",
-      sub: "Alongamentos leves, sem ir ao chão",
-      Icone: Footprints,
-      feito: feitos.has("movement"),
-      rotuloDoFeito: "Feito hoje",
-      aoTocar: () => ir("/jornada/mexer"),
     },
     {
       chave: "gratidao",

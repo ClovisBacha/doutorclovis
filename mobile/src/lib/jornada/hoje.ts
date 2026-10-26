@@ -28,22 +28,16 @@ export function cuidadosDoDia(o: {
   flags: FlagsDoDia;
   semana: number;
   nomeDoBebe: string | null;
-  /** O desafio do dia quando não há aula (dias sem quiz). */
-  desafio: string | null;
 }): Cuidado[] {
   const nome = o.nomeDoBebe?.trim() || null;
   const para = nome ?? "o bebê";
   const textos: Record<ChaveDoCuidado, { titulo: string; sub: string }> = {
-    aula: o.desafio
-      ? { titulo: "O desafio de hoje", sub: o.desafio }
-      : { titulo: `Aprender sobre a semana ${o.semana}`, sub: "2 min · uma lição e perguntas" },
+    aula: { titulo: `Aprender sobre a semana ${o.semana}`, sub: "2 min · uma lição e perguntas" },
     movement: { titulo: "Soltar o corpo", sub: "5 min · no ritmo do seu corpo" },
     meditation: { titulo: `Respirar com ${para}`, sub: "3 min · a mente desacelera junto" },
     bonding: {
       titulo: `Ler para ${para}`,
-      sub: nome
-        ? `1 min · ${nome} já reconhece a sua voz`
-        : "1 min · o bebê já reconhece a sua voz",
+      sub: "1 min · uma história na sua voz",
     },
     gratitude: {
       titulo: "Guardar uma coisa boa",

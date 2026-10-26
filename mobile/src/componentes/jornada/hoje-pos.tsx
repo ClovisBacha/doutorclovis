@@ -22,7 +22,6 @@ import { RECEM_NASCIDO } from "~/componentes/jornada/nascimento";
 import { Confete } from "~/componentes/jornada/pecas";
 import { ArteDaBolha, Flutuar, type HumorDaArte } from "~/componentes/movimento";
 import { CVV } from "~/config";
-import { sugestaoDoPosParto } from "~/lib/agenda/agenda";
 import { ligar } from "~/lib/links";
 import {
   faseDoPos,
@@ -44,18 +43,19 @@ import { cor, espaco, fonte } from "~/tema";
  * figurinha da semana de vida. Respirar, o momento com o bebê e a gratidão
  * ficam "para quando sobrar um minuto": acendem a chama e não cobram nada.
  *
- * "Triste" no check-in abre o apoio (fale com o seu médico · CVV 188). A
- * semana 3 do site já dizia: se a tristeza persistir, você não está sozinha.
+ * "Triste" no check-in abre o apoio: o CVV (188) e o SOS. Sem "fale com o seu
+ * médico": o app não encaminha (decisão do dono, 21/10/2026) — o que preocupa
+ * mora no SOS.
  */
 
-export type AtividadeDoPos = "meditation" | "movement" | "bonding" | "gratitude";
+export type AtividadeDoPos = "meditation" | "bonding" | "gratitude";
 
-/** Respirar, o bebê e a gratidão sempre; mexer só da semana 6 (a consulta puerperal libera). */
-function atividadesDaSemana(semana: number): AtividadeDoPos[] {
-  return semana >= 6
-    ? ["meditation", "bonding", "gratitude", "movement"]
-    : ["meditation", "bonding", "gratitude"];
-}
+/**
+ * Respirar, o bebê e a gratidão. O "Mexer devagar" saiu: no site ele vinha "só
+ * se o médico já liberou", e o app não tem médico para liberar exercício no
+ * pós-parto (decisão do dono, 21/10/2026).
+ */
+const ATIVIDADES_DO_POS: readonly AtividadeDoPos[] = ["meditation", "bonding", "gratitude"];
 
 const TEXTO_DA_ATIVIDADE: Record<
   AtividadeDoPos,
@@ -70,7 +70,6 @@ const TEXTO_DA_ATIVIDADE: Record<
     titulo: "Guardar uma coisa boa",
     sub: "1 min · vira lembrança destes dias",
   }),
-  movement: () => ({ titulo: "Mexer devagar", sub: "Só se o médico já liberou" }),
 };
 
 export function TelaDoQuartoTrimestre({
@@ -360,7 +359,7 @@ export function TelaDoQuartoTrimestre({
             Quando sobrar um minuto
           </Text>
           <View style={{ gap: 10 }}>
-            {atividadesDaSemana(semana).map((a) => {
+            {ATIVIDADES_DO_POS.map((a) => {
               const t = TEXTO_DA_ATIVIDADE[a](quem);
               return (
                 <LinhaDaAtividade
@@ -551,8 +550,8 @@ function Apoio() {
         Você não está sozinha 💜
       </Text>
       <Text style={{ fontFamily: fonte.media, fontSize: 14, lineHeight: 20, color: "#4b3a63" }}>
-        Dias assim acontecem no pós-parto. Se a tristeza não passa, pesa demais ou vem com vontade
-        de sumir, fale com o seu médico — e, a qualquer hora, o CVV escuta de graça.
+        Dias assim acontecem, e você não precisa atravessá-los sozinha. A qualquer hora, o CVV
+        escuta de graça — e o SOS do app fica a um toque.
       </Text>
       <View style={{ flexDirection: "row", gap: espaco.sm }}>
         <Pressable
@@ -900,7 +899,6 @@ function FolhaDaOrientacao({
   aoFechar: () => void;
   aoLer: () => void;
 }) {
-  const agenda = sugestaoDoPosParto(semana);
   return (
     <Modal visible={aberta} transparent animationType="slide" onRequestClose={aoFechar}>
       <Pressable
@@ -942,41 +940,11 @@ function FolhaDaOrientacao({
           accessibilityRole="header"
           style={{ fontFamily: fonte.titulo, fontSize: 22, color: "#3a2230" }}
         >
-          O que vale nesta semana
+          Nesta semana
         </Text>
         <Text style={{ fontFamily: fonte.media, fontSize: 16, lineHeight: 24, color: "#3a2230" }}>
           {orientacaoDoPos(semana)}
         </Text>
-        <Text style={{ fontFamily: fonte.normal, fontSize: 13, color: "#9a7486" }}>
-          Uma orientação geral: ela não substitui a avaliação do seu médico.
-        </Text>
-        {agenda.tipo ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => {
-              toque();
-              aoFechar();
-              router.push(
-                rota(
-                  `/agenda/marcar?tipo=${agenda.tipo}${agenda.titulo ? `&titulo=${encodeURIComponent(agenda.titulo)}` : ""}`,
-                ) as never,
-              );
-            }}
-            style={({ pressed }) => ({
-              minHeight: 48,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: 999,
-              backgroundColor: cor.agendaFundo,
-              opacity: pressed ? 0.85 : 1,
-            })}
-          >
-            <Text style={{ fontFamily: fonte.titulo, fontSize: 15, color: cor.agenda }}>
-              🗓️ Pôr na agenda: {agenda.titulo}
-            </Text>
-          </Pressable>
-        ) : null}
         <BotaoDaAtividade
           cor="#0284c7"
           rotulo={lida ? "Fechar" : "Entendi ✓"}

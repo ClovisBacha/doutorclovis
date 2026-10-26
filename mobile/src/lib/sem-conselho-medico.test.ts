@@ -73,6 +73,10 @@ describe("o app não dá conselho médico", () => {
     /* As aulas passam pelo banco do app (fase 2): ele troca as que ensinavam
        conduta e cai no site só nos dias que ainda não foram trocados. */
     expect(ondeAparece(/\bcarregarQuizDoDia\b/, ["lib/jornada/aulas-do-app.ts"])).toEqual([]);
+    /* Na gestação, todo dia de 7 a 300 tem aula do app, e o desafio do site
+       ("Começar o ácido fólico", "Zerar o álcool"…) só chegava a ela pela
+       notificação. Saiu: nada no app lê o desafio da gestação do site. */
+    expect(ondeAparece(/\bgestChallenge\b/)).toEqual([]);
   });
 
   test("nenhuma frase promete um médico que a v1 não tem, nem dá régua", () => {
@@ -82,11 +86,7 @@ describe("o app não dá conselho médico", () => {
         "lib/frase-do-dia.ts",
       ]),
     ).toEqual([]);
-    /* `desafios-no-app.ts` guarda o texto do site que ele troca; o que ela vê
-       é conferido em `desafios-no-app.test.ts`. */
-    expect(
-      ondeAparece(/5-1-1|o esperado são 10|Chegou a 10/, ["lib/jornada/desafios-no-app.ts"]),
-    ).toEqual([]);
+    expect(ondeAparece(/5-1-1|o esperado são 10|Chegou a 10/)).toEqual([]);
   });
 
   test("os movimentos do bebê têm a linha fixa para o SOS, e nenhuma meta", () => {

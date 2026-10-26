@@ -12,6 +12,7 @@ import {
   FALA_DO_FECHAMENTO,
   falaDoBalao,
   FECHAMENTO,
+  FECHAMENTO_TROCADO_NO_APP,
   formatarRestante,
   indiceDoTemaDoDia,
   lerRegistro,
@@ -68,8 +69,15 @@ describe("a meditação do app é a do site", () => {
       })),
     ).toEqual(COMO_ESTOU.map((c) => ({ emoji: c.emoji, label: c.label })));
     const fechamento = trecho(SITE, "const FECHAMENTO", "};");
-    for (const [rotulo, texto] of Object.entries(FECHAMENTO))
-      expect(fechamento).toContain(JSON.stringify(texto));
+    for (const [rotulo, texto] of Object.entries(FECHAMENTO)) {
+      const troca = FECHAMENTO_TROCADO_NO_APP[rotulo];
+      expect(fechamento).toContain(JSON.stringify(troca ? troca.site : texto));
+      if (troca) {
+        /* A trocada não leva a voz do site, que diz a frase antiga. */
+        expect(FALA_DO_FECHAMENTO[rotulo]).toBeUndefined();
+        expect(texto).not.toMatch(/consulta|médic|\bele\b/i);
+      }
+    }
     const falas = trecho(SITE, "const FALA_DO_FECHAMENTO", "};");
     for (const [rotulo, id] of Object.entries(FALA_DO_FECHAMENTO)) {
       expect(falas).toMatch(new RegExp(`"?${rotulo}"?: "${id}"`));

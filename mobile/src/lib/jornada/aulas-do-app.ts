@@ -35,6 +35,15 @@ export const DIAS_COM_AULA_DO_APP: readonly number[] = Object.keys(AULAS_DO_APP)
   .sort((a, b) => a - b);
 
 /**
+ * A aula do app no dia D, sem esperar: o banco do app vem no pacote. `null`
+ * fora de 7–300. É o que os lembretes usam para dizer o assunto da aula de
+ * qualquer dia à frente.
+ */
+export function aulaDoAppNoDia(D: number): DailyQuiz | null {
+  return AULAS_DO_APP[String(D)] ?? null;
+}
+
+/**
  * A aula do dia gestacional D como o app a dá: a do app, se o dia foi trocado;
  * senão, a do site. `null` fora da faixa ou se o banco do site não carregar —
  * as aulas do app não dependem dele.

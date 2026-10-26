@@ -5,7 +5,6 @@ import { Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import { tituloCurtoDaAula } from "~/lib/jornada/aula";
-import { desafioDaGestacao } from "~/lib/jornada/desafios-no-app";
 import { temQuizNoDia, type DailyQuiz } from "@/lib/daily-quizzes";
 import { carregarAulaDoDia } from "~/lib/jornada/aulas-do-app";
 import { recadoDaBolha } from "@/lib/recado-da-bolha";
@@ -112,13 +111,7 @@ export default function FolhaDoDia() {
     posParto: false,
     careMode: false,
   });
-  const desafio = !temQuizNoDia(D) ? desafioDaGestacao(D) : null;
-  const descDaAula =
-    quiz && quiz !== "carregando"
-      ? tituloCurtoDaAula(quiz.teach)
-      : quiz === "carregando"
-        ? "Aula de hoje"
-        : desafio?.label || "O desafio de hoje";
+  const descDaAula = quiz && quiz !== "carregando" ? tituloCurtoDaAula(quiz.teach) : "Aula de hoje";
 
   const momentoDe = (c: Chave): Momento => (c === "aula" ? "aula" : c);
 

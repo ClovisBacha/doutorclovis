@@ -139,22 +139,40 @@ export function comoEstouPara(cuidado: boolean) {
   return COMO_ESTOU.filter((c) => !cuidado || c.label !== "Conectada");
 }
 
+/**
+ * O que ela lê depois de responder. O texto é o do site, com duas trocas do app
+ * (21/10/2026, decisão do dono: o app não é conselho médico): "Ainda ansiosa"
+ * mandava "levar isso pra consulta", e "Conectada" chamava o bebê de "ele".
+ * A catraca do teste confere que o site ainda diz a frase trocada.
+ */
+export const FECHAMENTO_TROCADO_NO_APP: Readonly<Record<string, { site: string; app: string }>> = {
+  Conectada: {
+    site: "Esse instante também é cuidado com ele. Vocês dois sentiram.",
+    app: "Esse instante também é cuidado com o bebê. Vocês dois sentiram.",
+  },
+  "Ainda ansiosa": {
+    site: "Ansiedade que não passa em 5 minutos merece ser falada. Leve isso pra consulta.",
+    app: "Tudo bem: tem dia em que a calma demora mais. Volte quando quiser.",
+  },
+};
+
 export const FECHAMENTO: Record<string, string> = {
   "Mais calma": "É isso mesmo. Guarde esse ritmo pro resto do dia.",
   "Com sono": "Sono depois de meditar é o corpo aceitando descansar. Vá deitar.",
-  Conectada: "Esse instante também é cuidado com ele. Vocês dois sentiram.",
+  Conectada: FECHAMENTO_TROCADO_NO_APP.Conectada!.app,
   Igual: "Nem toda sessão muda o dia — e mesmo assim ela contou. Volte amanhã.",
-  "Ainda ansiosa":
-    "Ansiedade que não passa em 5 minutos merece ser falada. Leve isso pra consulta.",
+  "Ainda ansiosa": FECHAMENTO_TROCADO_NO_APP["Ainda ansiosa"]!.app,
 };
 
-/** A última fala da sessão, dita depois que ela responde (a gravação `fe-*`). */
+/**
+ * A última fala da sessão, dita depois que ela responde (a gravação `fe-*`).
+ * As duas respostas trocadas ficam sem voz: a gravação do site diz a frase
+ * antiga, e uma frase dita diferente da escrita seria pior que o silêncio.
+ */
 export const FALA_DO_FECHAMENTO: Record<string, string> = {
   "Mais calma": "fe-calma",
   "Com sono": "fe-sono",
-  Conectada: "fe-conectada",
   Igual: "fe-igual",
-  "Ainda ansiosa": "fe-ansiosa",
 };
 
 /** A escala do círculo e da bolha em cada fase (`ESCALA_RESPIRO` de `bolha.tsx`). */

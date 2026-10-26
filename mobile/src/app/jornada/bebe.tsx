@@ -92,15 +92,14 @@ const ARTE_DA_CARTA = require("../../../../src/assets/bebe/carta.webp");
 /* As gratidões de exemplo da bancada: o bastante para a carta delas existir. */
 const GRATIDOES_DA_BANCADA: Gratidao[] = [
   "O Rafael fez um chá e ficou comigo no sofá.",
-  "Ouvi o coração dele no ultrassom.",
-  "Consegui dormir a tarde inteira.",
+  "As amigas do grupo mandaram um áudio cantando.",
+  "Consegui ler um livro inteiro na tarde de domingo.",
   "Minha mãe veio almoçar.",
-  "O enjoo deu uma trégua.",
-  "Montamos o berço juntos.",
-  "Senti o primeiro chute.",
-  "A consulta foi tranquila.",
+  "Escolhemos a primeira roupinha da mala.",
+  "Pendurei as fotos da barriga no corredor.",
+  "Uma amiga do app comentou a minha foto.",
   "Ganhei um macacãozinho da vizinha.",
-  "Caminhei no parque no fim da tarde.",
+  "Rimos muito no jantar com a família.",
 ].map((texto, i) => ({ texto, quando: `2026-0${(i % 9) + 1}-10T12:00:00Z` }));
 
 export default function Bebe() {

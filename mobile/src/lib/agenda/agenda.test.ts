@@ -12,7 +12,6 @@ import {
   semanasDoMes,
   semCompromisso,
   separar,
-  sugestaoDoPosParto,
   type Compromisso,
 } from "./agenda";
 
@@ -131,12 +130,5 @@ describe("a agenda do pré-natal", () => {
     expect(
       contagemPorDia([c("a", "2026-10-22T09:00"), c("b", "2026-10-22T15:00")]).get("2026-10-22"),
     ).toBe(2);
-  });
-
-  test("no pós-parto, a dica é a orientação da semana de vida, com o que marcar", () => {
-    expect(sugestaoDoPosParto(1)).toMatchObject({ tipo: "consulta", titulo: "Revisão pós-parto" });
-    expect(sugestaoDoPosParto(8)).toMatchObject({ tipo: "vacina" });
-    expect(sugestaoDoPosParto(7)).toMatchObject({ tipo: null, titulo: null });
-    expect(sugestaoDoPosParto(4).texto).toContain("consulta puerperal");
   });
 });
