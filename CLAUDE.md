@@ -42,6 +42,21 @@ guardar da saúde para o SOS e o acompanhamento do Bebê."
   conteúdo (o depois do nascimento só de leve, o que ela sente das mexidinhas
   fora das aulas, nenhuma "novidade" que começou antes) estão no diário,
   "25/10 — build 33".
+- **O pós-parto também é do app**: os 84 desafios (D 7–90) e os 12 textos de
+  "O que esperar com o bebê" moram em
+  `mobile/src/lib/jornada/pos-parto.do-app.json`. O texto da semana é um fato
+  gentil do mundo do bebê, nunca um marco com prazo (no pós-parto ela VÊ o
+  bebê, e prazo vira régua); a primeira frase é o aviso da semana nova. A
+  gestação não tem desafio.
+- **Frase do site que o app mostra e foge destas regras é trocada no app,
+  pelo texto do site**, com catraca que cobra que o site ainda diz a frase
+  trocada: `bebe-da-semana.ts`, `frase-do-dia.ts`, `recado-da-bolha.ts` e, nas
+  atividades, `jornada/gratidao.ts`, `cartas.ts`, `meditacao.ts`, `mexer.ts`,
+  `sons.ts`, `conquistas.ts`. Nenhuma tela lê o texto do site direto
+  (`sem-conselho-medico.test.ts`). ⚠️ Fala com **voz gravada** (meditação,
+  Mexer, "Para vocês dois", histórias) não muda de texto: a voz diria a frase
+  antiga. Ou ela sai do plano, ou perde a voz até a regravação — ver o diário,
+  "26/10 — build 34".
 
 ## Stack
 
