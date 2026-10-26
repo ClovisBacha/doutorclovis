@@ -1,6 +1,7 @@
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ofertaveis, ROTULO_DO_SOM, type SomKey } from "@/lib/som-receitas";
+import { ofertaveis, type SomKey } from "@/lib/som-receitas";
+import { ROTULO_DO_SOM_NO_APP } from "~/lib/jornada/sons";
 import { toque } from "~/componentes/base";
 import { EscolhaComLegenda, type PaletaDaAtividade } from "~/componentes/jornada/atividade";
 import { cor, espaco, fonte } from "~/tema";
@@ -86,11 +87,11 @@ export function FolhaDeSons({
               <EscolhaComLegenda
                 key={k}
                 paleta={paleta}
-                titulo={ROTULO_DO_SOM[k].label}
-                legenda={ROTULO_DO_SOM[k].sub}
+                titulo={ROTULO_DO_SOM_NO_APP[k].label}
+                legenda={ROTULO_DO_SOM_NO_APP[k].sub}
                 ativa={som === k}
                 aoTocar={() => aoEscolher(k)}
-                antes={<Text style={{ fontSize: 20 }}>{ROTULO_DO_SOM[k].emoji}</Text>}
+                antes={<Text style={{ fontSize: 20 }}>{ROTULO_DO_SOM_NO_APP[k].emoji}</Text>}
               />
             ))}
             <Pressable

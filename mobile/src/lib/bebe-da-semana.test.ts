@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { babyForWeek, retaFinalMensagem } from "@/lib/gestacao";
 import { FRASES } from "@/lib/frases-do-mascote";
 import { bebeDaSemana, DESCRICAO_NO_APP, retaFinalNoApp } from "~/lib/bebe-da-semana";
-import { FRASES_FORA_DO_APP, fraseDoDiaNoApp } from "~/lib/frase-do-dia";
+import { FRASES_FORA_DO_APP, FRASES_TROCADAS_NO_APP, fraseDoDiaNoApp } from "~/lib/frase-do-dia";
 
 /** O que o app não diz mais (21/10/2026: rede social + gamificação, não conselho médico). */
 const CLINICO =
@@ -57,6 +57,29 @@ describe("a reta final no app", () => {
 describe("a frase do mascote no app", () => {
   test("as de fora existem na lista do site (se o site mudar, a catraca avisa)", () => {
     for (const f of FRASES_FORA_DO_APP) expect(FRASES.some((x) => x.texto === f)).toBe(true);
+  });
+
+  test("as trocadas existem na lista do site", () => {
+    for (const t of FRASES_TROCADAS_NO_APP)
+      expect(FRASES.some((x) => x.texto === t.site)).toBe(true);
+  });
+
+  test("nenhuma frase pede que ela sinta o bebê, beba água, se exercite ou chame o bebê de 'ele'", () => {
+    const fora = new Set<string>();
+    for (let dia = 20000; dia < 20400; dia++)
+      for (const periodo of ["madrugada", "manha", "tarde", "noite"] as const)
+        for (const semanas of [10, 30])
+          for (const nome of ["Ana", ""]) {
+            const f = fraseDoDiaNoApp({ dia, periodo, nome, hora: 15, semanas });
+            if (
+              f &&
+              /sentiu o bebê|chutes|bebeu água|movimento leve|alongamento|\b(nele|ele|dele)\b/i.test(
+                f,
+              )
+            )
+              fora.add(f);
+          }
+    expect([...fora]).toEqual([]);
   });
 
   test("nunca sai uma frase de fora, e nunca falta frase onde o site tinha", () => {

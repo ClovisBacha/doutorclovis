@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DENSIDADES, planejarSessao } from "@/lib/meditacao-sessao";
-import { PROGRAMA } from "@/lib/meditacao-programa";
+import { FALAS_DO_PROGRAMA, PROGRAMA } from "@/lib/meditacao-programa";
+import { ROTEIROS } from "@/lib/meditacao-roteiros";
 import { semComentarios } from "@/lib/sem-comentarios";
 import { SONS_CONTINUOS } from "@/lib/som-receitas";
 import {
@@ -12,11 +13,14 @@ import {
   FALA_DO_FECHAMENTO,
   falaDoBalao,
   FECHAMENTO,
+  FALAS_FORA_DO_APP,
   FECHAMENTO_TROCADO_NO_APP,
   formatarRestante,
   indiceDoTemaDoDia,
   lerRegistro,
   minutosAoEncerrar,
+  planoDaSessao,
+  PRECISA_NO_APP,
   registrar,
   TEMAS_DE_MEDITACAO,
 } from "./meditacao";
@@ -49,7 +53,15 @@ describe("a meditação do app é a do site", () => {
       ...bloco.matchAll(
         /theme: "([^"]+)",\s*need: "([^"]+)",\s*emoji: "([^"]+)",(\s*noLuto: true,)?/g,
       ),
-    ].map((m) => ({ tema: m[1], precisa: m[2], emoji: m[3], noLuto: !!m[4] }));
+    ].map((m) => ({
+      tema: m[1],
+      /* "Quero sentir o bebê" é trocado no app (as mexidinhas ficam fora). */
+      precisa: PRECISA_NO_APP[m[1]!]?.site === m[2] ? PRECISA_NO_APP[m[1]!]!.app : m[2],
+      emoji: m[3],
+      noLuto: !!m[4],
+    }));
+    for (const [tema, t] of Object.entries(PRECISA_NO_APP))
+      expect(bloco).toMatch(new RegExp(`theme: "${tema}",\\s*need: "${t.site}"`));
     expect(
       TEMAS_DE_MEDITACAO.map((t) => ({
         tema: t.tema,
@@ -161,5 +173,66 @@ describe("as contas da meditação", () => {
     expect(formatarRestante(192)).toBe("3m");
     expect(minutosAoEncerrar(0)).toBe(1);
     expect(minutosAoEncerrar(14)).toBe(4);
+  });
+});
+
+describe("as falas que o app não diz", () => {
+  /** Todos os planos que a tela pode montar. */
+  function* planos() {
+    const temas = [...TEMAS_DE_MEDITACAO.map((t) => t.tema), ...PROGRAMA.map((d) => d.tema)];
+    for (const tema of temas)
+      for (const dias of [0, 1, 2])
+        for (const { chave } of DENSIDADES)
+          for (const minutos of [1, 5, 10])
+            for (const [cuidado, posParto] of [
+              [false, false],
+              [true, false],
+              [false, true],
+            ] as const)
+              for (const semanas of [null, 10, 24, 34])
+                yield {
+                  cuidado,
+                  posParto,
+                  plano: planoDaSessao({
+                    minutos,
+                    tema,
+                    semanas,
+                    cuidado,
+                    posParto,
+                    densidade: chave,
+                    registro: { dias: Array(dias).fill("x"), minutos: 7, humores: [] },
+                  }),
+                };
+  }
+
+  test("cada fala de fora ainda existe no site (se o site mudar, a catraca avisa)", () => {
+    const ids = new Set([...ROTEIROS, ...FALAS_DO_PROGRAMA].map((f) => f.id));
+    for (const id of FALAS_FORA_DO_APP) expect(ids.has(id)).toBe(true);
+  });
+
+  test("nenhum plano diz consulta, 'normal', 'não é sinal', o bebê seguro aí dentro ou a respiração que mais ajuda no parto", () => {
+    const fora = new Set<string>();
+    for (const { plano } of planos())
+      for (const d of plano.deixas)
+        if (
+          FALAS_FORA_DO_APP.has(d.fala.id) ||
+          /consult|normal que|não é sinal|lugar seguro|o que mais ajuda|No dia, o corpo lembra|ser verdade/i.test(
+            d.fala.texto,
+          )
+        )
+          fora.add(`${d.fala.id}: ${d.fala.texto}`);
+    expect([...fora]).toEqual([]);
+  });
+
+  test("no luto e no pós-parto, nada da gestação; no pós-parto, nem o bebê 'aqui dentro'", () => {
+    const fora = new Set<string>();
+    for (const { cuidado, posParto, plano } of planos())
+      for (const d of plano.deixas) {
+        if (cuidado && /gesta|grávid|gravidez|recém-nascid/i.test(d.fala.texto))
+          fora.add(`luto ${d.fala.id}: ${d.fala.texto}`);
+        if (posParto && /aqui dentro|gesta|grávid|gravidez|batendo por dois/i.test(d.fala.texto))
+          fora.add(`pós ${d.fala.id}: ${d.fala.texto}`);
+      }
+    expect([...fora]).toEqual([]);
   });
 });

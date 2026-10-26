@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { CARTOES_DA_COMUNIDADE } from "@/lib/onboarding-da-comunidade";
 import type { ComentarioNaTela } from "~/servidor/rede";
 import {
   cartoesDoApp,
@@ -31,6 +32,7 @@ import {
   ehOfensivo,
   recadoDaOfensa,
   REGUA_DE_OFENSA,
+  TEXTO_DO_CARTAO_NO_APP,
 } from "./regras";
 import { REDUZ_OFENSA } from "@/lib/comentarios";
 import { CONTATO_EMAIL } from "~/config";
@@ -246,6 +248,12 @@ describe("regras e boas-vindas", () => {
       expect(k.texto.includes("⊞")).toBe(false);
     }
     expect(cartoes.some((k) => k.id === "clinico" && k.texto.includes("192"))).toBe(true);
+    /* O cartão "clinico" mandava falar com "o seu obstetra", e o "camada" dava
+       de exemplo a foto do ultrassom: a troca do app ainda tem de casar com o
+       texto do site, e nenhum cartão fala de médico ou de exame. */
+    for (const [id, t] of Object.entries(TEXTO_DO_CARTAO_NO_APP))
+      expect(CARTOES_DA_COMUNIDADE.find((k) => k.id === id)?.texto).toBe(t.site);
+    for (const k of cartoes) expect(k.texto).not.toMatch(/obstetra|médic|ultrass|exame/i);
   });
 });
 

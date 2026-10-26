@@ -206,7 +206,7 @@ export function TelaDoQuartoTrimestre({
                   source={RECEM_NASCIDO}
                   style={{ width: 186, height: 186 }}
                   contentFit="contain"
-                  accessibilityLabel={`${quem}, recém-nascido, enrolado na manta`}
+                  accessibilityLabel={`${quem} numa manta quentinha, nos primeiros dias`}
                 />
               </Flutuar>
             </View>

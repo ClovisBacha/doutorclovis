@@ -21,7 +21,7 @@ const okVazio = () => Promise.resolve({ ok: true as const });
 const estado = () => parametroDaBancada("estado");
 
 const RECADO_DE_EXEMPLO =
-  "Aqui a gente conta a própria experiência, sem dizer o que a outra deve fazer. Quem orienta é o médico dela.";
+  "Aqui a gente conta a própria experiência, sem dizer o que a outra deve fazer. Quem orienta é quem acompanha cada uma.";
 
 export const api = {
   meuPerfilSocial() {

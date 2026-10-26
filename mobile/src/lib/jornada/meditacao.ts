@@ -24,10 +24,24 @@ export type TemaDeMeditacao = {
   soGestacao?: boolean;
 };
 
+/**
+ * "Quero sentir o bebê" lia-se como sentir mexer — e o que ela sente das
+ * mexidinhas fica fora do app (quem sente pouco lê ali um sinal; sinal mora no
+ * SOS). A catraca do teste confere que o site ainda diz o texto trocado.
+ */
+export const PRECISA_NO_APP: Readonly<Record<string, { site: string; app: string }>> = {
+  "Conexão com o bebê": { site: "Quero sentir o bebê", app: "Quero um momento com o bebê" },
+};
+
 export const TEMAS_DE_MEDITACAO: readonly TemaDeMeditacao[] = [
   { tema: "Só respirar", precisa: "Quero só respirar", emoji: "🌬️", noLuto: true },
   { tema: "Calma", precisa: "Estou tensa", emoji: "🌊", noLuto: true },
-  { tema: "Conexão com o bebê", precisa: "Quero sentir o bebê", emoji: "💛", soGestacao: true },
+  {
+    tema: "Conexão com o bebê",
+    precisa: PRECISA_NO_APP["Conexão com o bebê"]!.app,
+    emoji: "💛",
+    soGestacao: true,
+  },
   { tema: "Descanso", precisa: "Preciso descansar", emoji: "🌙", noLuto: true },
   { tema: "Gratidão", precisa: "Quero um respiro bom", emoji: "✨" },
   { tema: "Sono tranquilo", precisa: "Não consigo dormir", emoji: "😴", noLuto: true },
@@ -94,10 +108,12 @@ export function planoDaSessao(o: {
   tema: string;
   semanas: number | null;
   cuidado: boolean;
+  /** O bebê já nasceu: sai o que fala dele "aqui dentro" e da gestação. */
+  posParto?: boolean;
   densidade: Densidade;
   registro: RegistroDaMeditacao;
 }): Plano {
-  return planejarSessao({
+  const plano = planejarSessao({
     minutos: o.minutos,
     tema: o.tema,
     variacao: ((o.registro.dias.length % 3) + 1) as 1 | 2 | 3,
@@ -107,7 +123,48 @@ export function planoDaSessao(o: {
     careMode: o.cuidado,
     semente: o.registro.minutos,
   });
+  const fica = (id: string, texto: string) =>
+    !FALAS_FORA_DO_APP.has(id) &&
+    !(o.cuidado && FORA_DO_LUTO.test(texto)) &&
+    !(o.posParto && (FORA_DO_POS.test(texto) || FALAS_FORA_DO_POS.has(id)));
+  return { ...plano, deixas: plano.deixas.filter((d) => fica(d.fala.id, d.fala.texto)) };
 }
+
+/**
+ * ⚠️ AS FALAS QUE O APP NÃO DIZ (21/10/2026: o app não é conselho médico).
+ *
+ * As falas da meditação têm voz gravada pelo `id`: trocar o texto deixaria a
+ * voz dizendo a frase antiga. Então a fala que foge das regras SAI do plano, e
+ * aquele ciclo fica em silêncio — a meditação já é feita de silêncio.
+ *
+ * - Em qualquer fase: "Se você tiver dúvida, ela cabe na consulta", "é normal
+ *   que seja", "Acordar de madrugada não é sinal de nada", "Não precisa sentir
+ *   para ser verdade", o bebê "neste mesmo lugar seguro que você" (tranquilizar
+ *   sobre o corpo ou o bebê é régua), a respiração "que mais ajuda" no parto e
+ *   "a porta do consultório".
+ * - No Modo Cuidado, a régua do site (`careMode`) não pega "gestação" nem
+ *   "grávida": "Cansaço na gestação não é fraqueza" e "Dormir grávida é uma
+ *   negociação" chegavam a quem perdeu o bebê.
+ * - No pós-parto, o mesmo, mais o bebê "aqui dentro" e "o coração está batendo
+ *   por dois", que já não são verdade.
+ *
+ * O "ele" para o bebê nas falas gravadas do tema "Conexão com o bebê" fica até
+ * a regravação: tirar dez falas do tema o esvaziaria.
+ */
+export const FALAS_FORA_DO_APP: ReadonlySet<string> = new Set([
+  "fase-1b",
+  "fase-3a",
+  "calma-3-4",
+  "sono-2-5",
+  "coragem-1-5",
+  "coragem-2-4",
+  "coragem-3-3",
+  "prog-6-4",
+]);
+
+const FORA_DO_LUTO = /gesta|grávid|gravidez|recém-nascid/i;
+const FORA_DO_POS = /aqui dentro|gesta|grávid|gravidez|recém-nascid/i;
+const FALAS_FORA_DO_POS: ReadonlySet<string> = new Set(["gratidao-2-2"]);
 
 /** Encerrar pelo ✕ só guarda a sessão a partir de um minuto (o mesmo corte do site). */
 export const CICLOS_DE_UM_MINUTO = Math.ceil(60 / CICLO);
@@ -140,9 +197,10 @@ export function comoEstouPara(cuidado: boolean) {
 }
 
 /**
- * O que ela lê depois de responder. O texto é o do site, com duas trocas do app
+ * O que ela lê depois de responder. O texto é o do site, com três trocas do app
  * (21/10/2026, decisão do dono: o app não é conselho médico): "Ainda ansiosa"
- * mandava "levar isso pra consulta", e "Conectada" chamava o bebê de "ele".
+ * mandava "levar isso pra consulta", "Conectada" chamava o bebê de "ele", e
+ * "Com sono" mandava dormir ("Vá deitar").
  * A catraca do teste confere que o site ainda diz a frase trocada.
  */
 export const FECHAMENTO_TROCADO_NO_APP: Readonly<Record<string, { site: string; app: string }>> = {
@@ -154,11 +212,15 @@ export const FECHAMENTO_TROCADO_NO_APP: Readonly<Record<string, { site: string; 
     site: "Ansiedade que não passa em 5 minutos merece ser falada. Leve isso pra consulta.",
     app: "Tudo bem: tem dia em que a calma demora mais. Volte quando quiser.",
   },
+  "Com sono": {
+    site: "Sono depois de meditar é o corpo aceitando descansar. Vá deitar.",
+    app: "Sono depois de meditar é o corpo pedindo descanso. Se der, aproveite.",
+  },
 };
 
 export const FECHAMENTO: Record<string, string> = {
   "Mais calma": "É isso mesmo. Guarde esse ritmo pro resto do dia.",
-  "Com sono": "Sono depois de meditar é o corpo aceitando descansar. Vá deitar.",
+  "Com sono": FECHAMENTO_TROCADO_NO_APP["Com sono"]!.app,
   Conectada: FECHAMENTO_TROCADO_NO_APP.Conectada!.app,
   Igual: "Nem toda sessão muda o dia — e mesmo assim ela contou. Volte amanhã.",
   "Ainda ansiosa": FECHAMENTO_TROCADO_NO_APP["Ainda ansiosa"]!.app,
@@ -166,12 +228,11 @@ export const FECHAMENTO: Record<string, string> = {
 
 /**
  * A última fala da sessão, dita depois que ela responde (a gravação `fe-*`).
- * As duas respostas trocadas ficam sem voz: a gravação do site diz a frase
- * antiga, e uma frase dita diferente da escrita seria pior que o silêncio.
+ * As respostas trocadas ficam sem voz: a gravação do site diz a frase antiga,
+ * e uma frase dita diferente da escrita seria pior que o silêncio.
  */
 export const FALA_DO_FECHAMENTO: Record<string, string> = {
   "Mais calma": "fe-calma",
-  "Com sono": "fe-sono",
   Igual: "fe-igual",
 };
 

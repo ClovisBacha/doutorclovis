@@ -30,7 +30,8 @@ import {
   TEMPOS,
   type Tempo,
 } from "@/lib/som-continuo";
-import { familiasDeSom, ROTULO_DO_SOM, type SomKey } from "@/lib/som-receitas";
+import { familiasDeSom, type SomKey } from "@/lib/som-receitas";
+import { ROTULO_DO_SOM_NO_APP } from "~/lib/jornada/sons";
 import { toque } from "~/componentes/base";
 import { corNoite } from "~/componentes/jornada/cores";
 import { voltarParaJornada } from "~/componentes/jornada/pecas";
@@ -91,7 +92,7 @@ export default function Dormir() {
     if (aplicouBancada || !ehBancada()) return;
     setAplicouBancada(true);
     const k = parametroDaBancada("som");
-    if (k && k in ROTULO_DO_SOM) {
+    if (k && k in ROTULO_DO_SOM_NO_APP) {
       setSom(k as SomKey);
       if (parametroDaBancada("pausado") === "1") setPausado(true);
       else setAlvo(quandoDesligar(30, Date.now()));
@@ -322,7 +323,7 @@ export default function Dormir() {
                       key={k}
                       accessibilityRole="button"
                       accessibilityState={{ selected: ativo }}
-                      accessibilityLabel={`${ROTULO_DO_SOM[k].label}${ativo ? (pausado ? ", pausado" : ", tocando") : ""}`}
+                      accessibilityLabel={`${ROTULO_DO_SOM_NO_APP[k].label}${ativo ? (pausado ? ", pausado" : ", tocando") : ""}`}
                       onPress={() => {
                         toque();
                         escolher(k);
@@ -345,7 +346,11 @@ export default function Dormir() {
                           minHeight: 44,
                         }}
                       >
-                        <Arte fonte={ARTE_DO_SOM[k]} emoji={ROTULO_DO_SOM[k].emoji} tamanho={44} />
+                        <Arte
+                          fonte={ARTE_DO_SOM[k]}
+                          emoji={ROTULO_DO_SOM_NO_APP[k].emoji}
+                          tamanho={44}
+                        />
                         {ativo && !pausado ? <Onda /> : null}
                       </View>
                       <Text
@@ -357,7 +362,7 @@ export default function Dormir() {
                           color: corNoite.branco,
                         }}
                       >
-                        {ROTULO_DO_SOM[k].label}
+                        {ROTULO_DO_SOM_NO_APP[k].label}
                       </Text>
                       <Text
                         style={{
@@ -368,7 +373,7 @@ export default function Dormir() {
                           color: corNoite.branco50,
                         }}
                       >
-                        {ROTULO_DO_SOM[k].sub}
+                        {ROTULO_DO_SOM_NO_APP[k].sub}
                       </Text>
                     </Pressable>
                   );

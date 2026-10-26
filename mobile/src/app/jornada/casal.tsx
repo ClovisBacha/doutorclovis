@@ -93,7 +93,7 @@ export default function Casal() {
     return (
       <Tela bordas={["top", "bottom"]}>
         <BarraDoTopo titulo="Jornada" />
-        <T>Esta sessão é a preparação para o parto, e hoje ela não faz parte da sua jornada.</T>
+        <T>Esta sessão não faz parte da sua jornada de hoje. Respirar e escrever continuam aqui.</T>
         <Botao rotulo="Voltar" aoTocar={voltarParaJornada} corFundo={corJornada.roxo} />
       </Tela>
     );
@@ -223,8 +223,8 @@ export default function Casal() {
                 color: corNoite.branco70,
               }}
             >
-              Dez minutos com quem vai estar com você no dia. Vocês vão treinar as três coisas que
-              mais funcionam no trabalho de parto — e nenhuma delas se aprende na hora.
+              Dez minutos com quem vai estar com você no dia. Vocês treinam juntos três gestos de
+              parceria, sem pressa — e dá para repetir quando quiserem.
             </Text>
             <View style={{ marginTop: 20, gap: espaco.sm }}>
               {[

@@ -85,6 +85,22 @@ describe("o app não dá conselho médico", () => {
     expect(ondeAparece(/from "@\/lib\/recado-da-bolha"/, ["lib/recado-da-bolha.ts"])).toEqual([]);
   });
 
+  test("as frases do site que fogem das regras passam pela troca do app", () => {
+    /* A varredura de 26/10/2026 achou 97 frases das atividades (gratidão,
+       cartas, meditação, Mexer, sons, conquistas, Comunidade) com médico,
+       sintoma, mexidinha ou o bebê no masculino — e a gratidão do site
+       chegando ao luto com as perguntas da gestação. Cada uma é trocada num
+       módulo do app; nenhuma tela lê o texto do site direto. */
+    expect(ondeAparece(/\bperguntaDoDia\(/, ["lib/jornada/gratidao.ts"])).toEqual([]);
+    expect(
+      ondeAparece(/\b(poolDeHoje|falaDaBolhaNaCarta|cartaDoDia)\(/, ["lib/jornada/cartas.ts"]),
+    ).toEqual([]);
+    expect(ondeAparece(/\bconquistaPorChave\(/)).toEqual([]);
+    expect(ondeAparece(/\bROTULO_DO_SOM\b(?!_NO_APP)/, ["lib/jornada/sons.ts"])).toEqual([]);
+    expect(ondeAparece(/\bsessaoDoDia\(/, ["lib/jornada/mexer.ts"])).toEqual([]);
+    expect(ondeAparece(/\bplanejarSessao\(/, ["lib/jornada/meditacao.ts"])).toEqual([]);
+  });
+
   test("o Modo Cuidado não oferece mais mexer o corpo", () => {
     /* O "Mexer devagar" saiu do Modo Cuidado e do pós-parto: no site ele vinha
        "só se o médico já liberou", e o app não tem médico para liberar. A

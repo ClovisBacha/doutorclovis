@@ -69,8 +69,13 @@ import { primeiroNome } from "~/lib/gestacao";
 import { recadoDaBolhaNoApp } from "~/lib/recado-da-bolha";
 import { BarraDoTopo, voltarParaJornada } from "~/componentes/jornada/pecas";
 import { useSessao } from "~/lib/sessao";
-import { montarGrade, paraResgatar, placar as placarDasConquistas } from "~/lib/jornada/conquistas";
-import { conquistaPorChave, type ConquistaDef } from "@/lib/conquistas";
+import {
+  conquistaNoApp,
+  montarGrade,
+  paraResgatar,
+  placar as placarDasConquistas,
+} from "~/lib/jornada/conquistas";
+import { type ConquistaDef } from "@/lib/conquistas";
 import { diaLongo } from "~/lib/jornada/dia";
 import {
   estadoAtual,
@@ -513,7 +518,7 @@ function useAvisosDoDia({
   const [novasVistas, setNovasVistas] = useState<string | null>(null);
   const novas = useMemo(() => {
     if (!conquistas || conquistas === "carregando" || conquistas.careMode) return [];
-    return conquistas.novas.map((k) => conquistaPorChave(k)).filter((d): d is ConquistaDef => !!d);
+    return conquistas.novas.map((k) => conquistaNoApp(k)).filter((d): d is ConquistaDef => !!d);
   }, [conquistas]);
   const chaveDasNovas = novas.map((d) => d.key).join(",");
   const mostrarNovas = novas.length > 0 && novasVistas !== chaveDasNovas;

@@ -2,15 +2,15 @@ import { recadoDaBolha } from "@/lib/recado-da-bolha";
 
 /**
  * O RECADO DA BOLHA COMO O APP O DIZ — as frases do site
- * (`@/lib/recado-da-bolha`, congelado), com quatro trocadas.
+ * (`@/lib/recado-da-bolha`, congelado), com cinco trocadas.
  *
  * ⚠️ 21/10/2026, decisão do dono: o app é rede social + gamificação, e não
  * conselho médico — e, desde as aulas, nunca dá gênero ao bebê. Do site vinham
  * "Cuidar de você hoje é cuidar DELE também" (na gestação e no pós-parto),
  * "Tarde é ótima pra alongar. {bebê} gosta quando você se mexe" (exercício e
  * uma afirmação sobre o bebê), "Quando você desacelera, {bebê} sente" (que
- * amarra o bebê ao nervoso dela) e "O corpo pesa mais agora", que no pós-parto
- * fala do corpo e não do cansaço.
+ * amarra o bebê ao nervoso dela), "O corpo pesa mais agora", que no pós-parto
+ * fala do corpo e não do cansaço, e "Já comeu?", a comida como lembrete.
  *
  * A troca casa pelo TEXTO, e não pela posição: a rotação do site (`dia % n`)
  * segue a mesma, e cada frase trocada ocupa o lugar da dela. `{bebe}` é o
@@ -32,6 +32,10 @@ export const RECADOS_NO_APP: readonly { site: string; app: string }[] = [
   {
     site: "🌆 Fim de tarde. O corpo pesa mais agora — vai com jeitinho. 💜",
     app: "🌆 Fim de tarde. O cansaço pesa mais agora — vai com jeitinho. 💜",
+  },
+  {
+    site: "🌞 Já comeu? Depois passa aqui pra desacelerar um pouco. 💗",
+    app: "🌞 Pausa do meio do dia? Passa aqui pra desacelerar um pouco. 💗",
   },
 ];
 

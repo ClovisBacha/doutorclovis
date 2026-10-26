@@ -18,6 +18,83 @@ import {
 } from "@/lib/conquistas";
 import type { ConquistaDesbloqueada } from "~/servidor/economia";
 
+/**
+ * OS TEXTOS DAS CONQUISTAS COMO O APP OS ESCREVE — o catálogo do site
+ * (`@/lib/conquistas`, congelado), com dez trocas (21/10/2026: o app não é
+ * conselho médico, e nunca dá gênero ao bebê).
+ *
+ * "Ele Ouviu Você" ia para o cartão dos Stories; "Bebê Ativo" punha um rótulo
+ * no bebê a partir da contagem de movimentos; e as de dado de saúde que ficam
+ * visíveis para quem já as ganhou no site ("Saúde em Dia", "Primeira Mamada",
+ * "Primeira vacina do bebê registrada") falam de um registro que o app não tem.
+ * Só o texto muda: a chave, a raridade e o pagamento seguem os do site.
+ */
+export const TEXTO_DAS_CONQUISTAS_NO_APP: Readonly<
+  Record<
+    string,
+    {
+      site: Pick<ConquistaDef, "title" | "description">;
+      app: Partial<Pick<ConquistaDef, "title" | "description" | "emoji">>;
+    }
+  >
+> = {
+  carta_1: {
+    site: { title: "Ele Ouviu Você", description: "Leu a primeira carta em voz alta pro bebê" },
+    app: { title: "Carta Entregue" },
+  },
+  carta_10: {
+    site: { title: "A Voz Preferida", description: "10 cartas lidas pro bebê" },
+    app: { title: "Dez Cartas de Amor" },
+  },
+  first_kicks: {
+    site: { title: "Primeiros Chutes!", description: "Registrou a primeira sessão de movimentos" },
+    app: { title: "Primeiro Encontro" },
+  },
+  kicks_10: {
+    site: { title: "Bebê Ativo", description: "10 sessões de contagem de chutes" },
+    app: { title: "Dez Encontros", description: "10 sessões de movimentos do bebê", emoji: "👣" },
+  },
+  first_vaccine: {
+    site: { title: "Protegido", description: "Primeira vacina do bebê registrada" },
+    app: { title: "Mais um Passo", description: "Guardou um registro do bebê", emoji: "🌟" },
+  },
+  first_health_log: {
+    site: { title: "Saúde em Dia", description: "Registrou o primeiro dado de saúde" },
+    app: { title: "Primeiro Registro", description: "Guardou o primeiro registro" },
+  },
+  health_7_days: {
+    site: { title: "Semana Saudável", description: "7 registros de saúde realizados" },
+    app: { title: "Semana de Registros", description: "7 registros guardados" },
+  },
+  first_breastfeeding: {
+    site: { title: "Primeira Mamada", description: "Registrou a primeira amamentação" },
+    app: { title: "Primeiro Momento", description: "Guardou o primeiro momento do bebê" },
+  },
+  first_baby_weight: {
+    site: { title: "Crescendo!", description: "Registrou o primeiro peso do bebê" },
+    app: { description: "Guardou uma lembrança do bebê", emoji: "🌱" },
+  },
+  prenatal_done: {
+    site: { title: "Pré-natal Concluído!", description: "Checklist completo — parabéns!" },
+    app: { title: "Lista Completa!" },
+  },
+};
+
+export function comTextoDoApp(d: ConquistaDef): ConquistaDef {
+  const t = TEXTO_DAS_CONQUISTAS_NO_APP[d.key];
+  return t && t.site.title === d.title && t.site.description === d.description
+    ? { ...d, ...t.app }
+    : d;
+}
+
+/** O catálogo do site, com os textos do app. */
+export const CONQUISTAS_NO_APP: readonly ConquistaDef[] = CONQUISTAS.map(comTextoDoApp);
+
+/** A conquista pela chave, com o texto do app (no lugar de `conquistaPorChave`). */
+export function conquistaNoApp(key: string): ConquistaDef | undefined {
+  return CONQUISTAS_NO_APP.find((d) => d.key === key);
+}
+
 export type EstadoDaConquista = "bloqueada" | "resgatar" | "resgatada" | "desbloqueada";
 
 export type Cartao = {
@@ -80,7 +157,7 @@ export function descricaoNoApp(def: ConquistaDef): string {
 export function montarGrade(
   unlocked: readonly ConquistaDesbloqueada[],
   resgatadas: readonly string[] | null,
-  catalogo: readonly ConquistaDef[] = CONQUISTAS,
+  catalogo: readonly ConquistaDef[] = CONQUISTAS_NO_APP,
 ): Cartao[] {
   const mapa = new Map(unlocked.map((u) => [u.achievement_key, u.unlocked_at] as const));
   const res = resgatadas === null ? null : new Set(resgatadas);
@@ -106,7 +183,7 @@ export function paraResgatar(grade: readonly Cartao[]): number {
  */
 export const SECOES: readonly { chave: CategoriaConquista; rotulo: string; emoji: string }[] = [
   { chave: "bebe", rotulo: "Bebê", emoji: "👶" },
-  { chave: "saude", rotulo: "Saúde", emoji: "❤️" },
+  { chave: "saude", rotulo: "Bem-estar", emoji: "🌿" },
   { chave: "diario", rotulo: "Diário", emoji: "📝" },
   { chave: "educacao", rotulo: "Educação", emoji: "🎓" },
   { chave: "familia", rotulo: "Família", emoji: "👨‍👩‍👧" },

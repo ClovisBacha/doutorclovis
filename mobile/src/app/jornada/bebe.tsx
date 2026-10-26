@@ -14,9 +14,7 @@ import {
 } from "react-native";
 import {
   cartaComNome,
-  falaDaBolhaNaCarta,
   fraseDeUltimaLeitura,
-  poolDeHoje,
   registrarLeitura,
   ultimaLeitura,
   type Carta,
@@ -50,7 +48,7 @@ import { useAtividade } from "~/componentes/jornada/usarJornada";
 import { useMovimentoReduzido } from "~/componentes/movimento";
 import { tocarSomDeFundo, type SomDeFundo } from "~/lib/audio/som-de-fundo";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
-import { cartaDoDiaNoApp } from "~/lib/jornada/cartas";
+import { cartaDoDiaNoApp, falaDaBolhaNaCartaNoApp, poolDeHojeNoApp } from "~/lib/jornada/cartas";
 import { gravarChave, useLoja } from "~/lib/jornada/loja";
 import { CHAVE_CARTAS_LIDAS } from "~/lib/jornada/momentos";
 import { supabase } from "~/servidor/supabase";
@@ -128,7 +126,8 @@ export default function Bebe() {
     return cartaComNome(c, nome);
   }, [at.pronto, at.cuidado, at.D, at.semana, at.pos, nome]);
   const album = useMemo(
-    () => poolDeHoje({ semanas: at.semana, posParto: at.pos }).map((c) => cartaComNome(c, nome)),
+    () =>
+      poolDeHojeNoApp({ semanas: at.semana, posParto: at.pos }).map((c) => cartaComNome(c, nome)),
     [at.semana, at.pos, nome],
   );
   const cartaDelas = useMemo(
@@ -283,7 +282,7 @@ export default function Bebe() {
         >
           <FimDoMomento
             titulo="Beijo entregue"
-            fala="Ele ouviu a sua voz — e, do jeitinho dele, guardou cada palavra. 💛"
+            fala="Esse minuto com a sua voz ficou guardado, só de vocês. 💛"
             desfecho={desfecho}
             D={at.D}
             cuidado={false}
@@ -302,7 +301,7 @@ export default function Bebe() {
               </View>
             }
             confete
-            balao={falaDaBolhaNaCarta({ tela: "done" })}
+            balao={falaDaBolhaNaCartaNoApp({ tela: "done" })}
           />
         </ScrollView>
       </FundoDaAtividade>
@@ -552,7 +551,7 @@ export default function Bebe() {
         <BolhaComBalao
           humor="apaixonado"
           paleta={PALETA}
-          fala={falaDaBolhaNaCarta({
+          fala={falaDaBolhaNaCartaNoApp({
             tela: "intro",
             fraseDeLeitura,
             lendoAsDelas,

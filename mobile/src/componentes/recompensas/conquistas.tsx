@@ -2,7 +2,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, Modal, Pressable, Text, View } from "react-native";
-import { conquistaPorChave, type ConquistaDef } from "@/lib/conquistas";
+import { type ConquistaDef } from "@/lib/conquistas";
 import { NaoConsegueLer, toque } from "~/componentes/base";
 import { Confete } from "~/componentes/jornada/pecas";
 import type { LeituraDasConquistas } from "~/componentes/jornada/economia";
@@ -16,7 +16,14 @@ import {
   vibrar,
 } from "~/componentes/recompensas/pecas";
 import { lerJson, gravarJson } from "~/lib/armazem";
-import { descricaoNoApp, montarGrade, resumo, secoes, type Cartao } from "~/lib/jornada/conquistas";
+import {
+  conquistaNoApp,
+  descricaoNoApp,
+  montarGrade,
+  resumo,
+  secoes,
+  type Cartao,
+} from "~/lib/jornada/conquistas";
 import { dataCompleta } from "~/lib/jornada/dia";
 import { useSessao } from "~/lib/sessao";
 import { RARIDADES } from "@/lib/conquistas";
@@ -128,7 +135,7 @@ export function AbaDasConquistas({
       setFesta((n) => n + 1);
       vibrar("sucesso");
       avisar(`+${res.granted} 🌱`);
-      const def = conquistaPorChave(key);
+      const def = conquistaNoApp(key);
       setConquistada({
         emoji: def?.emoji ?? "🏅",
         titulo: def?.title ?? "Conquista",

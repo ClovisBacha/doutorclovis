@@ -406,30 +406,41 @@ export function chaveDasBoasVindas(uid: string | null | undefined): string {
  * revisa — mas dois cartões descrevem coisas que nesta versão não existem:
  *  · "onde" fala da fileira ⊞, chá de bebê, amigas, álbum e atalhos da barra —
  *    nada disso está no app; mostrar seria apontar para botão que não há;
- *  · "clinico" termina dizendo que o SOS "avisa o seu médico" — o app não tem
- *    médico vinculado, e a promessa seria falsa. A frase vira o que o SOS do
- *    app faz de fato: 192 e o contato de emergência.
+ *  · "clinico" mandava falar com "o seu obstetra" e terminava dizendo que o SOS
+ *    "avisa o seu médico" — o app não tem médico vinculado, e a promessa seria
+ *    falsa. Ver `TEXTO_DO_CARTAO_NO_APP`.
  */
 export function cartoesDoApp(): CartaoDaComunidade[] {
-  return CARTOES_DA_COMUNIDADE.filter((c) => c.id !== "onde").map((c) =>
-    c.id === "clinico"
-      ? {
-          ...c,
-          texto: c.texto.replace(
-            /Ele avisa o seu médico e o seu contato de uma vez\.?/,
-            "Ele abre o 192 e avisa quem você cadastrou.",
-          ),
-        }
-      : c,
-  );
+  return CARTOES_DA_COMUNIDADE.filter((c) => c.id !== "onde").map((c) => {
+    const t = TEXTO_DO_CARTAO_NO_APP[c.id];
+    return t && t.site === c.texto ? { ...c, texto: t.app } : c;
+  });
 }
+
+/**
+ * O texto dos cartões que o app diz de outro jeito. O "clinico" mandava falar
+ * com "o seu obstetra" (nem toda mãe tem um, e a v1 não tem médico) e terminava
+ * dizendo que o SOS "avisa o seu médico" — ele abre o 192 e avisa o contato. O
+ * "camada" dava de exemplo "uma foto do ultrassom" (21/10/2026: o app não fala
+ * de exame). A regra continua a mesma: conduta não se pede nem se dá aqui.
+ */
+export const TEXTO_DO_CARTAO_NO_APP: Readonly<Record<string, { site: string; app: string }>> = {
+  camada: {
+    site: "Na hora de publicar você diz se aquilo é para todo mundo, para quem te acompanha, ou só para as suas amigas. Uma foto do ultrassom e um desabafo de terça não precisam ter o mesmo público.",
+    app: "Na hora de publicar você diz se aquilo é para todo mundo, para quem te acompanha, ou só para as suas amigas. Uma foto da barriga e um desabafo de terça não precisam ter o mesmo público.",
+  },
+  clinico: {
+    site: "Conduta é com o seu obstetra. Se algo no seu corpo te preocupa, fale com ele — e se for urgente, use o SOS na barra de baixo. Ele avisa o seu médico e o seu contato de uma vez.",
+    app: "Conduta não se pede nem se dá aqui — cada uma tem quem a acompanhe. Se for urgente, use o SOS na barra de baixo. Ele abre o 192 e avisa quem você cadastrou.",
+  },
+};
 
 /** Os três pontos que a folha das Regras precisa dizer (Apple 1.2). */
 export const PONTOS_DAS_REGRAS: readonly { titulo: string; texto: string }[] = [
   {
     titulo: "Tolerância zero",
     texto:
-      "Não é permitido conteúdo ofensivo, abusivo, de assédio, nem conselho de saúde perigoso. Aqui a gente conta a própria experiência — quem orienta é o obstetra de cada uma.",
+      "Não é permitido conteúdo ofensivo, abusivo, de assédio, nem conselho de saúde perigoso. Aqui a gente conta a própria experiência — quem orienta é quem acompanha cada uma.",
   },
   {
     titulo: "Denúncias revistas em até 24 horas",

@@ -22,7 +22,6 @@ import {
   HUMOR_GRATIDAO,
   marcoAtingido,
   MINIMO_PARA_CARTA,
-  perguntaDoDia,
   PREFIXO_GRATIDAO,
   textoDaGratidao,
   type Gratidao,
@@ -38,6 +37,7 @@ import {
   type PaletaDaAtividade,
 } from "~/componentes/jornada/atividade";
 import { corGratidao } from "~/componentes/jornada/cores";
+import { perguntaDoDiaNoApp } from "~/lib/jornada/gratidao";
 import { concluirMomento, FimDoMomento, type Desfecho } from "~/componentes/jornada/fim";
 import { BarraDoTopo } from "~/componentes/jornada/pecas";
 import { useAtividade } from "~/componentes/jornada/usarJornada";
@@ -127,7 +127,7 @@ export default function GratidaoTela() {
 
   const pergunta = useMemo(
     () =>
-      perguntaDoDia({
+      perguntaDoDiaNoApp({
         dia: at.D ?? diaDoAno(new Date()),
         semanas: at.semana,
         posParto: at.pos,

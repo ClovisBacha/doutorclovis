@@ -10,7 +10,8 @@ import {
   type Atividade,
   type Carteira,
 } from "~/servidor/economia";
-import { conquistaPorChave, RARIDADES } from "@/lib/conquistas";
+import { RARIDADES } from "@/lib/conquistas";
+import { conquistaNoApp } from "~/lib/jornada/conquistas";
 import { contarAmigas } from "~/servidor/amigas";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { estadoDaBancada } from "~/componentes/jornada/bancada";
@@ -173,7 +174,7 @@ export async function resgatar(
 ): Promise<{ granted: number; repetido: boolean } | null> {
   if (ehBancada()) {
     await espera(500);
-    const def = conquistaPorChave(key);
+    const def = conquistaNoApp(key);
     return { granted: def ? RARIDADES[def.raridade].sementinhas : 15, repetido: false };
   }
   try {

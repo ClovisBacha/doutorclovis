@@ -1,6 +1,6 @@
 import { CANTINHO_BY_ID } from "@/lib/cantinho";
-import { conquistaPorChave } from "@/lib/conquistas";
 import { TROFEUS_PARA } from "@/lib/trofeus";
+import { conquistaNoApp } from "~/lib/jornada/conquistas";
 
 /**
  * A ESCADA DOS TROFÉUS — para que eles servem, no app. A folha dizia só
@@ -25,7 +25,7 @@ export function escadaDosTrofeus(
   const por = (n: number, rotulo: string) =>
     porContagem.set(n, [...(porContagem.get(n) ?? []), rotulo]);
   for (const k of CONQUISTAS_DE_TROFEU) {
-    const def = conquistaPorChave(k);
+    const def = conquistaNoApp(k);
     const n = Number(k.split("_")[1]);
     if (def) por(n, `A conquista ${def.title}`);
   }

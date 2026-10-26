@@ -19,17 +19,24 @@ import {
   inicioDoProximo,
   linhaDoTempo,
   montarSessao,
+  NARRACAO_FORA_DO_APP,
   posicaoNoTempo,
+  TEXTO_DO_MOVIMENTO_NO_APP,
   temChaoParaTirar,
 } from "./mexer";
+import { MOVIMENTOS } from "@/lib/exercicios";
 import { lerRegistro, planoDaSessao, temasDisponiveis } from "./meditacao";
+import { CONQUISTAS } from "@/lib/conquistas";
 import {
+  CONQUISTAS_NO_APP,
+  conquistaNoApp,
   montarGrade,
   paraResgatar,
   placar,
   resumo,
   secoes,
   SEM_CAMINHO_NO_APP,
+  TEXTO_DAS_CONQUISTAS_NO_APP,
 } from "./conquistas";
 
 const unica: QuizQuestion = { q: "?", o: ["a", "b", "c"], a: 2, why: "porque" };
@@ -316,7 +323,15 @@ describe("a grade de conquistas", () => {
   test("a aba segue o site: seções na ordem do site, X de todas, e a nota do nascimento", () => {
     const g = montarGrade(unlocked, []);
     const sec = secoes(g);
-    expect(sec.map((s) => s.rotulo)).toEqual(["Bebê", "Saúde", "Diário", "Educação", "Família"]);
+    /* "Saúde" vira "Bem-estar": a seção junta a meditação e o Mexer, e o app
+       não fala de saúde como régua (21/10/2026). */
+    expect(sec.map((s) => s.rotulo)).toEqual([
+      "Bebê",
+      "Bem-estar",
+      "Diário",
+      "Educação",
+      "Família",
+    ]);
     expect(sec.flatMap((s) => s.cartoes).length).toBe(g.length);
     const r = resumo(g);
     expect(r.feitas).toBe(2);
@@ -348,5 +363,73 @@ describe("a revisão da aula feita", () => {
     });
     expect(estadoDaOpcao(e, q, 0)).toBe("certa");
     expect(estadoDaOpcao(e, q, 1)).toBe("neutra");
+  });
+});
+
+describe("os textos das conquistas no app", () => {
+  test("as trocadas ainda são, no site, o texto que foi trocado", () => {
+    for (const [key, t] of Object.entries(TEXTO_DAS_CONQUISTAS_NO_APP)) {
+      const site = CONQUISTAS.find((c) => c.key === key);
+      expect({ title: site?.title, description: site?.description }).toEqual(t.site);
+      expect(conquistaNoApp(key)?.title).toBe(t.app.title ?? t.site.title);
+    }
+  });
+
+  test("nenhum título nem descrição dá gênero ao bebê ou fala de saúde, vacina, mamada ou chute", () => {
+    const fora = CONQUISTAS_NO_APP.filter((c) =>
+      /\b(ele|ela)\b|saúde|saudável|vacina|mamada|amament|chutes|pré-natal|peso do bebê|bebê ativo/i.test(
+        `${c.title} ${c.description}`,
+      ),
+    ).map((c) => `${c.key}: ${c.title} — ${c.description}`);
+    expect(fora).toEqual([]);
+    expect(montarGrade([], []).every((c) => CONQUISTAS_NO_APP.includes(c.def))).toBe(true);
+  });
+});
+
+describe("os textos do Mexer no app", () => {
+  test("cada troca ainda é, no site, o texto que foi trocado", () => {
+    for (const [id, t] of Object.entries(TEXTO_DO_MOVIMENTO_NO_APP)) {
+      const m = MOVIMENTOS.find((x) => x.id === id);
+      expect(m).toBeDefined();
+      for (const k of ["cue", "sentir", "parar"] as const) if (t[k]) expect(m![k]).toBe(t[k]!.site);
+      for (const [i, p] of Object.entries(t.passos ?? {}))
+        expect(m!.passos[Number(i)]).toBe(p.site);
+    }
+  });
+
+  test("nenhuma sessão promete remédio, lista sinal de alerta ou manda para médico e consulta", () => {
+    const fora = new Set<string>();
+    for (const semana of [8, 16, 24, 30, 37, 39])
+      for (const minutos of DURACOES_MEXER)
+        for (const sintoma of [null, "cansaco"] as const)
+          for (let D = semana * 7; D < semana * 7 + 7; D++)
+            for (const m of montarSessao({
+              D,
+              minutos,
+              semana,
+              posParto: false,
+              cuidado: false,
+              sintoma,
+            }))
+              for (const t of [m.cue, m.sentir, m.parar, ...m.passos])
+                if (
+                  /médic|consulta|fisioterap|inchaço|azia|câimbra|remédio|encaixe|o parto pede|contração|quando você tosse|formigamento cedendo|dormente|dormência|refluxo|20ª semana|abre a saída/i.test(
+                    t,
+                  ) ||
+                  /lado ESQUERDO/.test(t)
+                )
+                  fora.add(`${m.id}: ${t}`);
+    expect([...fora]).toEqual([]);
+  });
+
+  test("a dica que mudou perde a narração gravada (a voz diria a frase antiga)", () => {
+    expect([...NARRACAO_FORA_DO_APP].sort()).toEqual(
+      Object.entries(TEXTO_DO_MOVIMENTO_NO_APP)
+        .filter(([, t]) => t.cue)
+        .map(([id]) => id)
+        .sort(),
+    );
+    expect(NARRACAO_FORA_DO_APP.has("tornozelo")).toBe(true);
+    expect(NARRACAO_FORA_DO_APP.has("balanco")).toBe(true);
   });
 });

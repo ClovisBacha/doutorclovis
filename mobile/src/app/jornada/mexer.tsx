@@ -38,6 +38,7 @@ import {
   inicioDoProximo,
   linhaDoTempo,
   montarSessao,
+  NARRACAO_FORA_DO_APP,
   posicaoNoTempo,
   temChaoParaTirar,
   type DuracaoMexer,
@@ -603,7 +604,9 @@ function Sessao({
       pararVozes();
       return;
     }
-    tocarVoz(VOZ_DO_MOVIMENTO[seq[indice]!.id], { canal: "guia" });
+    const id = seq[indice]!.id;
+    if (NARRACAO_FORA_DO_APP.has(id)) return;
+    tocarVoz(VOZ_DO_MOVIMENTO[id], { canal: "guia" });
   }, [indice, voz, pausada, seq]);
   useEffect(() => () => pararVozes(), []);
 
@@ -837,7 +840,7 @@ function Sessao({
               <Caixa
                 fundo={corMovimento.sentirFundo}
                 tinta={corMovimento.sentirTexto}
-                titulo="Você deve sentir"
+                titulo="O que reparar"
                 icone={<Sparkles size={16} color={corMovimento.forte} strokeWidth={2.4} />}
                 ficha={corMovimento.passoFundo}
               >

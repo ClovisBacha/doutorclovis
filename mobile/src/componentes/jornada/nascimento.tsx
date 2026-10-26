@@ -197,7 +197,7 @@ export function FestaDoNascimento({
                 source={RECEM_NASCIDO}
                 style={{ width: 210, height: 210 }}
                 contentFit="contain"
-                accessibilityLabel={`${quem} recém-nascido, enrolado na manta`}
+                accessibilityLabel={`${quem} numa manta quentinha, logo depois de chegar`}
               />
             </Flutuar>
           </View>

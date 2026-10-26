@@ -25,7 +25,8 @@ import {
 } from "@/lib/meditacao-programa";
 import { DENSIDADES, falaNoCiclo, type Densidade, type Plano } from "@/lib/meditacao-sessao";
 import { sequenciaDeDatas } from "@/lib/sequencia";
-import { familiasDeSom, ROTULO_DO_SOM, type SomKey } from "@/lib/som-receitas";
+import { familiasDeSom, type SomKey } from "@/lib/som-receitas";
+import { ROTULO_DO_SOM_NO_APP } from "~/lib/jornada/sons";
 import { Carregando, Tela, toque } from "~/componentes/base";
 import {
   BolhaComBalao,
@@ -189,6 +190,7 @@ export default function Meditar() {
           tema: tema.tema,
           semanas: at.semana,
           cuidado: at.cuidado,
+          posParto: at.pos,
           densidade: "guiada",
           registro,
         }),
@@ -242,6 +244,7 @@ export default function Meditar() {
       tema: prog?.tema ?? tema.tema,
       semanas: at.semana,
       cuidado: at.cuidado,
+      posParto: at.pos,
       densidade: prog?.densidade ?? densidade,
       registro,
     });
@@ -620,7 +623,7 @@ export default function Meditar() {
           <EscolhaComLegenda
             paleta={PALETA}
             titulo="Só sons, para dormir"
-            legenda="Chuva, mar ou o coração — com a tela apagada"
+            legenda="Chuva, mar ou vento — com a tela apagada"
             ativa={false}
             aoTocar={() => {
               pararAmostra();
@@ -1040,12 +1043,12 @@ function IconeDoSom({ som, tamanho = 22 }: { som: Som; tamanho?: number }) {
     return <Image source={arte} style={{ width: tamanho, height: tamanho }} contentFit="contain" />;
   return (
     <Text style={{ fontSize: tamanho * 0.86 }}>
-      {som === "silencio" ? "🔇" : ROTULO_DO_SOM[som].emoji}
+      {som === "silencio" ? "🔇" : ROTULO_DO_SOM_NO_APP[som].emoji}
     </Text>
   );
 }
 
-const rotuloDoSom = (k: Som) => (k === "silencio" ? "Silêncio" : ROTULO_DO_SOM[k].label);
+const rotuloDoSom = (k: Som) => (k === "silencio" ? "Silêncio" : ROTULO_DO_SOM_NO_APP[k].label);
 
 function SonsDeFundo({
   som,
