@@ -56,7 +56,9 @@ guardar da saúde para o SOS e o acompanhamento do Bebê."
   (`sem-conselho-medico.test.ts`). ⚠️ Fala com **voz gravada** (meditação,
   Mexer, "Para vocês dois", histórias) não muda de texto: a voz diria a frase
   antiga. Ou ela sai do plano, ou perde a voz até a regravação — ver o diário,
-  "26/10 — build 34".
+  "26/10 — build 34". A regravação (pedido do dono: pelo Higgsfield, na mesma
+  voz Isabella) tem roteiro pronto em `docs/regravacao/`: 40 falas, o texto
+  novo, e onde os arquivos moram (no app, nunca em `src/assets/audio`).
 
 ## Stack
 

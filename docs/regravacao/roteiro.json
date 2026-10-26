@@ -1,0 +1,372 @@
+{
+  "voz": {
+    "servico": "Higgsfield",
+    "modelo": "text2speech_v2",
+    "variante": "elevenlabs",
+    "voz": "Isabella",
+    "voice_id": "80924413-1ea8-4e64-9719-e00b86796f05",
+    "formato": "mp3, 128 kbps, 44,1 kHz, mono"
+  },
+  "falas": [
+    {
+      "id": "conexao-1-2",
+      "grupo": "meditacao",
+      "arquivo_do_site": "src/assets/audio/med/conexao-1-2.mp3",
+      "texto_do_site": "Deixe a mão subir e descer com a respiração. É o primeiro embalo que ele conhece.",
+      "texto_novo": "Deixe a mão subir e descer com a respiração. Um embalo bem de leve, só de vocês.",
+      "motivo": "o bebê no masculino",
+      "destino_no_app": "mobile/assets/vozes/regravadas/conexao-1-2.mp3"
+    },
+    {
+      "id": "conexao-1-3",
+      "grupo": "meditacao",
+      "arquivo_do_site": "src/assets/audio/med/conexao-1-3.mp3",
+      "texto_do_site": "O calor da sua mão atravessa. Ele sente que tem alguém do outro lado.",
+      "texto_novo": "O calor da sua mão fica ali, apoiado. Um jeito quieto de dizer: estou aqui.",
+      "motivo": "o bebê no masculino e uma afirmação sobre o que ele sente",
+      "destino_no_app": "mobile/assets/vozes/regravadas/conexao-1-3.mp3"
+    },
+    {
+      "id": "conexao-1-5",
+      "grupo": "meditacao",
+      "arquivo_do_site": "src/assets/audio/med/conexao-1-5.mp3",
+      "texto_do_site": "Se você quiser tirar a mão, tudo bem. Ele continua aí.",
+      "texto_novo": "Se você quiser tirar a mão, tudo bem. O carinho continua.",
+      "motivo": "o bebê no masculino e a garantia de que ele 'continua aí'",
+      "destino_no_app": "mobile/assets/vozes/regravadas/conexao-1-5.mp3"
+    },
+    {
+      "id": "conexao-2-1",
+      "grupo": "meditacao",
+      "arquivo_do_site": "src/assets/audio/med/conexao-2-1.mp3",
+      "texto_do_site": "Por dentro, sem falar alto, mande um oi pra ele.",
+      "texto_novo": "Por dentro, sem falar alto, mande um oi pro bebê.",
+      "motivo": "o bebê no masculino",
+      "destino_no_app": "mobile/assets/vozes/regravadas/conexao-2-1.mp3"
+    },
+    {
+      "id": "conexao-2-2",
+      "grupo": "meditacao",
+      "arquivo_do_site": "src/assets/audio/med/conexao-2-2.mp3",
+      "texto_do_site": "Conte uma coisa boa do seu dia. Pode ser bobagem — ele não julga.",
+      "texto_novo": "Conte uma coisa boa do seu dia. Pode ser bobagem — aqui ninguém julga.",
+      "motivo": "o bebê no masculino",
+      "destino_no_app": "mobile/assets/vozes/regravadas/conexao-2-2.mp3"
+    },
+    {
+      "id": "conexao-2-3",
+      "grupo": "meditacao",
+      "arquivo_do_site": "src/assets/audio/med/conexao-2-3.mp3",
+      "texto_do_site": "A sua voz chega até ele pelo corpo, antes de chegar pelo ouvido.",
+      "texto_novo": "A sua voz, mesmo baixinha por dentro, já é um carinho.",
+      "motivo": "o bebê no masculino e fisiologia (no 1º trimestre nem é verdade)",
+      "destino_no_app": "mobile/assets/vozes/regravadas/conexao-2-3.mp3"
+    },
+    {
+      "id": "conexao-2-4",
+      "grupo": "meditacao",
+      "arquivo_do_site": "src/assets/audio/med/conexao-2-4.mp3",
+      "texto_do_site": "Se não vier nada pra dizer, fique calada com ele. Também vale.",
+      "texto_novo": "Se não vier nada pra dizer, fique em silêncio com o bebê. Também vale.",
+      "motivo": "o bebê no masculino",
+      "destino_no_app": "mobile/assets/vozes/regravadas/conexao-2-4.mp3"
+    },
+    {
+      "id": "conexao-2-5",
+      "grupo": "meditacao",
+      "arquivo_do_site": "src/assets/audio/med/conexao-2-5.mp3",
+      "texto_do_site": "Ele vai reconhecer essa voz do lado de fora. Você está ensaiando com ele.",
+      "texto_novo": "Cada palavra de hoje é um pedacinho da história de vocês.",
+      "motivo": "o bebê no masculino, duas vezes",
+      "destino_no_app": "mobile/assets/vozes/regravadas/conexao-2-5.mp3"
+    },
+    {
+      "id": "conexao-3-2",
+      "grupo": "meditacao",
+      "arquivo_do_site": "src/assets/audio/med/conexao-3-2.mp3",
+      "texto_do_site": "Cada vez que você desacelera, o corpo dele desacelera junto.",
+      "texto_novo": "Cada vez que você desacelera, este minuto fica mais seu e do bebê.",
+      "motivo": "o bebê no masculino e amarrado ao estado dela",
+      "destino_no_app": "mobile/assets/vozes/regravadas/conexao-3-2.mp3"
+    },
+    {
+      "id": "conexao-3-3",
+      "grupo": "meditacao",
+      "arquivo_do_site": "src/assets/audio/med/conexao-3-3.mp3",
+      "texto_do_site": "Este minuto de sossego é seu, e é dele também. Cuidar de você é cuidar dos dois.",
+      "texto_novo": "Este minuto de sossego é seu, e é do bebê também. Cuidar de você é cuidar dos dois.",
+      "motivo": "o bebê no masculino",
+      "destino_no_app": "mobile/assets/vozes/regravadas/conexao-3-3.mp3"
+    },
+    {
+      "id": "fase-1a",
+      "grupo": "meditacao",
+      "arquivo_do_site": "src/assets/audio/med/fase-1a.mp3",
+      "texto_do_site": "O começo da gestação cansa de um jeito que ninguém vê por fora. Este cansaço é trabalho — o seu corpo está construindo alguém.",
+      "texto_novo": "O começo da gestação pede muito de você, mesmo quando ninguém vê por fora. Por alguns minutos, você não precisa dar conta de nada.",
+      "motivo": "afirma o sintoma e explica a fisiologia (limítrofe)",
+      "destino_no_app": "mobile/assets/vozes/regravadas/fase-1a.mp3"
+    },
+    {
+      "id": "fase-1b",
+      "grupo": "meditacao",
+      "arquivo_do_site": "src/assets/audio/med/fase-1b.mp3",
+      "texto_do_site": "Ainda é cedo, e talvez você quase não sinta nada acontecendo. Está acontecendo. Não precisa sentir para ser verdade.",
+      "texto_novo": "Ainda é cedo, e muita coisa ainda é só espera. Este minuto é seu, do jeito que você estiver.",
+      "motivo": "tranquiliza sobre a gestação (hoje fora do plano)",
+      "destino_no_app": "mobile/assets/vozes/regravadas/fase-1b.mp3"
+    },
+    {
+      "id": "fase-2a",
+      "grupo": "meditacao",
+      "arquivo_do_site": "src/assets/audio/med/fase-2a.mp3",
+      "texto_do_site": "Você chegou no meio do caminho. É a fase em que muita mulher volta a respirar — e é uma boa hora para aprender a fazer isso de propósito.",
+      "texto_novo": "Você chegou no meio do caminho. É uma boa hora para aprender a respirar de propósito, sem pressa nenhuma.",
+      "motivo": "o que se espera do 2º trimestre (limítrofe)",
+      "destino_no_app": "mobile/assets/vozes/regravadas/fase-2a.mp3"
+    },
+    {
+      "id": "fase-3a",
+      "grupo": "meditacao",
+      "arquivo_do_site": "src/assets/audio/med/fase-3a.mp3",
+      "texto_do_site": "A reta final é pesada, e é normal que seja. Nos próximos minutos você não precisa carregar nada — nem o peso, nem a espera.",
+      "texto_novo": "A reta final pode pesar, e tudo bem. Nos próximos minutos você não precisa carregar nada — nem o peso, nem a espera.",
+      "motivo": "'normal' (hoje fora do plano)",
+      "destino_no_app": "mobile/assets/vozes/regravadas/fase-3a.mp3"
+    },
+    {
+      "id": "calma-3-4",
+      "grupo": "meditacao",
+      "arquivo_do_site": "src/assets/audio/med/calma-3-4.mp3",
+      "texto_do_site": "O seu bebê está aqui dentro, neste mesmo lugar seguro que você.",
+      "texto_novo": "Aqui, agora, não tem nada pra resolver. Só você e o ar que entra e sai.",
+      "motivo": "garante que o bebê está seguro; falso no pós-parto (hoje fora do plano)",
+      "destino_no_app": "mobile/assets/vozes/regravadas/calma-3-4.mp3"
+    },
+    {
+      "id": "sono-2-3",
+      "grupo": "meditacao",
+      "arquivo_do_site": "src/assets/audio/med/sono-2-3.mp3",
+      "texto_do_site": "Se precisar mudar de posição, mude. Dormir grávida é uma negociação.",
+      "texto_novo": "Se precisar mudar de posição, mude. Achar o jeito de dormir é uma negociação.",
+      "motivo": "'grávida' no luto e no pós-parto (hoje fora do plano nos dois)",
+      "destino_no_app": "mobile/assets/vozes/regravadas/sono-2-3.mp3"
+    },
+    {
+      "id": "sono-2-5",
+      "grupo": "meditacao",
+      "arquivo_do_site": "src/assets/audio/med/sono-2-5.mp3",
+      "texto_do_site": "Acordar de madrugada não é sinal de nada. Acontece, e passa.",
+      "texto_novo": "Se acordar de madrugada, tudo bem. Volte para o ar, devagar.",
+      "motivo": "'não é sinal de nada' é régua (hoje fora do plano)",
+      "destino_no_app": "mobile/assets/vozes/regravadas/sono-2-5.mp3"
+    },
+    {
+      "id": "descanso-3-5",
+      "grupo": "meditacao",
+      "arquivo_do_site": "src/assets/audio/med/descanso-3-5.mp3",
+      "texto_do_site": "Cansaço na gestação não é fraqueza. É conta que o corpo está pagando.",
+      "texto_novo": "Cansaço não é fraqueza. É o corpo pedindo um tempo, e tudo bem dar.",
+      "motivo": "'gestação' no luto e no pós-parto (hoje fora do plano nos dois)",
+      "destino_no_app": "mobile/assets/vozes/regravadas/descanso-3-5.mp3"
+    },
+    {
+      "id": "gratidao-2-2",
+      "grupo": "meditacao",
+      "arquivo_do_site": "src/assets/audio/med/gratidao-2-2.mp3",
+      "texto_do_site": "O coração está batendo por dois. Não pedimos, e ele faz.",
+      "texto_novo": "O seu coração bate o dia inteiro. Não pedimos, e ele faz.",
+      "motivo": "falso no pós-parto (hoje fora do plano no pós-parto)",
+      "destino_no_app": "mobile/assets/vozes/regravadas/gratidao-2-2.mp3"
+    },
+    {
+      "id": "coragem-1-5",
+      "grupo": "meditacao",
+      "arquivo_do_site": "src/assets/audio/med/coragem-1-5.mp3",
+      "texto_do_site": "Respirar assim é treino. No dia, o corpo lembra.",
+      "texto_novo": "Respirar assim é um lugar seu. Dá pra voltar a ele quando quiser.",
+      "motivo": "técnica de parto vendida como útil (hoje fora do plano)",
+      "destino_no_app": "mobile/assets/vozes/regravadas/coragem-1-5.mp3"
+    },
+    {
+      "id": "coragem-2-1",
+      "grupo": "meditacao",
+      "arquivo_do_site": "src/assets/audio/med/coragem-2-1.mp3",
+      "texto_do_site": "Nada acontece tudo de uma vez. Acontece uma onda de cada vez.",
+      "texto_novo": "Nada precisa ser resolvido de uma vez. Um respiro de cada vez.",
+      "motivo": "ensina a contração (limítrofe)",
+      "destino_no_app": "mobile/assets/vozes/regravadas/coragem-2-1.mp3"
+    },
+    {
+      "id": "coragem-2-2",
+      "grupo": "meditacao",
+      "arquivo_do_site": "src/assets/audio/med/coragem-2-2.mp3",
+      "texto_do_site": "Entre uma e outra existe pausa. É nela que se descansa.",
+      "texto_novo": "Entre um respiro e outro existe pausa. É nela que se descansa.",
+      "motivo": "ensina a contração (limítrofe)",
+      "destino_no_app": "mobile/assets/vozes/regravadas/coragem-2-2.mp3"
+    },
+    {
+      "id": "coragem-2-4",
+      "grupo": "meditacao",
+      "arquivo_do_site": "src/assets/audio/med/coragem-2-4.mp3",
+      "texto_do_site": "Soltar o ar comprido é o que mais ajuda. Comprido, sem apressar.",
+      "texto_novo": "Agora é só soltar o ar comprido. Comprido, sem apressar.",
+      "motivo": "técnica vendida como a que mais ajuda (hoje fora do plano)",
+      "destino_no_app": "mobile/assets/vozes/regravadas/coragem-2-4.mp3"
+    },
+    {
+      "id": "coragem-2-5",
+      "grupo": "meditacao",
+      "arquivo_do_site": "src/assets/audio/med/coragem-2-5.mp3",
+      "texto_do_site": "Uma de cada vez, e elas acabam. Todas acabam.",
+      "texto_novo": "Um respiro de cada vez. Este minuto é só seu.",
+      "motivo": "as contrações (limítrofe)",
+      "destino_no_app": "mobile/assets/vozes/regravadas/coragem-2-5.mp3"
+    },
+    {
+      "id": "coragem-3-2",
+      "grupo": "meditacao",
+      "arquivo_do_site": "src/assets/audio/med/coragem-3-2.mp3",
+      "texto_do_site": "Você não vai atravessar isso sozinha. Tem gente do seu lado, e tem gente cuidando.",
+      "texto_novo": "Você não precisa atravessar isso sozinha. Dá pra chamar quem você quiser pra perto.",
+      "motivo": "a equipe e a companhia como certas (limítrofe)",
+      "destino_no_app": "mobile/assets/vozes/regravadas/coragem-3-2.mp3"
+    },
+    {
+      "id": "coragem-3-3",
+      "grupo": "meditacao",
+      "arquivo_do_site": "src/assets/audio/med/coragem-3-3.mp3",
+      "texto_do_site": "Se você tiver dúvida, ela cabe na consulta. Perguntar é parte do preparo.",
+      "texto_novo": "Se tiver medo, ele pode ser dito em voz alta. Falar é parte do preparo.",
+      "motivo": "consulta (hoje fora do plano)",
+      "destino_no_app": "mobile/assets/vozes/regravadas/coragem-3-3.mp3"
+    },
+    {
+      "id": "prog-3-6",
+      "grupo": "meditacao",
+      "arquivo_do_site": "src/assets/audio/med/prog-3-6.mp3",
+      "texto_do_site": "Esta varredura serve deitada, na cama, quando o sono não vem.",
+      "texto_novo": "Esta varredura também serve deitada, na cama, no fim do dia.",
+      "motivo": "técnica para insônia (limítrofe)",
+      "destino_no_app": "mobile/assets/vozes/regravadas/prog-3-6.mp3"
+    },
+    {
+      "id": "prog-5-3",
+      "grupo": "meditacao",
+      "arquivo_do_site": "src/assets/audio/med/prog-5-3.mp3",
+      "texto_do_site": "Se ficar desconfortável, é só desconforto. Ele passa sem você fazer nada.",
+      "texto_novo": "Se o silêncio ficar estranho, tudo bem. Ele vai ficando mais familiar.",
+      "motivo": "minimiza um desconforto; sinal mora no SOS (limítrofe)",
+      "destino_no_app": "mobile/assets/vozes/regravadas/prog-5-3.mp3"
+    },
+    {
+      "id": "prog-6-1",
+      "grupo": "meditacao",
+      "arquivo_do_site": "src/assets/audio/med/prog-6-1.mp3",
+      "texto_do_site": "Hoje a gente treina o que serve fora daqui — na fila, no ônibus, na sala de espera.",
+      "texto_novo": "Hoje a gente treina o que serve fora daqui — na fila, no ônibus, no trânsito.",
+      "motivo": "a sala de espera do consultório (limítrofe)",
+      "destino_no_app": "mobile/assets/vozes/regravadas/prog-6-1.mp3"
+    },
+    {
+      "id": "prog-6-4",
+      "grupo": "meditacao",
+      "arquivo_do_site": "src/assets/audio/med/prog-6-4.mp3",
+      "texto_do_site": "Escolha um momento do seu dia para isso. A porta do consultório serve bem.",
+      "texto_novo": "Escolha um momento do seu dia para isso. Antes de abrir uma porta serve bem.",
+      "motivo": "consultório (hoje fora do plano)",
+      "destino_no_app": "mobile/assets/vozes/regravadas/prog-6-4.mp3"
+    },
+    {
+      "id": "fe-sono",
+      "grupo": "meditacao-fechamento",
+      "arquivo_do_site": "src/assets/audio/med/fe-sono.mp3",
+      "texto_do_site": "Sono depois de meditar é o corpo aceitando descansar. Vá deitar.",
+      "texto_novo": "Sono depois de meditar é o corpo pedindo descanso. Se der, aproveite.",
+      "motivo": "sono como prescrição (hoje sem voz)",
+      "destino_no_app": "mobile/assets/vozes/regravadas/fe-sono.mp3"
+    },
+    {
+      "id": "fe-conectada",
+      "grupo": "meditacao-fechamento",
+      "arquivo_do_site": "src/assets/audio/med/fe-conectada.mp3",
+      "texto_do_site": "Esse instante também é cuidado com ele. Vocês dois sentiram.",
+      "texto_novo": "Esse instante também é cuidado com o bebê. Vocês dois sentiram.",
+      "motivo": "o bebê no masculino (hoje sem voz)",
+      "destino_no_app": "mobile/assets/vozes/regravadas/fe-conectada.mp3"
+    },
+    {
+      "id": "fe-ansiosa",
+      "grupo": "meditacao-fechamento",
+      "arquivo_do_site": null,
+      "texto_do_site": "Ansiedade que não passa em 5 minutos merece ser falada. Leve isso pra consulta.",
+      "texto_novo": "Tudo bem: tem dia em que a calma demora mais. Volte quando quiser.",
+      "motivo": "consulta; o site nunca teve voz para esta resposta (gravação nova)",
+      "destino_no_app": "mobile/assets/vozes/regravadas/fe-ansiosa.mp3"
+    },
+    {
+      "id": "casal-05",
+      "grupo": "casal",
+      "arquivo_do_site": "src/assets/audio/casal/casal-05.mp3",
+      "texto_do_site": "Isso que você está fazendo agora é a coisa mais útil que existe no trabalho de parto. Quando a hora chegar, ninguém vai lembrar de nenhuma técnica — mas o corpo dela vai seguir a respiração de quem estiver colado nela. Se você acelerar, ela acelera.",
+      "texto_novo": "Isso que vocês estão fazendo agora é estar junto sem dizer nada — e dá para levar para o dia do parto, se vocês quiserem. Quem manda no ritmo é ela; o seu ar só acompanha.",
+      "motivo": "promessa de eficácia no parto (decisão do dono: a sessão fica, da 28ª semana, e a promessa sai na regravação)",
+      "destino_no_app": "mobile/assets/vozes/regravadas/casal-05.mp3"
+    },
+    {
+      "id": "casal-13",
+      "grupo": "casal",
+      "arquivo_do_site": "src/assets/audio/casal/casal-13.mp3",
+      "texto_do_site": "Essa palavra passa a querer dizer uma coisa só: pare tudo e volte a respirar comigo. Ela serve na sala de parto, e serve amanhã no meio de uma discussão boba. Palavra combinada antes funciona; palavra inventada na hora, não.",
+      "texto_novo": "Essa palavra passa a querer dizer uma coisa só: pare tudo e volte a respirar comigo. Ela pode ir com vocês para o dia do parto, e serve amanhã no meio de uma discussão boba. É um combinado só de vocês.",
+      "motivo": "promessa de eficácia ('funciona')",
+      "destino_no_app": "mobile/assets/vozes/regravadas/casal-13.mp3"
+    },
+    {
+      "id": "casal-15",
+      "grupo": "casal",
+      "arquivo_do_site": "src/assets/audio/casal/casal-15.mp3",
+      "texto_do_site": "Vocês acabaram de treinar as três coisas que mais funcionam no dia: a respiração de um seguindo a do outro, a pressão nas costas, e a palavra. Podem repetir isso numa noite qualquer. Cinco minutos por semana já bastam.",
+      "texto_novo": "Vocês acabaram de treinar três coisas juntos: a respiração de um seguindo a do outro, a pressão nas costas, e a palavra. Podem repetir numa noite qualquer, do jeito de vocês.",
+      "motivo": "promessa de eficácia e dose ('cinco minutos por semana já bastam')",
+      "destino_no_app": "mobile/assets/vozes/regravadas/casal-15.mp3"
+    },
+    {
+      "id": "mov-tornozelo",
+      "grupo": "mexer",
+      "arquivo_do_site": "src/assets/audio/mov-tornozelo.mp3",
+      "texto_do_site": "Círculos de tornozelo. Desenhe círculos lentos com o pé — ajuda a circulação e o inchaço.",
+      "texto_novo": "Círculos de tornozelo. Desenhe círculos lentos com o pé, sem pressa nenhuma.",
+      "motivo": "promessa de remédio na dica narrada (hoje sem narração)",
+      "destino_no_app": "mobile/assets/vozes/regravadas/mov-tornozelo.mp3"
+    },
+    {
+      "id": "mov-balanco",
+      "grupo": "mexer",
+      "arquivo_do_site": "src/assets/audio/mov-balanco.mp3",
+      "texto_do_site": "Balanço em quatro apoios. Leve o quadril pra trás e volte — alivia as costas e ajuda o encaixe.",
+      "texto_novo": "Balanço em quatro apoios. Leve o quadril pra trás e volte, no ritmo do ar.",
+      "motivo": "'ajuda o encaixe' na dica narrada (hoje sem narração)",
+      "destino_no_app": "mobile/assets/vozes/regravadas/mov-balanco.mp3"
+    },
+    {
+      "id": "mar-01",
+      "grupo": "historias",
+      "arquivo_do_site": "src/assets/audio/dormir/mar-01.mp3",
+      "texto_do_site": "Você não precisa acompanhar esta história até o fim. Ela não tem final para guardar, nem nome para lembrar. Se você dormir no meio, ela terá funcionado exatamente como devia. Então procure a posição que o seu corpo pedir hoje. Um travesseiro entre os joelhos, se ajudar. Deixe os ombros pesarem no colchão, e deixe a mandíbula solta.",
+      "texto_novo": "Você não precisa acompanhar esta história até o fim. Ela não tem final para guardar, nem nome para lembrar. Se você dormir no meio, ela terá funcionado exatamente como devia. Então procure a posição que o seu corpo pedir hoje, do jeito mais gostoso. Deixe os ombros pesarem no colchão, e deixe a mandíbula solta.",
+      "motivo": "a dica de posição para dormir na gestação (limítrofe)",
+      "destino_no_app": "mobile/assets/vozes/regravadas/mar-01.mp3"
+    },
+    {
+      "id": "trem-23",
+      "grupo": "historias",
+      "arquivo_do_site": "src/assets/audio/dormir/trem-23.mp3",
+      "texto_do_site": "Está tudo cuidado. Você pode soltar. Boa noite.",
+      "texto_novo": "O trem segue sozinho. Você pode soltar. Boa noite.",
+      "motivo": "numa gestação de risco, lê-se como 'está tudo bem' (limítrofe)",
+      "destino_no_app": "mobile/assets/vozes/regravadas/trem-23.mp3"
+    }
+  ]
+}
