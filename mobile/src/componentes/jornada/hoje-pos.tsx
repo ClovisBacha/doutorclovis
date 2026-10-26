@@ -234,7 +234,7 @@ export function TelaDoQuartoTrimestre({
                 🍼{" "}
                 {idadeDias === 0
                   ? "nasceu hoje"
-                  : `${idadeDias} ${idadeDias === 1 ? "dia" : "dias"} juntos`}
+                  : `${idadeDias} ${idadeDias === 1 ? "dia" : "dias"} de vocês`}
               </Selo>
               <Selo>
                 {fase.emoji} {fase.name}
@@ -878,8 +878,8 @@ function Formatura({ quem }: { quem: string }) {
           color: "#047857",
         }}
       >
-        Parabéns! Você e {quem} atravessaram as 12 primeiras semanas juntos. O caminho e os álbuns
-        ficam guardados aqui para sempre 💝
+        Parabéns! Você e {quem} atravessaram, lado a lado, as 12 primeiras semanas. O caminho e os
+        álbuns ficam guardados aqui para sempre 💝
       </Text>
     </View>
   );

@@ -2,7 +2,7 @@
   "desafios": {
     "7": {
       "emoji": "👶",
-      "label": "Sinta o cheirinho do bebê e guarde na memória"
+      "label": "Diga ao bebê uma frase de boas-vindas"
     },
     "8": {
       "emoji": "📣",
@@ -34,7 +34,7 @@
     },
     "15": {
       "emoji": "☕",
-      "label": "Tome um café quente, do primeiro ao último gole"
+      "label": "Tome um chá ou um café quente, até o último gole"
     },
     "16": {
       "emoji": "🤝",
@@ -42,7 +42,7 @@
     },
     "17": {
       "emoji": "🌷",
-      "label": "Dê boas-vindas a uma mãe nova na Comunidade"
+      "label": "Publique na Comunidade um oi para quem chega"
     },
     "18": {
       "emoji": "🎵",
@@ -94,11 +94,11 @@
     },
     "30": {
       "emoji": "🍲",
-      "label": "Adiante algo do jantar enquanto ainda é dia"
+      "label": "Adiante algo do jantar de amanhã"
     },
     "31": {
       "emoji": "💗",
-      "label": "Comente com carinho o post de outra mãe"
+      "label": "Comente com carinho um post recente da Comunidade"
     },
     "32": {
       "emoji": "🗣️",
@@ -150,7 +150,7 @@
     },
     "44": {
       "emoji": "🧹",
-      "label": "Arrume só um cantinho e deixe o resto para lá"
+      "label": "Organize só um canto da casa e esqueça o resto"
     },
     "45": {
       "emoji": "🔗",
@@ -178,7 +178,7 @@
     },
     "51": {
       "emoji": "🎙️",
-      "label": "Responda às mensagens de uma vez, com um áudio"
+      "label": "Responda a várias mensagens num áudio só"
     },
     "52": {
       "emoji": "👭",
@@ -186,11 +186,11 @@
     },
     "53": {
       "emoji": "💕",
-      "label": "Diga em voz alta 3 coisas que você ama no bebê"
+      "label": "Diga em voz alta 3 coisas bonitas do bebê"
     },
     "54": {
-      "emoji": "🔥",
-      "label": "Confira quantos dias tem a sua chama"
+      "emoji": "💃",
+      "label": "Dance devagarinho com o bebê no colo"
     },
     "55": {
       "emoji": "🎥",
@@ -198,7 +198,7 @@
     },
     "56": {
       "emoji": "🙃",
-      "label": "Divirta-se com as caretas do bebê"
+      "label": "Faça uma careta de volta para o bebê"
     },
     "57": {
       "emoji": "🧴",
@@ -233,8 +233,8 @@
       "label": "Ligue para uma amiga só para conversar"
     },
     "65": {
-      "emoji": "🎁",
-      "label": "Separe algo do enxoval para passar adiante"
+      "emoji": "🍝",
+      "label": "Peça a alguém querido a sua comida preferida"
     },
     "66": {
       "emoji": "❤️",
@@ -262,7 +262,7 @@
     },
     "72": {
       "emoji": "🙅",
-      "label": "Diga não a algo que pode esperar, sem culpa"
+      "label": "Diga não a um pedido que não cabe no seu dia"
     },
     "73": {
       "emoji": "🏷️",
