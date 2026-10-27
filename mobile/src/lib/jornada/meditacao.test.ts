@@ -6,6 +6,7 @@ import { FALAS_DO_PROGRAMA, PROGRAMA } from "@/lib/meditacao-programa";
 import { ROTEIROS } from "@/lib/meditacao-roteiros";
 import { semComentarios } from "@/lib/sem-comentarios";
 import { SONS_CONTINUOS } from "@/lib/som-receitas";
+import { TEXTO_REGRAVADO } from "~/lib/audio/regravadas-texto";
 import {
   COMO_ESTOU,
   comoEstouPara,
@@ -215,7 +216,7 @@ describe("as falas que o app não diz", () => {
     for (const { plano } of planos())
       for (const d of plano.deixas)
         if (
-          FALAS_FORA_DO_APP.has(d.fala.id) ||
+          (FALAS_FORA_DO_APP.has(d.fala.id) && d.fala.texto !== TEXTO_REGRAVADO[d.fala.id]) ||
           /consult|normal que|não é sinal|lugar seguro|o que mais ajuda|No dia, o corpo lembra|ser verdade/i.test(
             d.fala.texto,
           )
