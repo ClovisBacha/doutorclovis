@@ -101,6 +101,20 @@ describe("o app não dá conselho médico", () => {
     expect(ondeAparece(/\bplanejarSessao\(/, ["lib/jornada/meditacao.ts"])).toEqual([]);
   });
 
+  test("toda voz do site passa antes pela regravação (texto e voz juntos)", () => {
+    /* `docs/regravacao`: a fala regravada troca o texto E a voz. Uma tela que
+       tocasse a voz do site sem perguntar a `VOZ_REGRAVADA` diria a frase
+       antiga embaixo do texto novo. */
+    const semRegravada = FONTES.filter(
+      (f) =>
+        f.arquivo !== "lib/audio/vozes.ts" &&
+        /\bVOZ_(DA_MEDITACAO|DA_NOITE|DO_MOVIMENTO)\[/.test(f.codigo) &&
+        !/\bVOZ_REGRAVADA\b/.test(f.codigo),
+    ).map((f) => f.arquivo);
+    expect(semRegravada).toEqual([]);
+    expect(ondeAparece(/SESSAO_DO_CASAL\.blocos/, ["lib/jornada/casal.ts"])).toEqual([]);
+  });
+
   test("o Modo Cuidado não oferece mais mexer o corpo", () => {
     /* O "Mexer devagar" saiu do Modo Cuidado e do pós-parto: no site ele vinha
        "só se o médico já liberou", e o app não tem médico para liberar. A

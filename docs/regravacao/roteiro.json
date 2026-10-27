@@ -299,10 +299,10 @@
     {
       "id": "fe-ansiosa",
       "grupo": "meditacao-fechamento",
-      "arquivo_do_site": null,
-      "texto_do_site": "Ansiedade que não passa em 5 minutos merece ser falada. Leve isso pra consulta.",
+      "arquivo_do_site": "src/assets/audio/med/fe-ansiosa.mp3",
+      "texto_do_site": "Ansiedade que não passa em cinco minutos merece ser falada. Leve isso pra consulta.",
       "texto_novo": "Tudo bem: tem dia em que a calma demora mais. Volte quando quiser.",
-      "motivo": "consulta; o site nunca teve voz para esta resposta (gravação nova)",
+      "motivo": "consulta (o site gravou esta fala e nunca a tocou; hoje sem voz)",
       "destino_no_app": "mobile/assets/vozes/regravadas/fe-ansiosa.mp3"
     },
     {

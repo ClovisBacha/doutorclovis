@@ -40,6 +40,7 @@ import { useMovimentoReduzido } from "~/componentes/movimento";
 import { tocarSomDeFundo, type SomDeFundo } from "~/lib/audio/som-de-fundo";
 import { ARTE_DO_SOM } from "~/lib/audio/sons-de-fundo";
 import { pararCanal, tocarVoz } from "~/lib/audio/voz";
+import { VOZ_REGRAVADA } from "~/lib/audio/regravadas";
 import { VOZ_DA_NOITE } from "~/lib/audio/vozes";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { ALVO_MINIMO, espaco, fonte } from "~/tema";
@@ -632,7 +633,7 @@ function HistoriaDaNoite({
         pausaDepoisDo(i, total) * 1000,
       );
     };
-    const fonte = VOZ_DA_NOITE[bloco.id];
+    const fonte = VOZ_REGRAVADA[bloco.id] ?? VOZ_DA_NOITE[bloco.id];
     if (!fonte || Platform.OS === "web") espera = setTimeout(seguir, 1000);
     else tocarVoz(fonte, { canal: "guia", fundo: true, velocidade: RITMO, aoAcabar: seguir });
     return () => {

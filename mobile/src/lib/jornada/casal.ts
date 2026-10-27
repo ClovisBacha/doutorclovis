@@ -13,6 +13,9 @@
  * Sem react-native aqui: é testado pelo bun.
  */
 
+import { SESSAO_DO_CASAL, type BlocoDoCasal } from "@/lib/sessao-do-casal";
+import { TEXTO_REGRAVADO } from "~/lib/audio/regravadas-texto";
+
 export const SEMANA_DO_CASAL = 28;
 
 export function casalAberto(o: {
@@ -21,4 +24,18 @@ export function casalAberto(o: {
   semana: number | null | undefined;
 }): boolean {
   return !o.cuidado && !o.posParto && typeof o.semana === "number" && o.semana >= SEMANA_DO_CASAL;
+}
+
+/**
+ * Os blocos da sessão como o app os diz: o texto da fala regravada
+ * (`docs/regravacao`) no lugar do do site — sem a promessa de eficácia. A voz
+ * nova vem junto, de `VOZ_REGRAVADA`; sem a regravação, é o bloco do site.
+ */
+export function blocosDoCasalNoApp(
+  regravadas: Readonly<Record<string, string>> = TEXTO_REGRAVADO,
+): readonly BlocoDoCasal[] {
+  return SESSAO_DO_CASAL.blocos.map((b) => {
+    const texto = regravadas[b.id];
+    return texto ? { ...b, texto } : b;
+  });
 }

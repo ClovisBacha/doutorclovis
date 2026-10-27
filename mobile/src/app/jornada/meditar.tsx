@@ -61,6 +61,7 @@ import {
   reagendarLembreteDaMeditacao,
 } from "~/lib/lembrete-da-meditacao";
 import { HORA_PADRAO, HORARIOS, horaValida } from "~/lib/jornada/lembrete";
+import { VOZ_REGRAVADA } from "~/lib/audio/regravadas";
 import { VOZ_DA_MEDITACAO, VOZ_DA_RESPIRACAO } from "~/lib/audio/vozes";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { ymdLocal } from "~/lib/gestacao";
@@ -72,8 +73,8 @@ import {
   DURACAO_PADRAO_MEDITAR,
   DURACOES_MEDITAR,
   ESCALA_RESPIRO,
-  FALA_DO_FECHAMENTO,
   falaDoBalao,
+  falaDoFechamento,
   FECHAMENTO,
   formatarRestante,
   indiceDoTemaDoDia,
@@ -286,7 +287,9 @@ export default function Meditar() {
 
   function responder(c: { emoji: string; label: string }) {
     setHumor(c.label);
-    if (voz) tocarVoz(VOZ_DA_MEDITACAO[FALA_DO_FECHAMENTO[c.label] ?? ""], { canal: "guia" });
+    /* A regravada da resposta trocada (`docs/regravacao`), ou a do site. */
+    const fala = falaDoFechamento(c.label);
+    if (voz && fala) tocarVoz(VOZ_REGRAVADA[fala] ?? VOZ_DA_MEDITACAO[fala], { canal: "guia" });
     gravarChave(
       CHAVE_LOG_MEDITACAO,
       registrar(lerRegistro(loja.blob[CHAVE_LOG_MEDITACAO]), {
@@ -1297,7 +1300,7 @@ function Sessao({
   /* A fala gravada do ciclo, no canal da guia. */
   useEffect(() => {
     if (pausada || !voz || !falaAgora) return;
-    tocarVoz(VOZ_DA_MEDITACAO[falaAgora.id], { canal: "guia" });
+    tocarVoz(VOZ_REGRAVADA[falaAgora.id] ?? VOZ_DA_MEDITACAO[falaAgora.id], { canal: "guia" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [falaAgora?.id, inst.ciclo, voz, pausada, retomada]);
 

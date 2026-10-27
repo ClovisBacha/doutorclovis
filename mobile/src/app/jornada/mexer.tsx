@@ -30,6 +30,7 @@ import { BarraDoTopo, voltarParaJornada } from "~/componentes/jornada/pecas";
 import { BolhaViva } from "~/componentes/movimento";
 import { useAtividade } from "~/componentes/jornada/usarJornada";
 import { pararVozes, tocarVoz } from "~/lib/audio/voz";
+import { VOZ_REGRAVADA } from "~/lib/audio/regravadas";
 import { VOZ_DO_MOVIMENTO } from "~/lib/audio/vozes";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import {
@@ -38,7 +39,7 @@ import {
   inicioDoProximo,
   linhaDoTempo,
   montarSessao,
-  NARRACAO_FORA_DO_APP,
+  narracaoNoApp,
   posicaoNoTempo,
   temChaoParaTirar,
   type DuracaoMexer,
@@ -605,8 +606,11 @@ function Sessao({
       return;
     }
     const id = seq[indice]!.id;
-    if (NARRACAO_FORA_DO_APP.has(id)) return;
-    tocarVoz(VOZ_DO_MOVIMENTO[id], { canal: "guia" });
+    const narracao = narracaoNoApp(id);
+    if (!narracao) return;
+    tocarVoz(narracao === "regravada" ? VOZ_REGRAVADA[`mov-${id}`] : VOZ_DO_MOVIMENTO[id], {
+      canal: "guia",
+    });
   }, [indice, voz, pausada, seq]);
   useEffect(() => () => pararVozes(), []);
 

@@ -7,6 +7,7 @@ import { Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, G, Path } from "react-native-svg";
 import { ROTULO_DO_ALVO, SESSAO_DO_CASAL, type BlocoDoCasal } from "@/lib/sessao-do-casal";
+import { VOZ_REGRAVADA } from "~/lib/audio/regravadas";
 import { Botao, Carregando, T, Tela, toque } from "~/componentes/base";
 import { corJornada, corNoite } from "~/componentes/jornada/cores";
 import { BarraDoTopo, voltarParaJornada } from "~/componentes/jornada/pecas";
@@ -14,7 +15,7 @@ import { useDiaDaJornada } from "~/componentes/jornada/usarJornada";
 import { useMovimentoReduzido } from "~/componentes/movimento";
 import { pararCanal, tocarVoz } from "~/lib/audio/voz";
 import { VOZ_DA_NOITE } from "~/lib/audio/vozes";
-import { casalAberto, SEMANA_DO_CASAL } from "~/lib/jornada/casal";
+import { blocosDoCasalNoApp, casalAberto, SEMANA_DO_CASAL } from "~/lib/jornada/casal";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { easeInOut } from "~/lib/jornada/figura";
 import { ALVO_MINIMO, espaco, fonte } from "~/tema";
@@ -37,9 +38,12 @@ import { ALVO_MINIMO, espaco, fonte } from "~/tema";
  * Bancada: /jornada/casal?bancada=1&semana=30 [&bloco=<n>] [&fim=1] [&pausado=1]
  * (sem `&semana`, a semana da bancada é antes da 28ª: a tela diz quando abre)
  */
+/** Os blocos com as falas regravadas no lugar das do site (`docs/regravacao`). */
+const BLOCOS_DO_CASAL = blocosDoCasalNoApp();
+
 export default function Casal() {
   const dia = useDiaDaJornada();
-  const blocos = SESSAO_DO_CASAL.blocos;
+  const blocos = BLOCOS_DO_CASAL;
   const total = blocos.length;
   const [comecou, setComecou] = useState(false);
   const [i, setI] = useState(0);
@@ -72,7 +76,7 @@ export default function Casal() {
     const seguir = () => {
       espera = setTimeout(() => setI((x) => x + 1), b.pausa * 1000);
     };
-    const fonte = VOZ_DA_NOITE[b.id];
+    const fonte = VOZ_REGRAVADA[b.id] ?? VOZ_DA_NOITE[b.id];
     if (!fonte || Platform.OS === "web") espera = setTimeout(seguir, 1500);
     else tocarVoz(fonte, { canal: "guia", aoAcabar: seguir });
     return () => {

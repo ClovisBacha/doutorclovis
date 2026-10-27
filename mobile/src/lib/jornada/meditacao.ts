@@ -13,6 +13,7 @@
 
 import { CICLO, planejarSessao, type Densidade, type Plano } from "@/lib/meditacao-sessao";
 import { sequenciaDeDatas } from "@/lib/sequencia";
+import { TEXTO_REGRAVADO } from "~/lib/audio/regravadas-texto";
 
 export type TemaDeMeditacao = {
   tema: string;
@@ -112,7 +113,10 @@ export function planoDaSessao(o: {
   posParto?: boolean;
   densidade: Densidade;
   registro: RegistroDaMeditacao;
+  /** As falas regravadas (texto novo por `id`); o padrão é o mapa gerado. */
+  regravadas?: Readonly<Record<string, string>>;
 }): Plano {
+  const regravadas = o.regravadas ?? TEXTO_REGRAVADO;
   const plano = planejarSessao({
     minutos: o.minutos,
     tema: o.tema,
@@ -123,11 +127,24 @@ export function planoDaSessao(o: {
     careMode: o.cuidado,
     semente: o.registro.minutos,
   });
-  const fica = (id: string, texto: string) =>
-    !FALAS_FORA_DO_APP.has(id) &&
-    !(o.cuidado && FORA_DO_LUTO.test(texto)) &&
-    !(o.posParto && (FORA_DO_POS.test(texto) || FALAS_FORA_DO_POS.has(id)));
-  return { ...plano, deixas: plano.deixas.filter((d) => fica(d.fala.id, d.fala.texto)) };
+  /* A fala regravada volta com o texto novo — e a voz nova, que a tela toca
+     de `VOZ_REGRAVADA`. As réguas do luto e do pós-parto olham o texto que ela
+     vai ouvir, e não o antigo. */
+  const fica = (id: string, texto: string) => {
+    const regravada = regravadas[id] != null;
+    return (
+      (regravada || !FALAS_FORA_DO_APP.has(id)) &&
+      !(o.cuidado && FORA_DO_LUTO.test(texto)) &&
+      !(o.posParto && (FORA_DO_POS.test(texto) || (!regravada && FALAS_FORA_DO_POS.has(id))))
+    );
+  };
+  const deixas = plano.deixas
+    .map((d) => {
+      const texto = regravadas[d.fala.id];
+      return texto ? { ...d, fala: { ...d.fala, texto } } : d;
+    })
+    .filter((d) => fica(d.fala.id, d.fala.texto));
+  return { ...plano, deixas };
 }
 
 /**
@@ -150,6 +167,9 @@ export function planoDaSessao(o: {
  *
  * O "ele" para o bebê nas falas gravadas do tema "Conexão com o bebê" fica até
  * a regravação: tirar dez falas do tema o esvaziaria.
+ *
+ * A REGRAVAÇÃO (`docs/regravacao`) devolve cada uma, com texto e voz novos: a
+ * fala que está em `TEXTO_REGRAVADO` volta ao plano mesmo estando aqui.
  */
 export const FALAS_FORA_DO_APP: ReadonlySet<string> = new Set([
   "fase-1b",
@@ -235,6 +255,26 @@ export const FALA_DO_FECHAMENTO: Record<string, string> = {
   "Mais calma": "fe-calma",
   Igual: "fe-igual",
 };
+
+/** A regravação de cada resposta trocada (`docs/regravacao`). "Ainda ansiosa" o site gravou e nunca tocou. */
+const FECHAMENTO_REGRAVADO: Readonly<Record<string, string>> = {
+  "Com sono": "fe-sono",
+  Conectada: "fe-conectada",
+  "Ainda ansiosa": "fe-ansiosa",
+};
+
+/**
+ * A gravação que fecha a sessão para a resposta dela: a regravada da trocada,
+ * se ela existe e diz o que a tela escreve, ou a do site; `null` = sem voz.
+ */
+export function falaDoFechamento(
+  rotulo: string,
+  regravadas: Readonly<Record<string, string>> = TEXTO_REGRAVADO,
+): string | null {
+  const nova = FECHAMENTO_REGRAVADO[rotulo];
+  if (nova && regravadas[nova] === FECHAMENTO[rotulo]) return nova;
+  return FALA_DO_FECHAMENTO[rotulo] ?? null;
+}
 
 /** A escala do círculo e da bolha em cada fase (`ESCALA_RESPIRO` de `bolha.tsx`). */
 export const ESCALA_RESPIRO = { inspire: 1.16, segure: 1.16, solte: 0.9 } as const;

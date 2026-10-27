@@ -36,21 +36,28 @@ produto no meio da sessão.
 ⚠️ **Nunca em `src/assets/audio`** — é do site, congelado, e o site toca esses
 arquivos. As regravadas vão para `mobile/assets/vozes/regravadas/<id>.mp3`.
 
-## Como ligar no app (texto e voz andam JUNTOS)
+## O app já está ligado (27/10/2026) — falta só gerar os arquivos
 
-1. Um mapa só, `mobile/src/lib/audio/regravadas.ts`: `id → { texto, arquivo }`
-   (`arquivo` é o `require` do mp3). Uma fala só entra no mapa com o arquivo
-   dela — assim o texto novo nunca aparece com a voz velha.
-2. **Meditação** (`planoDaSessao`): a deixa cuja fala está no mapa troca o
-   `texto` e toca o `arquivo`; o `id` sai de `FALAS_FORA_DO_APP` e das réguas de
-   luto/pós (com o texto novo, ela serve em toda fase).
-3. **Fechamento**: "Com sono", "Conectada" e "Ainda ansiosa" (`fe-ansiosa`, que
-   o site nunca teve) voltam a ter voz, pela regravada.
-4. **Para vocês dois**: `casal-05`, `casal-13` e `casal-15` trocam o
-   `bloco.texto` e a voz (`VOZ_DA_NOITE`).
-5. **Mexer**: tornozelo e balanço saem de `NARRACAO_FORA_DO_APP` e tocam a
-   regravada (a narração lê o nome e a dica — o `texto_novo` já vem assim).
-6. **Histórias**: `mar-01` e `trem-23` pela regravada.
+Texto e voz andam JUNTOS, e o app já sabe trocar os dois nos cinco lugares:
+
+- `mobile/scripts/gerar-mapa-das-regravadas.ts` lê este roteiro e a pasta
+  `mobile/assets/vozes/regravadas/`, e escreve `mobile/src/lib/audio/regravadas.ts`
+  (a voz) e `regravadas-texto.ts` (o texto). **Só entra a fala cujo arquivo
+  existe** — o texto novo nunca aparece com a voz velha.
+- A meditação (`planoDaSessao`) troca o texto e devolve ao plano a fala que tinha
+  saído; o fechamento (`falaDoFechamento`), o casal (`blocosDoCasalNoApp`), o
+  Mexer (`narracaoNoApp`) e as histórias tocam `VOZ_REGRAVADA` antes da do site.
+- `mobile/src/lib/audio/regravadas.test.ts` confere o roteiro contra o site, os
+  mapas contra a pasta, e a troca com as 40 falas.
+
+**Para a sessão que tiver o Higgsfield:**
+
+1. Gerar cada fala de `roteiro.json` com o `texto_novo`, na voz acima. Gerar UMA
+   primeiro e conferir o formato contra `src/assets/audio/med/inspire.mp3`.
+2. Salvar como `mobile/assets/vozes/regravadas/<id>.mp3` (o `id` do roteiro).
+3. `cd mobile && bun scripts/gerar-mapa-das-regravadas.ts` — ele diz quantas das
+   40 entraram.
+4. Portões, diário, `buildNumber`, commit e push.
 
 ## Catracas e entrega
 

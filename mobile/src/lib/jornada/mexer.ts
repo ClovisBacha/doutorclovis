@@ -15,6 +15,7 @@ import {
   type NotasDoCorpo,
   type Sintoma,
 } from "@/lib/exercicios";
+import { TEXTO_REGRAVADO } from "~/lib/audio/regravadas-texto";
 
 /** As durações do app antigo (`DURACOES_EXERCICIO`): 2, 5 ou 10 minutos. */
 export const DURACOES_MEXER = DURACOES_EXERCICIO;
@@ -229,6 +230,19 @@ export const NARRACAO_FORA_DO_APP: ReadonlySet<string> = new Set(
     .filter(([, t]) => !!t.cue)
     .map(([id]) => id),
 );
+
+/**
+ * Qual narração o movimento toca: a regravada (`docs/regravacao`, que já diz o
+ * nome e a dica do app), a do site, ou nenhuma — a dica mudou e a voz do site
+ * diria a antiga.
+ */
+export function narracaoNoApp(
+  id: string,
+  regravadas: Readonly<Record<string, string>> = TEXTO_REGRAVADO,
+): "regravada" | "site" | null {
+  if (regravadas[`mov-${id}`] != null) return "regravada";
+  return NARRACAO_FORA_DO_APP.has(id) ? null : "site";
+}
 
 export function movimentoNoApp(m: Movimento): Movimento {
   const t = TEXTO_DO_MOVIMENTO_NO_APP[m.id];
