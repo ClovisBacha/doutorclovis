@@ -36,7 +36,12 @@ produto no meio da sessão.
 ⚠️ **Nunca em `src/assets/audio`** — é do site, congelado, e o site toca esses
 arquivos. As regravadas vão para `mobile/assets/vozes/regravadas/<id>.mp3`.
 
-## O app já está ligado (27/10/2026) — falta só gerar os arquivos
+## Feita em 27/10/2026: as 40 entraram (build 36)
+
+Ver o diário, "27/10 — build 36". O caminho abaixo vale para a próxima fala que
+precisar de voz nova: acrescentá-la ao `roteiro.json` e seguir a receita.
+
+## Como o app liga as regravadas
 
 Texto e voz andam JUNTOS, e o app já sabe trocar os dois nos cinco lugares:
 
@@ -50,13 +55,13 @@ Texto e voz andam JUNTOS, e o app já sabe trocar os dois nos cinco lugares:
 - `mobile/src/lib/audio/regravadas.test.ts` confere o roteiro contra o site, os
   mapas contra a pasta, e a troca com as 40 falas.
 
-**Para a sessão que tiver o Higgsfield:**
+**Para gerar uma fala (precisa do conector do Higgsfield):**
 
 1. Gerar cada fala de `roteiro.json` com o `texto_novo`, na voz acima. Gerar UMA
    primeiro e conferir o formato contra `src/assets/audio/med/inspire.mp3`.
 2. Salvar como `mobile/assets/vozes/regravadas/<id>.mp3` (o `id` do roteiro).
-3. `cd mobile && bun scripts/gerar-mapa-das-regravadas.ts` — ele diz quantas das
-   40 entraram.
+3. `cd mobile && bun scripts/gerar-mapa-das-regravadas.ts` — ele diz quantas
+   falas do roteiro entraram.
 4. Portões, diário, `buildNumber`, commit e push.
 
 ## Catracas e entrega

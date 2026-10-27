@@ -56,9 +56,12 @@ guardar da saúde para o SOS e o acompanhamento do Bebê."
   (`sem-conselho-medico.test.ts`). ⚠️ Fala com **voz gravada** (meditação,
   Mexer, "Para vocês dois", histórias) não muda de texto: a voz diria a frase
   antiga. Ou ela sai do plano, ou perde a voz até a regravação — ver o diário,
-  "26/10 — build 34". A regravação (pedido do dono: pelo Higgsfield, na mesma
-  voz Isabella) tem roteiro pronto em `docs/regravacao/`: 40 falas, o texto
-  novo, e onde os arquivos moram (no app, nunca em `src/assets/audio`).
+  "26/10 — build 34". **Para mudar o texto de uma fala com voz, regrave**: a
+  de 27/10 trocou 40 (`docs/regravacao/`: o roteiro e a receita). Higgsfield,
+  `text2speech_v2`, motor ElevenLabs, voz Isabella
+  (`80924413-1ea8-4e64-9719-e00b86796f05`); o arquivo vai para
+  `mobile/assets/vozes/regravadas/<id>.mp3` (nunca em `src/assets/audio`) e
+  `bun mobile/scripts/gerar-mapa-das-regravadas.ts` liga texto e voz juntos.
 
 ## Stack
 
