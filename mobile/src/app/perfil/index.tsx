@@ -23,7 +23,7 @@ import { ehBancada } from "~/lib/bancada";
 import { api } from "~/lib/comunidade/api";
 import { esquecerMeuPerfilSocial, guardarMeuPerfilSocial } from "~/lib/comunidade/meu-perfil";
 import { CartaoDaPermissaoDeIA } from "~/lib/ia/PermissaoDeIA";
-import { abrir, PRIVACIDADE, TERMOS } from "~/lib/links";
+import { abrir } from "~/lib/links";
 import { zerarSelos } from "~/lib/selos";
 import { useSessao } from "~/lib/sessao";
 import { excluirMinhaConta, ligarModoCuidado, PALAVRA_DE_CONFIRMACAO } from "~/servidor/conta";
@@ -279,8 +279,17 @@ export default function Perfil() {
       </Cartao>
 
       <Cartao>
-        <Botao rotulo="Termos de uso" tipo="texto" aoTocar={() => abrir(TERMOS)} />
-        <Botao rotulo="Política de privacidade" tipo="texto" aoTocar={() => abrir(PRIVACIDADE)} />
+        {/* Os documentos do APP (fase 4), em telas próprias — não as páginas do site. */}
+        <Botao
+          rotulo="Termos de uso"
+          tipo="texto"
+          aoTocar={() => router.push(rota("/termos") as never)}
+        />
+        <Botao
+          rotulo="Política de privacidade"
+          tipo="texto"
+          aoTocar={() => router.push(rota("/privacidade") as never)}
+        />
         <Botao rotulo="Sair da conta" tipo="secundario" aoTocar={() => void esquecerAConta()} />
       </Cartao>
 

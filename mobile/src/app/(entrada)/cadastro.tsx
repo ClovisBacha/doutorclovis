@@ -1,19 +1,25 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, View } from "react-native";
-import { Botao, Campo, Cartao, Linha, T, Tela, toque } from "~/componentes/base";
+import { KeyboardAvoidingView, Platform } from "react-native";
+import { Botao, Campo, Cartao, Linha, T, Tela } from "~/componentes/base";
+import { CaixaDeMarcar } from "~/componentes/caixa";
 import { FolhaDaEntrada, FundoDaEntrada } from "~/componentes/entrada";
 import { CabecalhoDaMarca } from "~/componentes/marca";
 import { SITE } from "~/config";
-import { abrir, PRIVACIDADE, TERMOS } from "~/lib/links";
+import { metadadosDoAceite } from "~/lib/juridico/aceite";
+import { TEXTO_DO_CONSENTIMENTO_DE_SAUDE } from "~/lib/juridico/textos-do-aceite";
 import { supabase } from "~/servidor/supabase";
-import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
+import { cor, espaco } from "~/tema";
 
 /**
  * O cadastro pede o ACEITE de forma explícita, e não "ao criar a conta você
  * concorda": a Comunidade tem conteúdo de outras gestantes, e a Apple exige
  * (1.2) que a pessoa concorde com as regras — tolerância zero com conteúdo
  * ofensivo — ANTES de poder publicar.
+ *
+ * Desde a fase 4 os Termos e a Privacidade são os do APP (telas próprias,
+ * `lib/juridico`), o aceite grava a VERSÃO (`metadadosDoAceite`), e o dado de
+ * saúde tem a sua caixa separada e destacada (LGPD, art. 11, I).
  */
 export default function Cadastro() {
   const [nome, setNome] = useState("");
@@ -21,6 +27,7 @@ export default function Cadastro() {
   const [senha, setSenha] = useState("");
   const [aceite, setAceite] = useState(false);
   const [maior, setMaior] = useState(false);
+  const [saude, setSaude] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [enviado, setEnviado] = useState(false);
@@ -35,6 +42,10 @@ export default function Cadastro() {
       return setErro(
         "Para criar a conta, confirme que leu e concorda com os Termos e as regras da Comunidade.",
       );
+    if (!saude)
+      return setErro(
+        "Sem guardar a datação da gestação e o cartão do SOS, o app não consegue acompanhar você. Para criar a conta, marque a última caixa.",
+      );
     setCarregando(true);
     const { error } = await supabase.auth.signUp({
       email: email.trim(),
@@ -44,6 +55,7 @@ export default function Cadastro() {
         data: {
           display_name: nome.trim(),
           aceite_termos_em: new Date().toISOString(),
+          ...metadadosDoAceite(new Date()),
           origem: "app-ios",
         },
       },
@@ -114,19 +126,29 @@ export default function Cadastro() {
               textContentType="newPassword"
               dica="Pelo menos 8 caracteres."
             />
-            <Caixa
+            <CaixaDeMarcar
               marcada={maior}
               aoTocar={() => setMaior((v) => !v)}
               rotulo="Tenho 18 anos ou mais."
             />
-            <Caixa
+            <CaixaDeMarcar
               marcada={aceite}
               aoTocar={() => setAceite((v) => !v)}
               rotulo="Li e concordo com os Termos de uso, a Política de privacidade e as regras da Comunidade (tolerância zero com conteúdo ofensivo ou abusivo)."
             />
+            <CaixaDeMarcar
+              marcada={saude}
+              aoTocar={() => setSaude((v) => !v)}
+              rotulo={TEXTO_DO_CONSENTIMENTO_DE_SAUDE}
+              destaque
+            />
             <Linha estilo={{ flexWrap: "wrap" }}>
-              <Botao rotulo="Ler os Termos" tipo="texto" aoTocar={() => abrir(TERMOS)} />
-              <Botao rotulo="Ler a Privacidade" tipo="texto" aoTocar={() => abrir(PRIVACIDADE)} />
+              <Botao rotulo="Ler os Termos" tipo="texto" aoTocar={() => router.push("/termos")} />
+              <Botao
+                rotulo="Ler a Privacidade"
+                tipo="texto"
+                aoTocar={() => router.push("/privacidade")}
+              />
             </Linha>
             {erro ? (
               <T tipo="apagado" cor={cor.urgente}>
@@ -139,55 +161,5 @@ export default function Cadastro() {
         </Tela>
       </KeyboardAvoidingView>
     </FundoDaEntrada>
-  );
-}
-
-function Caixa({
-  marcada,
-  aoTocar,
-  rotulo,
-}: {
-  marcada: boolean;
-  aoTocar: () => void;
-  rotulo: string;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked: marcada }}
-      accessibilityLabel={rotulo}
-      onPress={() => {
-        toque();
-        aoTocar();
-      }}
-      style={{
-        flexDirection: "row",
-        gap: espaco.md,
-        alignItems: "flex-start",
-        minHeight: ALVO_MINIMO,
-        paddingVertical: 4,
-      }}
-    >
-      <View
-        style={{
-          width: 26,
-          height: 26,
-          borderRadius: raio.sm,
-          borderWidth: 2,
-          borderColor: marcada ? cor.primaria : cor.primariaSuave,
-          backgroundColor: marcada ? cor.primaria : cor.cartao,
-          alignItems: "center",
-          justifyContent: "center",
-          marginTop: 2,
-        }}
-      >
-        {marcada ? (
-          <T estilo={{ color: cor.branco, fontFamily: fonte.titulo, fontSize: 15, lineHeight: 18 }}>
-            ✓
-          </T>
-        ) : null}
-      </View>
-      <T estilo={{ flex: 1, fontSize: 15, lineHeight: 22 }}>{rotulo}</T>
-    </Pressable>
   );
 }

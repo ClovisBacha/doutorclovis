@@ -1,8 +1,8 @@
 import * as Linking from "expo-linking";
-import { SITE } from "~/config";
 
-export const TERMOS = `${SITE}/termos`;
-export const PRIVACIDADE = `${SITE}/privacidade`;
+/* Os Termos e a Privacidade são do app desde a fase 4 (`app/termos.tsx`,
+   `app/privacidade.tsx`, texto em `lib/juridico`): as páginas do site são
+   congeladas e falam de outro produto. */
 
 export function abrir(url: string) {
   void Linking.openURL(url).catch(() => {});
