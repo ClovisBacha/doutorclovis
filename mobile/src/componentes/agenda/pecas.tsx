@@ -224,7 +224,7 @@ export function AgendaNaHoje({ loja }: { loja: EstadoDaLoja }) {
   return <ProximaNaHoje c={proximo(lista, agora)} agora={agora} />;
 }
 
-/** O cartão da Saúde: a folhinha da próxima e o atalho para a agenda. */
+/** O cartão do Bebê: a folhinha da próxima e o atalho para a agenda (em todo modo). */
 export function PortaDaAgenda({ c, agora }: { c: Compromisso | null; agora: Date }) {
   return (
     <Pressable

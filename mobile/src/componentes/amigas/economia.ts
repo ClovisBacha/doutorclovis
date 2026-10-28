@@ -1,4 +1,5 @@
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
+import { seloDasAmigas } from "~/lib/selos";
 import type { RespostaDoPedido } from "~/lib/jornada/amigas";
 import {
   carimbarQueApareceu,
@@ -143,6 +144,25 @@ export async function lerAmigas(): Promise<LeituraDasAmigas | null> {
 }
 
 export type Pedido = { id: string; nome: string; diasNoApp: number };
+
+/**
+ * O número do selo das Amigas na barra: os pedidos que esperam resposta e o
+ * convite da dupla (`seloDasAmigas`). `null` quando a leitura falhou — o selo
+ * fica como estava, em vez de zerar sem saber.
+ */
+export async function contarParaOSelo(pos: boolean): Promise<number | null> {
+  if (ehBancada()) {
+    const [l, p] = await Promise.all([lerAmigas(), lerPedidos()]);
+    return l ? (l.careMode ? 0 : seloDasAmigas(p.length, l.dupla, pos)) : null;
+  }
+  try {
+    const [l, p] = await Promise.all([minhasAmigas(), pedidosDeAmizade()]);
+    if (!l.ok || !p.ok) return null;
+    return l.careMode ? 0 : seloDasAmigas(p.pedidos?.length ?? 0, l.dupla, pos);
+  } catch {
+    return null;
+  }
+}
 
 export async function lerPedidos(): Promise<Pedido[]> {
   if (ehBancada()) {

@@ -21,6 +21,16 @@ export function voltarOu(rota: Href) {
   else router.replace(rota);
 }
 
+/**
+ * Vai para uma ABA da barra de qualquer lugar. De uma tela empilhada (a
+ * trilha, o SOS), volta até a barra e troca de aba: empurrar a aba abriria
+ * uma SEGUNDA barra por cima da primeira. De dentro das abas, só troca.
+ */
+export function irParaAba(rota: Href) {
+  if (router.canDismiss()) router.dismissTo(rota);
+  else router.navigate(rota);
+}
+
 export function BotaoVoltar({
   voltarPara = "/inicio",
   aoTocar,

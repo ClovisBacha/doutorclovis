@@ -17,6 +17,9 @@ import * as rede from "~/servidor/rede";
  */
 
 const ok = <T extends object>(v: T) => Promise.resolve({ ok: true as const, ...v });
+
+/** A Atividade já aberta NESTA bancada: sem isto, o selo voltava ao recarregar. */
+let atividadeVistaNaBancada = false;
 const okVazio = () => Promise.resolve({ ok: true as const });
 const estado = () => parametroDaBancada("estado");
 
@@ -154,13 +157,22 @@ export const api = {
       if (estado() === "instavel") {
         return Promise.resolve({ ok: false as const, motivo: "instavel" as const });
       }
-      return ok(estado() === "vazio" ? { itens: [], novas: 0 } : B.atividadeDaBancada());
+      if (estado() === "vazio") return ok({ itens: [], novas: 0 });
+      const a = B.atividadeDaBancada();
+      return ok(
+        atividadeVistaNaBancada
+          ? { itens: a.itens.map((i) => ({ ...i, visto: true })), novas: 0 }
+          : a,
+      );
     }
     return seguro(() => rede.minhaAtividade({}));
   },
 
   marcarAtividadeVista() {
-    if (ehBancada()) return okVazio();
+    if (ehBancada()) {
+      atividadeVistaNaBancada = true;
+      return okVazio();
+    }
     return seguro(() => rede.marcarAtividadeVista({}));
   },
 

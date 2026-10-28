@@ -5,6 +5,7 @@ import { useState, type ReactNode } from "react";
 import { Modal, Pressable, Text, View } from "react-native";
 import { corDoAvatar, inicialDoNome, tempoNoApp, ultimaVez } from "@/lib/amigas";
 import { toque } from "~/componentes/base";
+import { irParaAba } from "~/componentes/cabecalho";
 import { ChamaDaSequencia } from "~/componentes/caminho/pecas";
 import {
   BONUS_DA_DUPLA,
@@ -569,7 +570,7 @@ export function PortaDasAmigas({ rota: destino }: { rota: string }) {
       accessibilityLabel="Abrir as Amigas"
       onPress={() => {
         toque();
-        router.push(destino as never);
+        irParaAba(destino as never);
       }}
       style={({ pressed }) => ({
         flexDirection: "row",

@@ -14,6 +14,8 @@ import {
 } from "lucide-react-native";
 import type { ComponentType } from "react";
 import { Pressable, View } from "react-native";
+import { PortaDaAgenda } from "~/componentes/agenda/pecas";
+import { useAgenda } from "~/componentes/agenda/usar-agenda";
 import { BEBE } from "~/componentes/artes";
 import { Cartao, Linha, NaoConsegueLer, Pilula, T, Tela, toque } from "~/componentes/base";
 import { CVV } from "~/config";
@@ -29,6 +31,7 @@ import {
   idadeDoBebe,
   rotuloDaIdade,
 } from "~/lib/inicio";
+import { proximo } from "~/lib/agenda/agenda";
 import { ligar } from "~/lib/links";
 import { semGeneroDoBebe } from "~/lib/nutricao/frase-do-topo";
 import { BolhaViva, Entrada, Flutuar, Inclinacao3D } from "~/componentes/movimento";
@@ -212,9 +215,23 @@ export default function Inicio() {
           aoTocar={() => router.push("/comunidade")}
         />
       ) : null}
+      {/* A agenda morava na aba Saúde, que saiu da barra: no Hoje fica a
+          próxima consulta; aqui, a porta da agenda em qualquer modo — inclusive
+          no Modo Cuidado, que não tem o Hoje da gestação. */}
+      <Entrada atraso={200 + 5 * 60}>
+        <AgendaNoBebe />
+      </Entrada>
       <AvisoMedico curto />
     </Tela>
   );
+}
+
+/** A porta da agenda, com a folhinha da próxima consulta. */
+function AgendaNoBebe() {
+  const { lista, pronto } = useAgenda();
+  if (!pronto) return null;
+  const agora = new Date();
+  return <PortaDaAgenda c={proximo(lista, agora)} agora={agora} />;
 }
 
 function CartaoDaSemana({

@@ -32,6 +32,7 @@ import {
 } from "~/lib/comunidade/regras";
 import { consumirFeedSujo } from "~/lib/comunidade/sinal";
 import { useRegrasDaComunidade } from "~/lib/comunidade/usar-regras";
+import { mudarSelos } from "~/lib/selos";
 import { useSessao } from "~/lib/sessao";
 import type { PerfilNaTela, PessoaNaLista, PostNaTela } from "~/servidor/rede";
 import { ALVO_MINIMO, cor, espaco, fonte, raio, sombra } from "~/tema";
@@ -134,7 +135,10 @@ export default function Comunidade() {
 
   const carregarCabecalho = useCallback(async () => {
     const [a, m] = await Promise.all([api.minhaAtividade(), api.meuPerfilSocial()]);
-    if (a.ok) setNovas(a.novas);
+    if (a.ok) {
+      setNovas(a.novas);
+      mudarSelos({ comunidade: a.novas });
+    }
     if (m.ok) setEu({ perfil: m.perfil, pausada: m.pausada, suspensa: m.suspensa });
   }, []);
 

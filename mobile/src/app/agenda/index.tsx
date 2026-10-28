@@ -50,7 +50,7 @@ export default function Agenda() {
   if (!pronto) {
     return (
       <Tela>
-        <CabecalhoDaPilha titulo="Minha agenda" voltarPara="/saude" />
+        <CabecalhoDaPilha titulo="Minha agenda" voltarPara="/jornada" />
         <Carregando />
       </Tela>
     );
@@ -68,7 +68,7 @@ export default function Agenda() {
       <CabecalhoDaPilha
         titulo="Minha agenda"
         subtitulo="Consultas, ultrassons e exames"
-        voltarPara="/saude"
+        voltarPara="/jornada"
       />
 
       {destaque ? <Destaque c={destaque} agora={agora} /> : <SemNada />}

@@ -220,7 +220,7 @@ export default function Chutes() {
         <Carregando />
       </Tela>
     );
-  if (cuidado || perfil?.birth_date) return <Redirect href="/saude" />;
+  if (cuidado || perfil?.birth_date) return <Redirect href="/inicio" />;
 
   const todas = mesclar(historico, pendentes) as Contagem[];
   const forca = emCurso?.forca ?? FORCA_PADRAO;

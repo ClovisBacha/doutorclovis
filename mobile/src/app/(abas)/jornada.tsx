@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Botao, Cartao, Carregando, NaoConsegueLer, T, Tela, toque } from "~/componentes/base";
+import { irParaAba } from "~/componentes/cabecalho";
 import { rota } from "~/componentes/jornada/bancada";
 import { SementesSubindo } from "~/componentes/jornada/efeitos";
 import { BolhaViva } from "~/componentes/movimento";
@@ -474,7 +475,7 @@ export function JornadaDaGestacao({
         aoAbrirLoja={() =>
           ir(aResgatar > 0 ? "/jornada/recompensas?aba=conquistas" : "/jornada/recompensas")
         }
-        aoAbrirAmigas={() => ir("/amigas")}
+        aoAbrirAmigas={() => irParaAba(rota("/amigas") as never)}
         aoAbrirFolha={setFolha}
         aoContarNascimento={() => ir("/jornada/nascimento")}
         decoracao={decoracao}

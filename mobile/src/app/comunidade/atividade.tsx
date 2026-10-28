@@ -10,6 +10,7 @@ import { useAviso } from "~/componentes/comunidade/folha";
 import { Avatar, fonteDaImagem } from "~/componentes/comunidade/imagem";
 import { api } from "~/lib/comunidade/api";
 import { mensagemDoErro } from "~/lib/comunidade/regras";
+import { mudarSelos } from "~/lib/selos";
 import type { AtividadeNaTela } from "~/servidor/rede";
 import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
 
@@ -18,7 +19,8 @@ import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
  *
  * ⚠️ O texto de cada aviso vem de `textoDoAviso` (site) — e ele NÃO traz o
  * comentário de propósito: ela toca e lê onde ele vive, com contexto.
- * ⚠️ Abrir marca tudo como visto (é o que zera o número do ♡).
+ * ⚠️ Abrir marca tudo como visto (é o que zera o número do ♡ e o selo da
+ * Comunidade na barra).
  */
 export default function Atividade() {
   const [itens, setItens] = useState<AtividadeNaTela[]>([]);
@@ -37,7 +39,10 @@ export default function Atividade() {
     }
     setItens(r.itens);
     setEstado("pronto");
-    void api.marcarAtividadeVista();
+    void api.marcarAtividadeVista().then((v) => {
+      /* Visto no servidor: o coração do feed e o selo da barra zeram juntos. */
+      if (v.ok) mudarSelos({ comunidade: 0 });
+    });
   }, []);
 
   useEffect(() => {
@@ -113,25 +118,67 @@ export default function Atividade() {
                 <Pressable
                   accessibilityRole="button"
                   onPress={() => abrir(item)}
-                  style={{ flexDirection: "row", alignItems: "center", gap: espaco.md, minHeight: ALVO_MINIMO }}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: espaco.md,
+                    minHeight: ALVO_MINIMO,
+                  }}
                 >
-                  <Avatar id={item.quemId} nome={item.quemNome} url={item.quemAvatar} tamanho={44} />
-                  <Text style={{ flex: 1, fontFamily: fonte.normal, fontSize: 15, lineHeight: 21, color: cor.texto }}>
+                  <Avatar
+                    id={item.quemId}
+                    nome={item.quemNome}
+                    url={item.quemAvatar}
+                    tamanho={44}
+                  />
+                  <Text
+                    style={{
+                      flex: 1,
+                      fontFamily: fonte.normal,
+                      fontSize: 15,
+                      lineHeight: 21,
+                      color: cor.texto,
+                    }}
+                  >
                     {textoDoAviso(item.especie, item.quemNome)}
-                    <Text style={{ color: cor.textoApagado }}>{` ·\u00a0${haQuantoPublicou(item.criadoEm, agora).replace(/ /g, "\u00a0")}`}</Text>
+                    <Text
+                      style={{ color: cor.textoApagado }}
+                    >{` ·\u00a0${haQuantoPublicou(item.criadoEm, agora).replace(/ /g, "\u00a0")}`}</Text>
                   </Text>
                   {item.postCapa ? (
-                    <Image source={fonteDaImagem(item.postCapa)} style={{ width: 44, height: 55, borderRadius: raio.sm }} contentFit="cover" />
+                    <Image
+                      source={fonteDaImagem(item.postCapa)}
+                      style={{ width: 44, height: 55, borderRadius: raio.sm }}
+                      contentFit="cover"
+                    />
                   ) : null}
                 </Pressable>
                 {pedido && !resposta ? (
-                  <View style={{ flexDirection: "row", gap: espaco.sm, paddingLeft: 44 + espaco.md }}>
-                    <Botao rotulo="Aceitar" aoTocar={() => responder(item, true)} estilo={{ flex: 1, minHeight: ALVO_MINIMO }} />
-                    <Botao rotulo="Recusar" tipo="secundario" aoTocar={() => responder(item, false)} estilo={{ flex: 1, minHeight: ALVO_MINIMO }} />
+                  <View
+                    style={{ flexDirection: "row", gap: espaco.sm, paddingLeft: 44 + espaco.md }}
+                  >
+                    <Botao
+                      rotulo="Aceitar"
+                      aoTocar={() => responder(item, true)}
+                      estilo={{ flex: 1, minHeight: ALVO_MINIMO }}
+                    />
+                    <Botao
+                      rotulo="Recusar"
+                      tipo="secundario"
+                      aoTocar={() => responder(item, false)}
+                      estilo={{ flex: 1, minHeight: ALVO_MINIMO }}
+                    />
                   </View>
                 ) : null}
                 {pedido && resposta ? (
-                  <Text style={{ paddingLeft: 44 + espaco.md, fontFamily: fonte.media, fontSize: 14, color: cor.textoApagado }}>
+                  <Text
+                    style={{
+                      paddingLeft: 44 + espaco.md,
+                      fontFamily: fonte.media,
+                      fontSize: 14,
+                      color: cor.textoApagado,
+                    }}
+                  >
                     {resposta === "aceito" ? "Pedido aceito." : "Pedido recusado."}
                   </Text>
                 ) : null}

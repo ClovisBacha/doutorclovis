@@ -499,7 +499,7 @@ export function TelaDaNutricao() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [permissao.estado]);
 
-  const voltar = () => (router.canGoBack() ? router.back() : router.replace("/saude"));
+  const voltar = () => (router.canGoBack() ? router.back() : router.replace("/inicio"));
 
   if (!bancada && !carregandoSessao && !sessao) return <Redirect href="/entrar" />;
 

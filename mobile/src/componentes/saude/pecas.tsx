@@ -1,5 +1,4 @@
 import { Image } from "expo-image";
-import { router } from "expo-router";
 import { Pressable, Text, View } from "react-native";
 import { Botao, Linha, T, toque } from "~/componentes/base";
 import { BotaoVoltar, PilulaSos } from "~/componentes/cabecalho";
@@ -13,23 +12,22 @@ export const ARTES = {
   nutricao: require("../../../../src/assets/saude/nutricao.webp"),
 } as const;
 
-export function voltarParaSaude() {
-  if (router.canGoBack()) router.back();
-  else router.replace("/saude");
-}
-
-/** O topo das telas da Saúde: voltar, a peça da família e o título. */
+/**
+ * O topo das telas da Saúde (os Movimentos do bebê, o cronômetro de
+ * contrações): voltar, a peça da família e o título. A aba Saúde saiu da barra
+ * na fase 3; sem pilha para voltar, os Movimentos caem no Bebê, onde moram.
+ */
 export function Cabecalho({
   titulo,
   arte,
   fundo,
-  voltarPara = "/saude",
+  voltarPara = "/inicio",
 }: {
   titulo: string;
   arte?: keyof typeof ARTES;
   fundo?: string;
   /** Sem pilha para voltar (abriu direto), vai para cá. */
-  voltarPara?: "/saude" | "/sos";
+  voltarPara?: "/inicio" | "/sos";
 }) {
   return (
     <Linha estilo={{ gap: espaco.md, marginBottom: espaco.xs }}>

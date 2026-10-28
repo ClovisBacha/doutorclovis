@@ -8,7 +8,6 @@ import { linkDeIndicacao, mensagemDeConvite } from "@/lib/indicacao";
 import { tempoNoApp } from "@/lib/amigas";
 import { useAviso } from "~/componentes/aviso";
 import { Carregando, NaoConsegueLer, toque } from "~/componentes/base";
-import { CabecalhoDaPilha } from "~/componentes/cabecalho";
 import {
   cobrarOBonus,
   lerAmigas,
@@ -29,13 +28,15 @@ import { rota } from "~/componentes/jornada/bancada";
 import { useJornada } from "~/componentes/jornada/usarJornada";
 import { lerAIndicacao } from "~/componentes/recompensas/economia-do-cantinho";
 import { fraseDoPedido } from "~/lib/jornada/amigas";
+import { mudarSelos, seloDasAmigas } from "~/lib/selos";
 import { ALVO_MINIMO, cor, espaco, fonte } from "~/tema";
 
 /**
- * AS AMIGAS — a aba do site (`src/components/amigas.tsx`) no app: os pedidos
- * de amizade, a DUPLA de sequência, a lista das amigas (o que cada uma
+ * AS AMIGAS — a aba do site (`src/components/amigas.tsx`), e uma das quatro da
+ * barra do app desde a fase 3 (a rede social no centro): os pedidos de
+ * amizade, a DUPLA de sequência, a lista das amigas (o que cada uma
  * construiu, nunca placar e nada clínico), achar uma amiga pelo código e
- * convidar pelo link.
+ * convidar pelo link. O selo da aba conta os pedidos e o convite da dupla.
  *
  * O grafo é o do convite e dos pedidos entre contas: sem busca por nome e sem
  * estranhos, não há o que moderar. No Modo Cuidado a aba se cala (o servidor
@@ -64,7 +65,9 @@ export default function Amigas() {
     const [l, p] = await Promise.all([lerAmigas(), lerPedidos()]);
     setLeitura(l);
     setPedidos(p);
-  }, []);
+    /* A tela acabou de ler: o selo da barra passa a dizer o que ela mostra. */
+    if (l) mudarSelos({ amigas: l.careMode ? 0 : seloDasAmigas(p.length, l.dupla, pos) });
+  }, [pos]);
 
   useFocusEffect(
     useCallback(() => {
@@ -118,6 +121,7 @@ export default function Amigas() {
       return;
     }
     setPedidos((lista) => lista.filter((x) => x.id !== p.id));
+    if (!aceitar) void carregar();
     if (aceitar) {
       avisar(`Agora vocês são amigas 💛`);
       void carregar();
@@ -410,8 +414,28 @@ export default function Amigas() {
 
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: "#fcf2f6" }}>
-      <View style={{ paddingHorizontal: espaco.lg, paddingBottom: espaco.sm }}>
-        <CabecalhoDaPilha titulo="Amigas" voltarPara="/jornada" />
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          minHeight: ALVO_MINIMO + 4,
+          paddingHorizontal: espaco.lg,
+          paddingTop: espaco.sm,
+          paddingBottom: espaco.sm,
+        }}
+      >
+        <Text
+          accessibilityRole="header"
+          style={{
+            flex: 1,
+            fontFamily: fonte.titulo,
+            fontSize: 28,
+            color: cor.texto,
+            letterSpacing: -0.4,
+          }}
+        >
+          Amigas
+        </Text>
       </View>
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: 10, paddingBottom: 60 }}
