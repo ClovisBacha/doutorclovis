@@ -98,3 +98,53 @@ export function corDaUltimaVez(texto: string): string {
   if (texto.startsWith("há ") && texto.endsWith("h")) return "#f59e0b";
   return "#a8a29e";
 }
+
+/* ── As amigas no Hoje (fase 3) ─────────────────────────────────────────── */
+
+/** O primeiro nome, para as frases curtas do Hoje. */
+export function primeiroNomeDaAmiga(nome: string | null | undefined): string {
+  return (nome ?? "").trim().split(/\s+/)[0] || "sua amiga";
+}
+
+/**
+ * Os rostos da faixa do Hoje: quem apareceu por último primeiro (é presença,
+ * nunca "online"), até `max`, e quantas ficaram de fora.
+ */
+export function rostosDaFaixa<T extends { vistaEm: string | null }>(
+  amigas: readonly T[],
+  max = 5,
+): { rostos: T[]; mais: number } {
+  const quando = (a: T) => (a.vistaEm ? Date.parse(a.vistaEm) || 0 : 0);
+  const ordem = [...amigas].sort((a, b) => quando(b) - quando(a));
+  return { rostos: ordem.slice(0, max), mais: Math.max(0, ordem.length - max) };
+}
+
+/**
+ * A linha da dupla na faixa do Hoje — `null` quando não há o que dizer. No
+ * pós-parto a dupla não existe (decisão do dono: lá ela não acende). Em pausa,
+ * diz o FATO e que nada se perdeu, nunca o motivo.
+ */
+export function linhaDaDuplaNoHoje(
+  dupla: {
+    estado: string;
+    nome: string | null;
+    sequencia: number;
+    recorde: number;
+    paradaHa: number | null;
+  } | null,
+  temAmigas: boolean,
+  pos: boolean,
+): string | null {
+  if (pos) return null;
+  if (!dupla) return temAmigas ? "Chame uma amiga para a dupla: +10 🌱 por dia juntas" : null;
+  const ela = primeiroNomeDaAmiga(dupla.nome);
+  if (dupla.estado === "convite-recebido") return `${ela} te chamou para a dupla 🔥`;
+  if (dupla.estado === "convite-enviado") return `Você chamou ${ela} para a dupla`;
+  if (dupla.estado !== "ativa") return null;
+  if (emPausa(dupla)) return `A dupla com ${ela} está em pausa — nada se perdeu`;
+  if (dupla.sequencia > 0)
+    return `🔥 ${dupla.sequencia} ${dupla.sequencia === 1 ? "dia" : "dias"} juntas com ${ela}`;
+  return dupla.recorde > 0
+    ? `🔥 A chama com ${ela} está esperando vocês duas`
+    : `🔥 A chama com ${ela} começa quando as duas aparecerem`;
+}

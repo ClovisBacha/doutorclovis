@@ -162,15 +162,23 @@ export const api = {
     return seguro(() => rede.meuFeed({ antesDe: antesDe ?? null }));
   },
 
-  sugestoesDoFeed() {
+  /** `mesmaFase`: o filtro que ELA liga (nunca por padrão — `fase-parecida.ts`). */
+  sugestoesDoFeed(mesmaFase = false) {
     if (ehBancada()) {
       if (estado() === "vazio" || parametroDaBancada("luto") === "1") {
         return ok({ posts: [], sugeridos: [] as string[], pessoas: [] });
       }
       const s = B.sugestoesDaBancada();
-      return ok({ posts: s.posts, sugeridos: s.posts.map((p) => p.id), pessoas: s.pessoas });
+      /* Com o filtro, menos gente — e `&fasevazia=1` mostra o vazio que explica a régua. */
+      const pessoas = mesmaFase
+        ? parametroDaBancada("fasevazia") === "1"
+          ? []
+          : s.pessoas.filter((_, i) => i !== 1)
+        : s.pessoas;
+      const posts = mesmaFase ? s.posts.slice(0, 1) : s.posts;
+      return ok({ posts, sugeridos: posts.map((p) => p.id), pessoas });
     }
-    return seguro(() => rede.sugestoesDoFeed({}));
+    return seguro(() => rede.sugestoesDoFeed(mesmaFase ? { mesmaFase: true } : {}));
   },
 
   reagir(postId: string, tipo: TipoDeReacao | null) {

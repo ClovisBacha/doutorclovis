@@ -216,6 +216,7 @@ export function TelaDeHoje({
   chama,
   avisos,
   nascimento,
+  amigas,
   agenda,
   aoAbrir,
   aoVerJornada,
@@ -242,6 +243,8 @@ export function TelaDeHoje({
   avisos?: ReactNode;
   /** A partir da semana 37: a porta para contar o nascimento. */
   nascimento?: ReactNode;
+  /** As amigas e a dupla, logo depois do cuidado do dia (fase 3). */
+  amigas?: ReactNode;
   /** A próxima consulta da agenda (ou o convite para marcar). */
   agenda?: ReactNode;
   aoAbrir: (c: ChaveDoCuidado) => void;
@@ -441,6 +444,8 @@ export function TelaDeHoje({
               <LinhaDoCuidado key={c.chave} c={c} aoAbrir={() => aoAbrir(c.chave)} />
             ))}
           </View>
+
+          {amigas}
 
           {agenda}
 

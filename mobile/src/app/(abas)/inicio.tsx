@@ -1,4 +1,5 @@
 import { semanaDaArte } from "@/lib/arte-do-bebe";
+import { ROTULO_DO_FILTRO } from "@/lib/fase-parecida";
 import { fruitEmojiForWeek, trimesterForWeek } from "@/lib/gestacao";
 import { diaLocalDe, periodoDaHora } from "@/lib/frases-do-mascote";
 import { Image } from "expo-image";
@@ -192,10 +193,10 @@ export default function Inicio() {
           ordem={4}
           Icone={MessageCircleHeart}
           titulo="Comunidade"
-          texto="Gestantes na mesma fase que você."
+          texto={`${ROTULO_DO_FILTRO}.`}
           corIcone={cor.primariaEscura}
           fundoIcone={cor.destaque}
-          aoTocar={() => router.push("/comunidade")}
+          aoTocar={() => router.push("/comunidade/busca?fase=1")}
         />
       ) : null}
       {/* A agenda morava na aba Saúde, que saiu da barra: no Hoje fica a

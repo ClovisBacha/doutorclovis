@@ -366,11 +366,11 @@ export default function Comunidade() {
       <Cartao estilo={{ marginHorizontal: espaco.lg }}>
         <T tipo="subtitulo">Seu feed ainda está quietinho</T>
         <T tipo="apagado">
-          Aqui aparecem as publicações de quem você segue. Encontre alguém pela busca ou conte como
-          você está hoje.
+          Aqui aparecem as publicações de quem você segue e das suas amigas. Encontre pessoas para
+          seguir — inclusive quem está numa fase parecida com a sua — ou conte como você está hoje.
         </T>
         <Botao
-          rotulo="Buscar pessoas"
+          rotulo="Encontrar pessoas"
           tipo="secundario"
           aoTocar={() => router.push("/comunidade/busca")}
         />

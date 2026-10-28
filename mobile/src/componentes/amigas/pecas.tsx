@@ -1,11 +1,9 @@
 import { Image } from "expo-image";
-import { router } from "expo-router";
 import { ChevronRight } from "lucide-react-native";
 import { useState, type ReactNode } from "react";
 import { Modal, Pressable, Text, View } from "react-native";
 import { corDoAvatar, inicialDoNome, tempoNoApp, ultimaVez } from "@/lib/amigas";
 import { toque } from "~/componentes/base";
-import { irParaAba } from "~/componentes/cabecalho";
 import { ChamaDaSequencia } from "~/componentes/caminho/pecas";
 import {
   BONUS_DA_DUPLA,
@@ -559,52 +557,5 @@ export function FolhaDeSair({
       aoFechar={aoFechar}
       aoConfirmar={aoConfirmar}
     />
-  );
-}
-
-/** A porta das Amigas onde a faixa da trilha não existe (a tela Hoje do pós-parto). */
-export function PortaDasAmigas({ rota: destino }: { rota: string }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="Abrir as Amigas"
-      onPress={() => {
-        toque();
-        irParaAba(destino as never);
-      }}
-      style={({ pressed }) => ({
-        flexDirection: "row",
-        alignItems: "center",
-        gap: espaco.md,
-        borderRadius: 20,
-        backgroundColor: cor.branco,
-        padding: 12,
-        opacity: pressed ? 0.85 : 1,
-        shadowColor: "#50286e",
-        shadowOpacity: 0.06,
-        shadowRadius: 6,
-        shadowOffset: { width: 0, height: 2 },
-      })}
-    >
-      <View
-        style={{
-          width: 48,
-          height: 48,
-          borderRadius: 24,
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: "#f6e9fb",
-        }}
-      >
-        <Text style={{ fontSize: 24 }}>👭</Text>
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={{ fontFamily: fonte.titulo, fontSize: 15, color: tinta.titulo }}>Amigas</Text>
-        <Text style={{ fontFamily: fonte.media, fontSize: 13, color: tinta.sub }}>
-          Quem você convidou, o Cantinho delas e os pedidos
-        </Text>
-      </View>
-      <ChevronRight size={20} color={tinta.apagado} />
-    </Pressable>
   );
 }

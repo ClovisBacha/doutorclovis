@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Botao, Cartao, Carregando, NaoConsegueLer, T, Tela, toque } from "~/componentes/base";
+import { AmigasNoHoje } from "~/componentes/amigas/faixa-do-hoje";
 import { BotaoDoPerfil } from "~/componentes/botao-do-perfil";
 import { irParaAba } from "~/componentes/cabecalho";
 import { rota } from "~/componentes/jornada/bancada";
@@ -54,7 +55,6 @@ import {
 } from "~/lib/jornada/pos-parto";
 import { AgendaNaHoje } from "~/componentes/agenda/pecas";
 import { carimbarPresenca } from "~/componentes/amigas/economia";
-import { PortaDasAmigas } from "~/componentes/amigas/pecas";
 import {
   ConviteDosLembretes,
   contextoDoLembrete,
@@ -419,6 +419,7 @@ export function JornadaDaGestacao({
               <PortaDoNascimento nome={nomeDoBebe} aoTocar={() => ir("/jornada/nascimento")} />
             ) : null
           }
+          amigas={<AmigasNoHoje pos={false} />}
           agenda={
             <>
               <ConviteDosLembretes
@@ -728,7 +729,6 @@ export function JornadaDoPosParto({
         extra={
           <>
             <BotaoDeConquistas leitura={conquistas} posParto />
-            <PortaDasAmigas rota={rota("/amigas")} />
           </>
         }
         aoMarcarHumor={(humor) => {
@@ -741,6 +741,7 @@ export function JornadaDoPosParto({
         aoVerTrilha={() => ir("/jornada/trilha")}
         aoVerAlbum={() => ir("/jornada/album")}
         direita={<BotaoDoPerfil />}
+        amigas={<AmigasNoHoje pos />}
       />
       {abreFesta && nascimento ? (
         <FestaDoNascimento

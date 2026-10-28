@@ -205,8 +205,13 @@ export const meuFeed = funcaoDoServidor<
   { ok: true; posts: PostNaTela[]; proximo: string | null } | Erro<"instavel">
 >("src/lib/rede-social.functions.ts", "meuFeed");
 
+/**
+ * As sugestões do fim do feed e da descoberta. `mesmaFase` é o filtro "Quem
+ * está numa fase parecida com a sua" (`@/lib/fase-parecida`): só ela o liga,
+ * nunca por padrão, e a fase de ninguém viaja na resposta.
+ */
 export const sugestoesDoFeed = funcaoDoServidor<
-  Record<string, never>,
+  { mesmaFase?: boolean },
   | { ok: true; posts: PostNaTela[]; sugeridos?: string[]; pessoas: PessoaNaLista[] }
   | Erro<"instavel">
 >("src/lib/rede-social.functions.ts", "sugestoesDoFeed");

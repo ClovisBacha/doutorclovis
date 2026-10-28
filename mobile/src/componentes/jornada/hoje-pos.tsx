@@ -89,6 +89,7 @@ export function TelaDoQuartoTrimestre({
   chama,
   figurinhas,
   avisos,
+  amigas,
   agenda,
   extra,
   aoMarcarHumor,
@@ -121,6 +122,8 @@ export function TelaDoQuartoTrimestre({
   /** Todas as figurinhas: as da gestação e as do 4º trimestre. */
   figurinhas: number;
   avisos?: ReactNode;
+  /** As amigas (sem a dupla, que não existe no pós-parto), logo depois das tarefas. */
+  amigas?: ReactNode;
   agenda?: ReactNode;
   /** O que vem depois do álbum (as conquistas). */
   extra?: ReactNode;
@@ -360,6 +363,8 @@ export function TelaDoQuartoTrimestre({
               />
             </>
           )}
+
+          {amigas}
 
           <Text
             accessibilityRole="header"

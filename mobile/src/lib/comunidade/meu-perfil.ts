@@ -49,7 +49,9 @@ export function useMeuPerfilSocial(uid: string | null): MeuPerfilSocial | null {
 /** Quem acabou de ler ou salvar o perfil avisa aqui. */
 export function guardarMeuPerfilSocial(uid: string, p: { nome: string; avatarUrl: string | null }) {
   if (atual && atual.uid === uid && atual.nome === p.nome && atual.avatarUrl === p.avatarUrl) {
-    atual = { ...atual, lidoEm: Date.now() };
+    /* Nada que a tela mostre mudou: só a hora da leitura, sem trocar o objeto
+       (trocar sem avisar os ouvintes faria cada tela enxergar uma cópia). */
+    atual.lidoEm = Date.now();
     return;
   }
   definir({ uid, nome: p.nome, avatarUrl: p.avatarUrl, lidoEm: Date.now() });
