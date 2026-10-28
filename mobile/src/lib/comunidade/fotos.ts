@@ -27,9 +27,25 @@ async function prepararFoto(uri: string, maximo = LADO_MAXIMO_DA_FOTO): Promise<
   const original = await ctx.renderAsync();
   const novo = tamanhoReduzido(original.width, original.height, maximo);
   const final = novo ? await ctx.resize(novo).renderAsync() : original;
-  const salvo = await final.saveAsync({ compress: COMPRESSAO_DA_FOTO, format: SaveFormat.JPEG, base64: true });
+  const salvo = await final.saveAsync({
+    compress: COMPRESSAO_DA_FOTO,
+    format: SaveFormat.JPEG,
+    base64: true,
+  });
   if (!salvo.base64) throw new Error("sem base64");
   return dataUrlJpeg(salvo.base64);
+}
+
+/**
+ * Um arquivo do aparelho — o cartão capturado da tela — pronto para publicar,
+ * pelo MESMO caminho das fotos (lado ≤ 1080, JPEG 0,72). `null` se não deu.
+ */
+export async function prepararArquivo(uri: string): Promise<string | null> {
+  try {
+    return await prepararFoto(uri);
+  } catch {
+    return null;
+  }
 }
 
 async function prepararVarias(assets: ImagePicker.ImagePickerAsset[]): Promise<ResultadoDaEscolha> {
@@ -74,7 +90,9 @@ export async function tirarFoto(): Promise<ResultadoDaEscolha> {
 }
 
 /** A foto de perfil: quadrada (recorte central), 512 × 512. */
-export async function escolherAvatar(): Promise<{ ok: true; foto: string } | { ok: false; motivo: "cancelou" | "falhou" }> {
+export async function escolherAvatar(): Promise<
+  { ok: true; foto: string } | { ok: false; motivo: "cancelou" | "falhou" }
+> {
   try {
     const r = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
@@ -89,7 +107,11 @@ export async function escolherAvatar(): Promise<{ ok: true; foto: string } | { o
     if (recorte) ctx.crop(recorte);
     ctx.resize({ width: LADO_DO_AVATAR, height: LADO_DO_AVATAR });
     const final = await ctx.renderAsync();
-    const salvo = await final.saveAsync({ compress: COMPRESSAO_DA_FOTO, format: SaveFormat.JPEG, base64: true });
+    const salvo = await final.saveAsync({
+      compress: COMPRESSAO_DA_FOTO,
+      format: SaveFormat.JPEG,
+      base64: true,
+    });
     if (!salvo.base64) return { ok: false, motivo: "falhou" };
     return { ok: true, foto: dataUrlJpeg(salvo.base64) };
   } catch {

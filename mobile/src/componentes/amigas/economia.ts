@@ -1,6 +1,11 @@
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { seloDasAmigas } from "~/lib/selos";
-import type { RespostaDoPedido } from "~/lib/jornada/amigas";
+import {
+  codigoLimpo,
+  lerResultadoDaIndicacao,
+  type ResultadoDaIndicacao,
+  type RespostaDoPedido,
+} from "~/lib/jornada/amigas";
 import {
   carimbarQueApareceu,
   cobrarBonusDaDupla,
@@ -17,6 +22,7 @@ import {
   type DuplaNaTela,
   type PerfilDeAmiga,
 } from "~/servidor/amigas";
+import { ligarPelaIndicacao } from "~/servidor/ganhos";
 
 /**
  * As amigas, do servidor do site — ou, na bancada, de exemplo, pelos MESMOS
@@ -292,6 +298,25 @@ export async function pedirAmizade(termo: string): Promise<RespostaDoPedido> {
     return await convidarAmiga({ termo });
   } catch {
     return { ok: false, error: "falhou" };
+  }
+}
+
+/**
+ * Liga a recém-chegada a quem a convidou, pelo código (`attributeReferral`).
+ * Na bancada, "JULI…" liga e o resto não acha (`&indicacao=depois`, a conta
+ * que ainda não ficou pronta).
+ */
+export async function ligarPeloCodigo(codigo: string): Promise<ResultadoDaIndicacao> {
+  const limpo = codigoLimpo(codigo);
+  if (ehBancada()) {
+    await espera();
+    if (parametroDaBancada("indicacao") === "depois") return "depois";
+    return limpo.startsWith("JULI") ? "ligou" : "nao-encontrou";
+  }
+  try {
+    return lerResultadoDaIndicacao(await ligarPelaIndicacao({ code: limpo }));
+  } catch {
+    return "falhou";
   }
 }
 

@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { toque } from "~/componentes/base";
 import { BotaoDaAtividade, Brilho, sombraDe } from "~/componentes/jornada/atividade";
 import { FolhaDeCompartilhar } from "~/componentes/jornada/compartilhar";
+import { legendaDaChegada } from "~/lib/jornada/cartoes";
 import { Confete } from "~/componentes/jornada/pecas";
 import { ArteDaBolha, Flutuar } from "~/componentes/movimento";
 import {
@@ -381,6 +382,7 @@ export function FestaDoNascimento({
         aoFechar={() => setCartao(false)}
         largura={LARGURA}
         corDoBotao="#b0306a"
+        legenda={legendaDaChegada(nome)}
       >
         <CartaoDaChegada nome={nome} dados={dados} />
       </FolhaDeCompartilhar>

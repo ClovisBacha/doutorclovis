@@ -2,7 +2,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useState } from "react";
 import { Linking, Pressable, Share, Text, TextInput, View } from "react-native";
 import { BONUS_INFLUENCIADORA } from "@/lib/economia-sementinhas";
-import { linkDeIndicacao, linkDoWhatsApp, mensagemDeConvite } from "@/lib/indicacao";
+import { linkDeIndicacao, linkDoWhatsApp } from "@/lib/indicacao";
 import { toque } from "~/componentes/base";
 import { corRecompensas } from "~/componentes/recompensas/cores";
 import {
@@ -16,6 +16,7 @@ import {
   type Lancamento,
 } from "~/componentes/recompensas/economia-do-cantinho";
 import { CartaoMaterial, vibrar } from "~/componentes/recompensas/pecas";
+import { mensagemDeConviteDoApp } from "~/lib/jornada/amigas";
 import { RECOMPENSA_DA_INDICACAO, RECOMPENSA_DO_DEPOIMENTO } from "~/lib/jornada/recompensas";
 import { useSessao } from "~/lib/sessao";
 import { ALVO_MINIMO, cor, espaco, fonte } from "~/tema";
@@ -120,8 +121,9 @@ function CartaoDaIndicacao({ avisar }: { avisar: (t: string) => void }) {
      código não liga a amiga a ninguém (`linkDeIndicacao` devolve `null`). */
   if (!ind || ind === "lendo") return null;
   const link = linkDeIndicacao(ind.codigo);
-  if (!link) return null;
-  const msg = mensagemDeConvite(link);
+  if (!link || !ind.codigo) return null;
+  /* Com o código escrito: no app, a amiga o digita no cadastro. */
+  const msg = mensagemDeConviteDoApp(ind.codigo, link);
 
   async function compartilhar() {
     toque();

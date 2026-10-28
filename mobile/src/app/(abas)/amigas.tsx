@@ -4,7 +4,7 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, ScrollView, Share, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { linkDeIndicacao, mensagemDeConvite } from "@/lib/indicacao";
+import { linkDeIndicacao } from "@/lib/indicacao";
 import { tempoNoApp } from "@/lib/amigas";
 import { useAviso } from "~/componentes/aviso";
 import { Carregando, NaoConsegueLer, toque } from "~/componentes/base";
@@ -28,7 +28,7 @@ import {
 import { rota } from "~/componentes/jornada/bancada";
 import { useJornada } from "~/componentes/jornada/usarJornada";
 import { lerAIndicacao } from "~/componentes/recompensas/economia-do-cantinho";
-import { fraseDoPedido } from "~/lib/jornada/amigas";
+import { fraseDoPedido, mensagemDeConviteDoApp } from "~/lib/jornada/amigas";
 import { mudarSelos, seloDasAmigas } from "~/lib/selos";
 import { ALVO_MINIMO, cor, espaco, fonte } from "~/tema";
 
@@ -104,12 +104,14 @@ export default function Amigas() {
   async function convidar() {
     toque();
     const link = linkDeIndicacao(codigo);
-    if (!link) {
+    if (!link || !codigo) {
       avisar("Ainda estou preparando o seu link. Tente de novo em instantes.");
       return;
     }
+    /* Com o código ESCRITO: quem baixa o app digita no cadastro ("Uma amiga
+       te chamou?"); o link é do site, que o captura sozinho. */
     try {
-      await Share.share({ message: mensagemDeConvite(link) });
+      await Share.share({ message: mensagemDeConviteDoApp(codigo, link) });
     } catch {
       avisar("Não consegui abrir o compartilhamento.");
     }

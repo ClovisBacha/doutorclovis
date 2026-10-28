@@ -79,3 +79,26 @@ export function cartaoDaChama(dias: number, posParto: boolean): DadosDoCartaoDeC
 
 /** A chama só vira cartão a partir de 3 dias: um dia aceso ainda não é história. */
 export const CHAMA_PARA_COMPARTILHAR = 3;
+
+/* ── A legenda que o cartão sugere para a Comunidade (fase 3) ───────────── */
+
+/**
+ * O que o cartão propõe escrever ao publicar na Comunidade — ela edita antes.
+ * Curta, e só o que o próprio cartão já mostra (o título e o desenho): nada de
+ * semana, peso ou dado que o cartão não diz.
+ */
+export function legendaDoCartao(d: DadosDoCartaoDeConquista): string {
+  if (d.eyebrow === "Conquista desbloqueada")
+    return `Desbloqueei a conquista "${d.titulo}" ${d.arte}`;
+  return `${d.titulo} ${d.arte}`;
+}
+
+/** A do cartão da semana (Stories): a semana e a fruta. */
+export function legendaDaSemana(semana: number): string {
+  return `Semana ${semana} ${fruitEmojiForWeek(semana)}`;
+}
+
+/** A do cartão da chegada: o nome sem artigo (o artigo supõe o sexo). */
+export function legendaDaChegada(nome: string | null): string {
+  return `${nome?.trim() || "O bebê"} chegou! 🍼`;
+}

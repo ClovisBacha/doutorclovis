@@ -4,6 +4,7 @@ import { Pressable, Text, View } from "react-native";
 import { toque } from "~/componentes/base";
 import { Brilho } from "~/componentes/jornada/atividade";
 import { FolhaDeCompartilhar } from "~/componentes/jornada/compartilhar";
+import { legendaDoCartao } from "~/lib/jornada/cartoes";
 import { cor, espaco, fonte } from "~/tema";
 
 /**
@@ -177,6 +178,7 @@ export function CompartilharConquista({
         aoFechar={() => setAberta(false)}
         largura={LARGURA}
         corDoBotao={tinta}
+        legenda={legendaDoCartao(d)}
       >
         <CartaoDeConquista d={d} />
       </FolhaDeCompartilhar>

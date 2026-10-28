@@ -45,3 +45,40 @@ describe("os cartões de compartilhar", () => {
     for (const t of textos) expect(t).not.toMatch(/sangr|pressão|glicemia|triste|humor/i);
   });
 });
+
+describe("a legenda que o cartão sugere para a Comunidade", () => {
+  const { legendaDaChegada, legendaDaSemana, legendaDoCartao, cartaoDaChama, cartaoDoMarco } =
+    require("~/lib/jornada/cartoes") as typeof import("~/lib/jornada/cartoes");
+
+  test("diz só o que o cartão já mostra, curta", () => {
+    expect(legendaDoCartao(cartaoDaChama(15, false))).toBe("15 dias seguidos 🔥");
+    expect(legendaDoCartao(cartaoDoMarco({ tipo: "trimestre", trimestre: 2 } as never, null))).toBe(
+      "Fim do 2º trimestre! 🎊",
+    );
+    expect(legendaDaChegada("Helena")).toBe("Helena chegou! 🍼");
+    expect(legendaDaChegada("  ")).toBe("O bebê chegou! 🍼");
+    expect(legendaDaSemana(24)).toMatch(/^Semana 24 \S+$/);
+  });
+
+  test("a conquista vem entre aspas, com o desenho", () => {
+    const l = legendaDoCartao({
+      eyebrow: "Conquista desbloqueada",
+      titulo: "Primeira Meditação",
+      arte: "🧘",
+      detalhe: "x",
+      selo: null,
+      fundo: "violeta",
+    });
+    expect(l).toBe('Desbloqueei a conquista "Primeira Meditação" 🧘');
+  });
+
+  test("nenhuma legenda dá gênero ao bebê nem fala de saúde", () => {
+    const todas = [
+      legendaDaChegada("Theo"),
+      legendaDaChegada(null),
+      legendaDaSemana(12),
+      legendaDoCartao(cartaoDaChama(3, true)),
+    ];
+    for (const l of todas) expect(l).not.toMatch(/\b(o|a) (Theo|Helena)\b|peso|kg|consulta|exame/i);
+  });
+});

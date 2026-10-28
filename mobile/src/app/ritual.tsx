@@ -18,25 +18,37 @@ import {
   recusaDaDum,
   recusaDoUltrassom,
 } from "~/lib/datas";
+import { ligarPeloCodigo } from "~/componentes/amigas/economia";
+import { codigoLimpo, fraseDaIndicacao, type ResultadoDaIndicacao } from "~/lib/jornada/amigas";
+import { RECOMPENSA_DA_INDICACAO } from "~/lib/jornada/recompensas";
 import { useSessao } from "~/lib/sessao";
 import { ALVO_MINIMO, cor, espaco, raio } from "~/tema";
 
 type Modo = "dum" | "us" | "nasceu";
-const PASSOS = 5;
+/** O nome, a data, o bebê, o contato, o médico e a rede (o último só no cadastro). */
+const PASSOS = 6;
+const PASSO_DA_REDE = 5;
 
 /**
  * O ritual de boas-vindas: o mínimo para o app acompanhar a gestação, em
- * quatro passos curtos. Só o passo da data é obrigatório — o resto pode ser
- * pulado e completado no Perfil.
+ * passos curtos. Só o passo da data é obrigatório — o resto pode ser pulado e
+ * completado no Perfil.
+ *
+ * O último é o da REDE (fase 3): "Uma amiga te chamou?" — o código dela liga
+ * as duas (`attributeReferral`: a amizade, o seguir mútuo e as sementinhas de
+ * quem convidou). Antes, quem entrava pelo app nunca virava amiga de quem a
+ * convidou: só o link do site levava o código. Corrigindo a data (`?editar=1`)
+ * não há passo da rede.
  */
 export default function Ritual() {
   const { sessao, perfil, recarregarPerfil } = useSessao();
   /* `?editar=1`: aberto do Perfil (ou da Jornada) para corrigir a data —
      começa no passo da data, já preenchido, e ao salvar volta de onde veio. */
   const editar = useLocalSearchParams<{ editar?: string }>().editar === "1";
+  const total = editar ? PASSO_DA_REDE : PASSOS;
   const inicial = editar ? 1 : Number(parametroDaBancada("passo") ?? 0);
   const [passo, setPasso] = useState(
-    Number.isFinite(inicial) ? Math.min(Math.max(inicial, 0), PASSOS - 1) : 0,
+    Number.isFinite(inicial) ? Math.min(Math.max(inicial, 0), total - 1) : 0,
   );
   const [nome, setNome] = useState(
     perfil?.display_name ?? (sessao?.user.user_metadata?.display_name as string | undefined) ?? "",
@@ -64,6 +76,9 @@ export default function Ritual() {
   const [medicoNome, setMedicoNome] = useState(perfil?.medico_nome ?? "");
   const [medicoCelular, setMedicoCelular] = useState(perfil?.medico_celular ?? "");
   const [medicoEmail, setMedicoEmail] = useState(perfil?.medico_email ?? "");
+  const [codigo, setCodigo] = useState("");
+  const [indicacao, setIndicacao] = useState<ResultadoDaIndicacao | null>(null);
+  const [ligando, setLigando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
 
@@ -87,7 +102,21 @@ export default function Ritual() {
     return null;
   }
 
-  function avancar() {
+  /** Liga as duas pelo código. Devolve o resultado (e o mostra na tela). */
+  async function ligar(): Promise<ResultadoDaIndicacao | null> {
+    setErro(null);
+    if (codigoLimpo(codigo).length < 3) {
+      setErro("Esse código parece curto. Confira as letras com ela.");
+      return null;
+    }
+    setLigando(true);
+    const r = await ligarPeloCodigo(codigo);
+    setLigando(false);
+    setIndicacao(r);
+    return r;
+  }
+
+  async function avancar() {
     setErro(null);
     if (passo === 1) {
       const e = conferirData();
@@ -98,7 +127,13 @@ export default function Ritual() {
         return setErro("Confira o celular: DDD e número.");
       if (medicoEmail.trim() && !emailValido(medicoEmail)) return setErro("Confira o e-mail.");
     }
-    if (passo < PASSOS - 1) setPasso(passo + 1);
+    /* Digitou o código e foi direto em "Começar": tenta ligar antes. Se não
+       achou, fica para ela conferir (o segundo toque segue sem). */
+    if (passo === PASSO_DA_REDE && codigo.trim() && indicacao === null) {
+      const r = await ligar();
+      if (r !== "ligou" && r !== "depois") return;
+    }
+    if (passo < total - 1) setPasso(passo + 1);
     else void salvar();
   }
 
@@ -164,6 +199,9 @@ export default function Ritual() {
       await abrirLoja(uid);
       gravarChave(CHAVE_NASCIMENTO, null);
     }
+    /* A conta não estava pronta quando ela digitou o código: agora o perfil
+       foi gravado, e o servidor consegue ligar as duas. */
+    if (indicacao === "depois") await ligarPeloCodigo(codigo);
     setSalvando(false);
     await recarregarPerfil();
     if (editar && router.canGoBack()) router.back();
@@ -177,7 +215,7 @@ export default function Ritual() {
     >
       <Tela bordas={["top", "bottom"]}>
         <Linha estilo={{ gap: 6 }}>
-          {Array.from({ length: PASSOS }, (_, i) => (
+          {Array.from({ length: total }, (_, i) => (
             <View
               key={i}
               style={{
@@ -192,8 +230,8 @@ export default function Ritual() {
         <View style={{ alignItems: "center", marginTop: espaco.md }}>
           {/* A chave troca o vídeo quando o humor muda (o player é por humor). */}
           <BolhaViva
-            key={passo === PASSOS - 1 ? "comemorando" : "feliz"}
-            humor={passo === PASSOS - 1 ? "comemorando" : "feliz"}
+            key={passo === total - 1 ? "comemorando" : "feliz"}
+            humor={passo === total - 1 ? "comemorando" : "feliz"}
             tamanho={116}
           />
         </View>
@@ -361,21 +399,60 @@ export default function Ritual() {
           </>
         ) : null}
 
+        {passo === PASSO_DA_REDE ? (
+          <>
+            <T tipo="titulo" centro>
+              Uma amiga te chamou?
+            </T>
+            <T tipo="apagado" centro>
+              {modo === "nasceu"
+                ? `Com o código dela, vocês viram amigas aqui dentro: ela ganha ${RECOMPENSA_DA_INDICACAO} sementinhas, e vocês se veem na Comunidade.`
+                : `Com o código dela, vocês viram amigas aqui dentro: ela ganha ${RECOMPENSA_DA_INDICACAO} sementinhas, e vocês podem formar uma dupla e se ver na Comunidade.`}
+            </T>
+            <Campo
+              rotulo="Código da amiga"
+              value={codigo}
+              onChangeText={(t) => {
+                setCodigo(t);
+                if (indicacao && indicacao !== "ligou") setIndicacao(null);
+              }}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              placeholder="Ex.: JULI7K"
+            />
+            <Botao
+              rotulo={indicacao === "ligou" ? "Vocês já são amigas 💛" : "Ligar à minha amiga"}
+              tipo="secundario"
+              carregando={ligando}
+              desabilitado={indicacao === "ligou" || codigoLimpo(codigo).length < 3}
+              aoTocar={() => void ligar()}
+            />
+            {indicacao ? (
+              <Cartao fundo={indicacao === "ligou" ? cor.destaque : cor.apagado}>
+                <T tipo="corpo">{fraseDaIndicacao(indicacao, RECOMPENSA_DA_INDICACAO)}</T>
+              </Cartao>
+            ) : null}
+            <T tipo="apagado" centro estilo={{ fontSize: 14 }}>
+              Sem código? Depois, na aba Amigas, você convida quem quiser.
+            </T>
+          </>
+        ) : null}
+
         {erro ? (
           <T tipo="apagado" cor={cor.urgente}>
             {erro}
           </T>
         ) : null}
         <Botao
-          rotulo={passo < PASSOS - 1 ? "Continuar" : "Começar"}
-          aoTocar={avancar}
-          carregando={salvando}
+          rotulo={passo < total - 1 ? "Continuar" : "Começar"}
+          aoTocar={() => void avancar()}
+          carregando={salvando || (passo === PASSO_DA_REDE && ligando)}
         />
         {passo >= 2 ? (
           <Botao
             rotulo="Pular por agora"
             tipo="texto"
-            aoTocar={() => (passo < PASSOS - 1 ? setPasso(passo + 1) : void salvar())}
+            aoTocar={() => (passo < total - 1 ? setPasso(passo + 1) : void salvar())}
           />
         ) : null}
         {passo > 0 ? (

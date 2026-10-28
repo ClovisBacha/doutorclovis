@@ -5,6 +5,7 @@ import { Pressable, Text, View } from "react-native";
 import { bebeDaSemana } from "~/lib/bebe-da-semana";
 import { Brilho } from "~/componentes/jornada/atividade";
 import { FolhaDeCompartilhar } from "~/componentes/jornada/compartilhar";
+import { legendaDaSemana } from "~/lib/jornada/cartoes";
 import { arteDoBebe } from "~/componentes/jornada/arte-do-bebe";
 import { cor, espaco, fonte } from "~/tema";
 
@@ -198,7 +199,12 @@ export function CompartilharASemana({ d }: { d: DadosDoCartao }) {
         <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: "#7a3fd1" }}>Ver ›</Text>
       </Pressable>
 
-      <FolhaDeCompartilhar aberta={aberta} aoFechar={() => setAberta(false)} largura={LARGURA}>
+      <FolhaDeCompartilhar
+        aberta={aberta}
+        aoFechar={() => setAberta(false)}
+        largura={LARGURA}
+        legenda={legendaDaSemana(d.semana)}
+      >
         <CartaoDaSemana d={d} />
       </FolhaDeCompartilhar>
     </>

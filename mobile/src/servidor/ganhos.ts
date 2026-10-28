@@ -17,6 +17,18 @@ export const lerIndicacao = funcaoDoServidor<
   { ok: true; code: string | null; count: number } | { ok: false; error: string }
 >("src/lib/referral.functions.ts", "getReferral");
 
+/**
+ * A amiga que entrou pelo convite liga-se a quem a convidou: a amizade (o
+ * `referred_by`, nos dois sentidos), o seguir mútuo na Comunidade e as
+ * sementinhas de quem convidou. Fixado uma vez só; sem auto-indicação.
+ * `retry: true` quer dizer que a conta ainda não está pronta (e-mail não
+ * confirmado ou perfil ainda não criado): tentar de novo depois.
+ */
+export const ligarPelaIndicacao = funcaoDoServidor<
+  { code: string },
+  { ok: true; attributed: boolean; retry?: boolean } | { ok: false; error: string }
+>("src/lib/referral.functions.ts", "attributeReferral");
+
 export type StatusDoDepoimento = "pending" | "approved" | "rejected";
 
 export const lerMeuDepoimento = funcaoDoServidor<

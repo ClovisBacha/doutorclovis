@@ -148,3 +148,49 @@ export function linhaDaDuplaNoHoje(
     ? `🔥 A chama com ${ela} está esperando vocês duas`
     : `🔥 A chama com ${ela} começa quando as duas aparecerem`;
 }
+
+/* ── O convite e o código da amiga (fase 3) ─────────────────────────────── */
+
+/** O resultado de ligar-se à amiga pelo código dela, como a tela o lê. */
+export type ResultadoDaIndicacao = "ligou" | "nao-encontrou" | "depois" | "falhou";
+
+export function lerResultadoDaIndicacao(
+  r: { ok: true; attributed: boolean; retry?: boolean } | { ok: false; error?: string },
+): ResultadoDaIndicacao {
+  if (!r.ok) return "falhou";
+  if (r.attributed) return "ligou";
+  return r.retry ? "depois" : "nao-encontrou";
+}
+
+/**
+ * A frase de cada resultado. "Não encontrou" cobre também quem já entrou pelo
+ * convite de outra pessoa (o servidor fixa uma vez só e não distingue), e
+ * diz as duas coisas em vez de afirmar a errada.
+ */
+export function fraseDaIndicacao(r: ResultadoDaIndicacao, bonus: number): string {
+  switch (r) {
+    case "ligou":
+      return `Pronto: vocês agora são amigas 💛 Ela ganhou ${bonus} sementinhas e aparece nas suas Amigas.`;
+    case "nao-encontrou":
+      return "Não encontrei esse código — ou você já entrou pelo convite de outra amiga. Confira as letras com ela.";
+    case "depois":
+      return "Guardei o código: assim que a sua conta terminar de ficar pronta, eu ligo vocês.";
+    default:
+      return "Não deu agora. Depois, nas Amigas, dá para pedir a amizade dela pelo código.";
+  }
+}
+
+/** O código como o servidor o guarda: letras e números, em maiúsculas. */
+export function codigoLimpo(t: string): string {
+  return t.replace(/[^a-z0-9]/gi, "").toUpperCase();
+}
+
+/**
+ * O texto do convite DO APP: com o código escrito, porque quem baixa o app não
+ * passa pelo link (o link é do site, que captura o código sozinho). Primeira
+ * pessoa, sem promessa clínica.
+ */
+export function mensagemDeConviteDoApp(codigo: string, link: string | null): string {
+  const base = `Estou usando o Obstétrica e queria você comigo lá 💛 No cadastro, use o meu código ${codigo}: a gente vira amiga lá dentro.`;
+  return link ? `${base} ${link}` : base;
+}
