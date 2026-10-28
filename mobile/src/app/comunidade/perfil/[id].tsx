@@ -3,12 +3,20 @@ import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { Ban, EyeOff, Flag, Images, MoreHorizontal } from "lucide-react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, Text, useWindowDimensions, View } from "react-native";
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Botao, Cartao, Carregando, NaoConsegueLer, Pilula, T, toque } from "~/componentes/base";
 import { BotaoIcone, Cabecalho, voltar } from "~/componentes/comunidade/cabecalho";
 import { Folha, FolhaDeOpcoes, useAviso } from "~/componentes/comunidade/folha";
 import { Avatar, fonteDaImagem } from "~/componentes/comunidade/imagem";
+import { rota } from "~/componentes/jornada/bancada";
 import { FolhaDeBloqueio, FolhaDeDenuncia } from "~/componentes/comunidade/regras";
 import { api } from "~/lib/comunidade/api";
 import {
@@ -22,26 +30,44 @@ import {
   type Vinculo,
 } from "~/lib/comunidade/regras";
 import { useSessao } from "~/lib/sessao";
-import type { PerfilNaTela, PostNaTela } from "~/servidor/rede";
+import type { ComoVisitante, PerfilNaTela, PostNaTela } from "~/servidor/rede";
 import { cor, espaco, fonte } from "~/tema";
 
 const COLUNAS = 3;
 const VAO = 2;
+
+/** O espelho: quem ela pode fingir ser, na ordem dos chips. */
+const PERSONAS: readonly { chave: ComoVisitante; rotulo: string; frase: string }[] = [
+  { chave: "estranha", rotulo: "Quem não te segue", frase: "Assim te vê quem não te segue." },
+  { chave: "seguidora", rotulo: "Quem te segue", frase: "Assim te vê quem te segue." },
+  { chave: "amiga", rotulo: "Amigas", frase: "Assim te veem as suas amigas." },
+];
 
 /**
  * O PERFIL DE ALGUÉM: cabeçalho, seguir, a grade de publicações e o ⋯.
  *
  * ⚠️ "indisponivel" é UM silêncio só — perfil que não existe, bloqueio,
  * luto, pausa e suspensão dão a mesma frase, de propósito.
+ *
+ * O ESPELHO (`?como=estranha|seguidora|amiga`, só sobre o próprio perfil): o
+ * "Ver como os outros veem" do Perfil. O servidor monta o perfil pelas MESMAS
+ * réguas da visita de verdade, e só ele distingue "trancado" — a visitante
+ * nem consegue abrir — de "indisponivel".
  */
 export default function TelaDoPerfil() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, como } = useLocalSearchParams<{ id: string; como?: string }>();
   const alvoId = String(id ?? "");
-  const { cuidado } = useSessao();
+  const { cuidado, sessao } = useSessao();
+  const persona = PERSONAS.find((p) => p.chave === como)?.chave ?? null;
+  const [comoAgora, setComoAgora] = useState<ComoVisitante | null>(persona);
+  /* O espelho só vale sobre o próprio perfil (o servidor também ignora no dos outros). */
+  const espelho = comoAgora && sessao?.user.id === alvoId ? comoAgora : null;
   const [perfil, setPerfil] = useState<PerfilNaTela | null>(null);
   const [posts, setPosts] = useState<PostNaTela[]>([]);
   const [proximo, setProximo] = useState<string | null>(null);
-  const [estado, setEstado] = useState<"carregando" | "pronto" | "indisponivel" | "falhou">("carregando");
+  const [estado, setEstado] = useState<
+    "carregando" | "pronto" | "indisponivel" | "trancado" | "falhou"
+  >("carregando");
   const [vinculo, setVinculo] = useState<Vinculo>(null);
   const [seguindoAgora, setSeguindoAgora] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -56,9 +82,15 @@ export default function TelaDoPerfil() {
 
   const carregar = useCallback(async () => {
     setEstado("carregando");
-    const r = await api.verPerfil(alvoId);
+    const r = await api.verPerfil(alvoId, null, espelho);
     if (!r.ok) {
-      setEstado(r.motivo === "indisponivel" || r.motivo === "trancado" ? "indisponivel" : "falhou");
+      setEstado(
+        r.motivo === "trancado" && espelho
+          ? "trancado"
+          : r.motivo === "indisponivel" || r.motivo === "trancado"
+            ? "indisponivel"
+            : "falhou",
+      );
       return;
     }
     setPerfil(r.perfil);
@@ -66,7 +98,7 @@ export default function TelaDoPerfil() {
     setPosts(r.posts);
     setProximo(r.proximo);
     setEstado("pronto");
-  }, [alvoId]);
+  }, [alvoId, espelho]);
 
   useEffect(() => {
     void carregar();
@@ -79,7 +111,7 @@ export default function TelaDoPerfil() {
     let cursor: string | null = proximo;
     let vazias = 0;
     while (temMais(cursor) && vazias < 4) {
-      const r = await api.verPerfil(alvoId, cursor);
+      const r = await api.verPerfil(alvoId, cursor, espelho);
       if (!r.ok) break;
       setPosts((ps) => juntarPaginas(ps, r.posts));
       cursor = r.proximo;
@@ -89,7 +121,7 @@ export default function TelaDoPerfil() {
     setProximo(cursor);
     setMaisCarregando(false);
     buscando.current = false;
-  }, [alvoId, proximo]);
+  }, [alvoId, proximo, espelho]);
 
   const seguirOuNao = () => {
     if (!perfil || seguindoAgora) return;
@@ -103,7 +135,8 @@ export default function TelaDoPerfil() {
       if (!r.ok) return aviso.mostrar(mensagemDoErro(r.motivo, r.recado, "perfil"), true);
       toque(false);
       setVinculo(r.estado);
-      if (r.estado === "pendente") aviso.mostrar("Pedido enviado. O perfil é fechado: a pessoa decide se aceita.");
+      if (r.estado === "pendente")
+        aviso.mostrar("Pedido enviado. O perfil é fechado: a pessoa decide se aceita.");
     });
   };
 
@@ -125,8 +158,14 @@ export default function TelaDoPerfil() {
       <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.lg }}>
         <Avatar id={perfil.id} nome={perfil.nome} url={perfil.avatarUrl} tamanho={84} />
         <View style={{ flex: 1, flexDirection: "row", justifyContent: "space-around" }}>
-          <Numero valor={posts.length} rotulo={posts.length === 1 ? "publicação" : "publicações"} mais={temMais(proximo)} />
-          {perfil.seguidores != null ? <Numero valor={perfil.seguidores} rotulo="seguidores" /> : null}
+          <Numero
+            valor={posts.length}
+            rotulo={posts.length === 1 ? "publicação" : "publicações"}
+            mais={temMais(proximo)}
+          />
+          {perfil.seguidores != null ? (
+            <Numero valor={perfil.seguidores} rotulo="seguidores" />
+          ) : null}
           {perfil.seguindo != null ? <Numero valor={perfil.seguindo} rotulo="seguindo" /> : null}
         </View>
       </View>
@@ -136,10 +175,20 @@ export default function TelaDoPerfil() {
           {perfil.oficial ? <Text style={{ color: cor.primaria }}> ✓</Text> : null}
         </Text>
         {perfil.handle ? (
-          <Text style={{ fontFamily: fonte.media, fontSize: 14, color: cor.textoApagado }}>@{perfil.handle}</Text>
+          <Text style={{ fontFamily: fonte.media, fontSize: 14, color: cor.textoApagado }}>
+            @{perfil.handle}
+          </Text>
         ) : null}
         {perfil.bio ? (
-          <Text style={{ fontFamily: fonte.normal, fontSize: 15, lineHeight: 21, color: cor.texto, marginTop: 4 }}>
+          <Text
+            style={{
+              fontFamily: fonte.normal,
+              fontSize: 15,
+              lineHeight: 21,
+              color: cor.texto,
+              marginTop: 4,
+            }}
+          >
             {perfil.bio}
           </Text>
         ) : null}
@@ -147,11 +196,17 @@ export default function TelaDoPerfil() {
       {!cuidado && (perfil.seloSemana || perfil.seloBebe) ? (
         <View style={{ flexDirection: "row", gap: espaco.sm, flexWrap: "wrap" }}>
           {perfil.seloSemana ? <Pilula texto={`🤰 ${perfil.seloSemana}`} /> : null}
-          {perfil.seloBebe ? <Pilula texto={`👶 ${perfil.seloBebe}`} fundo={cor.chutesFundo} corTexto={cor.chutes} /> : null}
+          {perfil.seloBebe ? (
+            <Pilula texto={`👶 ${perfil.seloBebe}`} fundo={cor.chutesFundo} corTexto={cor.chutes} />
+          ) : null}
         </View>
       ) : null}
-      {perfil.souEu ? (
-        <Botao rotulo="Editar perfil" tipo="secundario" aoTocar={() => router.push("/comunidade/eu")} />
+      {espelho ? null : perfil.souEu ? (
+        <Botao
+          rotulo="Editar perfil"
+          tipo="secundario"
+          aoTocar={() => router.push(rota("/perfil/editar") as never)}
+        />
       ) : (
         <Botao
           rotulo={rotuloDoBotaoSeguir(vinculo)}
@@ -166,16 +221,47 @@ export default function TelaDoPerfil() {
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: cor.fundo }}>
       <Cabecalho
-        titulo={perfil?.handle ? `@${perfil.handle}` : (perfil?.nome ?? "Perfil")}
+        titulo={
+          espelho
+            ? "Como te veem"
+            : perfil?.handle
+              ? `@${perfil.handle}`
+              : (perfil?.nome ?? "Perfil")
+        }
         direita={
-          perfil && !perfil.souEu ? (
+          perfil && !perfil.souEu && !espelho ? (
             <BotaoIcone rotulo="Mais opções do perfil" aoTocar={() => setMenu(true)}>
               <MoreHorizontal size={22} color={cor.texto} />
             </BotaoIcone>
           ) : null
         }
       />
+      {espelho ? (
+        <EscolhaDoEspelho
+          como={espelho}
+          aoTrocar={(c) => {
+            toque();
+            setComoAgora(c);
+          }}
+        />
+      ) : null}
       {estado === "carregando" ? <Carregando /> : null}
+      {estado === "trancado" ? (
+        <View style={{ padding: espaco.lg }}>
+          <Cartao>
+            <T tipo="subtitulo">Quem não te segue não abre o seu perfil</T>
+            <T tipo="apagado" cor={cor.texto}>
+              Ele é fechado: para essa pessoa, aparecem só o seu nome e a sua foto onde você comenta
+              ou reage. Quem quiser te acompanhar manda um pedido, e você decide.
+            </T>
+            <Botao
+              rotulo="Mudar em Editar perfil"
+              tipo="secundario"
+              aoTocar={() => router.push(rota("/perfil/editar") as never)}
+            />
+          </Cartao>
+        </View>
+      ) : null}
       {estado === "indisponivel" ? (
         <View style={{ padding: espaco.lg }}>
           <Cartao>
@@ -202,7 +288,9 @@ export default function TelaDoPerfil() {
             <View style={{ alignItems: "center", padding: espaco.xl, gap: espaco.sm }}>
               <Images size={36} color={cor.textoApagado} />
               <T tipo="apagado" centro>
-                {perfil.souEu ? "Você ainda não publicou nada." : "Nenhuma publicação para mostrar."}
+                {perfil.souEu
+                  ? "Você ainda não publicou nada."
+                  : "Nenhuma publicação para mostrar."}
               </T>
             </View>
           }
@@ -263,7 +351,13 @@ export default function TelaDoPerfil() {
           });
         }}
       />
-      <Folha aberta={desfazendo} aoFechar={() => setDesfazendo(false)} titulo={vinculo === "pendente" ? "Cancelar o pedido?" : `Deixar de seguir ${perfil?.nome ?? ""}?`}>
+      <Folha
+        aberta={desfazendo}
+        aoFechar={() => setDesfazendo(false)}
+        titulo={
+          vinculo === "pendente" ? "Cancelar o pedido?" : `Deixar de seguir ${perfil?.nome ?? ""}?`
+        }
+      >
         <T tipo="apagado">
           {vinculo === "pendente"
             ? "O pedido para seguir é retirado. Dá para pedir de novo depois."
@@ -271,7 +365,11 @@ export default function TelaDoPerfil() {
               ? "As publicações saem do seu feed. Dá para seguir de novo quando quiser."
               : "O perfil é fechado: para voltar a seguir, você vai precisar pedir de novo."}
         </T>
-        <Botao rotulo={vinculo === "pendente" ? "Cancelar o pedido" : "Deixar de seguir"} tipo="perigo" aoTocar={desfazer} />
+        <Botao
+          rotulo={vinculo === "pendente" ? "Cancelar o pedido" : "Deixar de seguir"}
+          tipo="perigo"
+          aoTocar={desfazer}
+        />
         <Botao rotulo="Voltar" tipo="texto" aoTocar={() => setDesfazendo(false)} />
       </Folha>
       {aviso.elemento}
@@ -279,14 +377,81 @@ export default function TelaDoPerfil() {
   );
 }
 
+/** Os chips do espelho e a frase do que se vê. */
+function EscolhaDoEspelho({
+  como,
+  aoTrocar,
+}: {
+  como: ComoVisitante;
+  aoTrocar: (c: ComoVisitante) => void;
+}) {
+  const atual = PERSONAS.find((p) => p.chave === como)!;
+  return (
+    <View style={{ paddingHorizontal: espaco.lg, paddingTop: espaco.md, gap: espaco.sm }}>
+      <View accessibilityRole="tablist" style={{ flexDirection: "row", gap: espaco.xs }}>
+        {PERSONAS.map((p) => {
+          const ativo = p.chave === como;
+          return (
+            <Pressable
+              key={p.chave}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: ativo }}
+              accessibilityLabel={p.rotulo}
+              onPress={() => aoTrocar(p.chave)}
+              style={({ pressed }) => ({
+                flex: 1,
+                minHeight: 44,
+                borderRadius: 999,
+                alignItems: "center",
+                justifyContent: "center",
+                paddingHorizontal: 6,
+                backgroundColor: ativo ? cor.primaria : cor.cartao,
+                borderWidth: ativo ? 0 : 1,
+                borderColor: cor.borda,
+                opacity: pressed ? 0.8 : 1,
+              })}
+            >
+              <Text
+                numberOfLines={2}
+                style={{
+                  textAlign: "center",
+                  fontFamily: fonte.forte,
+                  fontSize: 13,
+                  color: ativo ? cor.branco : cor.texto,
+                }}
+              >
+                {p.rotulo}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      <T tipo="apagado">{atual.frase}</T>
+    </View>
+  );
+}
+
 function Numero({ valor, rotulo, mais }: { valor: number; rotulo: string; mais?: boolean }) {
   return (
-    <View accessible accessibilityLabel={`${valor}${mais ? " ou mais" : ""} ${rotulo}`} style={{ alignItems: "center", minWidth: 64 }}>
-      <Text style={{ fontFamily: fonte.titulo, fontSize: 19, color: cor.texto, fontVariant: ["tabular-nums"] }}>
+    <View
+      accessible
+      accessibilityLabel={`${valor}${mais ? " ou mais" : ""} ${rotulo}`}
+      style={{ alignItems: "center", minWidth: 64 }}
+    >
+      <Text
+        style={{
+          fontFamily: fonte.titulo,
+          fontSize: 19,
+          color: cor.texto,
+          fontVariant: ["tabular-nums"],
+        }}
+      >
         {contagemCurta(valor)}
         {mais ? "+" : ""}
       </Text>
-      <Text style={{ fontFamily: fonte.normal, fontSize: 13, color: cor.textoApagado }}>{rotulo}</Text>
+      <Text style={{ fontFamily: fonte.normal, fontSize: 13, color: cor.textoApagado }}>
+        {rotulo}
+      </Text>
     </View>
   );
 }
@@ -294,23 +459,46 @@ function Numero({ valor, rotulo, mais }: { valor: number; rotulo: string; mais?:
 /** Um quadrado 3:4 da grade. Post sensível aparece sem a imagem. */
 function Ladrilho({ post, lado }: { post: PostNaTela; lado: number }) {
   const fotos = fotosDoPost(post);
-  const veu = veuDoPost({ sensivel: !!post.sensivel, batePalavra: !!post.batePalavraMinha, souAAutora: post.souAAutora, revelado: false });
+  const veu = veuDoPost({
+    sensivel: !!post.sensivel,
+    batePalavra: !!post.batePalavraMinha,
+    souAAutora: post.souAAutora,
+    revelado: false,
+  });
   const altura = (lado * 4) / 3;
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={veu ? "Publicação com aviso de conteúdo sensível" : post.texto ? `Publicação: ${post.texto.slice(0, 80)}` : "Publicação com foto"}
+      accessibilityLabel={
+        veu
+          ? "Publicação com aviso de conteúdo sensível"
+          : post.texto
+            ? `Publicação: ${post.texto.slice(0, 80)}`
+            : "Publicação com foto"
+      }
       onPress={() => router.push(`/comunidade/post/${post.id}`)}
-      style={({ pressed }) => ({ width: lado, height: altura, opacity: pressed ? 0.8 : 1, backgroundColor: cor.apagado, overflow: "hidden" })}
+      style={({ pressed }) => ({
+        width: lado,
+        height: altura,
+        opacity: pressed ? 0.8 : 1,
+        backgroundColor: cor.apagado,
+        overflow: "hidden",
+      })}
     >
       {veu ? (
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 4 }}>
           <EyeOff size={22} color={cor.textoApagado} />
-          <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: cor.textoApagado }}>Sensível</Text>
+          <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: cor.textoApagado }}>
+            Sensível
+          </Text>
         </View>
       ) : fotos[0] ? (
         <>
-          <Image source={fonteDaImagem(post.miniaturaUrl ?? fotos[0])} style={{ width: lado, height: altura }} contentFit="cover" />
+          <Image
+            source={fonteDaImagem(post.miniaturaUrl ?? fotos[0])}
+            style={{ width: lado, height: altura }}
+            contentFit="cover"
+          />
           {fotos.length > 1 ? (
             <View style={{ position: "absolute", top: 6, right: 6 }}>
               <Images size={16} color={cor.branco} />
@@ -318,8 +506,18 @@ function Ladrilho({ post, lado }: { post: PostNaTela; lado: number }) {
           ) : null}
         </>
       ) : (
-        <View style={{ flex: 1, padding: espaco.sm, justifyContent: "center", backgroundColor: corDaInicial(post.id) + "22" }}>
-          <Text numberOfLines={6} style={{ fontFamily: fonte.media, fontSize: 13, lineHeight: 17, color: cor.texto }}>
+        <View
+          style={{
+            flex: 1,
+            padding: espaco.sm,
+            justifyContent: "center",
+            backgroundColor: corDaInicial(post.id) + "22",
+          }}
+        >
+          <Text
+            numberOfLines={6}
+            style={{ fontFamily: fonte.media, fontSize: 13, lineHeight: 17, color: cor.texto }}
+          >
             {post.texto}
           </Text>
         </View>
@@ -327,4 +525,3 @@ function Ladrilho({ post, lado }: { post: PostNaTela; lado: number }) {
     </Pressable>
   );
 }
-

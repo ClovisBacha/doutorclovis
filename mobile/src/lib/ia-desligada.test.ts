@@ -40,7 +40,7 @@ describe("com a IA desligada, nada leva a ela", () => {
   });
 
   test.skipIf(IA_NO_APP)("o Perfil não mostra a permissão de IA", () => {
-    const s = ler(join(RAIZ, "app", "perfil.tsx"));
+    const s = ler(join(RAIZ, "app", "perfil", "index.tsx"));
     expect(s).toContain("IA_NO_APP ? <CartaoDaPermissaoDeIA");
   });
 

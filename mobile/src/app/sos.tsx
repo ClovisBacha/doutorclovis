@@ -636,7 +636,7 @@ export default function Sos() {
         {!telMedico ? (
           <Pressable
             accessibilityRole="button"
-            onPress={() => (sessao ? router.push("/perfil") : undefined)}
+            onPress={() => (sessao ? router.push("/perfil/dados") : undefined)}
             style={{
               marginTop: espaco.sm,
               paddingVertical: espaco.sm,
@@ -764,7 +764,7 @@ export default function Sos() {
           }
           aberta={fichaAberta}
           aoAlternar={() => setFichaAberta((v) => !v)}
-          aoCompletar={sessao ? () => router.push("/perfil") : undefined}
+          aoCompletar={sessao ? () => router.push("/perfil/dados") : undefined}
         />
 
         {/* ── SINAIS DE ALERTA ─────────────────────────────────────────── */}

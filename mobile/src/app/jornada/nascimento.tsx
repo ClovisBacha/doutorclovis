@@ -89,8 +89,8 @@ export default function ContarONascimento() {
     return (
       <Tela>
         <CabecalhoDaPilha titulo="O nascimento" voltarPara="/jornada" />
-        <T>Os dados da gestação se corrigem no seu perfil, quando você quiser.</T>
-        <Botao rotulo="Abrir o perfil" aoTocar={() => router.replace("/perfil")} />
+        <T>Os dados da gestação se corrigem em Seus dados, no Perfil, quando você quiser.</T>
+        <Botao rotulo="Abrir os seus dados" aoTocar={() => router.replace("/perfil/dados")} />
       </Tela>
     );
   }

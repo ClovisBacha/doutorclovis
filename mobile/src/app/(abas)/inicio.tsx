@@ -10,13 +10,13 @@ import {
   MessageCircleHeart,
   Phone,
   Sparkles,
-  UserRound,
 } from "lucide-react-native";
 import type { ComponentType } from "react";
 import { Pressable, View } from "react-native";
 import { PortaDaAgenda } from "~/componentes/agenda/pecas";
 import { useAgenda } from "~/componentes/agenda/usar-agenda";
 import { BEBE } from "~/componentes/artes";
+import { BotaoDoPerfil } from "~/componentes/botao-do-perfil";
 import { Cartao, Linha, NaoConsegueLer, Pilula, T, Tela, toque } from "~/componentes/base";
 import { CVV } from "~/config";
 import { bebeDaSemana, retaFinalNoApp } from "~/lib/bebe-da-semana";
@@ -87,24 +87,7 @@ export default function Inicio() {
             {nome ?? "Olá"}
           </T>
         </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Meu perfil e conta"
-          onPress={() => {
-            toque();
-            router.push("/perfil");
-          }}
-          style={{
-            width: ALVO_MINIMO + 4,
-            height: ALVO_MINIMO + 4,
-            borderRadius: raio.pilula,
-            backgroundColor: cor.destaque,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <UserRound color={cor.primariaEscura} size={24} />
-        </Pressable>
+        <BotaoDoPerfil tamanho={44} />
       </Linha>
 
       {frase ? (

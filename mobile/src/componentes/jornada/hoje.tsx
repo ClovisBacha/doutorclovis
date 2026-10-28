@@ -219,7 +219,7 @@ export function TelaDeHoje({
   agenda,
   aoAbrir,
   aoVerJornada,
-  sos,
+  direita,
 }: {
   D: number;
   /** A jornada já foi lida do aparelho (`loja.pronto`). */
@@ -246,7 +246,8 @@ export function TelaDeHoje({
   agenda?: ReactNode;
   aoAbrir: (c: ChaveDoCuidado) => void;
   aoVerJornada: () => void;
-  sos: ReactNode;
+  /** O canto direito do topo: a foto dela, que abre o Perfil. */
+  direita?: ReactNode;
 }) {
   const topo = useSafeAreaInsets().top;
   const ceu = CEUS[ceuDaHora(hora)];
@@ -324,7 +325,7 @@ export function TelaDeHoje({
                 {saudacao}
               </Text>
             </View>
-            {sos}
+            {direita}
           </View>
           <View style={{ alignItems: "center", marginTop: 2 }}>
             <View style={{ alignItems: "center", justifyContent: "center" }}>

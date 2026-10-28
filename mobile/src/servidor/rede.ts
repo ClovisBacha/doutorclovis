@@ -155,8 +155,11 @@ export const salvarPerfilSocial = funcaoDoServidor<
   { ok: true; parcial: boolean } | Erro<"imagem" | "bio_clinica" | "banco">
 >("src/lib/rede-social.functions.ts", "salvarPerfilSocial");
 
+/** Quem o espelho finge ser (só vale sobre o próprio perfil — o servidor ignora no dos outros). */
+export type ComoVisitante = "estranha" | "seguidora" | "amiga";
+
 export const verPerfil = funcaoDoServidor<
-  { alvoId: string; antesDe?: string | null },
+  { alvoId: string; antesDe?: string | null; comoVisitante?: ComoVisitante | null },
   | { ok: true; perfil: PerfilNaTela; posts: PostNaTela[]; proximo: string | null }
   | Erro<"indisponivel" | "trancado">
 >("src/lib/rede-social.functions.ts", "verPerfil");

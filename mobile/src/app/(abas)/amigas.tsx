@@ -8,6 +8,7 @@ import { linkDeIndicacao, mensagemDeConvite } from "@/lib/indicacao";
 import { tempoNoApp } from "@/lib/amigas";
 import { useAviso } from "~/componentes/aviso";
 import { Carregando, NaoConsegueLer, toque } from "~/componentes/base";
+import { BotaoDoPerfil } from "~/componentes/botao-do-perfil";
 import {
   cobrarOBonus,
   lerAmigas,
@@ -436,6 +437,7 @@ export default function Amigas() {
         >
           Amigas
         </Text>
+        <BotaoDoPerfil tamanho={34} />
       </View>
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: 10, paddingBottom: 60 }}

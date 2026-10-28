@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Botao, Cartao, Carregando, NaoConsegueLer, T, toque } from "~/componentes/base";
 import { useAcoesDosPosts } from "~/componentes/comunidade/acoes";
+import { BotaoDoPerfil } from "~/componentes/botao-do-perfil";
 import { BotaoIcone } from "~/componentes/comunidade/cabecalho";
 import { useAviso } from "~/componentes/comunidade/folha";
 import { Avatar } from "~/componentes/comunidade/imagem";
@@ -22,6 +23,7 @@ import { BoasVindas, FolhaDasRegras } from "~/componentes/comunidade/regras";
 import { lerJson, gravarJson } from "~/lib/armazem";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { api } from "~/lib/comunidade/api";
+import { guardarMeuPerfilSocial } from "~/lib/comunidade/meu-perfil";
 import {
   cartoesDoApp,
   chaveDasBoasVindas,
@@ -139,8 +141,11 @@ export default function Comunidade() {
       setNovas(a.novas);
       mudarSelos({ comunidade: a.novas });
     }
-    if (m.ok) setEu({ perfil: m.perfil, pausada: m.pausada, suspensa: m.suspensa });
-  }, []);
+    if (m.ok) {
+      setEu({ perfil: m.perfil, pausada: m.pausada, suspensa: m.suspensa });
+      if (uid) guardarMeuPerfilSocial(uid, { nome: m.perfil.nome, avatarUrl: m.perfil.avatarUrl });
+    }
+  }, [uid]);
 
   useEffect(() => {
     if (estadoDoPerfil === "carregando") return;
@@ -242,7 +247,7 @@ export default function Comunidade() {
           Comunidade
         </Text>
         {/* No Modo Cuidado o feed some, e as portas para posts e perfis de
-            outras gestantes somem junto. */}
+            outras gestantes somem junto. O Perfil fica: é onde mora a conta. */}
         {!cuidado ? (
           <>
             <BotaoIcone
@@ -255,11 +260,9 @@ export default function Comunidade() {
             <BotaoIcone rotulo="Buscar pessoas" aoTocar={() => router.push("/comunidade/busca")}>
               <Search size={24} color={cor.texto} strokeWidth={1.9} />
             </BotaoIcone>
-            <BotaoIcone rotulo="Meu perfil" aoTocar={() => router.push("/comunidade/eu")}>
-              <Avatar id={uid ?? "eu"} nome={meuNome} url={meuAvatar} tamanho={32} />
-            </BotaoIcone>
           </>
         ) : null}
+        <BotaoDoPerfil tamanho={34} />
       </View>
 
       {eu?.suspensa ? (

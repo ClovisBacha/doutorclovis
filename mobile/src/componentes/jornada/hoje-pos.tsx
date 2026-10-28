@@ -97,6 +97,7 @@ export function TelaDoQuartoTrimestre({
   aoAbrir,
   aoVerTrilha,
   aoVerAlbum,
+  direita,
 }: {
   D: number;
   /** A jornada já foi lida do aparelho (`loja.pronto`). */
@@ -129,6 +130,8 @@ export function TelaDoQuartoTrimestre({
   aoAbrir: (a: AtividadeDoPos) => void;
   aoVerTrilha: () => void;
   aoVerAlbum: () => void;
+  /** O canto direito do topo: a foto dela, que abre o Perfil. */
+  direita?: ReactNode;
 }) {
   const topo = useSafeAreaInsets().top;
   const ceu = CEUS[ceuDaHora(hora)];
@@ -172,31 +175,42 @@ export function TelaDoQuartoTrimestre({
               opacity: brilho,
             }}
           />
-          <View style={{ paddingTop: topo + espaco.lg, paddingHorizontal: 20 }}>
-            <Text
-              style={{
-                fontFamily: fonte.titulo,
-                fontSize: 12,
-                letterSpacing: 1.4,
-                textTransform: "uppercase",
-                color: ceu.sec,
-              }}
-            >
-              {data}
-            </Text>
-            <Text
-              accessibilityRole="header"
-              style={{
-                marginTop: 2,
-                fontFamily: fonte.titulo,
-                fontSize: 31,
-                lineHeight: 37,
-                letterSpacing: -0.5,
-                color: ceu.tinta,
-              }}
-            >
-              {saudacao}
-            </Text>
+          <View
+            style={{
+              paddingTop: topo + espaco.lg,
+              paddingHorizontal: 20,
+              flexDirection: "row",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+            }}
+          >
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{
+                  fontFamily: fonte.titulo,
+                  fontSize: 12,
+                  letterSpacing: 1.4,
+                  textTransform: "uppercase",
+                  color: ceu.sec,
+                }}
+              >
+                {data}
+              </Text>
+              <Text
+                accessibilityRole="header"
+                style={{
+                  marginTop: 2,
+                  fontFamily: fonte.titulo,
+                  fontSize: 31,
+                  lineHeight: 37,
+                  letterSpacing: -0.5,
+                  color: ceu.tinta,
+                }}
+              >
+                {saudacao}
+              </Text>
+            </View>
+            {direita}
           </View>
           <View style={{ alignItems: "center", marginTop: 2 }}>
             <View style={{ alignItems: "center", justifyContent: "center" }}>

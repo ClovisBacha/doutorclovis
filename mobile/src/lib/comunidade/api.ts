@@ -3,6 +3,7 @@ import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import * as B from "~/lib/comunidade/bancada";
 import { seguro } from "~/lib/comunidade/regras";
 import * as rede from "~/servidor/rede";
+import type { PerfilNaTela } from "~/servidor/rede";
 
 /**
  * O caminho ÚNICO das telas da Comunidade até o servidor.
@@ -20,6 +21,15 @@ const ok = <T extends object>(v: T) => Promise.resolve({ ok: true as const, ...v
 
 /** A Atividade já aberta NESTA bancada: sem isto, o selo voltava ao recarregar. */
 let atividadeVistaNaBancada = false;
+
+/** O que "Editar perfil" salvou NESTA bancada (só memória): o Perfil o mostra ao voltar. */
+const salvoNaBancada: Partial<
+  Pick<PerfilNaTela, "nome" | "bio" | "publico" | "mostrarSemana" | "mostrarBebe" | "avatarUrl">
+> = {};
+
+function meuPerfilNaBancada(): PerfilNaTela {
+  return { ...B.perfilDaBancadaSocial(B.EU_NA_BANCADA), ...salvoNaBancada };
+}
 const okVazio = () => Promise.resolve({ ok: true as const });
 const estado = () => parametroDaBancada("estado");
 
@@ -30,7 +40,7 @@ export const api = {
   meuPerfilSocial() {
     if (ehBancada()) {
       return ok({
-        perfil: B.perfilDaBancadaSocial(B.EU_NA_BANCADA),
+        perfil: meuPerfilNaBancada(),
         emCuidado: parametroDaBancada("luto") === "1",
         pausada: false,
         suspensa: false,
@@ -41,19 +51,62 @@ export const api = {
   },
 
   salvarPerfilSocial(entrada: Parameters<typeof rede.salvarPerfilSocial>[0] & object) {
-    if (ehBancada()) return ok({ parcial: false });
+    if (ehBancada()) {
+      const { nome, bio, publico, mostrarSemana, mostrarBebe, avatar } = entrada;
+      Object.assign(salvoNaBancada, {
+        ...(nome !== undefined ? { nome } : {}),
+        ...(bio !== undefined ? { bio } : {}),
+        ...(publico !== undefined ? { publico } : {}),
+        ...(mostrarSemana !== undefined ? { mostrarSemana } : {}),
+        ...(mostrarBebe !== undefined ? { mostrarBebe } : {}),
+        ...(avatar !== undefined ? { avatarUrl: avatar } : {}),
+      });
+      return ok({ parcial: false });
+    }
     return seguro(() => rede.salvarPerfilSocial(entrada));
   },
 
-  verPerfil(alvoId: string, antesDe?: string | null) {
+  /**
+   * `como` é o ESPELHO: o próprio perfil como uma estranha, uma seguidora ou
+   * uma amiga o veem. Só ele distingue "trancado" (a visitante não consegue
+   * abrir) de "indisponivel".
+   */
+  verPerfil(alvoId: string, antesDe?: string | null, como?: rede.ComoVisitante | null) {
     if (ehBancada()) {
       if (estado() === "indisponivel") {
         return Promise.resolve({ ok: false as const, motivo: "indisponivel" as const });
       }
-      const perfil = B.perfilDaBancadaSocial(alvoId === "eu" ? B.EU_NA_BANCADA : alvoId);
-      return ok({ perfil, posts: antesDe ? [] : B.postsDoPerfilDaBancada(alvoId), proximo: null });
+      const id = alvoId === "eu" ? B.EU_NA_BANCADA : alvoId;
+      const base = id === B.EU_NA_BANCADA ? meuPerfilNaBancada() : B.perfilDaBancadaSocial(id);
+      if (como && base.souEu) {
+        /* O perfil de exemplo é FECHADO: quem não segue não abre. */
+        if (como === "estranha" && !base.publico) {
+          return Promise.resolve({ ok: false as const, motivo: "trancado" as const });
+        }
+        const perfil = {
+          ...base,
+          souEu: false,
+          meuVinculo: como === "seguidora" ? ("ativo" as const) : null,
+        };
+        return ok({
+          perfil,
+          posts: antesDe ? [] : B.postsDoPerfilDaBancada(alvoId),
+          proximo: null,
+        });
+      }
+      return ok({
+        perfil: base,
+        posts: antesDe ? [] : B.postsDoPerfilDaBancada(alvoId),
+        proximo: null,
+      });
     }
-    return seguro(() => rede.verPerfil({ alvoId, antesDe: antesDe ?? null }));
+    return seguro(() =>
+      rede.verPerfil({
+        alvoId,
+        antesDe: antesDe ?? null,
+        ...(como ? { comoVisitante: como } : {}),
+      }),
+    );
   },
 
   seguir(alvoId: string) {

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Botao, Cartao, Carregando, NaoConsegueLer, T, Tela, toque } from "~/componentes/base";
+import { BotaoDoPerfil } from "~/componentes/botao-do-perfil";
 import { irParaAba } from "~/componentes/cabecalho";
 import { rota } from "~/componentes/jornada/bancada";
 import { SementesSubindo } from "~/componentes/jornada/efeitos";
@@ -430,7 +431,7 @@ export function JornadaDaGestacao({
           }
           aoAbrir={(c) => ir(ROTA_DO_CUIDADO[c])}
           aoVerJornada={() => ir("/jornada/trilha")}
-          sos={null}
+          direita={<BotaoDoPerfil />}
         />
         <FestaDoMarco festa={marco.festa} nomeDoBebe={nomeDoBebe} aoFechar={marco.fechar} />
       </View>
@@ -739,6 +740,7 @@ export function JornadaDoPosParto({
         aoAbrir={(a) => ir(ROTA_DO_CUIDADO[a])}
         aoVerTrilha={() => ir("/jornada/trilha")}
         aoVerAlbum={() => ir("/jornada/album")}
+        direita={<BotaoDoPerfil />}
       />
       {abreFesta && nascimento ? (
         <FestaDoNascimento
@@ -893,11 +895,15 @@ function dataPorExtenso(d: Date): string {
   return `${diaLongo(d)}, ${d.getDate()} de ${MESES[d.getMonth()]}`;
 }
 
+/** O topo das telas Hoje sem céu (Modo Cuidado, sem data): o título e a foto dela. */
 function Saudacao({ titulo, sub }: { titulo: string; sub: string }) {
   return (
-    <View style={{ gap: 2, marginBottom: espaco.xs }}>
-      <T tipo="titulo">{titulo}</T>
-      <T tipo="apagado">{sub}</T>
+    <View style={{ flexDirection: "row", alignItems: "flex-start", marginBottom: espaco.xs }}>
+      <View style={{ flex: 1, gap: 2 }}>
+        <T tipo="titulo">{titulo}</T>
+        <T tipo="apagado">{sub}</T>
+      </View>
+      <BotaoDoPerfil />
     </View>
   );
 }
