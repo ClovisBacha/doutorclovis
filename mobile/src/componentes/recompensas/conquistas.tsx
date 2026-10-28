@@ -8,6 +8,7 @@ import { Confete } from "~/componentes/jornada/pecas";
 import type { LeituraDasConquistas } from "~/componentes/jornada/economia";
 import { useMovimentoReduzido } from "~/componentes/movimento";
 import { corRecompensas, quadroDaRaridade } from "~/componentes/recompensas/cores";
+import { MarcosDaRede } from "~/componentes/recompensas/marcos-da-rede";
 import {
   CartaoMaterial,
   Esqueleto,
@@ -346,6 +347,9 @@ export function AbaDasConquistas({
           </View>
         </View>
       ))}
+
+      {/* Os atos sociais: marcos do app, sem sementinhas (fase 3). */}
+      <MarcosDaRede />
 
       {festa > 0 ? <Confete key={festa} pecas={40} /> : null}
 

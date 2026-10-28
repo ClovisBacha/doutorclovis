@@ -62,6 +62,15 @@ guardar da saúde para o SOS e o acompanhamento do Bebê."
   (`80924413-1ea8-4e64-9719-e00b86796f05`); o arquivo vai para
   `mobile/assets/vozes/regravadas/<id>.mp3` (nunca em `src/assets/audio`) e
   `bun mobile/scripts/gerar-mapa-das-regravadas.ts` liga texto e voz juntos.
+- **A rede no centro (fase 3, builds 37–41):** a barra é Hoje · Comunidade ·
+  SOS · Amigas · Bebê (`barra.test.ts`); um perfil só, em `/perfil`, e o nome
+  dela se grava só em `/perfil/editar`, pelas regras da Comunidade
+  (`perfil-unico.test.ts`); "fase parecida" nasce desligada, como o
+  `fase-parecida.ts` do site exige. ⚠️ **O app NÃO registra token de push, de
+  propósito**: o servidor manda os avisos sociais por APNs, mas pelo mesmo
+  canal sai o aviso semanal da Vercel (`/api/push-weekly-tick`) com o texto do
+  bebê do SITE, inclusive o clínico. Ligar o push social é decisão do dono —
+  ver o diário, "28/10 — fase 3, a rede social no centro: o plano".
 
 ## Stack
 
