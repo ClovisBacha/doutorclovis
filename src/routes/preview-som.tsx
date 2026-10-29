@@ -95,7 +95,7 @@ function PreviewSom() {
               key={m}
               onClick={() => setMinutos(m)}
               className={`press rounded-full px-4 py-2 text-xs font-bold ${
-                minutos === m ? "bg-violet-500 text-white" : "bg-white/10 text-slate-300"
+                minutos === m ? "bg-violet-700 text-white" : "bg-white/10 text-slate-300"
               }`}
             >
               {m} min
@@ -174,7 +174,7 @@ function PreviewSom() {
                 gravarNivel(n.chave);
               }}
               className={`press rounded-2xl px-4 py-3 text-left ${
-                nivel === n.chave ? "bg-violet-500 text-white" : "bg-white/[0.06] text-slate-200"
+                nivel === n.chave ? "bg-violet-700 text-white" : "bg-white/[0.06] text-slate-200"
               }`}
             >
               <span className="block text-sm font-extrabold">{n.rotulo}</span>

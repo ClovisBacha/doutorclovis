@@ -4,8 +4,14 @@
 <dict>
   <key>CAPACITOR_DEBUG</key>
 	<string>$(CAPACITOR_DEBUG)</string>
+	<!-- O app é em português do Brasil: é isto que a loja lista em "Idiomas" e o
+	     que decide a língua dos diálogos do sistema (permissões, alertas). -->
 	<key>CFBundleDevelopmentRegion</key>
-	<string>en</string>
+	<string>pt-BR</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>pt-BR</string>
+	</array>
 	<key>CFBundleDisplayName</key>
         <string>Obstétrica</string>
 	<key>CFBundleExecutable</key>
@@ -89,20 +95,16 @@
 	<string>Main</string>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
-		<string>armv7</string>
+		<string>arm64</string>
 	</array>
+	<!-- Só retrato, só iPhone. O app não desenha paisagem (o PWA já declarava
+	     `portrait-primary`), e o iPad saiu do alvo (`TARGETED_DEVICE_FAMILY = 1`
+	     no projeto): a barra de baixo some acima de 768 px, então um iPad
+	     mostraria o site de mesa dentro da casca — e a revisão testa no iPad
+	     quando ele está declarado. -->
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
-	</array>
-	<key>UISupportedInterfaceOrientations~ipad</key>
-	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationPortraitUpsideDown</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
@@ -111,6 +113,23 @@
 	     alerta do sistema: precisa dizer PARA QUE, nao "o app quer sua
 	     localizacao". A revisao da Apple reprova texto generico. -->
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Sua localização é enviada junto com o SOS, para que seu médico e seus contatos de emergência saibam onde te encontrar.</string>
+	<string>Para mostrar o tempo e o céu da sua cidade na tela inicial e, se você acionar o SOS, enviar onde você está para o seu médico e os seus contatos de emergência.</string>
+
+	<!-- Aparência clara declarada: o app não tem tema escuro, e sem esta chave o
+	     teclado, os alertas e a folha de compartilhar vinham escuros sobre uma
+	     página clara quando o aparelho está no modo escuro. -->
+	<key>UIUserInterfaceStyle</key>
+	<string>Light</string>
+	<!-- Só HTTPS padrão, nenhuma criptografia própria: responde de uma vez a
+	     pergunta de exportação que o App Store Connect faz a cada envio. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<!-- O SOS abre o WhatsApp do médico e do contato de emergência; sem o esquema
+	     declarado, `canOpenURL("whatsapp://")` responde "não" mesmo com o app
+	     instalado. -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>whatsapp</string>
+	</array>
 </dict>
 </plist>

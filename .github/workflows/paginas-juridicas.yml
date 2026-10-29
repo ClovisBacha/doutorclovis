@@ -1,0 +1,73 @@
+name: Páginas jurídicas
+
+# Publica no GitHub Pages a Política de privacidade e os Termos do APP, com a
+# página de suporte que liga os dois:
+#
+#   https://clovisbacha.github.io/doutorclovis/               (suporte)
+#   https://clovisbacha.github.io/doutorclovis/privacidade.html
+#   https://clovisbacha.github.io/doutorclovis/termos.html
+#
+# Existe porque a App Store exige uma URL pública para a privacidade e outra
+# para o suporte, e o site da Vercel está congelado (decisão do dono de
+# 14/10/2026): as páginas do app não podem nascer lá.
+#
+# Publica SÓ as três páginas de `docs/juridico` — nunca a pasta `docs` inteira,
+# que é onde mora o diário. Por isso o Pages lê deste workflow, e não de uma
+# pasta do branch.
+#
+# ⚠️ As URLs acima vão para o App Store Connect. Renomear um destes arquivos,
+# ou o repositório, quebra o link que a Apple confere — e a revisão reprova app
+# com link de privacidade quebrado.
+#
+# O texto nasce em `mobile/src/lib/juridico/` e as cópias saem de
+# `bun mobile/scripts/gerar-juridico.ts`; a catraca `juridico.test.ts` reprova
+# a CI se as cópias ficarem atrás do texto do app. Então: mudou o texto, gerou,
+# empurrou — e este workflow põe no ar.
+#
+# Ligar o Pages é configuração do dono, uma vez: Settings → Pages → Build and
+# deployment → Source: "GitHub Actions". Sem isso o passo `configure-pages`
+# falha dizendo exatamente isso.
+
+on:
+  push:
+    paths:
+      - "docs/juridico/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Um deploy de cada vez, e o que está em curso termina: cancelar no meio pode
+# deixar o Pages entre duas versões.
+concurrency:
+  group: paginas-juridicas
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    name: Publica docs/juridico no GitHub Pages
+    # Só do branch padrão — é dele que o ambiente `github-pages` aceita deploy,
+    # e é ele que a produção segue. Um push em outro branch não publica nada.
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Separa as três páginas
+        run: |
+          mkdir -p _site
+          cp docs/juridico/index.html docs/juridico/privacidade.html docs/juridico/termos.html _site/
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4

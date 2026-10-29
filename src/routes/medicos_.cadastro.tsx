@@ -719,7 +719,7 @@ function CadastroMedicoPage() {
               disabled={busy}
               className="press glow-cta w-full rounded-full bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50"
             >
-              {busy ? "Aguarde..." : mode === "signup" ? "Criar conta grátis" : "Entrar"}
+              {busy ? "Aguarde…" : mode === "signup" ? "Criar conta grátis" : "Entrar"}
             </button>
             <p className="text-center text-xs text-muted-foreground">
               {mode === "signup" ? "Já tem conta?" : "Ainda não tem conta?"}{" "}
@@ -1004,7 +1004,7 @@ function CadastroMedicoPage() {
                 disabled={busy}
                 className="press glow-cta w-full rounded-full bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50"
               >
-                {busy ? "Criando seu consultório..." : "Abrir meu consultório digital 🚀"}
+                {busy ? "Criando seu consultório…" : "Abrir meu consultório digital 🚀"}
               </button>
               <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
                 Ao continuar você concorda com os termos de uso. Seus dados e os das suas pacientes

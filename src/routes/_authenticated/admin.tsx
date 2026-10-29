@@ -1,4 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { FilaDeDenuncias } from "@/components/fila-de-denuncias";
+import { NumerosDaComunidade } from "@/components/numeros-da-comunidade";
+import { SaudeClinicaTab } from "@/components/saude-clinica-tab";
+import { CustoTab } from "@/components/custo-da-plataforma-tab";
 import { Fragment, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -46,6 +50,8 @@ import {
   DoctorThinkTab,
 } from "./admin-sections";
 import { downloadCsv, CsvButton } from "@/components/admin-ui";
+import { SaudeDoBancoTab } from "@/components/saude-do-banco-tab";
+import { saudeDoBanco, type ArquivoConferido } from "@/lib/saude-do-banco.functions";
 import { adminListTestimonials, reviewTestimonial } from "@/lib/testimonials.functions";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -156,6 +162,10 @@ const PLANS = [
 type AdminTab =
   | "visao"
   | "consultor"
+  | "custo"
+  | "saude-clinica"
+  | "moderacao"
+  | "banco"
   | "crescimento"
   | "alertas"
   | "nps"
@@ -179,6 +189,10 @@ const NAV_GROUPS: { group: string; items: { key: AdminTab; label: string; icon: 
     group: "Crescimento",
     items: [
       { key: "consultor", label: "Consultor IA", icon: "🤖" },
+      { key: "custo", label: "Custo", icon: "🧾" },
+      { key: "saude-clinica", label: "Fila clínica", icon: "🩺" },
+      { key: "moderacao", label: "Moderação", icon: "🛡️" },
+      { key: "banco", label: "Banco", icon: "🗄️" },
       { key: "crescimento", label: "Crescimento", icon: "📈" },
       { key: "alertas", label: "Alertas", icon: "🚨" },
       { key: "nps", label: "NPS", icon: "⭐" },
@@ -222,6 +236,36 @@ function AdminConsole() {
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [data, setData] = useState<PlatformOverview | null>(null);
   const [tab, setTab] = useState<AdminTab>("visao");
+
+  /* ⚠️ A conferência do banco é sob demanda, e nunca na abertura da tela: são
+     ~190 sondas, e ninguém abre o /admin para saber do schema. */
+  const [banco, setBanco] = useState<
+    | { t: "nunca" }
+    | { t: "ok"; arquivos: ArquivoConferido[] }
+    | { t: "sem_chave" }
+    | { t: "falhou" }
+  >({ t: "nunca" });
+  const [bancoEm, setBancoEm] = useState<string | undefined>();
+  const [conferindo, setConferindo] = useState(false);
+
+  async function conferirBanco() {
+    setConferindo(true);
+    try {
+      const r = await saudeDoBanco({ data: { accessToken: await token() } });
+      if (r.ok) {
+        setBanco({ t: "ok", arquivos: r.arquivos });
+        setBancoEm(r.conferidoEm);
+      } else {
+        /* ⚠️ "sem chave" e "falhou" dizem coisas diferentes, e nenhuma delas
+           é "está tudo certo". */
+        setBanco({ t: r.motivo === "sem_chave_de_servico" ? "sem_chave" : "falhou" });
+      }
+    } catch {
+      setBanco({ t: "falhou" });
+    } finally {
+      setConferindo(false);
+    }
+  }
 
   async function load() {
     const tk = await token();
@@ -356,6 +400,47 @@ function AdminConsole() {
           </div>
           {tab === "visao" && data && <OverviewTab data={data} />}
           {tab === "consultor" && <ConsultorTab />}
+          {tab === "custo" && <CustoTab />}
+          {/**
+           * ⚠️ **A FILA DE DENÚNCIAS VIVIA NUM LUGAR QUE NINGUÉM QUE PODE
+           * LÊ-LA ALCANÇA.**
+           *
+           * Ela era desenhada em `/painel`, o console do MÉDICO. Mas
+           * `denunciasAbertas` só admite quem está em `ADMIN_EMAILS` — e
+           * `/painel` REDIRECIONA o super-admin para `/admin` (`if
+           * (sa.isSuperAdmin) window.location.replace("/admin")`).
+           *
+           * Ou seja: a única pessoa autorizada a ver a fila era expulsa da
+           * única tela que a mostrava. Toda denúncia de paciente entrava numa
+           * fila inalcançável, com o app prometendo "a gente vai olhar".
+           *
+           * Aqui é onde ele de fato chega. */}
+          {tab === "banco" && (
+            <SaudeDoBancoTab
+              estado={banco}
+              conferidoEm={bancoEm}
+              aoConferir={() => void conferirBanco()}
+              carregando={conferindo}
+            />
+          )}
+
+          {tab === "moderacao" && (
+            <>
+              {/* ⚠️ **OS NÚMEROS MORAVAM NUMA TELA DE ONDE O DONO É EXPULSO.**
+                  `NumerosDaComunidade` montava só no /painel — e o painel
+                  redireciona o super-admin para cá, algumas centenas de linhas
+                  antes de desenhar qualquer coisa. É a MESMA forma do defeito da
+                  fila de denúncias ("a única pessoa autorizada era expulsa da
+                  única tela que a mostrava"), consertado para a fila e deixado
+                  de pé para os números. A bancada da moderação sempre montou os
+                  dois juntos — a produção é que nunca teve a composição que a
+                  bancada aprovava. O /painel continua montando, para os
+                  ADMIN_EMAILS que são médicos e vivem lá. */}
+              <NumerosDaComunidade />
+              <FilaDeDenuncias />
+            </>
+          )}
+          {tab === "saude-clinica" && <SaudeClinicaTab />}
           {tab === "crescimento" && <CrescimentoTab />}
           {tab === "alertas" && <AlertasTab />}
           {tab === "nps" && <NpsTab />}
@@ -1053,6 +1138,23 @@ function DoctorRow({ d, onChanged }: { d: PlatformDoctor; onChanged: () => void 
             </span>
           )}
         </p>
+        {/* ⚠️ **O SELO E O CONSELHO SÃO COISAS DIFERENTES, e é essa a
+            informação.** "✓ verificado" é um booleano que alguém aperta aqui;
+            esta linha é o que o CFM respondeu. A plataforma pagava a consulta
+            ao conselho e não a mostrava em lugar nenhum, então o selo podia
+            estar aceso sobre uma conferência que nunca aconteceu — ou apagado
+            sobre um médico com situação regular. */}
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {d.crm ? (
+            <>
+              CFM: {d.crm.situacao ?? "—"}
+              {d.crm.nome ? ` · ${d.crm.nome}` : ""} · conferido em{" "}
+              {new Date(d.crm.em).toLocaleDateString("pt-BR")}
+            </>
+          ) : (
+            "CFM: nunca conferido por aqui"
+          )}
+        </p>
         <p className="truncate text-xs text-muted-foreground">
           {d.email ?? "—"} · {d.patients} pacientes · {d.brainEntries} no cérebro
         </p>
@@ -1085,7 +1187,7 @@ function DoctorRow({ d, onChanged }: { d: PlatformDoctor; onChanged: () => void 
         onClick={() => change({ active: !d.active })}
         disabled={busy}
         className={`rounded-full px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-50 ${
-          d.active ? "bg-rose-500" : "bg-emerald-500"
+          d.active ? "bg-rose-700" : "bg-emerald-700"
         }`}
       >
         {d.active ? "Desativar" : "Ativar"}
@@ -1489,7 +1591,7 @@ function DepoimentosAdminTab() {
           <button
             onClick={() => review(r.id, true)}
             disabled={busy === r.id}
-            className="rounded-full bg-emerald-500 px-4 py-1.5 text-xs font-bold text-white disabled:opacity-40"
+            className="rounded-full bg-emerald-700 px-4 py-1.5 text-xs font-bold text-white disabled:opacity-40"
           >
             Aprovar (+100 🌱)
           </button>

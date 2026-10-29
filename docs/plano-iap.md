@@ -127,19 +127,22 @@ isto é uma tela chamando a revalidação — não um sistema novo.
 
 ### 5. Excluir a conta
 
-Continua pendente desde julho e **reprova sozinho** (5.1.1(v)). Não é IAP, mas
-está no mesmo caminho crítico.
+**Feita em ago/2026** para a paciente (`src/components/excluir-conta.tsx`: palavra
+digitada, apagamento no servidor por `conta.functions.ts`). A do médico passa
+pelo suporte, porque a conta dele é o vínculo das pacientes e a autoria do
+prontuário. Deixou de ser bloqueio da 5.1.1(v).
 
 ---
 
 ## Ordem sugerida
 
-1. Instalar o Capacitor e gerar `ios/` e `android/` — hoje não existem.
+1. ~~Instalar o Capacitor e gerar `ios/` e `android/`~~ — **feito** (ago/2026): os
+   dois existem e o workflow `App nativo` os compila a cada push.
 2. Cadastrar os seis produtos nas duas lojas.
 3. Validação de recibo no servidor, com as notificações.
 4. Virar `IAP_ATIVO` para `true` em `canal-de-venda.ts` e ligar a compra da
    loja nas telas da paciente.
-5. Restaurar compras + excluir conta.
+5. Restaurar compras.
 6. Só então a oferta introdutória.
 
 ## O que fica decidido, e o que não

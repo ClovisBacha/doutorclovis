@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { OnboardingRitual, CodigoDaEmbaixadora } from "@/routes/_authenticated/minha-conta";
+import { OnboardingRitual, CodigoDaEmbaixadora } from "@/components/onboarding-ritual";
 
 /**
  * Bancada do RITUAL DE BOAS-VINDAS.

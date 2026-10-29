@@ -14,6 +14,7 @@
  */
 
 import { formatarDinheiro } from "@/lib/dinheiro";
+import { inicialDoMedico } from "@/lib/nome-do-medico";
 
 export function PreviaCardMedico({
   nome,
@@ -47,10 +48,7 @@ export function PreviaCardMedico({
   crm: string;
 }) {
   const nomeVisivel = nome.trim() || "Seu nome aqui";
-  const inicial = nomeVisivel
-    .replace(/^(Dr|Dra)\.?\s*/i, "")
-    .charAt(0)
-    .toUpperCase();
+  const inicial = inicialDoMedico(nomeVisivel);
   const linhasFormacao = formacoes
     .split("\n")
     .map((l) => l.trim())
@@ -61,7 +59,7 @@ export function PreviaCardMedico({
       <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
         Como a paciente te vê
       </p>
-      <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      <div className="rounded-2xl card-material p-4">
         <div className="flex items-start gap-3">
           {/* Sem foto ainda: a inicial. É honesto sobre o que o card mostra
               hoje, em vez de desenhar um rosto que não existe. */}

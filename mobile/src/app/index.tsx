@@ -1,0 +1,38 @@
+import { Redirect, router } from "expo-router";
+import { Botao, Carregando, NaoConsegueLer, Tela } from "~/componentes/base";
+import { ehBancada } from "~/lib/bancada";
+import { precisaAceitar, VERSAO_DOS_TERMOS } from "~/lib/juridico/aceite";
+import { aceitouNestaSessao } from "~/lib/juridico/aceite-da-sessao";
+import { useSessao } from "~/lib/sessao";
+
+/** A porta do app: decide para onde cada estado vai, num lugar só. */
+export default function Porta() {
+  const { sessao, carregandoSessao, perfil, estadoDoPerfil, recarregarPerfil } = useSessao();
+  if (carregandoSessao) return <Carregando texto="Abrindo…" />;
+  if (!sessao) return <Redirect href="/entrar" />;
+  /* Os Termos e a Privacidade do app, na versão em vigor (fase 4): quem entrou
+     pela Apple, quem aceitou os do site e todas, quando a versão muda. */
+  if (
+    !ehBancada() &&
+    precisaAceitar(sessao.user.user_metadata) &&
+    !aceitouNestaSessao(VERSAO_DOS_TERMOS)
+  )
+    return <Redirect href="/aceite" />;
+  if (estadoDoPerfil === "carregando") return <Carregando texto="Abrindo…" />;
+  if (estadoDoPerfil === "falhou")
+    return (
+      <Tela>
+        <NaoConsegueLer
+          sossego="Os seus dados continuam guardados. O SOS funciona sem internet."
+          aoTentar={() => void recarregarPerfil()}
+        />
+        <Botao rotulo="Abrir o SOS" tipo="perigo" aoTocar={() => router.push("/sos")} />
+      </Tela>
+    );
+  /* Sem perfil, ou sem nenhuma âncora da gestação (e sem parto), o ritual
+     de boas-vindas pede o que falta. */
+  const temAncora = !!(perfil?.lmp_date || perfil?.reference_date || perfil?.birth_date);
+  if (!perfil || !temAncora) return <Redirect href="/ritual" />;
+  /* O app abre no "Hoje", o cuidado do dia (decisão do dono, out/2026). */
+  return <Redirect href="/jornada" />;
+}

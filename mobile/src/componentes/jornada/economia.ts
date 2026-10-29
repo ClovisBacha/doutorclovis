@@ -1,0 +1,200 @@
+import type { ConquistaDesbloqueada } from "~/servidor/economia";
+import {
+  abrirCarteiraDoDia,
+  conferirConquistas,
+  pagarAtividade,
+  pagarAulaDoDia,
+  pagarCincoEstrelas,
+  progressoDoDia,
+  resgatarConquista,
+  type Atividade,
+  type Carteira,
+} from "~/servidor/economia";
+import { RARIDADES } from "@/lib/conquistas";
+import { conquistaNoApp } from "~/lib/jornada/conquistas";
+import { contarAmigas } from "~/servidor/amigas";
+import { ehBancada, parametroDaBancada } from "~/lib/bancada";
+import { estadoDaBancada } from "~/componentes/jornada/bancada";
+
+/**
+ * A economia vista pela Jornada: as funções do servidor (src/servidor/economia.ts)
+ * com duas coisas a mais —
+ *
+ *  1. NUNCA lançam: rede caída vira `null` ("não sei"), que a tela mostra
+ *     como falha e nunca como sucesso. Resposta `{ok:false}` também é `null`.
+ *  2. Na bancada não chamam o servidor: devolvem dados de exemplo pelos
+ *     mesmos caminhos (e `&estado=falhou` faz a carteira falhar).
+ */
+
+const espera = (ms = 250) => new Promise((r) => setTimeout(r, ms));
+
+export type CarteiraOk = Extract<Carteira, { ok: true }>;
+
+export async function lerCarteiraDoDia(): Promise<CarteiraOk | null> {
+  if (ehBancada()) {
+    await espera();
+    if (estadoDaBancada() === "falhou") return null;
+    return {
+      ok: true,
+      /* `&saldo=N` vale para a carteira E para o Cantinho: as duas leituras
+         da mesma tela precisam dizer o mesmo número. */
+      balance: Number(parametroDaBancada("saldo") ?? (estadoDaBancada() === "fechado" ? 287 : 245)),
+      trofeus: estadoDaBancada() === "fechado" ? 10 : 9,
+      /* `&marco=semana|trimestre|nascimento|mes` — a festa do marco, na bancada. */
+      recent: lancamentoDoMarcoDaBancada(),
+      presente:
+        parametroDaBancada("presente") === "1"
+          ? { quantidade: 30, quando: "2026-10-01T12:00:00Z", de: "amiga", nome: "Júlia" }
+          : null,
+    };
+  }
+  try {
+    const r = await abrirCarteiraDoDia();
+    return r && r.ok ? r : null;
+  } catch {
+    return null;
+  }
+}
+
+function lancamentoDoMarcoDaBancada(): { amount: number; reason: string; created_at: string }[] {
+  const agora = new Date().toISOString();
+  const semana = Number(parametroDaBancada("semana") ?? 24);
+  switch (parametroDaBancada("marco")) {
+    case "semana":
+      return [{ amount: 25, reason: `Semana ${semana} 🎉`, created_at: agora }];
+    case "trimestre":
+      return [
+        { amount: 25, reason: "Semana 13 🎉", created_at: agora },
+        { amount: 100, reason: "Fim do 1º trimestre 🎊", created_at: agora },
+      ];
+    case "nascimento":
+      return [{ amount: 100, reason: "Bem-vindo ao mundo 🍼", created_at: agora }];
+    case "mes":
+      return [{ amount: 25, reason: "Bebê com 1 mês 🎉", created_at: agora }];
+    default:
+      return [];
+  }
+}
+
+/** Quanto o servidor creditou; `null` = não sabemos (falhou). */
+export async function pagarAula(day: number, correct: number): Promise<number | null> {
+  if (ehBancada()) {
+    await espera(600);
+    return 5 + 3 * correct;
+  }
+  try {
+    const r = await pagarAulaDoDia({ day, correct });
+    return r.ok ? r.granted : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function pagarMomento(day: number, activity: Atividade): Promise<number | null> {
+  if (ehBancada()) {
+    await espera(600);
+    return 5;
+  }
+  try {
+    const r = await pagarAtividade({ day, activity });
+    return r.ok ? r.granted : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function pagarDiaFechado(day: number): Promise<number | null> {
+  if (ehBancada()) {
+    await espera(300);
+    return 20;
+  }
+  try {
+    const r = await pagarCincoEstrelas({ day });
+    return r.ok ? r.granted : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function lerProgressoDoDia(day: number): Promise<Atividade[] | null> {
+  if (ehBancada()) return null;
+  try {
+    const r = await progressoDoDia({ day });
+    return r.ok ? r.done : null;
+  } catch {
+    return null;
+  }
+}
+
+export type LeituraDasConquistas = {
+  unlocked: ConquistaDesbloqueada[];
+  resgatadas: string[] | null;
+  careMode: boolean;
+  /** As que ESTA conferência desbloqueou — o aviso "conquista nova" da trilha. */
+  novas: string[];
+};
+
+export async function lerConquistas(): Promise<LeituraDasConquistas | null> {
+  if (ehBancada()) {
+    await espera();
+    const estado = estadoDaBancada();
+    if (estado === "falhou") return null;
+    const unlocked = [
+      ["first_login", "2026-06-02T12:00:00Z"],
+      ["medita_1", "2026-06-03T12:00:00Z"],
+      ["first_journal", "2026-07-10T12:00:00Z"],
+      ["gratidao_1", "2026-07-11T12:00:00Z"],
+      ["carta_1", "2026-08-02T12:00:00Z"],
+      ["journal_10", "2026-09-20T12:00:00Z"],
+    ].map(([achievement_key, unlocked_at]) => ({ achievement_key, unlocked_at }));
+    return {
+      unlocked,
+      resgatadas: estado === "neutro" ? null : ["first_login", "medita_1", "gratidao_1"],
+      careMode: false,
+      /* `&novas=journal_10` — o aviso de conquista nova, na bancada. */
+      novas: (parametroDaBancada("novas") ?? "").split(",").filter(Boolean),
+    };
+  }
+  try {
+    const r = await conferirConquistas();
+    if (!r.ok) return null;
+    return {
+      unlocked: r.unlocked,
+      resgatadas: r.resgatadas,
+      careMode: r.careMode,
+      novas: Array.isArray(r.newlyAwarded) ? r.newlyAwarded : [],
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function resgatar(
+  key: string,
+): Promise<{ granted: number; repetido: boolean } | null> {
+  if (ehBancada()) {
+    await espera(500);
+    const def = conquistaNoApp(key);
+    return { granted: def ? RARIDADES[def.raridade].sementinhas : 15, repetido: false };
+  }
+  try {
+    const r = await resgatarConquista({ key });
+    return r.ok ? { granted: r.granted, repetido: r.repetido } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Quantas amigas ela tem (o número da faixa do Caminho); `null` = não sabemos. */
+export async function lerContagemDeAmigas(): Promise<number | null> {
+  if (ehBancada()) {
+    await espera();
+    return Number(parametroDaBancada("amigas") ?? 3) || 0;
+  }
+  try {
+    const r = await contarAmigas();
+    return r && r.ok ? r.amigas : null;
+  } catch {
+    return null;
+  }
+}
