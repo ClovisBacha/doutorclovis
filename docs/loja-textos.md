@@ -27,6 +27,8 @@ Apple, que é sua. Os campos com limite de caracteres foram contados.
 | Categoria secundária | **Saúde e fitness**                                            |
 | Idioma principal     | Português (Brasil)                                             |
 | Preço                | Grátis, sem compras dentro do app (as sementinhas são do jogo) |
+| URL de suporte       | `https://clovisbacha.github.io/doutorclovis/`                  |
+| URL da privacidade   | `https://clovisbacha.github.io/doutorclovis/privacidade.html`  |
 
 **Por que Redes sociais, e não Medicina.** É a decisão do dono de 21/10/2026: o
 app é rede social + gamificação, não conselho médico. Medicina é a categoria do
@@ -183,7 +185,9 @@ agenda do iPhone (o app não lê a agenda).
 > Se um dia entrar um SDK de análise, de crash ou de anúncio, ou o push do
 > servidor, esta tabela e a Política mudam ANTES do SDK.
 
-URL da política de privacidade: ver "Antes de apertar enviar".
+URL da política de privacidade (Privacy Policy URL):
+`https://clovisbacha.github.io/doutorclovis/privacidade.html` — ver "Onde a
+Privacidade e os Termos estão hospedados", no fim.
 
 ---
 
@@ -234,10 +238,10 @@ atividades, sem valor em dinheiro.
 
 ## Antes de apertar "enviar" (o que só o dono destrava)
 
-- [ ] **A URL pública da Política de privacidade.** A App Store exige uma URL, e
-      a página do site (`/privacidade`) é a do produto antigo e está congelada.
-      O texto do app está pronto para hospedar em `docs/juridico/privacidade.html`
-      (e os Termos em `termos.html`) — ver "Onde hospedar" no fim.
+- [ ] **Ligar o GitHub Pages, uma vez:** Settings → Pages → Build and
+      deployment → Source: **GitHub Actions**. Sem isso as URLs de suporte e de
+      privacidade da tabela de identidade não respondem — ver "Onde a
+      Privacidade e os Termos estão hospedados", no fim.
 - [ ] Revisão jurídica dos Termos e da Privacidade (`docs/juridico/*.md`): foram
       escritos a partir do que o app faz, mas não por advogado.
 - [ ] Conta de demonstração criada e povoada (as notas acima dependem dela).
@@ -245,20 +249,30 @@ atividades, sem valor em dinheiro.
 - [ ] O questionário de privacidade, com a tabela acima.
 - [ ] Um build de verdade num iPhone: nada neste repositório substitui isso.
 
-### Onde hospedar a Privacidade e os Termos
+### Onde a Privacidade e os Termos estão hospedados
 
-A página precisa ser pública e estável. Três caminhos, do mais simples ao mais
-independente:
+No **GitHub Pages** deste repositório, publicados pelo workflow
+`.github/workflows/paginas-juridicas.yml`:
 
-1. **No domínio de hoje**, como arquivo estático (`public/app/privacidade.html`
-   no deploy da Vercel): a URL fica `www.obstetrica.com.br/app/privacidade.html`.
-   É o mais simples, mas mexe no deploy do site — que está congelado. Decisão
-   sua.
-2. **Num documento público** (Google Docs "Publicar na Web" ou Notion público),
-   colando o texto de `docs/juridico/privacidade.md`.
-3. **GitHub Pages**, a partir da pasta `docs/juridico` (exige ligar o Pages nas
-   configurações do repositório).
+| página                  | URL                                                           |
+| ----------------------- | ------------------------------------------------------------- |
+| Suporte                 | `https://clovisbacha.github.io/doutorclovis/`                 |
+| Política de privacidade | `https://clovisbacha.github.io/doutorclovis/privacidade.html` |
+| Termos de uso           | `https://clovisbacha.github.io/doutorclovis/termos.html`      |
 
-Quando a URL existir, ela entra no App Store Connect (Privacy Policy URL) e,
-se quiser, no app — que já mostra o texto inteiro em telas próprias, sem
-depender de rede.
+- **Sai só `docs/juridico`** (as três páginas), nunca a pasta `docs` inteira —
+  ali mora o diário.
+- **Fica em dia sozinho:** mudou o texto em `mobile/src/lib/juridico/`, rode
+  `bun mobile/scripts/gerar-juridico.ts` e empurre; o workflow publica a cada
+  push que muda `docs/juridico`. E a CI reprova se as cópias ficarem atrás do
+  texto do app.
+- **A página de suporte** é a URL de suporte que a App Store exige (ela precisa
+  levar a um contato): o e-mail, que saúde é com quem acompanha a gestação, o
+  192, e onde ficam a exclusão da conta e a cópia dos dados.
+- ⚠️ **Não renomeie os arquivos nem o repositório** depois de pôr as URLs no
+  App Store Connect: o link quebra, e a revisão reprova app com link de
+  privacidade quebrado.
+
+Por que não os outros caminhos: o domínio de hoje (`www.obstetrica.com.br`)
+exigiria mexer no deploy do site, que está congelado; e um documento colado
+no Google Docs ou no Notion ficaria atrás do texto do app na primeira mudança.

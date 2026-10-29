@@ -20,11 +20,14 @@ Dele saem:
 
 - as telas do app (`/termos`, `/privacidade`), que funcionam sem internet;
 - `termos.md` e `privacidade.md` aqui, para revisão;
-- `termos.html` e `privacidade.html` aqui, prontas para hospedar (a URL pública
-  que a App Store pede no campo "Privacy Policy URL").
+- `termos.html` e `privacidade.html` aqui, publicadas no GitHub Pages (a URL
+  pública que a App Store pede no campo "Privacy Policy URL");
+- `index.html` aqui, a página de suporte que liga as duas (a "Support URL").
 
-Depois de mudar o texto: `cd mobile && bun scripts/gerar-juridico.ts`. A catraca
-`juridico.test.ts` reprova se as cópias daqui ficarem para trás.
+Depois de mudar o texto: `cd mobile && bun scripts/gerar-juridico.ts`, e
+empurre. A catraca `juridico.test.ts` reprova se as cópias daqui ficarem para
+trás, e o workflow `paginas-juridicas.yml` publica a cada push que muda esta
+pasta.
 
 ## O aceite, por versão
 
@@ -37,6 +40,14 @@ Apple, que antes nunca passava por aceite nem pelos 18 anos.
 
 **Mudou algo relevante?** Mude a data da versão: todas aceitam de novo.
 
-## Onde hospedar
+## Onde estão hospedados
 
-Ver `docs/loja-textos.md`, "Onde hospedar a Privacidade e os Termos".
+No GitHub Pages deste repositório — só esta pasta, nunca `docs` inteira:
+
+- suporte: `https://clovisbacha.github.io/doutorclovis/`
+- privacidade: `https://clovisbacha.github.io/doutorclovis/privacidade.html`
+- termos: `https://clovisbacha.github.io/doutorclovis/termos.html`
+
+⚠️ Essas URLs vão para o App Store Connect: não renomeie os arquivos nem o
+repositório. Os detalhes estão em `docs/loja-textos.md`, "Onde a Privacidade e
+os Termos estão hospedados".

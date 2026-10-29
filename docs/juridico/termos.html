@@ -10,6 +10,7 @@
         --texto: #2f2140;
         --apagado: #6d5b85;
         --marca: #b0306a;
+        --linha: #eadfe6;
       }
       @media (prefers-color-scheme: dark) {
         :root {
@@ -17,6 +18,7 @@
           --texto: #f4eef7;
           --apagado: #bfb2cc;
           --marca: #f08bb6;
+          --linha: #3a2e42;
         }
       }
       body {
@@ -57,6 +59,12 @@
       }
       li {
         margin: 0.3rem 0;
+      }
+      .rodape {
+        margin-top: 3rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--linha);
+        color: var(--apagado);
       }
     </style>
   </head>
@@ -218,6 +226,10 @@
         mora.
       </p>
       <p>Dúvidas: <a href="mailto:contato@drclovisbacha.com.br">contato@drclovisbacha.com.br</a></p>
+      <nav class="rodape">
+        <a href="index.html">Suporte</a> · <a href="termos.html">Termos de uso</a> ·
+        <a href="privacidade.html">Política de privacidade</a>
+      </nav>
     </main>
   </body>
 </html>

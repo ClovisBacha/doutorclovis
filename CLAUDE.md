@@ -71,6 +71,16 @@ guardar da saúde para o SOS e o acompanhamento do Bebê."
   canal sai o aviso semanal da Vercel (`/api/push-weekly-tick`) com o texto do
   bebê do SITE, inclusive o clínico. Ligar o push social é decisão do dono —
   ver o diário, "28/10 — fase 3, a rede social no centro: o plano".
+- **Os Termos e a Privacidade são do app (fase 4, builds 42–43):** o texto
+  mora em `mobile/src/lib/juridico/`, sai das telas `/termos` e `/privacidade`,
+  e o aceite é por versão (`VERSAO_DOS_TERMOS`). Mudou o que o app coleta (uma
+  tabela, uma permissão, um SDK, um canal do SOS)? A Privacidade muda junto, e
+  a versão também. As cópias de `docs/juridico/` saem de
+  `bun mobile/scripts/gerar-juridico.ts`, e o workflow `paginas-juridicas.yml`
+  as publica no GitHub Pages (`clovisbacha.github.io/doutorclovis/`: suporte,
+  `privacidade.html`, `termos.html`). ⚠️ Essas URLs vão para o App Store
+  Connect: não renomeie os arquivos nem o repositório, e nunca publique a pasta
+  `docs` inteira (o diário mora lá).
 
 ## Stack
 

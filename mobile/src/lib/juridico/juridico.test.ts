@@ -4,7 +4,12 @@ import { join, relative } from "node:path";
 import { semComentarios } from "@/lib/sem-comentarios";
 import { CONTATO_EMAIL } from "~/config";
 import { DATA_DOS_TERMOS } from "~/lib/juridico/aceite";
-import { paraHtml, paraMarkdown, type DocumentoJuridico } from "~/lib/juridico/documento";
+import {
+  paraHtml,
+  paraMarkdown,
+  paraSuporte,
+  type DocumentoJuridico,
+} from "~/lib/juridico/documento";
 import { PRIVACIDADE } from "~/lib/juridico/privacidade";
 import { TERMOS } from "~/lib/juridico/termos";
 import { PONTOS_DO_ACEITE, TEXTO_DO_CONSENTIMENTO_DE_SAUDE } from "~/lib/juridico/textos-do-aceite";
@@ -69,6 +74,29 @@ describe("os documentos do app", () => {
         nome,
         textoDaPagina(paraHtml(doc, DATA_DOS_TERMOS, CONTATO_EMAIL)),
       ]);
+    }
+    const suporte = readFileSync(join(DOCS, "index.html"), "utf8");
+    expect(textoDaPagina(suporte)).toEqual(
+      textoDaPagina(paraSuporte(DATA_DOS_TERMOS, CONTATO_EMAIL)),
+    );
+  });
+
+  test("a página de suporte (a URL de suporte da loja) leva a um contato e aos documentos", () => {
+    const html = paraSuporte(DATA_DOS_TERMOS, CONTATO_EMAIL);
+    const texto = textoDaPagina(html);
+    expect(html).toContain(`href="mailto:${CONTATO_EMAIL}"`);
+    expect(html).toContain('href="termos.html"');
+    expect(html).toContain('href="privacidade.html"');
+    expect(texto).toContain("não dá orientação médica");
+    expect(texto).toContain("ligue 192");
+    expect(texto).toContain("Perfil → Excluir minha conta");
+    expect(texto).toContain("Perfil → Baixar uma cópia dos meus dados");
+    expect(texto).not.toMatch(/sangramento|febre|perda de líquido|\btome\b|\bevite\b/i);
+    /* E cada documento volta para o suporte e para o outro documento. */
+    for (const doc of [TERMOS, PRIVACIDADE]) {
+      const pagina = paraHtml(doc, DATA_DOS_TERMOS, CONTATO_EMAIL);
+      for (const destino of ["index.html", "termos.html", "privacidade.html"])
+        expect(pagina).toContain(`href="${destino}"`);
     }
   });
 
