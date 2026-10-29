@@ -238,7 +238,7 @@ atividades, sem valor em dinheiro.
 
 ## Antes de apertar "enviar" (o que só o dono destrava)
 
-- [ ] **Ligar o GitHub Pages, uma vez:** Settings → Pages → Build and
+- [x] **Ligar o GitHub Pages, uma vez** (feito em 29/10; as três páginas respondem): Settings → Pages → Build and
       deployment → Source: **GitHub Actions**. Sem isso as URLs de suporte e de
       privacidade da tabela de identidade não respondem — ver "Onde a
       Privacidade e os Termos estão hospedados", no fim.
