@@ -139,13 +139,26 @@ describe("os documentos do app", () => {
 
   test("o que a Privacidade promete, o app faz (o inventário do build 43)", () => {
     const privacidade = textoDe(PRIVACIDADE);
-    /* A localização é só "durante o uso": o Info.plist não pede a de sempre. */
+    /* A localização é só "durante o uso". Com a chave "sempre" no Info.plist,
+       o expo-location pede "sempre" até no pedido comum
+       (`EXLocationPermissionRequester.m`: `isConfiguredForAlwaysAuthorization`
+       → `requestAlwaysAuthorization`) — então ela fica fora, e isto desfaz a
+       decisão de 06/10 (o diário, "29/10 — a localização 'sempre'"). E o app
+       nunca pede localização em segundo plano. */
     const app = JSON.parse(readFileSync(join(RAIZ, "..", "app.json"), "utf8"));
     const local = app.expo.plugins.find(
       (p: unknown) => Array.isArray(p) && p[0] === "expo-location",
     )[1];
     expect(local.locationAlwaysPermission).toBe(false);
     expect(local.locationAlwaysAndWhenInUsePermission).toBe(false);
+    expect(typeof local.locationWhenInUsePermission).toBe("string");
+    expect(
+      FONTES.filter((f) =>
+        /requestBackgroundPermissionsAsync|startLocationUpdatesAsync|startGeofencingAsync/.test(
+          f.codigo,
+        ),
+      ).map((f) => f.arquivo),
+    ).toEqual([]);
     expect(privacidade).toContain("só enquanto o app está aberto");
     /* A cópia dos dados existe onde o texto diz. */
     expect(privacidade).toContain("Perfil → Baixar uma cópia dos meus dados");
