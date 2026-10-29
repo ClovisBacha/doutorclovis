@@ -1,6 +1,6 @@
 # Termos de uso
 
-_Versão de 28 de outubro de 2026._
+_Versão de 29 de outubro de 2026._
 
 O Obstétrica é uma comunidade de gestantes e mães, com um jogo de cuidado diário. Ele não dá orientação médica e não substitui quem acompanha a sua gestação. Usando o app, você concorda com estes termos, com a Política de privacidade e com as regras da Comunidade.
 
@@ -27,7 +27,7 @@ Em emergência, ligue 192 (SAMU) ou vá ao pronto-socorro mais próximo — os s
 
 ## 4. O SOS
 
-O SOS liga para o 192 pelo seu telefone e, se você permitir o acesso à localização, avisa as pessoas que você cadastrou: o servidor manda um e-mail de emergência, com a sua localização e a sua ficha, para o contato de emergência e para quem acompanha a sua gestação; e o app pode abrir no seu celular uma mensagem de SMS ou de WhatsApp já escrita — quem envia é você.
+O SOS liga para o 192 pelo seu telefone. E, quando você toca em "Pedir socorro agora", ele avisa o contato de emergência e quem acompanha a sua gestação, com a sua ficha e — se você permitir o acesso à localização — com a sua localização: o servidor manda por e-mail e, quando esses canais estão ligados, por WhatsApp ou SMS; e o app abre no seu celular uma mensagem de WhatsApp ou de SMS já escrita — quem envia é você.
 
 O SOS depende do seu aparelho, da rede e de outros serviços (operadora, e-mail, WhatsApp). Ele ajuda, mas não garante que o aviso chegue nem que alguém responda. Em emergência, ligue 192 sempre.
 

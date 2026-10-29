@@ -17,10 +17,10 @@
  */
 
 /** A versão em vigor. Mudou o texto de forma relevante? Mude a data: todas aceitam de novo. */
-export const VERSAO_DOS_TERMOS = "2026-10-28";
+export const VERSAO_DOS_TERMOS = "2026-10-29";
 
 /** A data por extenso que os documentos mostram ("Versão de …"). */
-export const DATA_DOS_TERMOS = "28 de outubro de 2026";
+export const DATA_DOS_TERMOS = "29 de outubro de 2026";
 
 type Metadados = Record<string, unknown> | null | undefined;
 

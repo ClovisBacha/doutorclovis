@@ -48,7 +48,7 @@ export const TERMOS: DocumentoJuridico = {
     {
       titulo: "4. O SOS",
       blocos: [
-        "O SOS liga para o 192 pelo seu telefone e, se você permitir o acesso à localização, avisa as pessoas que você cadastrou: o servidor manda um e-mail de emergência, com a sua localização e a sua ficha, para o contato de emergência e para quem acompanha a sua gestação; e o app pode abrir no seu celular uma mensagem de SMS ou de WhatsApp já escrita — quem envia é você.",
+        'O SOS liga para o 192 pelo seu telefone. E, quando você toca em "Pedir socorro agora", ele avisa o contato de emergência e quem acompanha a sua gestação, com a sua ficha e — se você permitir o acesso à localização — com a sua localização: o servidor manda por e-mail e, quando esses canais estão ligados, por WhatsApp ou SMS; e o app abre no seu celular uma mensagem de WhatsApp ou de SMS já escrita — quem envia é você.',
         "O SOS depende do seu aparelho, da rede e de outros serviços (operadora, e-mail, WhatsApp). Ele ajuda, mas não garante que o aviso chegue nem que alguém responda. Em emergência, ligue 192 sempre.",
         "Mantenha os dados do SOS em dia, em Perfil → Seus dados e o SOS, e avise as pessoas de que elas são os seus contatos.",
       ],

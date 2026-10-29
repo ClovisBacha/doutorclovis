@@ -10,7 +10,7 @@
     "backgroundColor": "#fffaf6",
     "ios": {
       "bundleIdentifier": "br.com.obstetrica.app",
-      "buildNumber": "42",
+      "buildNumber": "43",
       "appleTeamId": "8PL2X9F9PV",
       "supportsTablet": false,
       "usesAppleSignIn": true,
@@ -73,8 +73,8 @@
         "expo-location",
         {
           "locationWhenInUsePermission": "Se você acionar o SOS, sua localização vai junto na mensagem para a pessoa que você escolheu como contato de emergência.",
-          "locationAlwaysAndWhenInUsePermission": "Se você acionar o SOS, sua localização vai junto na mensagem para a pessoa que você escolheu como contato de emergência.",
-          "locationAlwaysPermission": "Se você acionar o SOS, sua localização vai junto na mensagem para a pessoa que você escolheu como contato de emergência.",
+          "locationAlwaysAndWhenInUsePermission": false,
+          "locationAlwaysPermission": false,
           "motionUsagePermission": "Para os cartões do app acompanharem o movimento do seu celular com um leve efeito 3D."
         }
       ],

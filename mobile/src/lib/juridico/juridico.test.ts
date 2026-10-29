@@ -103,8 +103,38 @@ describe("os documentos do app", () => {
       expect(textoDe(PRIVACIDADE)).toContain(parte);
     }
     expect(textoDe(PRIVACIDADE)).toContain("art. 11, I");
-    expect(textoDe(PRIVACIDADE)).toMatch(/não pede, nem guarda, peso, pressão, glicemia/);
+    expect(textoDe(PRIVACIDADE)).toMatch(
+      /não pede peso, altura, pressão, glicemia, exames, sintomas/,
+    );
     expect(PONTOS_DO_ACEITE.join(" ")).toContain("não dá orientação médica");
+  });
+
+  test("o que a Privacidade promete, o app faz (o inventário do build 43)", () => {
+    const privacidade = textoDe(PRIVACIDADE);
+    /* A localização é só "durante o uso": o Info.plist não pede a de sempre. */
+    const app = JSON.parse(readFileSync(join(RAIZ, "..", "app.json"), "utf8"));
+    const local = app.expo.plugins.find(
+      (p: unknown) => Array.isArray(p) && p[0] === "expo-location",
+    )[1];
+    expect(local.locationAlwaysPermission).toBe(false);
+    expect(local.locationAlwaysAndWhenInUsePermission).toBe(false);
+    expect(privacidade).toContain("só enquanto o app está aberto");
+    /* A cópia dos dados existe onde o texto diz. */
+    expect(privacidade).toContain("Perfil → Baixar uma cópia dos meus dados");
+    expect(fonte(join("app", "perfil", "index.tsx"))).toContain("Baixar uma cópia dos meus dados");
+    expect(fonte(join("app", "perfil", "index.tsx"))).toContain("exportarMeusDados(");
+    /* O cartão do SOS vai para a conta: a tela não pode dizer que fica só no celular. */
+    expect(fonte(join("app", "perfil", "dados.tsx"))).not.toMatch(/Fica guardado no celular/);
+    /* As amigas veem o nome do bebê: o texto e a chave do perfil dizem isso. */
+    expect(privacidade).toMatch(/para as amigas, o seu nome, o nome do bebê/);
+    expect(fonte(join("app", "perfil", "editar.tsx"))).toContain(
+      "As suas amigas veem o nome do bebê de qualquer jeito",
+    );
+    /* O SOS manda o aviso mesmo sem localização, e por mais de um canal. */
+    for (const doc of [TERMOS, PRIVACIDADE]) {
+      expect(textoDe(doc)).toMatch(/se você permitir/);
+      expect(textoDe(doc)).toMatch(/WhatsApp ou SMS/);
+    }
   });
 });
 

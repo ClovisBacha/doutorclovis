@@ -172,7 +172,8 @@ function FormularioDosDados() {
         <Cartao>
           <T tipo="subtitulo">Para o SOS</T>
           <T tipo="apagado" estilo={{ fontSize: 14 }}>
-            Fica guardado no celular e aparece na tela do SOS, mesmo sem internet.
+            Fica guardado na sua conta e também no celular, para aparecer na tela do SOS mesmo sem
+            internet.
           </T>
           <Campo rotulo="Contato de emergência" value={contato} onChangeText={setContato} />
           <Campo

@@ -3,8 +3,9 @@
 Os **Termos de uso** e a **Política de privacidade** do app Obstétrica (o React
 Native de `mobile/`). Escritos em 28/10/2026 para o app de hoje — comunidade de
 gestantes e mães, jogo de cuidado diário, SOS, sem orientação médica (decisão
-do dono de 21/10/2026) — e a partir do que o app coleta de fato (o inventário
-está no diário, "28/10 — build 42").
+do dono de 21/10/2026) — e a partir do que o app coleta de fato. Corrigidos em
+29/10/2026 por um inventário independente do código, que achou o que o
+primeiro texto errava (o diário, "28/10 — build 42" e "29/10 — build 43").
 
 > ⚠️ **Precisam de revisão jurídica antes da loja.** Foram escritos a partir do
 > código, por quem conhece o app, e não por advogado. Os pontos que mais pedem

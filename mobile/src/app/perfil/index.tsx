@@ -23,10 +23,17 @@ import { ehBancada } from "~/lib/bancada";
 import { api } from "~/lib/comunidade/api";
 import { esquecerMeuPerfilSocial, guardarMeuPerfilSocial } from "~/lib/comunidade/meu-perfil";
 import { CartaoDaPermissaoDeIA } from "~/lib/ia/PermissaoDeIA";
+import { compartilharCopia } from "~/lib/juridico/arquivo-da-copia";
+import { recadoDaCopia } from "~/lib/juridico/copia-dos-dados";
 import { abrir } from "~/lib/links";
 import { zerarSelos } from "~/lib/selos";
 import { useSessao } from "~/lib/sessao";
-import { excluirMinhaConta, ligarModoCuidado, PALAVRA_DE_CONFIRMACAO } from "~/servidor/conta";
+import {
+  excluirMinhaConta,
+  exportarMeusDados,
+  ligarModoCuidado,
+  PALAVRA_DE_CONFIRMACAO,
+} from "~/servidor/conta";
 import type { PerfilNaTela } from "~/servidor/rede";
 import { supabase } from "~/servidor/supabase";
 import { cor, espaco, fonte } from "~/tema";
@@ -37,8 +44,9 @@ import { cor, espaco, fonte } from "~/tema";
  * No topo, ela como a rede a vê: a foto, o nome, o @, a bio, quem segue e é
  * seguida, e se o perfil é aberto ou fechado — com "Editar perfil" e "Ver como
  * os outros veem" (o espelho do servidor). Embaixo, a conta: os dados do bebê e
- * do SOS, o Modo Cuidado, os lembretes, as bloqueadas, os documentos, sair e
- * excluir a conta (exigência da Apple: excluir DENTRO do app).
+ * do SOS, o Modo Cuidado, os lembretes, as bloqueadas, os documentos, a cópia
+ * dos dados (LGPD, art. 18), sair e excluir a conta (exigência da Apple:
+ * excluir DENTRO do app).
  *
  * Antes eram dois "meu perfil" — este, com os dados, e o "Meu perfil" da
  * Comunidade, com a foto e a bio — e o mesmo nome se gravava pelos dois, com
@@ -57,6 +65,8 @@ export default function Perfil() {
   const [excluindo, setExcluindo] = useState<"fechado" | "aberto" | "enviando">("fechado");
   const [palavra, setPalavra] = useState("");
   const [erroExcluir, setErroExcluir] = useState<string | null>(null);
+  const [copia, setCopia] = useState<{ texto: string; erro: boolean } | null>(null);
+  const [baixando, setBaixando] = useState(false);
 
   /* Relê ao voltar de "Editar perfil": o topo mostra o que ficou gravado. */
   const carregar = useCallback(async () => {
@@ -115,6 +125,38 @@ export default function Perfil() {
     zerarSelos();
     await supabase.auth.signOut().catch(() => {});
     router.replace("/entrar");
+  }
+
+  /* A cópia dos dados: o servidor monta o arquivo; o app o entrega à folha de
+     compartilhar do iPhone e o apaga do aparelho em seguida. */
+  async function baixarCopia() {
+    setCopia(null);
+    if (ehBancada() || Platform.OS === "web") {
+      return setCopia({ texto: "Na bancada nenhum arquivo é gerado.", erro: false });
+    }
+    setBaixando(true);
+    try {
+      let r: Awaited<ReturnType<typeof exportarMeusDados>>;
+      try {
+        r = await exportarMeusDados();
+      } catch {
+        return setCopia({ texto: "Sem conexão. Tente de novo com internet.", erro: true });
+      }
+      if (r.ok) {
+        try {
+          const fim = await compartilharCopia(JSON.stringify(r.arquivo, null, 2));
+          if (fim === "fechou" && !recadoDaCopia(r).erro) return;
+        } catch {
+          return setCopia({
+            texto: "Não conseguimos abrir o arquivo no aparelho. Tente de novo.",
+            erro: true,
+          });
+        }
+      }
+      setCopia(recadoDaCopia(r));
+    } finally {
+      setBaixando(false);
+    }
   }
 
   async function excluir() {
@@ -290,6 +332,17 @@ export default function Perfil() {
           tipo="texto"
           aoTocar={() => router.push(rota("/privacidade") as never)}
         />
+        <Botao
+          rotulo="Baixar uma cópia dos meus dados"
+          tipo="texto"
+          carregando={baixando}
+          aoTocar={() => void baixarCopia()}
+        />
+        {copia ? (
+          <T tipo="apagado" cor={copia.erro ? cor.urgente : cor.ok} estilo={{ fontSize: 14 }}>
+            {copia.texto}
+          </T>
+        ) : null}
         <Botao rotulo="Sair da conta" tipo="secundario" aoTocar={() => void esquecerAConta()} />
       </Cartao>
 

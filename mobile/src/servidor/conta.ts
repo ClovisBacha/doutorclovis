@@ -1,6 +1,6 @@
 import { funcaoDoServidor } from "~/servidor/ponte";
 
-/** src/lib/conta.functions.ts e src/lib/care-mode.functions.ts */
+/** src/lib/conta.functions.ts, src/lib/care-mode.functions.ts e src/lib/exportar-dados.functions.ts */
 
 export const PALAVRA_DE_CONFIRMACAO = "EXCLUIR";
 
@@ -20,3 +20,13 @@ export const ligarModoCuidado = funcaoDoServidor<
   { on: boolean },
   { ok: true; careMode: boolean } | { ok: false; error: string }
 >("src/lib/care-mode.functions.ts", "setCareMode");
+
+/**
+ * A cópia dos dados (LGPD, art. 18, II e V). O arquivo é montado pelo
+ * servidor; a regra do app está em `~/lib/juridico/copia-dos-dados.ts`.
+ */
+export const exportarMeusDados = funcaoDoServidor<
+  Record<string, never>,
+  | { ok: true; arquivo: { falhas?: unknown } & Record<string, unknown> }
+  | { ok: false; motivo: string }
+>("src/lib/exportar-dados.functions.ts", "exportarMeusDados");

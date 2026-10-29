@@ -419,8 +419,12 @@ export default function EditarPerfil() {
                       )
                     }
                   />
+                  {/* As amigas recebem o nome do bebê do servidor com a chave ligada ou
+                      não (amigas.functions.ts): a tela não pode prometer o contrário. */}
                   <T tipo="apagado">
-                    Aparecem como um selo embaixo do seu nome, para quem pode abrir o seu perfil.
+                    Aparecem como um selo embaixo do seu nome, para quem pode abrir o seu perfil na
+                    Comunidade. As suas amigas veem o nome do bebê de qualquer jeito, na página de
+                    amiga.
                   </T>
                 </>
               ) : null}

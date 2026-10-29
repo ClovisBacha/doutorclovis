@@ -49,6 +49,10 @@ export async function limparRastrosLocais(): Promise<void> {
   await import("~/lib/lembretes-da-jornada")
     .then((m) => m.cancelarLembretesDaJornada())
     .catch(() => {});
+  /* E nenhuma cópia dos dados (que tem dado de saúde) fica no cache. */
+  await import("~/lib/juridico/arquivo-da-copia")
+    .then((m) => m.apagarCopiasDoAparelho())
+    .catch(() => {});
   try {
     const chaves = await AsyncStorage.getAllKeys();
     const nossas = chaves.filter((c) => c.startsWith("dc-"));

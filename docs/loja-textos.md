@@ -98,7 +98,8 @@ O BEBÊ
 • Depois do nascimento, as 12 primeiras semanas de vocês
 
 O SOS
-• Um toque liga para o 192 e manda a sua localização para quem você escolheu
+• Na tela do SOS: um toque liga para o 192, e outro avisa quem você escolheu,
+  com a sua localização
 
 MODO CUIDADO
 • Para quando a gestação não seguiu: o app para de falar do bebê, e o SOS e o
@@ -146,25 +147,33 @@ As cinco que contam a história, nesta ordem:
 
 Preencher errado aqui é pior que preencher de menos: a Apple compara o
 declarado com o que o binário faz. A tabela sai do inventário do que o app de
-hoje coleta (diário, "28/10 — build 42") e bate com a Política de privacidade
-do app (`docs/juridico/privacidade.md`).
+hoje coleta (diário, "28/10 — build 42" e "build 43") e bate com a Política de
+privacidade do app (`docs/juridico/privacidade.md`).
 
-**Todas as linhas: vinculado à pessoa = SIM · usado para rastrear = NÃO ·
-finalidade = Funcionalidade do app.** (Não há anúncios, análise de uso,
-personalização de terceiros nem corretores de dados.)
+**Todas as linhas: vinculado à pessoa = SIM · usado para rastrear = NÃO.** A
+finalidade é **Funcionalidade do app** em todas; três linhas somam outra, na
+coluna "finalidade". (Não há anúncios, SDK de análise de terceiros nem
+corretores de dados.)
 
-| categoria da Apple        | tipo                      | o que é, no app                                                                                                                        |
-| ------------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Informações de contato    | Nome                      | o nome dela                                                                                                                            |
-| Informações de contato    | Endereço de e-mail        | o e-mail da conta                                                                                                                      |
-| Saúde e condicionamento   | Saúde                     | a datação da gestação, o nascimento, os movimentos do bebê, as contrações cronometradas, o tipo sanguíneo, as alergias e as medicações |
-| Informações confidenciais | Dados confidenciais       | gestação e parto (a Apple lista "pregnancy or childbirth information" aqui)                                                            |
-| Localização               | Localização precisa       | só quando ela aciona o SOS                                                                                                             |
-| Contatos                  | Contatos                  | o contato de emergência e quem acompanha a gestação (nome, telefone e e-mail), que ela digita                                          |
-| Conteúdo do usuário       | Fotos ou vídeos           | as fotos da Comunidade e a do perfil                                                                                                   |
-| Conteúdo do usuário       | Outro conteúdo do usuário | publicações, comentários, bio, as linhas guardadas, a agenda                                                                           |
-| Identificadores           | ID do usuário             | o id da conta                                                                                                                          |
-| Dados de uso              | Interação com o produto   | o progresso da jornada (o "lugar salvo" do jogo) e o "vista há…" das Amigas                                                            |
+| categoria da Apple        | tipo                      | finalidade                          | o que é, no app                                                                                                                                                                                                                                                                               |
+| ------------------------- | ------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Informações de contato    | Nome                      | Funcionalidade                      | o nome dela                                                                                                                                                                                                                                                                                   |
+| Informações de contato    | Endereço de e-mail        | Funcionalidade                      | o e-mail da conta (pela Apple, pode ser o endereço do "Ocultar meu e-mail")                                                                                                                                                                                                                   |
+| Saúde e condicionamento   | Saúde                     | Funcionalidade + **Personalização** | a datação da gestação, o nascimento (data e, se ela contar, hora, peso e comprimento), os movimentos do bebê, as contrações cronometradas (horários e intensidade), como ela estava no dia, a agenda (consultas, ultrassons, exames e vacinas), o tipo sanguíneo, as alergias e as medicações |
+| Informações confidenciais | Dados confidenciais       | Funcionalidade + **Personalização** | gestação e parto (a Apple lista "pregnancy or childbirth information" aqui) e o Modo Cuidado (a gestação que não seguiu)                                                                                                                                                                      |
+| Localização               | Localização precisa       | Funcionalidade                      | só quando ela toca em "Pedir socorro agora", no SOS                                                                                                                                                                                                                                           |
+| Contatos                  | Contatos                  | Funcionalidade                      | o contato de emergência e quem acompanha a gestação (nome, telefone e e-mail), que ela digita; e a rede dela no app — as amigas, quem ela segue e quem a segue                                                                                                                                |
+| Conteúdo do usuário       | Fotos ou vídeos           | Funcionalidade                      | as fotos da Comunidade e a do perfil                                                                                                                                                                                                                                                          |
+| Conteúdo do usuário       | Outro conteúdo do usuário | Funcionalidade                      | publicações, comentários, bio, as publicações salvas, as linhas guardadas (as coisas boas e as cartas para o bebê) e o depoimento                                                                                                                                                             |
+| Identificadores           | ID do usuário             | Funcionalidade                      | o id da conta                                                                                                                                                                                                                                                                                 |
+| Dados de uso              | Interação com o produto   | Funcionalidade + **Análise**        | o progresso da jornada (o "lugar salvo" do jogo), o "vista há…" das Amigas e os números de uso que a equipe vê (quantas pessoas fizeram o cuidado do dia)                                                                                                                                     |
+
+**Por que essas três finalidades a mais.** _Personalização_: a datação (Saúde e
+Confidenciais) também sugere pessoas numa fase parecida, quando ela liga o
+filtro — a Apple chama isso de personalização, mesmo sem terceiro nenhum.
+_Análise_: os números de uso que a equipe vê para melhorar o app são análise
+de primeira parte. Declarar de menos é o que reprova; declarar o que é verdade,
+não.
 
 **O que NÃO entra:** compras, dados financeiros, histórico de navegação, de
 busca (a busca de pessoas não é guardada), diagnósticos e crash (não há SDK),
@@ -195,10 +204,13 @@ orientação médica: não faz diagnóstico, não indica tratamento, exame, rem�
 ou dieta, e diz isso no app (Perfil e Bebê), nos Termos e nesta descrição.
 
 O SOS E A LOCALIZAÇÃO
-A localização é pedida só quando a usuária aciona o SOS, com permissão
-"durante o uso". O SOS liga para o 192 pelo telefone e manda a localização
-para o contato de emergência e para quem acompanha a gestação que ela mesma
-cadastrou. Não há rastreamento em segundo plano.
+A permissão de localização é só "durante o uso", e é pedida quando a usuária
+abre a tela do SOS, para a localização estar pronta no aperto. Ela só sai do
+aparelho quando a usuária toca em "Pedir socorro agora": o servidor avisa,
+por e-mail (e por WhatsApp ou SMS, quando esses canais estão ligados), o
+contato de emergência e quem acompanha a gestação, que ela mesma cadastrou. O
+SOS também liga para o 192 pelo telefone. Não há localização em segundo
+plano, e o app não pede a permissão "sempre".
 
 CONTEÚDO DE USUÁRIAS (diretriz 1.2)
 - Antes de publicar, comentar ou reagir pela primeira vez, a usuária aceita as
@@ -210,6 +222,7 @@ CONTEÚDO DE USUÁRIAS (diretriz 1.2)
 
 CONTA (diretriz 5.1.1(v))
 Perfil → Excluir minha conta: a exclusão é feita dentro do app, na hora.
+Perfil → Baixar uma cópia dos meus dados: um arquivo com o que ela registrou.
 Sign in with Apple disponível na tela de entrada.
 
 COMPRAS

@@ -9,6 +9,7 @@ import { gravarPerfil } from "~/lib/gravar-perfil";
 import { abrirLoja, gravarChave } from "~/lib/jornada/loja";
 import { CHAVE_NASCIMENTO } from "~/lib/jornada/nascimento";
 import { guardarMedicoLocal } from "~/lib/medico-local";
+import { nomeParaSugerir, precisaDeNome } from "~/lib/nome-do-cadastro";
 import { celularE164, emailValido } from "@/lib/medico-da-gestante";
 import {
   deYmd,
@@ -50,8 +51,13 @@ export default function Ritual() {
   const [passo, setPasso] = useState(
     Number.isFinite(inicial) ? Math.min(Math.max(inicial, 0), total - 1) : 0,
   );
+  /* Nunca o começo do e-mail: é o nome que a Comunidade mostra (nome-do-cadastro.ts). */
   const [nome, setNome] = useState(
-    perfil?.display_name ?? (sessao?.user.user_metadata?.display_name as string | undefined) ?? "",
+    nomeParaSugerir({
+      doPerfil: perfil?.display_name,
+      daConta: sessao?.user.user_metadata?.display_name as string | undefined,
+      email: sessao?.user.email,
+    }),
   );
   const modoInicial: Modo = perfil?.birth_date ? "nasceu" : perfil?.reference_date ? "us" : "dum";
   const [modo, setModo] = useState<Modo>(modoInicial);
@@ -118,6 +124,12 @@ export default function Ritual() {
 
   async function avancar() {
     setErro(null);
+    if (
+      passo === 0 &&
+      !ehBancada() &&
+      precisaDeNome({ digitado: nome, doPerfil: perfil?.display_name, email: sessao?.user.email })
+    )
+      return setErro("Conte como você gostaria de ser chamada: é o nome que as amigas veem.");
     if (passo === 1) {
       const e = conferirData();
       if (e) return setErro(e);
