@@ -110,6 +110,8 @@ import {
 import type { Atividade } from "~/servidor/economia";
 import { chama as calcularChama } from "~/lib/jornada/trilha";
 import { ALVO_MINIMO, cor, espaco, fonte, raio, sombra } from "~/tema";
+import { pedirSocorro, ROTULO_DO_SOCORRO, SE_PRECISAR } from "~/lib/socorro";
+import { SOS_NO_APP } from "~/config";
 
 /**
  * A ABA JORNADA — o coração do app: um dia de cada vez, cinco momentos por dia.
@@ -155,7 +157,8 @@ export default function AbaJornada() {
     );
   }
   if (dia.cuidado) return <JornadaDoCuidado uid={dia.uid} />;
-  if (dia.modo === "gestacao") return <JornadaDaGestacao dia={dia} loja={loja} />;
+  /* A trilha é a aba, como no Duolingo (decisão do dono, 11/11/2026). */
+  if (dia.modo === "gestacao") return <JornadaDaGestacao dia={dia} loja={loja} vista="aba" />;
   if (dia.modo === "pos") return <JornadaDoPosParto dia={dia} loja={loja} />;
   return <JornadaSemData uid={dia.uid} />;
 }
@@ -301,11 +304,13 @@ function useReconciliacao(D: number, pronta: boolean, aoMudarSaldo: () => void) 
    ══════════════════════════════════════════════════════════════════════════ */
 
 /**
- * A gestação em duas vistas: "hoje" (a aba — o cuidado do dia, com os avisos,
- * a festa dos marcos e a reconciliação) e "trilha" (a rota /jornada/trilha — o
- * Caminho inteiro, aberto por "Ver minha jornada"). Uma função só para as duas
- * lerem a mesma carteira e o mesmo Cantinho; o que é da abertura do dia roda
- * só na vista "hoje", para não festejar nem cobrar duas vezes.
+ * A gestação em três vistas: "aba" (a aba — a trilha inteira, como no
+ * Duolingo, com os avisos, a festa dos marcos e a reconciliação da abertura
+ * do dia; decisão do dono, 11/11/2026), "hoje" (a tela do cuidado do dia, que
+ * foi a aba de 19/10 a 11/11) e "trilha" (a rota /jornada/trilha, que hoje
+ * leva de volta à aba). Uma função só para todas lerem a mesma carteira e o
+ * mesmo Cantinho; o que é da abertura do dia roda só na vista que abre o app,
+ * para não festejar nem cobrar duas vezes.
  */
 export function JornadaDaGestacao({
   dia,
@@ -314,9 +319,12 @@ export function JornadaDaGestacao({
 }: {
   dia: Extract<DiaDaJornada, { modo: "gestacao" }>;
   loja: EstadoDaLoja;
-  vista?: "hoje" | "trilha";
+  vista?: "aba" | "hoje" | "trilha";
 }) {
   const ehHoje = vista === "hoje";
+  /* O que é da abertura do dia (festa, reconciliação, avisos) roda na vista
+     que abre o app. */
+  const abre = vista !== "trilha";
   const { D, semana, perfil, hoje } = dia;
   const { carteira, recarregar } = useCarteira(true);
   /* A festa dos marcos chama a conferência das conquistas lá embaixo; os
@@ -340,14 +348,14 @@ export function JornadaDaGestacao({
     recarregar,
     conquistas,
     loja,
-    cuidado: dia.cuidado || !ehHoje,
+    cuidado: dia.cuidado || !abre,
   });
   const aResgatar = useMemo(() => {
     if (!conquistas || conquistas === "carregando" || conquistas.careMode) return 0;
     if (conquistas.resgatadas === null) return 0;
     return paraResgatar(montarGrade(conquistas.unlocked, conquistas.resgatadas));
   }, [conquistas]);
-  useReconciliacao(D, loja.pronto && ehHoje, recarregar);
+  useReconciliacao(D, loja.pronto && abre, recarregar);
   const amigas = useContagemDeAmigas();
   const [folha, setFolha] = useState<FolhaDoPlacar>(null);
 
@@ -356,7 +364,7 @@ export function JornadaDaGestacao({
   const checkin = lerCheckin(loja.blob[CHAVE_CHECKIN]);
   const fases = useMemo(() => fasesDaGestacao(D), [D]);
 
-  const avisos = useAvisosDoDia({ carteira, recarregar, conquistas, loja, ehHoje });
+  const avisos = useAvisosDoDia({ carteira, recarregar, conquistas, loja, ehHoje: abre });
 
   /* ── O Cantinho na trilha: o que ela tem, o cenário e a pele ── */
   const cantinho = useCantinhoDaTrilha();
@@ -442,7 +450,11 @@ export function JornadaDaGestacao({
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: cor.fundo }}>
       <View style={{ paddingHorizontal: espaco.lg }}>
-        <BarraDoTopo titulo="Minha jornada" />
+        {vista === "aba" ? (
+          <CabecalhoDaTrilha nomeDoBebe={nomeDoBebe} semana={semana} />
+        ) : (
+          <BarraDoTopo titulo="Minha jornada" />
+        )}
       </View>
       <Caminho
         hojeD={D}
@@ -497,6 +509,41 @@ export function JornadaDaGestacao({
       />
       <FestaDoMarco festa={marco.festa} nomeDoBebe={nomeDoBebe} aoFechar={marco.fechar} />
     </SafeAreaView>
+  );
+}
+
+/**
+ * O topo da trilha quando ela é a aba: o nome da trilha e a semana à
+ * esquerda, o perfil à direita — sem voltar (a trilha é a porta do app).
+ */
+function CabecalhoDaTrilha({ nomeDoBebe, semana }: { nomeDoBebe: string | null; semana: number }) {
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: espaco.md,
+        minHeight: ALVO_MINIMO + 4,
+      }}
+    >
+      <View style={{ flex: 1 }}>
+        <Text
+          accessibilityRole="header"
+          numberOfLines={1}
+          style={{ fontFamily: fonte.titulo, fontSize: 20, color: cor.texto }}
+        >
+          Sua trilha
+        </Text>
+        <Text
+          numberOfLines={1}
+          style={{ fontFamily: fonte.media, fontSize: 13, color: cor.textoApagado }}
+        >
+          Semana {semana}
+          {nomeDoBebe ? ` · ${nomeDoBebe}` : ""}
+        </Text>
+      </View>
+      <BotaoDoPerfil />
+    </View>
   );
 }
 
@@ -813,7 +860,9 @@ function JornadaDoCuidado({ uid }: { uid: string }) {
         mostrarEstrelas={false}
       />
       <T tipo="apagado">
-        Se precisar de ajuda agora, o botão SOS fica sempre aqui embaixo, em qualquer tela.
+        {SOS_NO_APP
+          ? "Se precisar de ajuda agora, o botão SOS fica sempre aqui embaixo, em qualquer tela."
+          : "Se precisar de ajuda agora, ligue 192 — ou 188, o CVV, para conversar."}
       </T>
     </Tela>
   );
@@ -1123,12 +1172,12 @@ function AlertaDas42Semanas({ nomeDoBebe }: { nomeDoBebe: string | null }) {
             style={{ fontFamily: fonte.normal, fontSize: 14, lineHeight: 22, color: cor.texto }}
           >
             Falta pouquíssimo para vocês se encontrarem. O seu caminho, as figurinhas e tudo o que
-            vocês viveram até aqui estão guardados. Se precisar, o SOS está a um toque.
+            vocês viveram até aqui estão guardados. {SE_PRECISAR}
           </Text>
           <View style={{ marginTop: espaco.sm, flexDirection: "row" }}>
             <Pressable
               accessibilityRole="button"
-              onPress={() => router.push("/sos")}
+              onPress={pedirSocorro}
               style={({ pressed }) => ({
                 minHeight: ALVO_MINIMO,
                 paddingHorizontal: espaco.xl,
@@ -1139,7 +1188,7 @@ function AlertaDas42Semanas({ nomeDoBebe }: { nomeDoBebe: string | null }) {
               })}
             >
               <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: cor.branco }}>
-                Abrir o SOS
+                {ROTULO_DO_SOCORRO}
               </Text>
             </Pressable>
           </View>

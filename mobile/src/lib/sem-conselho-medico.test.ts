@@ -133,10 +133,11 @@ describe("o app não dá conselho médico", () => {
     expect(ondeAparece(/5-1-1|o esperado são 10|Chegou a 10/)).toEqual([]);
   });
 
-  test("os movimentos do bebê têm a linha fixa para o SOS, e nenhuma meta", () => {
+  test("os movimentos do bebê têm a linha fixa do socorro, e nenhuma meta", () => {
     const chutes = FONTES.find((f) => f.arquivo === "app/saude/chutes.tsx")!.codigo;
     expect(chutes).toContain("Sentiu o bebê diferente?");
-    expect(chutes).toContain('router.push("/sos")');
+    /* O SOS, com ele no app; o 192, sem ele (`lib/socorro.ts`). */
+    expect(chutes).toContain("pedirSocorro()");
     expect(chutes).not.toMatch(/de 10\b/);
   });
 

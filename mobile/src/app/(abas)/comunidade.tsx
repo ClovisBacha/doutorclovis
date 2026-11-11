@@ -1,5 +1,5 @@
 import { deveVerOnboarding } from "@/lib/onboarding-da-comunidade";
-import { router, useFocusEffect } from "expo-router";
+import { Redirect, router, useFocusEffect } from "expo-router";
 import { Heart, ImagePlus, Search } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -38,6 +38,7 @@ import { mudarSelos } from "~/lib/selos";
 import { useSessao } from "~/lib/sessao";
 import type { PerfilNaTela, PessoaNaLista, PostNaTela } from "~/servidor/rede";
 import { ALVO_MINIMO, cor, espaco, fonte, raio, sombra } from "~/tema";
+import { COMUNIDADE_NO_APP } from "~/config";
 
 type Item =
   | { tipo: "post"; post: PostNaTela; sugerido: boolean }
@@ -55,7 +56,13 @@ const PAGINAS_VAZIAS_MAX = 4;
  * ⚠️ Modo Cuidado: o servidor devolve o feed vazio de propósito; a tela diz
  * uma frase acolhedora que não fala do bebê, e não oferece publicar.
  */
+/** Com a Comunidade desligada (`COMUNIDADE_NO_APP`), um link antigo cai na trilha. */
 export default function Comunidade() {
+  if (!COMUNIDADE_NO_APP) return <Redirect href="/jornada" />;
+  return <ComunidadeNoApp />;
+}
+
+function ComunidadeNoApp() {
   const { sessao, perfil, estadoDoPerfil, cuidado } = useSessao();
   const uid = sessao?.user.id ?? null;
   const [posts, setPosts] = useState<PostNaTela[]>([]);

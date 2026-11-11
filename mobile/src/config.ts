@@ -41,3 +41,33 @@ export const CONTATO_EMAIL = "contato@drclovisbacha.com.br";
  * `ia-desligada.test.ts` cobra as duas coisas juntas.
  */
 export const IA_NO_APP = false;
+
+/**
+ * O SOS NO APP — DESLIGADO (decisão do dono, 11/11/2026: "tirar o SOS" para
+ * lançar o app mais simples, como um Duolingo para gestantes).
+ *
+ * Some a tela do SOS e o cronômetro de contrações que mora nela, o botão do
+ * meio da barra, a pílula vermelha dos cabeçalhos e o cartão de emergência
+ * (contato, tipo sanguíneo, alergias, medicações) no Perfil e no cadastro. Onde
+ * o app dizia "abra o SOS", ele passa a oferecer ligar para o 192
+ * (`lib/socorro.ts`). O nome e o contato do médico continuam, no Bebê.
+ *
+ * O código fica todo no lugar. Para religar: `true` aqui — e os Termos, a
+ * Privacidade, o consentimento do cadastro e o texto da loja voltam a
+ * descrever o SOS (a Apple e a LGPD cobram que o texto diga o que o app faz).
+ */
+export const SOS_NO_APP = false;
+
+/**
+ * A COMUNIDADE (O FEED) NO APP — DESLIGADA (decisão do dono, 11/11/2026: "a
+ * única comunidade vai ser a da gamificação, como no Duolingo").
+ *
+ * Some a aba Comunidade, com as publicações, os comentários, a busca, os
+ * perfis e o publicar dos cartões; no Perfil ficam só o nome e a foto (que as
+ * Amigas mostram). As Amigas ficam: amigas, dupla, chama e convites são a
+ * parte social do jogo.
+ *
+ * O código fica todo no lugar. Para religar: `true` aqui — e os Termos, a
+ * Privacidade e a loja voltam a descrever a Comunidade.
+ */
+export const COMUNIDADE_NO_APP = false;

@@ -1,6 +1,6 @@
 import { haQuantoPublicou, textoDoAviso } from "@/lib/rede-social";
 import { Image } from "expo-image";
-import { router } from "expo-router";
+import { Redirect, router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { FlatList, Pressable, RefreshControl, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -13,6 +13,7 @@ import { mensagemDoErro } from "~/lib/comunidade/regras";
 import { mudarSelos } from "~/lib/selos";
 import type { AtividadeNaTela } from "~/servidor/rede";
 import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
+import { COMUNIDADE_NO_APP } from "~/config";
 
 /**
  * A ATIVIDADE (o ♡ do feed): quem seguiu, pediu, reagiu, comentou.
@@ -22,7 +23,13 @@ import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
  * ⚠️ Abrir marca tudo como visto (é o que zera o número do ♡ e o selo da
  * Comunidade na barra).
  */
+/** Com a Comunidade desligada (`COMUNIDADE_NO_APP`), um link antigo cai na trilha. */
 export default function Atividade() {
+  if (!COMUNIDADE_NO_APP) return <Redirect href="/jornada" />;
+  return <AtividadeNoApp />;
+}
+
+function AtividadeNoApp() {
   const [itens, setItens] = useState<AtividadeNaTela[]>([]);
   const [estado, setEstado] = useState<"carregando" | "pronto" | "falhou">("carregando");
   const [atualizando, setAtualizando] = useState(false);

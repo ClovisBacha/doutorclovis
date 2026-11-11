@@ -1,7 +1,7 @@
 import { comPacote, ehLocal, mesclar } from "@/lib/fila-local";
 import { FORCA_PADRAO, NIVEIS_DE_FORCA, nivelDeForca } from "@/lib/forca-do-movimento";
 import type { SessaoDeChutes } from "@/lib/serie-de-chutes";
-import { Redirect, router } from "expo-router";
+import { Redirect } from "expo-router";
 import { ChevronRight } from "lucide-react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
@@ -41,6 +41,7 @@ import { usarRelogio, usarRetorno, usarTelaAcesa } from "~/lib/saude/usar-retorn
 import { useSessao } from "~/lib/sessao";
 import { supabase } from "~/servidor/supabase";
 import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
+import { pedirSocorro, ROTULO_DO_SOCORRO } from "~/lib/socorro";
 
 type Contagem = SessaoDeChutes & { id: string; strength?: number | null };
 type Aviso = { texto: string; tom: "ok" | "aparelho" | "neutro" } | null;
@@ -397,16 +398,17 @@ export default function Chutes() {
 
 /**
  * A LINHA FIXA: o que o app diz a quem sente o bebê diferente. Sem número, sem
- * régua — abre o SOS, onde moram os sinais de alerta e o socorro.
+ * régua — abre o SOS, onde moram os sinais de alerta e o socorro; com o SOS
+ * desligado, liga para o 192 (`lib/socorro.ts`).
  */
 function LinhaDoSos() {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Sentiu o bebê diferente? Abra o SOS"
+      accessibilityLabel={`Sentiu o bebê diferente? ${ROTULO_DO_SOCORRO}`}
       onPress={() => {
         toque();
-        router.push("/sos");
+        pedirSocorro();
       }}
       style={({ pressed }) => ({
         flexDirection: "row",
@@ -423,7 +425,7 @@ function LinhaDoSos() {
     >
       <Text style={{ flex: 1, fontFamily: fonte.media, fontSize: 15, color: cor.texto }}>
         Sentiu o bebê diferente?{" "}
-        <Text style={{ fontFamily: fonte.forte, color: cor.urgente }}>Abra o SOS</Text>
+        <Text style={{ fontFamily: fonte.forte, color: cor.urgente }}>{ROTULO_DO_SOCORRO}</Text>
       </Text>
       <ChevronRight size={20} color={cor.urgente} />
     </Pressable>

@@ -7,7 +7,7 @@ import { FolhaDaEntrada, FundoDaEntrada } from "~/componentes/entrada";
 import { CabecalhoDaMarca } from "~/componentes/marca";
 import { SITE } from "~/config";
 import { metadadosDoAceite } from "~/lib/juridico/aceite";
-import { TEXTO_DO_CONSENTIMENTO_DE_SAUDE } from "~/lib/juridico/textos-do-aceite";
+import { TEXTO_DO_CONSENTIMENTO_DE_SAUDE, TEXTO_DOS_TERMOS } from "~/lib/juridico/textos-do-aceite";
 import { supabase } from "~/servidor/supabase";
 import { cor, espaco } from "~/tema";
 
@@ -40,11 +40,11 @@ export default function Cadastro() {
     if (!maior) return setErro("O app é para maiores de 18 anos.");
     if (!aceite)
       return setErro(
-        "Para criar a conta, confirme que leu e concorda com os Termos e as regras da Comunidade.",
+        "Para criar a conta, confirme que leu e concorda com os Termos e a Política de privacidade.",
       );
     if (!saude)
       return setErro(
-        "Sem guardar a datação da gestação e o cartão do SOS, o app não consegue acompanhar você. Para criar a conta, marque a última caixa.",
+        "Sem guardar a datação da gestação, o app não consegue montar a sua trilha. Para criar a conta, marque a última caixa.",
       );
     setCarregando(true);
     const { error } = await supabase.auth.signUp({
@@ -134,7 +134,7 @@ export default function Cadastro() {
             <CaixaDeMarcar
               marcada={aceite}
               aoTocar={() => setAceite((v) => !v)}
-              rotulo="Li e concordo com os Termos de uso, a Política de privacidade e as regras da Comunidade (tolerância zero com conteúdo ofensivo ou abusivo)."
+              rotulo={TEXTO_DOS_TERMOS}
             />
             <CaixaDeMarcar
               marcada={saude}

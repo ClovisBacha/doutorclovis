@@ -11,6 +11,7 @@ import { celularE164, emailValido } from "@/lib/medico-da-gestante";
 import { CabecalhoDaPilha } from "~/componentes/cabecalho";
 import { useSessao } from "~/lib/sessao";
 import { cor } from "~/tema";
+import { SOS_NO_APP } from "~/config";
 
 const texto = (v: unknown) => (typeof v === "string" ? v : "");
 
@@ -83,12 +84,18 @@ function FormularioDosDados() {
        "Editar perfil" o grava, pelas regras de lá (obrigatório, sem ofensa). */
     const campos: Record<string, unknown> = {
       ...(cuidadoDaSessao ? {} : { baby_name: bebe.trim() || null }),
-      emergency_contact: contato.trim() || null,
-      emergency_phone: telefone.trim() || null,
-      emergency_email: emailContato.trim() || null,
-      blood_type: sangue.trim() || null,
-      allergies: alergias.trim() || null,
-      medications: remedios.trim() || null,
+      /* O cartão do SOS só se grava com o SOS no app; desligado, o app não
+         coleta — e não apaga o que já estava guardado. */
+      ...(SOS_NO_APP
+        ? {
+            emergency_contact: contato.trim() || null,
+            emergency_phone: telefone.trim() || null,
+            emergency_email: emailContato.trim() || null,
+            blood_type: sangue.trim() || null,
+            allergies: alergias.trim() || null,
+            medications: remedios.trim() || null,
+          }
+        : {}),
       medico_nome: medicoNome.trim() || null,
       medico_celular: medicoCelular.trim() || null,
       medico_email: medicoEmail.trim() || null,
@@ -169,42 +176,45 @@ function FormularioDosDados() {
           </Cartao>
         ) : null}
 
-        <Cartao>
-          <T tipo="subtitulo">Para o SOS</T>
-          <T tipo="apagado" estilo={{ fontSize: 14 }}>
-            Fica guardado na sua conta e também no celular, para aparecer na tela do SOS mesmo sem
-            internet.
-          </T>
-          <Campo rotulo="Contato de emergência" value={contato} onChangeText={setContato} />
-          <Campo
-            rotulo="Telefone do contato"
-            value={telefone}
-            onChangeText={setTelefone}
-            keyboardType="phone-pad"
-          />
-          <Campo
-            rotulo="E-mail do contato (opcional)"
-            value={emailContato}
-            onChangeText={setEmailContato}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-          <Campo
-            rotulo="Tipo sanguíneo"
-            value={sangue}
-            onChangeText={setSangue}
-            placeholder="Ex.: O+"
-            autoCapitalize="characters"
-          />
-          <Campo rotulo="Alergias" value={alergias} onChangeText={setAlergias} />
-          <Campo rotulo="Medicações em uso" value={remedios} onChangeText={setRemedios} />
-        </Cartao>
+        {SOS_NO_APP ? (
+          <Cartao>
+            <T tipo="subtitulo">Para o SOS</T>
+            <T tipo="apagado" estilo={{ fontSize: 14 }}>
+              Fica guardado na sua conta e também no celular, para aparecer na tela do SOS mesmo sem
+              internet.
+            </T>
+            <Campo rotulo="Contato de emergência" value={contato} onChangeText={setContato} />
+            <Campo
+              rotulo="Telefone do contato"
+              value={telefone}
+              onChangeText={setTelefone}
+              keyboardType="phone-pad"
+            />
+            <Campo
+              rotulo="E-mail do contato (opcional)"
+              value={emailContato}
+              onChangeText={setEmailContato}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            <Campo
+              rotulo="Tipo sanguíneo"
+              value={sangue}
+              onChangeText={setSangue}
+              placeholder="Ex.: O+"
+              autoCapitalize="characters"
+            />
+            <Campo rotulo="Alergias" value={alergias} onChangeText={setAlergias} />
+            <Campo rotulo="Medicações em uso" value={remedios} onChangeText={setRemedios} />
+          </Cartao>
+        ) : null}
 
         <Cartao>
           <T tipo="subtitulo">Quem acompanha a sua gestação</T>
           <T tipo="apagado" estilo={{ fontSize: 14 }}>
-            No SOS, o app manda para essa pessoa o e-mail de emergência e oferece a mensagem pronta
-            no WhatsApp, com a sua localização e a sua ficha.
+            {SOS_NO_APP
+              ? "No SOS, o app manda para essa pessoa o e-mail de emergência e oferece a mensagem pronta no WhatsApp, com a sua localização e a sua ficha."
+              : "Fica guardado na sua conta, para você ter o contato sempre à mão."}
           </T>
           <Campo
             rotulo="Nome do médico ou médica"

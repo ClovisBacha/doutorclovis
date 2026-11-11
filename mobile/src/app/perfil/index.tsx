@@ -17,7 +17,7 @@ import {
 import { CabecalhoDaPilha } from "~/componentes/cabecalho";
 import { Avatar } from "~/componentes/comunidade/imagem";
 import { rota } from "~/componentes/jornada/bancada";
-import { CONTATO_EMAIL, IA_NO_APP } from "~/config";
+import { COMUNIDADE_NO_APP, CONTATO_EMAIL, IA_NO_APP, SOS_NO_APP } from "~/config";
 import { limparRastrosLocais } from "~/lib/armazem";
 import { ehBancada } from "~/lib/bancada";
 import { api } from "~/lib/comunidade/api";
@@ -109,8 +109,7 @@ export default function Perfil() {
 
   function pedirCuidado(on: boolean) {
     if (!on) return void trocarCuidado(false);
-    const msg =
-      "O app para de mostrar o bebê, a semana e as contagens. O SOS e o acolhimento continuam. Você pode desligar quando quiser.";
+    const msg = `O app para de mostrar o bebê, a semana e as contagens. ${SOS_NO_APP ? "O SOS e o acolhimento continuam." : "O acolhimento continua."} Você pode desligar quando quiser.`;
     if (Platform.OS === "web") return void trocarCuidado(true);
     Alert.alert("Ligar o Modo Cuidado?", msg, [
       { text: "Agora não", style: "cancel" },
@@ -208,8 +207,8 @@ export default function Perfil() {
             <T tipo="subtitulo" linhas={2}>
               {nome}
             </T>
-            {social?.handle ? <T tipo="apagado">@{social.handle}</T> : null}
-            {social && !cuidadoDaSessao ? (
+            {social?.handle && COMUNIDADE_NO_APP ? <T tipo="apagado">@{social.handle}</T> : null}
+            {social && !cuidadoDaSessao && COMUNIDADE_NO_APP ? (
               <Linha estilo={{ gap: espaco.lg, marginTop: 2 }}>
                 <Contagem valor={social.seguidores} rotulo="seguidores" />
                 <Contagem valor={social.seguindo} rotulo="seguindo" />
@@ -217,8 +216,8 @@ export default function Perfil() {
             ) : null}
           </View>
         </Linha>
-        {social?.bio ? <T>{social.bio}</T> : null}
-        {social && !cuidadoDaSessao ? (
+        {social?.bio && COMUNIDADE_NO_APP ? <T>{social.bio}</T> : null}
+        {social && !cuidadoDaSessao && COMUNIDADE_NO_APP ? (
           <Pilula
             texto={social.publico ? "🌐 Perfil público" : "🔒 Perfil fechado"}
             fundo={cor.apagado}
@@ -242,7 +241,7 @@ export default function Perfil() {
             aoTocar={() => router.push(rota("/perfil/editar") as never)}
           />
           {/* O espelho: no Modo Cuidado ninguém a vê na rede, então não há o que mostrar. */}
-          {uid && !cuidadoDaSessao ? (
+          {uid && !cuidadoDaSessao && COMUNIDADE_NO_APP ? (
             <Botao
               rotulo="Ver como os outros veem"
               tipo="secundario"
@@ -256,11 +255,15 @@ export default function Perfil() {
       {/* ── A conta ── */}
       <LinhaDoPerfil
         Icone={HeartPulse}
-        titulo="Seus dados e o SOS"
+        titulo={SOS_NO_APP ? "Seus dados e o SOS" : "Seus dados"}
         texto={
-          cuidadoDaSessao
-            ? "O contato de emergência, a sua ficha e quem acompanha você."
-            : "O bebê, o contato de emergência, a sua ficha e quem acompanha a sua gestação."
+          SOS_NO_APP
+            ? cuidadoDaSessao
+              ? "O contato de emergência, a sua ficha e quem acompanha você."
+              : "O bebê, o contato de emergência, a sua ficha e quem acompanha a sua gestação."
+            : cuidadoDaSessao
+              ? "Quem acompanha você."
+              : "O bebê, a data da gestação e quem acompanha a sua gestação."
         }
         aoTocar={() => router.push(rota("/perfil/dados") as never)}
       />
@@ -270,7 +273,8 @@ export default function Perfil() {
           <View style={{ flex: 1, gap: 2 }}>
             <T tipo="rotulo">Modo Cuidado</T>
             <T tipo="apagado" estilo={{ fontSize: 14 }}>
-              Para quando a gestação não seguiu. O app para de falar do bebê; o SOS continua.
+              Para quando a gestação não seguiu. O app para de falar do bebê
+              {SOS_NO_APP ? "; o SOS continua." : "."}
             </T>
           </View>
           <Switch
@@ -294,12 +298,14 @@ export default function Perfil() {
         texto="O cuidado de hoje, a semana nova, a meditação e as consultas."
         aoTocar={() => router.push(rota("/lembretes") as never)}
       />
-      <LinhaDoPerfil
-        Icone={Ban}
-        titulo="Pessoas bloqueadas"
-        texto="Quem você bloqueou na Comunidade."
-        aoTocar={() => router.push(rota("/comunidade/bloqueados") as never)}
-      />
+      {COMUNIDADE_NO_APP ? (
+        <LinhaDoPerfil
+          Icone={Ban}
+          titulo="Pessoas bloqueadas"
+          texto="Quem você bloqueou na Comunidade."
+          aoTocar={() => router.push(rota("/comunidade/bloqueados") as never)}
+        />
+      ) : null}
 
       {IA_NO_APP ? <CartaoDaPermissaoDeIA /> : null}
 
@@ -310,8 +316,8 @@ export default function Perfil() {
       <Cartao>
         <T tipo="rotulo">Fale com a gente</T>
         <T tipo="apagado">
-          Dúvidas sobre o app, a sua conta ou a Comunidade: {CONTATO_EMAIL}. Assuntos de saúde são
-          com o seu médico — em emergência, ligue 192.
+          Dúvidas sobre o app, a sua conta{COMUNIDADE_NO_APP ? " ou a Comunidade" : " ou o jogo"}:{" "}
+          {CONTATO_EMAIL}. Assuntos de saúde são com o seu médico — em emergência, ligue 192.
         </T>
         <Botao
           rotulo="Escrever um e-mail"

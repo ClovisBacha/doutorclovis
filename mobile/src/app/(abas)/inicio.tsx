@@ -19,7 +19,7 @@ import { useAgenda } from "~/componentes/agenda/usar-agenda";
 import { BEBE } from "~/componentes/artes";
 import { BotaoDoPerfil } from "~/componentes/botao-do-perfil";
 import { Cartao, Linha, NaoConsegueLer, Pilula, T, Tela, toque } from "~/componentes/base";
-import { CVV } from "~/config";
+import { COMUNIDADE_NO_APP, CVV, IA_NO_APP, SOS_NO_APP } from "~/config";
 import { bebeDaSemana, retaFinalNoApp } from "~/lib/bebe-da-semana";
 import { ferramentasDaGestacao, NOME_DOS_MOVIMENTOS } from "~/lib/ferramentas";
 import { fraseDoDiaNoApp } from "~/lib/frase-do-dia";
@@ -40,7 +40,6 @@ import { Medida } from "~/componentes/medida";
 import { useSessao } from "~/lib/sessao";
 import { ALVO_MINIMO, cor, espaco, raio } from "~/tema";
 import { AvisoMedico } from "~/componentes/aviso-medico";
-import { IA_NO_APP } from "~/config";
 
 function saudacao(h: number) {
   if (h < 5) return "Boa madrugada";
@@ -73,7 +72,11 @@ export default function Inicio() {
     return (
       <Tela>
         <NaoConsegueLer
-          sossego="O SOS funciona sem internet pelo botão vermelho."
+          sossego={
+            SOS_NO_APP
+              ? "O SOS funciona sem internet pelo botão vermelho."
+              : "Os seus dados continuam guardados."
+          }
           aoTentar={() => void recarregarPerfil()}
         />
       </Tela>
@@ -188,7 +191,7 @@ export default function Inicio() {
           aoTocar={() => router.push("/nutricao")}
         />
       ) : null}
-      {!cuidado ? (
+      {!cuidado && COMUNIDADE_NO_APP ? (
         <Atalho
           ordem={4}
           Icone={MessageCircleHeart}
@@ -317,7 +320,10 @@ function CartaoDeAcolhimento() {
   return (
     <Cartao fundo={cor.destaque}>
       <T tipo="subtitulo">Estamos aqui com você</T>
-      <T>Este é um espaço para cuidar de você, no seu tempo. O SOS continua aqui.</T>
+      <T>
+        Este é um espaço para cuidar de você, no seu tempo.
+        {SOS_NO_APP ? " O SOS continua aqui." : ""}
+      </T>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Ligar para o CVV, 188"

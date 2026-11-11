@@ -4,8 +4,10 @@ import { join, relative } from "node:path";
 import { semComentarios } from "@/lib/sem-comentarios";
 
 /**
- * A BARRA DA FASE 3 (a rede social no centro, decisão do dono de 21/10/2026):
- * Hoje · Comunidade · SOS · Amigas · Bebê, sem a aba Saúde.
+ * A BARRA (decisão do dono de 11/11/2026, "um Duolingo para gestantes"):
+ * Trilha · Amigas · Bebê. A Comunidade e o SOS ficam no código, escondidos
+ * pelas chaves `COMUNIDADE_NO_APP` e `SOS_NO_APP` de `config.ts`; ligadas,
+ * a barra volta a ser Hoje · Comunidade · SOS · Amigas · Bebê (fase 3).
  *
  * Esta catraca cobra a ordem das abas, que a Saúde não volte por um link
  * esquecido, e que ninguém EMPURRE uma aba de uma tela empilhada — isso abre
@@ -31,12 +33,15 @@ const FONTES = arquivos(RAIZ).map((p) => ({
 
 const BARRA = FONTES.find((f) => f.arquivo === join("app", "(abas)", "_layout.tsx"))!.codigo;
 
-describe("a barra: Hoje · Comunidade · SOS · Amigas · Bebê", () => {
-  test("as quatro abas, nesta ordem (as duas primeiras antes do SOS)", () => {
+describe("a barra: Trilha · Amigas · Bebê", () => {
+  test("as abas, nesta ordem; a Comunidade e o SOS só com as chaves ligadas", async () => {
     const abas = [...BARRA.matchAll(/<Tabs\.Screen\s+name="(\w+)"/g)].map((m) => m[1]);
     expect(abas).toEqual(["jornada", "comunidade", "amigas", "inicio"]);
-    expect(BARRA).toContain("rotas.slice(0, 2)");
-    expect(BARRA).toContain("rotas.slice(2, 4)");
+    expect(BARRA).toContain('options={{ title: "Trilha" }}');
+    expect(BARRA).toMatch(/COMUNIDADE_NO_APP \? \{\} : \{ href: null \}/);
+    expect(BARRA).toContain("{SOS_NO_APP ? <BotaoDoSos /> : null}");
+    const { COMUNIDADE_NO_APP, SOS_NO_APP } = await import("~/config");
+    expect([COMUNIDADE_NO_APP, SOS_NO_APP]).toEqual([false, false]);
     const pastaDasAbas = readdirSync(join(RAIZ, "app", "(abas)"))
       .filter((n) => n !== "_layout.tsx")
       .map((n) => n.replace(/\.tsx$/, ""))

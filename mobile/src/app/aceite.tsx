@@ -10,7 +10,11 @@ import { ehBancada } from "~/lib/bancada";
 import { esquecerMeuPerfilSocial } from "~/lib/comunidade/meu-perfil";
 import { metadadosDoAceite, VERSAO_DOS_TERMOS, versaoAceita } from "~/lib/juridico/aceite";
 import { lembrarAceite } from "~/lib/juridico/aceite-da-sessao";
-import { PONTOS_DO_ACEITE, TEXTO_DO_CONSENTIMENTO_DE_SAUDE } from "~/lib/juridico/textos-do-aceite";
+import {
+  PONTOS_DO_ACEITE,
+  TEXTO_DO_CONSENTIMENTO_DE_SAUDE,
+  TEXTO_DOS_TERMOS,
+} from "~/lib/juridico/textos-do-aceite";
 import { zerarSelos } from "~/lib/selos";
 import { useSessao } from "~/lib/sessao";
 import { supabase } from "~/servidor/supabase";
@@ -44,7 +48,7 @@ export default function Aceite() {
     if (!termos) return setErro("Para continuar, confirme que leu e concorda com os Termos.");
     if (!saude)
       return setErro(
-        "Sem guardar a datação da gestação e o cartão do SOS, o app não consegue acompanhar você. Para continuar, marque a última caixa.",
+        "Sem guardar a datação da gestação, o app não consegue montar a sua trilha. Para continuar, marque a última caixa.",
       );
     if (ehBancada()) return router.replace(rota("/jornada") as never);
     setEnviando(true);
@@ -110,7 +114,7 @@ export default function Aceite() {
       <CaixaDeMarcar
         marcada={termos}
         aoTocar={() => setTermos((v) => !v)}
-        rotulo="Li e concordo com os Termos de uso, a Política de privacidade e as regras da Comunidade (tolerância zero com conteúdo ofensivo ou abusivo)."
+        rotulo={TEXTO_DOS_TERMOS}
       />
       <CaixaDeMarcar
         marcada={saude}

@@ -24,11 +24,16 @@ import { codigoLimpo, fraseDaIndicacao, type ResultadoDaIndicacao } from "~/lib/
 import { RECOMPENSA_DA_INDICACAO } from "~/lib/jornada/recompensas";
 import { useSessao } from "~/lib/sessao";
 import { ALVO_MINIMO, cor, espaco, raio } from "~/tema";
+import { COMUNIDADE_NO_APP, SOS_NO_APP } from "~/config";
 
 type Modo = "dum" | "us" | "nasceu";
 /** O nome, a data, o bebê, o contato, o médico e a rede (o último só no cadastro). */
 const PASSOS = 6;
 const PASSO_DA_REDE = 5;
+/** O contato de emergência: só com o SOS no app (`SOS_NO_APP`). */
+const PASSO_DO_CONTATO = 3;
+const seguinte = (p: number) => (p + 1 === PASSO_DO_CONTATO && !SOS_NO_APP ? p + 2 : p + 1);
+const anterior = (p: number) => (p - 1 === PASSO_DO_CONTATO && !SOS_NO_APP ? p - 2 : p - 1);
 
 /**
  * O ritual de boas-vindas: o mínimo para o app acompanhar a gestação, em
@@ -145,7 +150,7 @@ export default function Ritual() {
       const r = await ligar();
       if (r !== "ligou" && r !== "depois") return;
     }
-    if (passo < total - 1) setPasso(passo + 1);
+    if (passo < total - 1) setPasso(seguinte(passo));
     else void salvar();
   }
 
@@ -158,8 +163,8 @@ export default function Ritual() {
     const payload: Record<string, unknown> = {};
     if (nome.trim()) payload.display_name = nome.trim();
     if (bebe.trim()) payload.baby_name = bebe.trim();
-    if (contato.trim()) payload.emergency_contact = contato.trim();
-    if (telefone.trim()) payload.emergency_phone = telefone.trim();
+    if (SOS_NO_APP && contato.trim()) payload.emergency_contact = contato.trim();
+    if (SOS_NO_APP && telefone.trim()) payload.emergency_phone = telefone.trim();
     if (medicoNome.trim()) payload.medico_nome = medicoNome.trim();
     if (medicoCelular.trim()) payload.medico_celular = medicoCelular.trim();
     if (medicoEmail.trim()) payload.medico_email = medicoEmail.trim();
@@ -348,7 +353,7 @@ export default function Ritual() {
           </>
         ) : null}
 
-        {passo === 3 ? (
+        {passo === PASSO_DO_CONTATO && SOS_NO_APP ? (
           <>
             <T tipo="titulo" centro>
               Quem avisar numa emergência?
@@ -385,8 +390,9 @@ export default function Ritual() {
               Quem acompanha a sua gestação?
             </T>
             <T tipo="apagado" centro>
-              No SOS, o app manda o e-mail de emergência para o seu médico ou médica e deixa a
-              mensagem pronta no WhatsApp, com a sua localização.
+              {SOS_NO_APP
+                ? "No SOS, o app manda o e-mail de emergência para o seu médico ou médica e deixa a mensagem pronta no WhatsApp, com a sua localização."
+                : "Fica guardado na sua conta, para você ter o contato sempre à mão."}
             </T>
             <Campo
               rotulo="Nome do médico ou médica"
@@ -418,8 +424,8 @@ export default function Ritual() {
             </T>
             <T tipo="apagado" centro>
               {modo === "nasceu"
-                ? `Com o código dela, vocês viram amigas aqui dentro: ela ganha ${RECOMPENSA_DA_INDICACAO} sementinhas, e vocês se veem na Comunidade.`
-                : `Com o código dela, vocês viram amigas aqui dentro: ela ganha ${RECOMPENSA_DA_INDICACAO} sementinhas, e vocês podem formar uma dupla e se ver na Comunidade.`}
+                ? `Com o código dela, vocês viram amigas aqui dentro: ela ganha ${RECOMPENSA_DA_INDICACAO} sementinhas, e vocês ${COMUNIDADE_NO_APP ? "se veem na Comunidade" : "acompanham o jogo uma da outra"}.`
+                : `Com o código dela, vocês viram amigas aqui dentro: ela ganha ${RECOMPENSA_DA_INDICACAO} sementinhas, e vocês podem formar uma dupla e ${COMUNIDADE_NO_APP ? "se ver na Comunidade" : "acompanhar o jogo uma da outra"}.`}
             </T>
             <Campo
               rotulo="Código da amiga"
@@ -464,11 +470,11 @@ export default function Ritual() {
           <Botao
             rotulo="Pular por agora"
             tipo="texto"
-            aoTocar={() => (passo < total - 1 ? setPasso(passo + 1) : void salvar())}
+            aoTocar={() => (passo < total - 1 ? setPasso(seguinte(passo)) : void salvar())}
           />
         ) : null}
         {passo > 0 ? (
-          <Botao rotulo="Voltar" tipo="texto" aoTocar={() => setPasso(passo - 1)} />
+          <Botao rotulo="Voltar" tipo="texto" aoTocar={() => setPasso(anterior(passo))} />
         ) : null}
       </Tela>
     </KeyboardAvoidingView>

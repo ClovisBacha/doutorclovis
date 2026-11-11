@@ -45,6 +45,8 @@ import {
   type DuracaoMexer,
 } from "~/lib/jornada/mexer";
 import { ALVO_MINIMO, cor, espaco, fonte } from "~/tema";
+import { pedirSocorro, ROTULO_DO_SOCORRO } from "~/lib/socorro";
+import { SOS_NO_APP } from "~/config";
 
 /**
  * MEXER — a sessão montada pela régua do site (`sessaoDoDia`): pela fase da
@@ -326,13 +328,13 @@ export default function Mexer() {
         {temChao ? <SemChao ligado={semChao} aoTocar={() => setSemChao((v) => !v)} /> : null}
 
         {/* Sinal de alerta mora num lugar só: o SOS (21/10/2026). Aqui, uma
-            linha que leva até ele. */}
+            linha que leva até ele — ou ao 192, com o SOS desligado. */}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Sentiu algo estranho? Pare e abra o SOS"
+          accessibilityLabel={`Sentiu algo estranho? Pare. ${ROTULO_DO_SOCORRO}`}
           onPress={() => {
             toque();
-            router.push("/sos");
+            pedirSocorro();
           }}
           style={({ pressed }) => ({
             marginTop: 28,
@@ -356,7 +358,9 @@ export default function Mexer() {
             }}
           >
             Sentiu algo estranho?{" "}
-            <Text style={{ fontFamily: fonte.titulo }}>Pare e abra o SOS.</Text>
+            <Text style={{ fontFamily: fonte.titulo }}>
+              {SOS_NO_APP ? "Pare e abra o SOS." : "Pare e, se precisar, ligue 192."}
+            </Text>
           </Text>
           <ChevronRight size={20} color={corMovimento.alertaTexto} />
         </Pressable>

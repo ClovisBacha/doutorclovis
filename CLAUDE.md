@@ -18,7 +18,25 @@ servidor dele (`/_serverFn/<sha256 do arquivo e do nome>`, ver
 site do ar derruba compras, SOS e tudo o que passa pelo servidor — e mexer num
 arquivo de `src/` que o app importa muda o que o app faz.
 
-## ⚠️ O APP É REDE SOCIAL + GAMIFICAÇÃO, NÃO CONSELHO MÉDICO (decisão do dono, 21/10/2026)
+## ⚠️ O APP É UM DUOLINGO PARA GESTANTES (decisão do dono, 11/11/2026)
+
+Nas palavras dele: "o Duolingo para grávidas [...] tirar o SOS [...] tirar a
+rede social também. Eu quero deixar mais simples possível pra gente lançar
+esse aplicativo logo." A trilha é a primeira aba (Trilha · Amigas · Bebê); as
+Amigas são a única parte social ("a comunidade da gamificação"); o Bebê guarda
+o acompanhamento e o contato do médico. Exames ficaram para depois.
+
+- **O SOS e a Comunidade estão desligados por chave, não apagados**:
+  `SOS_NO_APP` e `COMUNIDADE_NO_APP` em `mobile/src/config.ts` (o padrão do
+  `IA_NO_APP`). Cada tela deles redireciona quando a chave está desligada, e
+  onde o app dizia "abra o SOS" ele oferece ligar 192 (`lib/socorro.ts`).
+  ⚠️ Religar uma chave obriga a reescrever junto os Termos, a Privacidade, o
+  consentimento e a loja — `juridico.test.ts` e `barra.test.ts` cobram que
+  as duas estão desligadas enquanto os textos dizem isso.
+- A regra de 21/10 abaixo continua valendo, com uma troca: sem o SOS, o sinal
+  de alerta vira "ligue 192"; o app segue sem conduta nenhuma.
+
+## ⚠️ O APP NÃO É CONSELHO MÉDICO (decisão do dono, 21/10/2026)
 
 Nas palavras dele: "Essa questão de conselhos médicos etc queria tirar a ideia,
 seria mais usar como uma rede social e questão da gamificação. Alguns dados de
@@ -62,7 +80,8 @@ guardar da saúde para o SOS e o acompanhamento do Bebê."
   (`80924413-1ea8-4e64-9719-e00b86796f05`); o arquivo vai para
   `mobile/assets/vozes/regravadas/<id>.mp3` (nunca em `src/assets/audio`) e
   `bun mobile/scripts/gerar-mapa-das-regravadas.ts` liga texto e voz juntos.
-- **A rede no centro (fase 3, builds 37–41):** a barra é Hoje · Comunidade ·
+- **A rede no centro (fase 3, builds 37–41) — desligada em 11/11 pela
+  `COMUNIDADE_NO_APP`; vale para quando voltar:** a barra é Hoje · Comunidade ·
   SOS · Amigas · Bebê (`barra.test.ts`); um perfil só, em `/perfil`, e o nome
   dela se grava só em `/perfil/editar`, pelas regras da Comunidade
   (`perfil-unico.test.ts`); "fase parecida" nasce desligada, como o
@@ -71,7 +90,7 @@ guardar da saúde para o SOS e o acompanhamento do Bebê."
   canal sai o aviso semanal da Vercel (`/api/push-weekly-tick`) com o texto do
   bebê do SITE, inclusive o clínico. Ligar o push social é decisão do dono —
   ver o diário, "28/10 — fase 3, a rede social no centro: o plano".
-- **Os Termos e a Privacidade são do app (fase 4, builds 42–43):** o texto
+- **Os Termos e a Privacidade são do app (fase 4, builds 42–44):** o texto
   mora em `mobile/src/lib/juridico/`, sai das telas `/termos` e `/privacidade`,
   e o aceite é por versão (`VERSAO_DOS_TERMOS`). Mudou o que o app coleta (uma
   tabela, uma permissão, um SDK, um canal do SOS)? A Privacidade muda junto, e

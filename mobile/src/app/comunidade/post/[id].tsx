@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from "expo-router";
+import { Redirect, useLocalSearchParams } from "expo-router";
 import { Flag, Send, Trash2, X } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -31,6 +31,7 @@ import { useRegrasDaComunidade } from "~/lib/comunidade/usar-regras";
 import { useSessao } from "~/lib/sessao";
 import type { ComentarioNaTela, PostNaTela } from "~/servidor/rede";
 import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
+import { COMUNIDADE_NO_APP } from "~/config";
 
 type Comentarios = {
   lista: ComentarioNaTela[];
@@ -45,11 +46,19 @@ type Comentarios = {
  * aceita o texto e o servidor recusa depois é botão que promete e não cumpre.
  * ⚠️ Comentar com sucesso não devolve o comentário: a lista é lida de novo.
  */
+/** Com a Comunidade desligada (`COMUNIDADE_NO_APP`), um link antigo cai na trilha. */
 export default function TelaDoPost() {
+  if (!COMUNIDADE_NO_APP) return <Redirect href="/jornada" />;
+  return <TelaDoPostNoApp />;
+}
+
+function TelaDoPostNoApp() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const postId = String(id ?? "");
   const [posts, setPosts] = useState<PostNaTela[]>([]);
-  const [estadoPost, setEstadoPost] = useState<"carregando" | "pronto" | "indisponivel" | "falhou">("carregando");
+  const [estadoPost, setEstadoPost] = useState<"carregando" | "pronto" | "indisponivel" | "falhou">(
+    "carregando",
+  );
   const [comentarios, setComentarios] = useState<Comentarios | null>(null);
   const [estadoCom, setEstadoCom] = useState<"carregando" | "pronto" | "falhou">("carregando");
   const [texto, setTexto] = useState("");
@@ -156,7 +165,8 @@ export default function TelaDoPost() {
                 aoTocar: () => {
                   const alvo = menu;
                   void api.apagarComentario(alvo.id).then(async (r) => {
-                    if (!r.ok) return aviso.mostrar(mensagemDoErro(r.motivo, r.recado, "comentario"), true);
+                    if (!r.ok)
+                      return aviso.mostrar(mensagemDoErro(r.motivo, r.recado, "comentario"), true);
                     aviso.mostrar("Comentário apagado.");
                     await lerComentarios();
                   });
@@ -186,8 +196,14 @@ export default function TelaDoPost() {
   return (
     <SafeAreaView edges={["top", "bottom"]} style={{ flex: 1, backgroundColor: cor.fundo }}>
       <Cabecalho titulo="Publicação" />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <ScrollView contentContainerStyle={{ paddingVertical: espaco.lg, gap: espaco.lg }} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <ScrollView
+          contentContainerStyle={{ paddingVertical: espaco.lg, gap: espaco.lg }}
+          keyboardShouldPersistTaps="handled"
+        >
           {estadoPost === "carregando" ? <Carregando /> : null}
           {estadoPost === "indisponivel" ? (
             <Cartao estilo={{ marginHorizontal: espaco.lg }}>
@@ -197,7 +213,10 @@ export default function TelaDoPost() {
           ) : null}
           {estadoPost === "falhou" ? (
             <View style={{ marginHorizontal: espaco.lg }}>
-              <NaoConsegueLer sossego="A publicação continua lá." aoTentar={() => void carregar()} />
+              <NaoConsegueLer
+                sossego="A publicação continua lá."
+                aoTentar={() => void carregar()}
+              />
             </View>
           ) : null}
           {post ? <CartaoDoPost post={post} agora={agora} acoes={acoes} textoInteiro /> : null}
@@ -205,17 +224,29 @@ export default function TelaDoPost() {
           {estadoPost === "pronto" && post ? (
             <View style={{ marginHorizontal: espaco.lg, gap: espaco.md }}>
               <T tipo="subtitulo">Comentários</T>
-              {estadoCom === "carregando" ? <Carregando texto="Carregando os comentários…" /> : null}
+              {estadoCom === "carregando" ? (
+                <Carregando texto="Carregando os comentários…" />
+              ) : null}
               {estadoCom === "falhou" ? (
-                <NaoConsegueLer sossego="Os comentários continuam lá." aoTentar={() => void lerComentarios()} />
+                <NaoConsegueLer
+                  sossego="Os comentários continuam lá."
+                  aoTentar={() => void lerComentarios()}
+                />
               ) : null}
               {estadoCom === "pronto" && conversas.length === 0 ? (
                 <T tipo="apagado">
-                  {campo ? "Ninguém comentou ainda. Que tal ser a primeira?" : "Ninguém comentou ainda."}
+                  {campo
+                    ? "Ninguém comentou ainda. Que tal ser a primeira?"
+                    : "Ninguém comentou ainda."}
                 </T>
               ) : null}
               {conversas.map((c) => (
-                <ConversaNaTela key={c.raiz.id} conversa={c} agora={agora} acoes={acoesDoComentario} />
+                <ConversaNaTela
+                  key={c.raiz.id}
+                  conversa={c}
+                  agora={agora}
+                  acoes={acoesDoComentario}
+                />
               ))}
               {estadoCom === "pronto" && comentarios && !comentarios.abertos ? (
                 <T tipo="apagado">A autora fechou os comentários desta publicação.</T>
@@ -225,22 +256,58 @@ export default function TelaDoPost() {
         </ScrollView>
 
         {campo && post ? (
-          <View style={{ borderTopWidth: 1, borderTopColor: cor.borda, backgroundColor: cor.cartao, paddingHorizontal: espaco.md, paddingVertical: espaco.sm, gap: espaco.xs }}>
+          <View
+            style={{
+              borderTopWidth: 1,
+              borderTopColor: cor.borda,
+              backgroundColor: cor.cartao,
+              paddingHorizontal: espaco.md,
+              paddingVertical: espaco.sm,
+              gap: espaco.xs,
+            }}
+          >
             {recusa ? (
-              <View style={{ backgroundColor: cor.atencaoFundo, borderRadius: raio.md, padding: espaco.md }}>
-                <Text style={{ fontFamily: fonte.media, fontSize: 14, lineHeight: 20, color: cor.texto }}>{recusa}</Text>
+              <View
+                style={{
+                  backgroundColor: cor.atencaoFundo,
+                  borderRadius: raio.md,
+                  padding: espaco.md,
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: fonte.media,
+                    fontSize: 14,
+                    lineHeight: 20,
+                    color: cor.texto,
+                  }}
+                >
+                  {recusa}
+                </Text>
               </View>
             ) : null}
             {respondendo ? (
               <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <Text style={{ flex: 1, fontFamily: fonte.media, fontSize: 13, color: cor.textoApagado }}>
+                <Text
+                  style={{
+                    flex: 1,
+                    fontFamily: fonte.media,
+                    fontSize: 13,
+                    color: cor.textoApagado,
+                  }}
+                >
                   Respondendo a {respondendo.autorNome}
                 </Text>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="Cancelar a resposta"
                   onPress={() => setRespondendo(null)}
-                  style={{ width: ALVO_MINIMO, height: ALVO_MINIMO - 8, alignItems: "center", justifyContent: "center" }}
+                  style={{
+                    width: ALVO_MINIMO,
+                    height: ALVO_MINIMO - 8,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
                 >
                   <X size={18} color={cor.textoApagado} />
                 </Pressable>
@@ -289,11 +356,22 @@ export default function TelaDoPost() {
                   justifyContent: "center",
                 }}
               >
-                {enviando ? <ActivityIndicator color={cor.branco} /> : <Send size={20} color={cor.branco} />}
+                {enviando ? (
+                  <ActivityIndicator color={cor.branco} />
+                ) : (
+                  <Send size={20} color={cor.branco} />
+                )}
               </Pressable>
             </View>
             {texto.length > LIMITE_DO_COMENTARIO - 80 ? (
-              <Text style={{ fontFamily: fonte.normal, fontSize: 13, color: cor.textoApagado, textAlign: "right" }}>
+              <Text
+                style={{
+                  fontFamily: fonte.normal,
+                  fontSize: 13,
+                  color: cor.textoApagado,
+                  textAlign: "right",
+                }}
+              >
                 {texto.length}/{LIMITE_DO_COMENTARIO}
               </Text>
             ) : null}

@@ -154,7 +154,7 @@ export const PERGUNTAS_NO_APP: Readonly<
     },
     app: {
       texto: "Quem te disse alguma coisa boa sobre o parto?",
-      fichas: ["Alguém da Comunidade 💬", "Alguém que já passou 💛", "Quem mora comigo 🏠"],
+      fichas: ["Uma amiga 💬", "Alguém que já passou 💛", "Quem mora comigo 🏠"],
     },
   },
   "t3-espera": {

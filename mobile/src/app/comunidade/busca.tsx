@@ -1,6 +1,6 @@
 import { ROTULO_DO_FILTRO, VAZIO_DO_FILTRO } from "@/lib/fase-parecida";
 import { MINIMO_DA_BUSCA } from "@/lib/rede-social";
-import { router, useLocalSearchParams } from "expo-router";
+import { Redirect, router, useLocalSearchParams } from "expo-router";
 import { Search, X } from "lucide-react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FlatList, Pressable, ScrollView, Switch, Text, TextInput, View } from "react-native";
@@ -14,6 +14,7 @@ import { api } from "~/lib/comunidade/api";
 import { mensagemDoErro, rotuloDoBotaoSeguir } from "~/lib/comunidade/regras";
 import type { PerfilNaTela, PessoaNaLista } from "~/servidor/rede";
 import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
+import { COMUNIDADE_NO_APP } from "~/config";
 
 /**
  * BUSCAR PESSOAS — e, com a caixa vazia, a DESCOBERTA: "Pessoas para seguir",
@@ -28,7 +29,13 @@ import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
  * rótulo fala da fase DELA ("parecida com a sua"), nunca das outras; ninguém
  * aparece marcado com a fase; e o vazio explica a régua.
  */
+/** Com a Comunidade desligada (`COMUNIDADE_NO_APP`), um link antigo cai na trilha. */
 export default function Busca() {
+  if (!COMUNIDADE_NO_APP) return <Redirect href="/jornada" />;
+  return <BuscaNoApp />;
+}
+
+function BuscaNoApp() {
   const { fase } = useLocalSearchParams<{ fase?: string }>();
   const [termo, setTermo] = useState("");
   const [perfis, setPerfis] = useState<PerfilNaTela[]>([]);

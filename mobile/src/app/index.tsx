@@ -4,6 +4,7 @@ import { ehBancada } from "~/lib/bancada";
 import { precisaAceitar, VERSAO_DOS_TERMOS } from "~/lib/juridico/aceite";
 import { aceitouNestaSessao } from "~/lib/juridico/aceite-da-sessao";
 import { useSessao } from "~/lib/sessao";
+import { SOS_NO_APP } from "~/config";
 
 /** A porta do app: decide para onde cada estado vai, num lugar só. */
 export default function Porta() {
@@ -23,16 +24,22 @@ export default function Porta() {
     return (
       <Tela>
         <NaoConsegueLer
-          sossego="Os seus dados continuam guardados. O SOS funciona sem internet."
+          sossego={
+            SOS_NO_APP
+              ? "Os seus dados continuam guardados. O SOS funciona sem internet."
+              : "Os seus dados continuam guardados."
+          }
           aoTentar={() => void recarregarPerfil()}
         />
-        <Botao rotulo="Abrir o SOS" tipo="perigo" aoTocar={() => router.push("/sos")} />
+        {SOS_NO_APP ? (
+          <Botao rotulo="Abrir o SOS" tipo="perigo" aoTocar={() => router.push("/sos")} />
+        ) : null}
       </Tela>
     );
   /* Sem perfil, ou sem nenhuma âncora da gestação (e sem parto), o ritual
      de boas-vindas pede o que falta. */
   const temAncora = !!(perfil?.lmp_date || perfil?.reference_date || perfil?.birth_date);
   if (!perfil || !temAncora) return <Redirect href="/ritual" />;
-  /* O app abre no "Hoje", o cuidado do dia (decisão do dono, out/2026). */
+  /* O app abre na trilha, como no Duolingo (decisão do dono, 11/11/2026). */
   return <Redirect href="/jornada" />;
 }

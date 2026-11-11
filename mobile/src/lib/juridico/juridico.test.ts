@@ -121,15 +121,12 @@ describe("os documentos do app", () => {
   });
 
   test("o dado de saúde é exatamente o que o app guarda, e tem consentimento próprio", () => {
-    for (const parte of [
-      "cartão do SOS",
-      "datação da gestação",
-      "nascimento",
-      "movimentos do bebê",
-    ]) {
+    for (const parte of ["datação da gestação", "nascimento", "movimentos do bebê"]) {
       expect(TEXTO_DO_CONSENTIMENTO_DE_SAUDE).toContain(parte);
       expect(textoDe(PRIVACIDADE)).toContain(parte);
     }
+    /* Sem o SOS no app (11/11/2026), o consentimento não pede o cartão dele. */
+    expect(TEXTO_DO_CONSENTIMENTO_DE_SAUDE).not.toContain("SOS");
     expect(textoDe(PRIVACIDADE)).toContain("art. 11, I");
     expect(textoDe(PRIVACIDADE)).toMatch(
       /não pede peso, altura, pressão, glicemia, exames, sintomas/,
@@ -137,7 +134,7 @@ describe("os documentos do app", () => {
     expect(PONTOS_DO_ACEITE.join(" ")).toContain("não dá orientação médica");
   });
 
-  test("o que a Privacidade promete, o app faz (o inventário do build 43)", () => {
+  test("o que a Privacidade promete, o app faz (o inventário do build 43)", async () => {
     const privacidade = textoDe(PRIVACIDADE);
     /* A localização é só "durante o uso". Com a chave "sempre" no Info.plist,
        o expo-location pede "sempre" até no pedido comum
@@ -159,23 +156,28 @@ describe("os documentos do app", () => {
         ),
       ).map((f) => f.arquivo),
     ).toEqual([]);
-    expect(privacidade).toContain("só enquanto o app está aberto");
+    /* Sem o SOS (11/11/2026), o app não pede a localização: o texto diz isso,
+       e a chave que a esconde precisa estar desligada. */
+    const { COMUNIDADE_NO_APP, SOS_NO_APP } = await import("~/config");
+    expect(SOS_NO_APP).toBe(false);
+    expect(privacidade).toContain("O app não pede a sua localização.");
     /* A cópia dos dados existe onde o texto diz. */
     expect(privacidade).toContain("Perfil → Baixar uma cópia dos meus dados");
     expect(fonte(join("app", "perfil", "index.tsx"))).toContain("Baixar uma cópia dos meus dados");
     expect(fonte(join("app", "perfil", "index.tsx"))).toContain("exportarMeusDados(");
-    /* O cartão do SOS vai para a conta: a tela não pode dizer que fica só no celular. */
+    /* O que a tela guarda vai para a conta: ela não pode dizer que fica só no celular. */
     expect(fonte(join("app", "perfil", "dados.tsx"))).not.toMatch(/Fica guardado no celular/);
     /* As amigas veem o nome do bebê: o texto e a chave do perfil dizem isso. */
-    expect(privacidade).toMatch(/para as amigas, o seu nome, o nome do bebê/);
+    expect(privacidade).toMatch(/amigas no app: o seu nome, a sua foto, o nome do bebê/);
     expect(fonte(join("app", "perfil", "editar.tsx"))).toContain(
       "As suas amigas veem o nome do bebê de qualquer jeito",
     );
-    /* O SOS manda o aviso mesmo sem localização, e por mais de um canal. */
-    for (const doc of [TERMOS, PRIVACIDADE]) {
-      expect(textoDe(doc)).toMatch(/se você permitir/);
-      expect(textoDe(doc)).toMatch(/WhatsApp ou SMS/);
-    }
+    /* O SOS e a Comunidade estão desligados: os documentos não os descrevem
+       (a Privacidade só lembra o que ficou guardado de uma versão anterior). */
+    expect(COMUNIDADE_NO_APP).toBe(false);
+    expect(textoDe(TERMOS)).not.toMatch(/\bSOS\b|Comunidade|publica/);
+    expect(privacidade).not.toMatch(/Pedir socorro|WhatsApp|comentários|denúncias/);
+    expect(PONTOS_DO_ACEITE.join(" ")).not.toMatch(/\bSOS\b|Comunidade/);
   });
 });
 
@@ -194,7 +196,7 @@ describe("o aceite na porta do app", () => {
     expect(cadastro).toContain("destaque");
   });
 
-  test("o aceite tem o SOS à mão, e não prende ninguém (sair e excluir)", () => {
+  test("o aceite não prende ninguém (sair e excluir), e o SOS volta com a chave", () => {
     const aceite = fonte(join("app", "aceite.tsx"));
     expect(aceite).toContain("<PilulaSos />");
     expect(aceite).toContain("Sair da conta");

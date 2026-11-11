@@ -3,13 +3,13 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Linking from "expo-linking";
 import * as SMS from "expo-sms";
-import { router } from "expo-router";
+import { Redirect, router } from "expo-router";
 import { ChevronRight, X } from "lucide-react-native";
 import { useEffect, useState, type ReactNode } from "react";
 import { Platform, Pressable, ScrollView, Text, useWindowDimensions, View } from "react-native";
 import { toque } from "~/componentes/base";
 import { Fone, LogoWhatsApp, Pino, QrDaFicha, Sirene } from "~/componentes/sos";
-import { BOMBEIROS, CVV, SAMU } from "~/config";
+import { BOMBEIROS, CVV, SAMU, SOS_NO_APP } from "~/config";
 import { ehBancada } from "~/lib/bancada";
 import { gestacaoDoPerfil } from "~/lib/gestacao";
 import {
@@ -61,7 +61,13 @@ type EstadoDoLugar = "buscando" | "pronto" | "negado" | "semSinal";
  * Nunca passa pelo Modo Cuidado — socorro não se esconde. No luto a ficha
  * não diz "gestante" nem a semana (situacaoParaSocorro).
  */
+/** Com o SOS desligado (`SOS_NO_APP`), um link antigo cai no começo do app. */
 export default function Sos() {
+  if (!SOS_NO_APP) return <Redirect href="/" />;
+  return <TelaDoSos />;
+}
+
+function TelaDoSos() {
   const { sessao, perfil } = useSessao();
   const { width } = useWindowDimensions();
   const [kitGuardado, setKitGuardado] = useState<KitDoSos | null>(null);

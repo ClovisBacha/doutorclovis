@@ -29,6 +29,8 @@ import { usarRelogio, usarRetorno, usarTelaAcesa } from "~/lib/saude/usar-retorn
 import { useSessao } from "~/lib/sessao";
 import { supabase } from "~/servidor/supabase";
 import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
+import { Redirect } from "expo-router";
+import { SOS_NO_APP } from "~/config";
 
 /**
  * O CRONÔMETRO DE CONTRAÇÕES — um cronômetro simples, aberto de dentro do SOS.
@@ -42,7 +44,13 @@ import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
  *
  * Fica no Modo Cuidado: quem perdeu a gestação pode estar em trabalho de parto.
  */
+/** Com o SOS desligado (`SOS_NO_APP`), um link antigo cai no começo do app. */
 export default function Contracoes() {
+  if (!SOS_NO_APP) return <Redirect href="/" />;
+  return <TelaDasContracoes />;
+}
+
+function TelaDasContracoes() {
   const { sessao } = useSessao();
   const uid = sessao?.user.id ?? null;
 

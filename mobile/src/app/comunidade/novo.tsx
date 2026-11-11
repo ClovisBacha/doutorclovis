@@ -1,7 +1,7 @@
 import { MOTIVOS_SENSIVEIS } from "@/lib/conteudo-sensivel";
 import { LIMITE_DO_TEXTO, VISIBILIDADES, type Visibilidade } from "@/lib/rede-social";
 import { Image } from "expo-image";
-import { router } from "expo-router";
+import { Redirect, router } from "expo-router";
 import {
   Camera,
   Check,
@@ -44,6 +44,7 @@ import { marcarFeedSujo } from "~/lib/comunidade/sinal";
 import { useRegrasDaComunidade } from "~/lib/comunidade/usar-regras";
 import { useSessao } from "~/lib/sessao";
 import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
+import { COMUNIDADE_NO_APP } from "~/config";
 
 const ICONE = { publico: Globe, seguidores: Users, amigas: Lock } as const;
 
@@ -56,7 +57,13 @@ const ICONE = { publico: Globe, seguidores: Users, amigas: Lock } as const;
  * ⚠️ Recusa do servidor mostra o `recado` como chegou (é a triagem clínica),
  * e o texto fica para ela reescrever.
  */
+/** Com a Comunidade desligada (`COMUNIDADE_NO_APP`), um link antigo cai na trilha. */
 export default function NovoPost() {
+  if (!COMUNIDADE_NO_APP) return <Redirect href="/jornada" />;
+  return <NovoPostNoApp />;
+}
+
+function NovoPostNoApp() {
   const { cuidado } = useSessao();
   const [texto, setTexto] = useState("");
   const [fotos, setFotos] = useState<string[]>([]);

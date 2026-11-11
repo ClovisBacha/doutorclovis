@@ -1,6 +1,5 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
 import { useState, type ReactNode } from "react";
 import { Animated, Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -17,11 +16,10 @@ import {
   Selo,
   useMomentoDoDia,
 } from "~/componentes/jornada/hoje";
-import { rota } from "~/componentes/jornada/bancada";
 import { RECEM_NASCIDO } from "~/componentes/jornada/nascimento";
 import { Confete } from "~/componentes/jornada/pecas";
 import { ArteDaBolha, Flutuar, type HumorDaArte } from "~/componentes/movimento";
-import { CVV } from "~/config";
+import { CVV, SOS_NO_APP } from "~/config";
 import { ligar } from "~/lib/links";
 import {
   faseDoPos,
@@ -34,6 +32,7 @@ import {
 } from "~/lib/jornada/pos-parto";
 import type { FlagsDoDia } from "~/lib/jornada/momentos";
 import { cor, espaco, fonte } from "~/tema";
+import { pedirSocorro } from "~/lib/socorro";
 
 /**
  * HOJE, NO 4º TRIMESTRE — a mesma tela do cuidado diário, agora com o bebê no
@@ -570,7 +569,7 @@ function Apoio() {
       </Text>
       <Text style={{ fontFamily: fonte.media, fontSize: 14, lineHeight: 20, color: "#4b3a63" }}>
         Dias assim acontecem, e você não precisa atravessá-los sozinha. A qualquer hora, o CVV
-        escuta de graça — e o SOS do app fica a um toque.
+        escuta de graça{SOS_NO_APP ? " — e o SOS do app fica a um toque" : ""}.
       </Text>
       <View style={{ flexDirection: "row", gap: espaco.sm }}>
         <Pressable
@@ -598,7 +597,7 @@ function Apoio() {
           accessibilityRole="button"
           onPress={() => {
             toque();
-            router.push(rota("/sos") as never);
+            pedirSocorro();
           }}
           style={({ pressed }) => ({
             flex: 1,
@@ -613,7 +612,7 @@ function Apoio() {
           })}
         >
           <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: "#6d28d9" }}>
-            Abrir o SOS
+            {SOS_NO_APP ? "Abrir o SOS" : "Ligar 192"}
           </Text>
         </Pressable>
       </View>

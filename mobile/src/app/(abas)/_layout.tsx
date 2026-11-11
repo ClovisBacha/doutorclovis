@@ -1,5 +1,5 @@
 import { Redirect, router, Tabs } from "expo-router";
-import { Baby, House, MessageCircleHeart, Sun, Users } from "lucide-react-native";
+import { Baby, House, MessageCircleHeart, Sprout, Users } from "lucide-react-native";
 import { useCallback, useEffect, useRef } from "react";
 import { Animated, AppState, Easing, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -10,19 +10,18 @@ import { Pulso, useMovimentoReduzido } from "~/componentes/movimento";
 import { api } from "~/lib/comunidade/api";
 import { mudarSelos, rotuloDaAba, textoDoSelo, useSelos, zerarSelos } from "~/lib/selos";
 import { useSessao } from "~/lib/sessao";
+import { COMUNIDADE_NO_APP, SOS_NO_APP } from "~/config";
 import { ALVO_MINIMO, cor, fonte } from "~/tema";
 
 /**
- * A BARRA: Hoje · Comunidade · SOS · Amigas · Bebê (21/10/2026, decisão do
- * dono: o app é rede social + gamificação). O cuidado do dia abre o app; as
- * duas abas da rede ficam uma de cada lado do SOS; o bebê, na ponta.
+ * A BARRA: Trilha · Amigas · Bebê (11/11/2026, decisão do dono: "um Duolingo
+ * para gestantes", o mais simples possível para lançar). A trilha abre o app,
+ * como no Duolingo; as Amigas são a parte social do jogo; o bebê, na ponta.
  *
- * A aba Saúde saiu: depois da fase 1 ela só guardava os Movimentos do bebê
- * (que moram no Bebê) e a agenda (que mora no Hoje e no Bebê).
- *
- * O SOS não é uma aba: é um botão que abre a folha de emergência por cima de
- * qualquer tela, em qualquer estado — inclusive no Modo Cuidado, porque quem
- * perdeu a gestação continua podendo passar mal.
+ * Com as chaves de `config.ts` ligadas, voltam a aba Comunidade
+ * (`COMUNIDADE_NO_APP`) e o botão do SOS no meio (`SOS_NO_APP`): o SOS não é
+ * uma aba, é um botão que abre a folha de emergência por cima de qualquer
+ * tela, inclusive no Modo Cuidado.
  */
 export default function LayoutDasAbas() {
   const { sessao, carregandoSessao, cuidado } = useSessao();
@@ -36,9 +35,12 @@ export default function LayoutDasAbas() {
       screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: cor.fundo } }}
       tabBar={(props) => <BarraDeBaixo {...props} />}
     >
-      {/* "Hoje": o cuidado do dia é a porta do app (a trilha abre dali). */}
-      <Tabs.Screen name="jornada" options={{ title: "Hoje" }} />
-      <Tabs.Screen name="comunidade" options={{ title: "Comunidade" }} />
+      {/* A trilha é a porta do app, como no Duolingo. */}
+      <Tabs.Screen name="jornada" options={{ title: "Trilha" }} />
+      <Tabs.Screen
+        name="comunidade"
+        options={{ title: "Comunidade", ...(COMUNIDADE_NO_APP ? {} : { href: null }) }}
+      />
       <Tabs.Screen name="amigas" options={{ title: "Amigas" }} />
       {/* No Modo Cuidado a aba não fala do bebê: vira "Início", com uma casa. */}
       <Tabs.Screen name="inicio" options={{ title: cuidado ? "Início" : "Bebê" }} />
@@ -57,9 +59,12 @@ const RELEITURA_MS = 3 * 60_000;
  */
 function useSelosDaBarra(ligado: boolean, pos: boolean) {
   const atualizar = useCallback(async () => {
-    const [atividade, amigas] = await Promise.all([api.minhaAtividade(), contarParaOSelo(pos)]);
+    const [atividade, amigas] = await Promise.all([
+      COMUNIDADE_NO_APP ? api.minhaAtividade() : Promise.resolve(null),
+      contarParaOSelo(pos),
+    ]);
     mudarSelos({
-      ...(atividade.ok ? { comunidade: atividade.novas } : {}),
+      ...(atividade?.ok ? { comunidade: atividade.novas } : {}),
       ...(amigas !== null ? { amigas } : {}),
     });
   }, [pos]);
@@ -83,7 +88,7 @@ function useSelosDaBarra(ligado: boolean, pos: boolean) {
 }
 
 const ICONES = {
-  jornada: Sun,
+  jornada: Sprout,
   comunidade: MessageCircleHeart,
   amigas: Users,
   inicio: Baby,
@@ -92,9 +97,13 @@ const ICONES = {
 function BarraDeBaixo({ state, navigation, descriptors }: any) {
   const baixo = useSafeAreaInsets().bottom;
   const selos = useSelos();
-  const rotas = state.routes as { key: string; name: keyof typeof ICONES }[];
-  const item = (rota: (typeof rotas)[number], i: number) => {
-    const ativo = state.index === i;
+  /* As abas escondidas por uma chave (`href: null`, que o expo-router troca
+     por `tabBarItemStyle: { display: "none" }`) ficam fora da barra. */
+  const rotas = (state.routes as { key: string; name: keyof typeof ICONES }[]).filter(
+    (r) => descriptors[r.key]?.options?.tabBarItemStyle?.display !== "none",
+  );
+  const item = (rota: (typeof rotas)[number]) => {
+    const ativo = state.routes[state.index]?.key === rota.key;
     const titulo = descriptors[rota.key]?.options?.title ?? rota.name;
     const Icone = rota.name === "inicio" && titulo === "Início" ? House : ICONES[rota.name];
     const n =
@@ -155,47 +164,54 @@ function BarraDeBaixo({ state, navigation, descriptors }: any) {
         paddingHorizontal: 4,
       }}
     >
-      {rotas.slice(0, 2).map((r, i) => item(r, i))}
-      <View style={{ flex: 1, alignItems: "center" }}>
-        <HaloDoSos />
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="SOS — emergência"
-          accessibilityHint="Abre a tela de emergência: ligar 192 e avisar quem você cadastrou"
-          onPress={() => {
-            toque(false);
-            router.push("/sos");
+      {rotas.slice(0, SOS_NO_APP ? 2 : rotas.length).map((r) => item(r))}
+      {SOS_NO_APP ? <BotaoDoSos /> : null}
+      {SOS_NO_APP ? rotas.slice(2).map((r) => item(r)) : null}
+    </View>
+  );
+}
+
+/** O SOS no meio da barra (só com `SOS_NO_APP`). */
+function BotaoDoSos() {
+  return (
+    <View style={{ flex: 1, alignItems: "center" }}>
+      <HaloDoSos />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="SOS — emergência"
+        accessibilityHint="Abre a tela de emergência: ligar 192 e avisar quem você cadastrou"
+        onPress={() => {
+          toque(false);
+          router.push("/sos");
+        }}
+        style={({ pressed }) => ({
+          width: 64,
+          height: 64,
+          marginTop: -26,
+          borderRadius: 32,
+          backgroundColor: pressed ? cor.urgentePressionado : cor.urgente,
+          alignItems: "center",
+          justifyContent: "center",
+          borderWidth: 4,
+          borderColor: cor.cartao,
+          shadowColor: "#b91c1c",
+          shadowOpacity: 0.35,
+          shadowRadius: 10,
+          shadowOffset: { width: 0, height: 4 },
+          elevation: 6,
+        })}
+      >
+        <Text
+          style={{
+            fontFamily: fonte.titulo,
+            fontSize: 18,
+            color: cor.branco,
+            letterSpacing: 0.5,
           }}
-          style={({ pressed }) => ({
-            width: 64,
-            height: 64,
-            marginTop: -26,
-            borderRadius: 32,
-            backgroundColor: pressed ? cor.urgentePressionado : cor.urgente,
-            alignItems: "center",
-            justifyContent: "center",
-            borderWidth: 4,
-            borderColor: cor.cartao,
-            shadowColor: "#b91c1c",
-            shadowOpacity: 0.35,
-            shadowRadius: 10,
-            shadowOffset: { width: 0, height: 4 },
-            elevation: 6,
-          })}
         >
-          <Text
-            style={{
-              fontFamily: fonte.titulo,
-              fontSize: 18,
-              color: cor.branco,
-              letterSpacing: 0.5,
-            }}
-          >
-            SOS
-          </Text>
-        </Pressable>
-      </View>
-      {rotas.slice(2, 4).map((r, i) => item(r, i + 2))}
+          SOS
+        </Text>
+      </Pressable>
     </View>
   );
 }

@@ -1,5 +1,13 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { BookOpen, HeartHandshake, Siren, Sparkles, type LucideIcon } from "lucide-react-native";
+import {
+  BookOpen,
+  HeartHandshake,
+  Siren,
+  Sparkles,
+  Sprout,
+  type LucideIcon,
+} from "lucide-react-native";
+import { SOS_NO_APP } from "~/config";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Animated,
@@ -225,8 +233,10 @@ export function DivisorDaEntrada({ texto }: { texto: string }) {
 const FRASES: { icone: LucideIcon; texto: string }[] = [
   { icone: BookOpen, texto: "Uma aula curtinha por dia" },
   { icone: Sparkles, texto: "Estrelas e conquistas a cada passo" },
-  { icone: HeartHandshake, texto: "Outras gestantes do seu lado" },
-  { icone: Siren, texto: "SOS que funciona até sem internet" },
+  { icone: HeartHandshake, texto: "Amigas jogando junto com você" },
+  SOS_NO_APP
+    ? { icone: Siren, texto: "SOS que funciona até sem internet" }
+    : { icone: Sprout, texto: "Sementinhas para cada passo da trilha" },
 ];
 
 export function FrasesQueGiram() {

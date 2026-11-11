@@ -32,6 +32,7 @@ import { ehOfensivo, mensagemDoErro, recadoDaOfensa } from "~/lib/comunidade/reg
 import { useSessao } from "~/lib/sessao";
 import type { PerfilNaTela } from "~/servidor/rede";
 import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
+import { COMUNIDADE_NO_APP } from "~/config";
 
 /**
  * EDITAR PERFIL — o que a rede vê dela: a foto, o nome, a bio, o @, se o
@@ -109,7 +110,7 @@ export default function EditarPerfil() {
     /* O filtro de ofensa antes de sair do aparelho (Apple 1.2). */
     if (ehOfensivo(nome)) {
       aviso.mostrar(
-        "O nome não pode ser salvo assim: ele tem palavras que as regras da Comunidade não permitem.",
+        "O nome não pode ser salvo assim: ele tem palavras que as regras do app não permitem.",
         true,
       );
       return;
@@ -219,7 +220,8 @@ export default function EditarPerfil() {
         ) : null}
         {estado === "pronto" && perfil ? (
           <>
-            {/* A foto, o nome e a bio: um Salvar para os três. */}
+            {/* A foto, o nome e a bio: um Salvar para os três. Sem a Comunidade
+                (`COMUNIDADE_NO_APP`), ficam só a foto e o nome, que as Amigas mostram. */}
             <Cartao estilo={{ gap: espaco.md }}>
               <View style={{ alignItems: "center", gap: espaco.sm }}>
                 <Pressable
@@ -255,50 +257,52 @@ export default function EditarPerfil() {
                 maxLength={60}
                 autoCapitalize="words"
               />
-              <View style={{ gap: 6 }}>
-                <Campo
-                  rotulo="Bio"
-                  value={bio}
-                  onChangeText={(t) => {
-                    setBio(t);
-                    if (erroBio) setErroBio(null);
-                  }}
-                  maxLength={LIMITE_DA_BIO}
-                  multiline
-                  placeholder="Uma frase sobre você"
-                  style={{ minHeight: 80 }}
-                />
-                <Text
-                  style={{
-                    alignSelf: "flex-end",
-                    fontFamily: fonte.normal,
-                    fontSize: 13,
-                    color: cor.textoApagado,
-                  }}
-                >
-                  {bio.length}/{LIMITE_DA_BIO}
-                </Text>
-                {erroBio ? (
-                  <View
+              {COMUNIDADE_NO_APP ? (
+                <View style={{ gap: 6 }}>
+                  <Campo
+                    rotulo="Bio"
+                    value={bio}
+                    onChangeText={(t) => {
+                      setBio(t);
+                      if (erroBio) setErroBio(null);
+                    }}
+                    maxLength={LIMITE_DA_BIO}
+                    multiline
+                    placeholder="Uma frase sobre você"
+                    style={{ minHeight: 80 }}
+                  />
+                  <Text
                     style={{
-                      backgroundColor: cor.atencaoFundo,
-                      borderRadius: raio.md,
-                      padding: espaco.md,
+                      alignSelf: "flex-end",
+                      fontFamily: fonte.normal,
+                      fontSize: 13,
+                      color: cor.textoApagado,
                     }}
                   >
-                    <Text
+                    {bio.length}/{LIMITE_DA_BIO}
+                  </Text>
+                  {erroBio ? (
+                    <View
                       style={{
-                        fontFamily: fonte.media,
-                        fontSize: 14,
-                        lineHeight: 20,
-                        color: cor.texto,
+                        backgroundColor: cor.atencaoFundo,
+                        borderRadius: raio.md,
+                        padding: espaco.md,
                       }}
                     >
-                      {erroBio}
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
+                      <Text
+                        style={{
+                          fontFamily: fonte.media,
+                          fontSize: 14,
+                          lineHeight: 20,
+                          color: cor.texto,
+                        }}
+                      >
+                        {erroBio}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
               <Botao
                 rotulo="Salvar"
                 aoTocar={() => void salvar()}
@@ -307,128 +311,134 @@ export default function EditarPerfil() {
               />
             </Cartao>
 
-            {/* O @: tem limite de troca no servidor, então se salva à parte. */}
-            <Cartao>
-              <T tipo="rotulo">Seu @</T>
-              <Linha>
-                <View
-                  style={{
-                    flex: 1,
-                    flexDirection: "row",
-                    alignItems: "center",
-                    minHeight: ALVO_MINIMO + 4,
-                    borderRadius: raio.md,
-                    borderWidth: 1,
-                    borderColor: erroHandle ? cor.atencao : cor.borda,
-                    backgroundColor: cor.cartao,
-                    paddingLeft: espaco.md,
-                  }}
-                >
-                  <Text style={{ fontFamily: fonte.forte, fontSize: 16, color: cor.textoApagado }}>
-                    @
-                  </Text>
-                  <TextInput
-                    value={handle}
-                    onChangeText={(t) => {
-                      setHandle(t.replace(/^@/, ""));
-                      setErroHandle(null);
-                      setOkHandle(null);
-                    }}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    maxLength={HANDLE_MAX}
-                    accessibilityLabel="Seu @"
-                    placeholder="seunome"
-                    placeholderTextColor={cor.textoApagado}
-                    style={{
-                      flex: 1,
-                      minHeight: ALVO_MINIMO,
-                      paddingHorizontal: 4,
-                      fontFamily: fonte.normal,
-                      fontSize: 16,
-                      color: cor.texto,
-                    }}
-                  />
-                </View>
-                <Botao
-                  rotulo="Salvar @"
-                  tipo="secundario"
-                  aoTocar={() => void salvarHandle()}
-                  carregando={salvandoHandle}
-                  desabilitado={!handleMudou}
-                  estilo={{ paddingHorizontal: espaco.lg }}
-                />
-              </Linha>
-              <T tipo="apagado">
-                Letras sem acento, números, ponto e sublinhado. Dá para trocar duas vezes a cada 14
-                dias.
-              </T>
-              {erroHandle ? (
-                <T tipo="apagado" cor={cor.atencao}>
-                  {erroHandle}
-                </T>
-              ) : null}
-              {okHandle ? (
-                <T tipo="apagado" cor={cor.ok}>
-                  {okHandle}
-                </T>
-              ) : null}
-            </Cartao>
-
-            {/* Quem vê, e o que aparece: cada chave grava na hora. */}
-            <Cartao estilo={{ gap: espaco.md }}>
-              <T tipo="subtitulo">Quem vê o seu perfil</T>
-              <Chave
-                rotulo="Perfil público"
-                valor={publico}
-                aoMudar={(v) => void trocarPublico(v)}
-              />
-              <T tipo="apagado" cor={cor.texto}>
-                {publico
-                  ? "Qualquer pessoa no app pode abrir o seu perfil e ver as publicações marcadas para todo mundo, e a busca encontra você. Seguir não precisa de aprovação."
-                  : "Fechado: só quem você aceitou vê o seu perfil, e a busca não encontra você. Quem quiser te acompanhar manda um pedido, e você decide."}
-              </T>
-              {/* No Modo Cuidado o perfil não fala do bebê: as duas chaves somem. */}
-              {!cuidado ? (
-                <>
-                  <Chave
-                    rotulo="Mostrar a semana da gestação"
-                    valor={mostrarSemana}
-                    aoMudar={(v) =>
-                      void trocarChave(
-                        "mostrarSemana",
-                        v,
-                        mostrarSemana,
-                        setMostrarSemana,
-                        v ? "A semana aparece no seu perfil." : "A semana saiu do seu perfil.",
-                      )
-                    }
-                  />
-                  <Chave
-                    rotulo="Mostrar o nome do bebê"
-                    valor={mostrarBebe}
-                    aoMudar={(v) =>
-                      void trocarChave(
-                        "mostrarBebe",
-                        v,
-                        mostrarBebe,
-                        setMostrarBebe,
-                        v
-                          ? "O nome do bebê aparece no seu perfil."
-                          : "O nome do bebê saiu do seu perfil.",
-                      )
-                    }
-                  />
-                  {/* As amigas recebem o nome do bebê do servidor com a chave ligada ou
-                      não (amigas.functions.ts): a tela não pode prometer o contrário. */}
+            {COMUNIDADE_NO_APP ? (
+              <>
+                {/* O @: tem limite de troca no servidor, então se salva à parte. */}
+                <Cartao>
+                  <T tipo="rotulo">Seu @</T>
+                  <Linha>
+                    <View
+                      style={{
+                        flex: 1,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        minHeight: ALVO_MINIMO + 4,
+                        borderRadius: raio.md,
+                        borderWidth: 1,
+                        borderColor: erroHandle ? cor.atencao : cor.borda,
+                        backgroundColor: cor.cartao,
+                        paddingLeft: espaco.md,
+                      }}
+                    >
+                      <Text
+                        style={{ fontFamily: fonte.forte, fontSize: 16, color: cor.textoApagado }}
+                      >
+                        @
+                      </Text>
+                      <TextInput
+                        value={handle}
+                        onChangeText={(t) => {
+                          setHandle(t.replace(/^@/, ""));
+                          setErroHandle(null);
+                          setOkHandle(null);
+                        }}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        maxLength={HANDLE_MAX}
+                        accessibilityLabel="Seu @"
+                        placeholder="seunome"
+                        placeholderTextColor={cor.textoApagado}
+                        style={{
+                          flex: 1,
+                          minHeight: ALVO_MINIMO,
+                          paddingHorizontal: 4,
+                          fontFamily: fonte.normal,
+                          fontSize: 16,
+                          color: cor.texto,
+                        }}
+                      />
+                    </View>
+                    <Botao
+                      rotulo="Salvar @"
+                      tipo="secundario"
+                      aoTocar={() => void salvarHandle()}
+                      carregando={salvandoHandle}
+                      desabilitado={!handleMudou}
+                      estilo={{ paddingHorizontal: espaco.lg }}
+                    />
+                  </Linha>
                   <T tipo="apagado">
-                    Aparecem como um selo embaixo do seu nome, para quem pode abrir o seu perfil na
-                    Comunidade. As suas amigas veem o nome do bebê de qualquer jeito, na página de
-                    amiga.
+                    Letras sem acento, números, ponto e sublinhado. Dá para trocar duas vezes a cada
+                    14 dias.
                   </T>
-                </>
-              ) : null}
-            </Cartao>
+                  {erroHandle ? (
+                    <T tipo="apagado" cor={cor.atencao}>
+                      {erroHandle}
+                    </T>
+                  ) : null}
+                  {okHandle ? (
+                    <T tipo="apagado" cor={cor.ok}>
+                      {okHandle}
+                    </T>
+                  ) : null}
+                </Cartao>
+
+                {/* Quem vê, e o que aparece: cada chave grava na hora. */}
+                <Cartao estilo={{ gap: espaco.md }}>
+                  <T tipo="subtitulo">Quem vê o seu perfil</T>
+                  <Chave
+                    rotulo="Perfil público"
+                    valor={publico}
+                    aoMudar={(v) => void trocarPublico(v)}
+                  />
+                  <T tipo="apagado" cor={cor.texto}>
+                    {publico
+                      ? "Qualquer pessoa no app pode abrir o seu perfil e ver as publicações marcadas para todo mundo, e a busca encontra você. Seguir não precisa de aprovação."
+                      : "Fechado: só quem você aceitou vê o seu perfil, e a busca não encontra você. Quem quiser te acompanhar manda um pedido, e você decide."}
+                  </T>
+                  {/* No Modo Cuidado o perfil não fala do bebê: as duas chaves somem. */}
+                  {!cuidado ? (
+                    <>
+                      <Chave
+                        rotulo="Mostrar a semana da gestação"
+                        valor={mostrarSemana}
+                        aoMudar={(v) =>
+                          void trocarChave(
+                            "mostrarSemana",
+                            v,
+                            mostrarSemana,
+                            setMostrarSemana,
+                            v ? "A semana aparece no seu perfil." : "A semana saiu do seu perfil.",
+                          )
+                        }
+                      />
+                      <Chave
+                        rotulo="Mostrar o nome do bebê"
+                        valor={mostrarBebe}
+                        aoMudar={(v) =>
+                          void trocarChave(
+                            "mostrarBebe",
+                            v,
+                            mostrarBebe,
+                            setMostrarBebe,
+                            v
+                              ? "O nome do bebê aparece no seu perfil."
+                              : "O nome do bebê saiu do seu perfil.",
+                          )
+                        }
+                      />
+                      {/* As amigas recebem o nome do bebê do servidor com a chave ligada ou
+                      não (amigas.functions.ts): a tela não pode prometer o contrário. */}
+                      <T tipo="apagado">
+                        Aparecem como um selo embaixo do seu nome, para quem pode abrir o seu perfil
+                        na Comunidade. As suas amigas veem o nome do bebê de qualquer jeito, na
+                        página de amiga.
+                      </T>
+                    </>
+                  ) : null}
+                </Cartao>
+              </>
+            ) : null}
           </>
         ) : null}
       </Tela>

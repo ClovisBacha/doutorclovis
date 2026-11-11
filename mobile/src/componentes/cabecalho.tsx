@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
 import { toque } from "~/componentes/base";
 import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
+import { SOS_NO_APP } from "~/config";
 
 /**
  * O TOPO DAS TELAS EMPILHADAS — um desenho só para o app inteiro.
@@ -69,8 +70,12 @@ export function BotaoVoltar({
   );
 }
 
-/** O SOS das telas sem a barra de baixo: pequeno, vermelho, sempre à direita. */
+/**
+ * O SOS das telas sem a barra de baixo: pequeno, vermelho, sempre à direita.
+ * Com o SOS desligado (`SOS_NO_APP`), some de todos os cabeçalhos de uma vez.
+ */
 export function PilulaSos() {
+  if (!SOS_NO_APP) return null;
   return (
     <Pressable
       accessibilityRole="button"

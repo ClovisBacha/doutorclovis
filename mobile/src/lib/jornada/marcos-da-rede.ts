@@ -33,6 +33,8 @@ export type DefDoMarco = {
   texto: string;
   /** Marco da dupla: no pós-parto a dupla não existe, então só aparece se já foi feito. */
   daDupla?: boolean;
+  /** Marco da Comunidade: some quando ela está desligada (`COMUNIDADE_NO_APP`). */
+  daComunidade?: boolean;
   feito: (d: DadosDaRede) => boolean;
 };
 
@@ -78,6 +80,7 @@ export const MARCOS_DA_REDE: readonly DefDoMarco[] = [
   },
   {
     chave: "primeira-publicacao",
+    daComunidade: true,
     emoji: "📝",
     titulo: "Primeira publicação",
     texto: "Você contou algo seu na Comunidade.",
@@ -101,9 +104,13 @@ export function marcosNaTela(o: {
   agora: readonly string[];
   guardados: readonly string[];
   pos: boolean;
+  /** A Comunidade está no app? Sem ela, o marco dela não aparece. */
+  comunidade?: boolean;
 }): MarcoNaTela[] {
   return MARCOS_DA_REDE.map((m) => {
     const ganho = o.agora.includes(m.chave) || o.guardados.includes(m.chave);
     return { ...m, ganho, novo: o.agora.includes(m.chave) && !o.guardados.includes(m.chave) };
-  }).filter((m) => !(o.pos && m.daDupla && !m.ganho));
+  })
+    .filter((m) => !(o.pos && m.daDupla && !m.ganho))
+    .filter((m) => o.comunidade !== false || !m.daComunidade);
 }

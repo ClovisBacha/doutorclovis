@@ -1,6 +1,6 @@
 import { veuDoPost } from "@/lib/conteudo-sensivel";
 import { Image } from "expo-image";
-import { router, useLocalSearchParams } from "expo-router";
+import { Redirect, router, useLocalSearchParams } from "expo-router";
 import { Ban, EyeOff, Flag, Images, MoreHorizontal } from "lucide-react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -32,6 +32,7 @@ import {
 import { useSessao } from "~/lib/sessao";
 import type { ComoVisitante, PerfilNaTela, PostNaTela } from "~/servidor/rede";
 import { cor, espaco, fonte } from "~/tema";
+import { COMUNIDADE_NO_APP } from "~/config";
 
 const COLUNAS = 3;
 const VAO = 2;
@@ -54,7 +55,13 @@ const PERSONAS: readonly { chave: ComoVisitante; rotulo: string; frase: string }
  * réguas da visita de verdade, e só ele distingue "trancado" — a visitante
  * nem consegue abrir — de "indisponivel".
  */
+/** Com a Comunidade desligada (`COMUNIDADE_NO_APP`), um link antigo cai na trilha. */
 export default function TelaDoPerfil() {
+  if (!COMUNIDADE_NO_APP) return <Redirect href="/jornada" />;
+  return <TelaDoPerfilNoApp />;
+}
+
+function TelaDoPerfilNoApp() {
   const { id, como } = useLocalSearchParams<{ id: string; como?: string }>();
   const alvoId = String(id ?? "");
   const { cuidado, sessao } = useSessao();

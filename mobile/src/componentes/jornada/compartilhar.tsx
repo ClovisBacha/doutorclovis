@@ -24,6 +24,7 @@ import { marcarFeedSujo } from "~/lib/comunidade/sinal";
 import { useRegrasDaComunidade } from "~/lib/comunidade/usar-regras";
 import { useSessao } from "~/lib/sessao";
 import { ALVO_MINIMO, cor, espaco, fonte } from "~/tema";
+import { COMUNIDADE_NO_APP } from "~/config";
 
 type Modo = "previa" | "escrevendo" | "publicado";
 
@@ -77,7 +78,10 @@ export function FolhaDeCompartilhar({
   const alvo = useRef<View>(null);
 
   /* Na web só a bancada publica (com uma foto de exemplo no lugar do cartão). */
-  const podePublicar = !!legenda && !cuidado && (Platform.OS !== "web" || ehBancada());
+  /* Sem a Comunidade (`COMUNIDADE_NO_APP`), o cartão só se compartilha pela
+     folha do iPhone. */
+  const podePublicar =
+    COMUNIDADE_NO_APP && !!legenda && !cuidado && (Platform.OS !== "web" || ehBancada());
 
   function fechar() {
     setModo("previa");

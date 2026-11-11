@@ -10,6 +10,7 @@ import { api } from "~/lib/comunidade/api";
 import { marcosFeitosAgora, marcosNaTela, type MarcoNaTela } from "~/lib/jornada/marcos-da-rede";
 import { useSessao } from "~/lib/sessao";
 import { cor, espaco, fonte } from "~/tema";
+import { COMUNIDADE_NO_APP } from "~/config";
 
 /**
  * OS MARCOS DA SUA REDE — os atos sociais na aba das Conquistas (fase 3).
@@ -37,17 +38,17 @@ export function MarcosDaRede() {
       const [amigas, indicacao, perfil, guardados] = await Promise.all([
         lerAmigas(),
         lerAIndicacao(),
-        api.verPerfil(uid),
+        COMUNIDADE_NO_APP ? api.verPerfil(uid) : Promise.resolve(null),
         ehBancada() ? Promise.resolve([] as string[]) : lerJson<string[]>(chave, []),
       ]);
       const agora = marcosFeitosAgora({
         amigas: amigas ? amigas.amigas.length : null,
         recordeDaDupla: amigas ? (amigas.dupla?.recorde ?? 0) : null,
         convites: indicacao ? indicacao.amigas : null,
-        publicacoes: perfil.ok ? perfil.posts.length : null,
+        publicacoes: perfil?.ok ? perfil.posts.length : null,
       });
       if (!vivo) return;
-      setMarcos(marcosNaTela({ agora, guardados, pos }));
+      setMarcos(marcosNaTela({ agora, guardados, pos, comunidade: COMUNIDADE_NO_APP }));
       if (!ehBancada()) void gravarJson(chave, Array.from(new Set([...guardados, ...agora])));
     })();
     return () => {
