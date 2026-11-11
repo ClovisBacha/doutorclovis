@@ -38,6 +38,8 @@ yarn-error.*
 
 # generated native folders
 /ios
+# o archive do scripts/testflight.sh
+/build
 /android
 
 # saídas de export do portão
