@@ -46,19 +46,21 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publicar:
-    name: Publica docs/juridico no GitHub Pages
+  # Dois jobs, como no modelo oficial do GitHub: o `deploy-pages` só procura o
+  # pacote quando o job que o enviou já terminou. Num job só, em 11/11/2026, ele
+  # procurou um instante cedo demais ("Found 0 artifact(s)") — e repetir a
+  # mesma execução não conserta, porque o pacote antigo continua lá ("Multiple
+  # artifacts"): o caminho é uma execução nova, pelo botão.
+  separar:
+    name: Separa as três páginas
     # Só do branch padrão — é dele que o ambiente `github-pages` aceita deploy,
     # e é ele que a produção segue. Um push em outro branch não publica nada.
     if: github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Separa as três páginas
+      - name: Copia só docs/juridico
         run: |
           mkdir -p _site
           cp docs/juridico/index.html docs/juridico/privacidade.html docs/juridico/termos.html _site/
@@ -69,5 +71,13 @@ jobs:
         with:
           path: _site
 
+  publicar:
+    name: Publica docs/juridico no GitHub Pages
+    needs: separar
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
       - id: deploy
         uses: actions/deploy-pages@v4
