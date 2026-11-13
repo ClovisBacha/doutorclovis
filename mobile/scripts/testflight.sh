@@ -13,6 +13,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# O CocoaPods quebra fora de um terminal UTF-8 ("Unicode Normalization not
+# appropriate for ASCII-8BIT"). O Terminal do Mac já vem assim; o shell de uma
+# sessão do Claude Code, não — e foi lá que o build 45 parou no `pod install`.
+export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+
 echo "1/4 — trazendo a versão nova"
 git pull --ff-only
 
