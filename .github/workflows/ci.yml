@@ -77,7 +77,11 @@ jobs:
 
   bancadas:
     name: Bancadas — abre as telas, toca nos controles e lê o console
-    runs-on: ubuntu-latest
+    # Ubuntu fixo, e não `ubuntu-latest`: em 13/11/2026 o `ubuntu-latest` passou
+    # a ser o 26.04, e o Playwright 1.60 recusa instalar o Chromium nele ("does
+    # not support chromium on ubuntu26.04-x64") — a bancada caía antes de abrir
+    # uma tela. Trocar para o mais novo quando o Playwright o suportar.
+    runs-on: ubuntu-24.04
     # ⚠️ ESTE JOB EXISTE POR UM DEFEITO CONCRETO: um `getServerSnapshot`
     # devolvendo `[]` novo a cada leitura pôs a barra de navegação em laço
     # infinito e DEIXOU O APP SEM ABRIR. Ele viveu vários commits com `tsc`
