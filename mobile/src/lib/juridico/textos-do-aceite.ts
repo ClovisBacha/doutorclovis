@@ -24,7 +24,7 @@ export const TEXTO_DOS_TERMOS = "Li e concordo com os Termos de uso e a Polític
 
 /** O essencial, em linguagem simples, antes das caixas. */
 export const PONTOS_DO_ACEITE: readonly string[] = [
-  "O Obstétrica é um jogo para aprender sobre a gestação, um pouco por dia — como um Duolingo para gestantes. Ele não dá orientação médica: em emergência, ligue 192.",
+  "O app Mãe Esperta é um jogo para aprender sobre a gestação, um pouco por dia — como um Duolingo para gestantes. Ele não dá orientação médica: em emergência, ligue 192.",
   "De saúde, o app guarda só o que a trilha e o acompanhamento do bebê usam: a datação da gestação, o nascimento e os movimentos do bebê.",
   "As suas amigas no app veem o seu nome, a sua foto, o nome do bebê e o seu progresso no jogo — nunca um dado de saúde.",
   "Você pode baixar uma cópia dos seus dados e excluir a conta quando quiser, no Perfil.",

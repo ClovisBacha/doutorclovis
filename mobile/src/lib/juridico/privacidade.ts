@@ -25,7 +25,7 @@ export const PRIVACIDADE: DocumentoJuridico = {
     {
       titulo: "1. Quem cuida dos seus dados",
       blocos: [
-        `O controlador dos dados é Dr. Clóvis Bacha, ginecologista e obstetra (CRM-MG 22.333), que oferece o app Obstétrica. O encarregado pelo tratamento de dados pessoais atende em ${CONTATO_EMAIL}.`,
+        `O controlador dos dados é Dr. Clóvis Bacha, ginecologista e obstetra (CRM-MG 22.333), que oferece o app Mãe Esperta. O encarregado pelo tratamento de dados pessoais atende em ${CONTATO_EMAIL}.`,
       ],
     },
     {

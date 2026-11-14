@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { COMUNIDADE_NO_APP } from "~/config";
 import { primeiraFrase } from "~/lib/jornada/lembrete-da-jornada";
 import {
   abreFestaDoNascimento,
@@ -269,6 +270,18 @@ describe("os desafios e o texto da semana do pós-parto são do app", () => {
   test("o app de verdade: post se reage (não se curte) e o cartão não mostra quantos comentários tem", () => {
     const fora = TODOS_OS_TEXTOS.filter(([, t]) =>
       /\bcurt\w*\b[^.]{0,20}\bposts?\b|sem coment[aá]rios?/i.test(t),
+    ).map(([onde]) => onde);
+    expect(fora).toEqual([]);
+  });
+
+  test("com a Comunidade desligada, nenhum desafio nem texto da semana manda a mãe para ela", () => {
+    /* Até 12/11/2026, o desafio da rede de apoio de cada semana era "poste na
+       Comunidade", "siga uma mãe da Comunidade"… — que saiu no build 44. */
+    if (COMUNIDADE_NO_APP) return;
+    const fora = TODOS_OS_TEXTOS.filter(([, t]) =>
+      /\bcomunidade\b|\bpost(ar|ou|s|e)?\b|\bpubli(car|que)\b|\breaja\b|\bsiga uma\b|do outro lado da tela/i.test(
+        t,
+      ),
     ).map(([onde]) => onde);
     expect(fora).toEqual([]);
   });

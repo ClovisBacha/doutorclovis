@@ -144,12 +144,12 @@
     ]
   },
   "199": {
-    "teach": "Um post com os capítulos da sua espera. Lembra do livro da espera, com um título para cada capítulo? O sumário pode virar um post gostoso na Comunidade: conte os títulos que você deu ao 1º e ao 2º trimestres e, se quiser, a história por trás de cada um. Se os títulos ainda não saíram, tudo bem: dá para inventar agora mesmo, ou contar só a música ou a frase que marcou cada fase. Depois, vale passear pelos posts das outras gestantes e deixar um comentário carinhoso. Dizer qual título fez você sorrir, ou que história por trás de um título tocou você, é um jeito simples de fazer companhia a quem está do outro lado da tela. Cada espera é uma história, e é bonito descobrir quanta gente está escrevendo a sua, cada uma do seu jeito.",
-    "funFact": "A palavra 'comunidade' vem do latim communitas, de communis, que quer dizer comum, o que é de todos.",
+    "teach": "Os capítulos da sua espera, numa conversa. Lembra do livro da espera, com um título para cada capítulo? O sumário pode virar uma conversa gostosa com alguém querido: conte os títulos que você deu ao 1º e ao 2º trimestres e, se quiser, a história por trás de cada um. Se os títulos ainda não saíram, tudo bem: dá para inventar agora mesmo, ou contar só a música ou a frase que marcou cada fase. Depois, vale virar a pergunta: que título quem acompanhou você de perto daria a cada capítulo? Ouvir qual título fez a pessoa sorrir, ou que lembrança ficou com ela de cada fase, é um jeito simples de ver a sua espera por outros olhos. Cada espera é uma história, e é bonito descobrir quanta gente ajuda a escrever a sua, cada uma do seu jeito.",
+    "funFact": "A palavra 'capítulo' vem do latim capitulum, cabecinha, de caput, cabeça: era a pequena cabeça, o título, que abria cada parte de um texto.",
     "questions": [
       {
         "type": "choice",
-        "q": "O que a aula sugere contar num post da Comunidade?",
+        "q": "O que a aula sugere contar para alguém querido?",
         "o": [
           "Os títulos que você deu aos capítulos da sua espera",
           "Quantas sementinhas você juntou na trilha do app",
@@ -162,36 +162,36 @@
         "type": "choice",
         "q": "E se os títulos ainda não saíram?",
         "o": [
-          "O post fica para daqui a alguns meses",
+          "A conversa fica para daqui a alguns meses",
           "Dá para inventar agora mesmo",
-          "Só vale postar com os três títulos prontos"
+          "Só vale contar com os três títulos prontos"
         ],
         "a": 1,
         "why": "Tudo bem: dá para inventar os títulos agora mesmo, ou contar só a música ou a frase que marcou cada fase."
       },
       {
         "type": "multi",
-        "q": "Marque jeitos de fazer companhia nos posts das outras gestantes, segundo a aula (marque todas):",
+        "q": "Marque o que a aula sugere para a conversa sobre os capítulos (marque todas):",
         "o": [
-          "Dizer qual título fez você sorrir",
-          "Comentar só quando conhecer a pessoa",
-          "Contar qual história tocou você",
-          "Deixar um comentário carinhoso",
-          "Corrigir os títulos que achar estranhos"
+          "Contar a história por trás de cada título",
+          "Esperar os três títulos ficarem prontos",
+          "Perguntar que título a pessoa daria",
+          "Contar só a música ou a frase de cada fase",
+          "Corrigir os títulos que a pessoa sugerir"
         ],
         "a": [0, 2, 3],
-        "why": "Um comentário carinhoso, dizendo qual título fez você sorrir ou que história por trás de um título tocou você, faz companhia a quem está do outro lado da tela. Não precisa conhecer a pessoa, e cada título é do jeito de quem escreveu."
+        "why": "Dá para contar a história por trás de cada título, ou só a música ou a frase que marcou cada fase, e perguntar que título quem acompanhou você daria a cada capítulo. Não precisa esperar os três títulos, e cada título é do jeito de quem sugeriu."
       },
       {
         "type": "choice",
-        "q": "De onde vem a palavra 'comunidade'?",
+        "q": "De onde vem a palavra 'capítulo'?",
         "o": [
-          "Do inglês community, o bairro onde se mora",
-          "Do latim communitas, de communis, comum",
-          "Do tupi, e quer dizer roda de conversa"
+          "Do inglês chapter, a parte de um livro",
+          "Do latim capitulum, de caput, cabeça",
+          "Do grego, e quer dizer folha dobrada"
         ],
         "a": 1,
-        "why": "'Comunidade' vem do latim communitas, de communis, que quer dizer comum, o que é de todos."
+        "why": "'Capítulo' vem do latim capitulum, cabecinha, de caput, cabeça: a pequena cabeça, o título, que abria cada parte de um texto."
       }
     ]
   },
@@ -282,7 +282,7 @@
     ]
   },
   "202": {
-    "teach": "Revisão da semana 28: o 3º trimestre começou! Do tamanho de uma abóbora, com cerca de 37,6 cm e 1 kg, o bebê já abre e fecha os olhinhos, com cílios enfeitando a beirinha das pálpebras. Você abriu o trimestre com o livro da espera, dando um título a cada capítulo vivido e deixando a linha do terceiro em branco. Viu como escrever o nome do bebê do jeitinho que vai ficar, com a grafia, os acentos e a ordem dos sobrenomes, e que os títulos da espera podem virar um post na Comunidade. Conheceu a história antiga da piscina: o âmnio existe há mais de 300 milhões de anos e dá nome aos amniotas, o grupo que reúne répteis, aves e mamíferos, como nós. E a semana fechou em Atenas, com a anfidromia, a volta ao redor da lareira que dava boas-vindas ao bebê.",
+    "teach": "Revisão da semana 28: o 3º trimestre começou! Do tamanho de uma abóbora, com cerca de 37,6 cm e 1 kg, o bebê já abre e fecha os olhinhos, com cílios enfeitando a beirinha das pálpebras. Você abriu o trimestre com o livro da espera, dando um título a cada capítulo vivido e deixando a linha do terceiro em branco. Viu como escrever o nome do bebê do jeitinho que vai ficar, com a grafia, os acentos e a ordem dos sobrenomes, e que os títulos da espera podem virar uma conversa com alguém querido. Conheceu a história antiga da piscina: o âmnio existe há mais de 300 milhões de anos e dá nome aos amniotas, o grupo que reúne répteis, aves e mamíferos, como nós. E a semana fechou em Atenas, com a anfidromia, a volta ao redor da lareira que dava boas-vindas ao bebê.",
     "funFact": "Na semana que vem, a figurinha do app vira o repolho, que na tabela marca cerca de 38,6 cm e 1,15 kg, e a novidade é sobre os músculos e os pulmões.",
     "questions": [
       {
@@ -305,11 +305,11 @@
           "Um título só para a espera inteira",
           "Um título para cada capítulo já vivido",
           "O nome escrito com a grafia, os acentos e os sobrenomes",
-          "Um post com os títulos dos capítulos",
-          "Um post só depois de ter os três títulos prontos"
+          "Uma conversa sobre os títulos dos capítulos",
+          "Uma conversa só depois de ter os três títulos prontos"
         ],
         "a": [1, 2, 3],
-        "why": "Um título para cada capítulo, o nome escrito do jeitinho que vai ficar e o post com os títulos foram ideias da semana. O terceiro título vai se escrevendo pelo caminho, sem esperar por ele para postar."
+        "why": "Um título para cada capítulo, o nome escrito do jeitinho que vai ficar e a conversa sobre os títulos foram ideias da semana. O terceiro título vai se escrevendo pelo caminho, sem esperar por ele para contar."
       },
       {
         "type": "choice",
@@ -324,14 +324,14 @@
       },
       {
         "type": "choice",
-        "q": "Ao pé da letra, o que quer dizer communis, a raiz latina de 'comunidade'?",
+        "q": "Ao pé da letra, o que quer dizer capitulum, a raiz latina de 'capítulo'?",
         "o": [
-          "O que é só de uma pessoa",
-          "O que fica perto de casa",
-          "O que é comum, o que é de todos"
+          "Pedacinho de papel escrito à mão",
+          "Página que fica no fim",
+          "Cabecinha, de caput, cabeça"
         ],
         "a": 2,
-        "why": "Communis quer dizer comum, o que é de todos: um bom nome para um lugar de encontro entre gestantes."
+        "why": "Capitulum quer dizer cabecinha, de caput, cabeça: a pequena cabeça, o título, que abre cada parte de um texto, como os capítulos do livro da espera."
       }
     ]
   },
@@ -444,7 +444,7 @@
     ]
   },
   "205": {
-    "teach": "A mala do bebê: as roupinhas. Entre os preparativos da espera, arrumar a parte do bebê na mala da maternidade pode ser um dos mais gostosos. As roupinhas são a parte principal: bodies, macacões, meias e, se já foi escolhida, a roupinha da saída. Um jeito prático de arrumar é separar por peça, com os bodies de um lado, os macacões do outro e as meias juntinhas num canto. E, para tudo caber e ficar à vista quando a mala abrir, vale enrolar cada peça como um rocambole. Depois de tudo no lugar, fotografe a mala aberta: a foto vira lembrança da espera e ainda mostra, a quem for ajudar, onde ficou cada coisa. E, se quiser, mostre a sua arrumação num post da Comunidade e espie a das outras gestantes: sempre aparece um truque esperto para copiar.",
+    "teach": "A mala do bebê: as roupinhas. Entre os preparativos da espera, arrumar a parte do bebê na mala da maternidade pode ser um dos mais gostosos. As roupinhas são a parte principal: bodies, macacões, meias e, se já foi escolhida, a roupinha da saída. Um jeito prático de arrumar é separar por peça, com os bodies de um lado, os macacões do outro e as meias juntinhas num canto. E, para tudo caber e ficar à vista quando a mala abrir, vale enrolar cada peça como um rocambole. Depois de tudo no lugar, fotografe a mala aberta: a foto vira lembrança da espera e ainda mostra, a quem for ajudar, onde ficou cada coisa. E, se quiser, troque ideias de arrumação com uma amiga que já foi mãe: sempre aparece um truque esperto para copiar.",
     "funFact": "No Museu Britânico, em Londres, há uma meinha de criança feita no Egito há cerca de 1.700 anos, de lã listrada e colorida, com o dedão separado dos outros dedos.",
     "questions": [
       {
@@ -478,10 +478,14 @@
       },
       {
         "type": "choice",
-        "q": "Onde a aula sugere mostrar a arrumação da mala?",
-        "o": ["Num cartaz na porta de casa", "Numa mensagem para a loja", "Num post da Comunidade"],
+        "q": "Com quem a aula sugere trocar ideias de arrumação da mala?",
+        "o": [
+          "Com a vendedora da loja de enxoval",
+          "Com o carteiro do bairro",
+          "Com uma amiga que já foi mãe"
+        ],
         "a": 2,
-        "why": "Num post da Comunidade, dá para mostrar a sua arrumação e espiar a das outras gestantes: sempre aparece um truque esperto para copiar."
+        "why": "Com uma amiga que já foi mãe, dá para trocar ideias de arrumação: sempre aparece um truque esperto para copiar."
       },
       {
         "type": "choice",
@@ -771,7 +775,7 @@
     ]
   },
   "211": {
-    "teach": "Que tal um minuto olhando as nuvens? O convite de hoje é pequeno e não pede nada: nem ingresso, nem lista, nem hora marcada. Basta uma janela, uma varanda ou um pedaço de céu no caminho. Escolha uma nuvem e procure uma forma nela: um coelho, um barco, quem sabe uma das frutas do app. Se você esperar um pouquinho, a forma muda diante dos seus olhos, e o coelho vira barco, o barco vira pepino. É um passatempo antigo, sem regra e sem resposta certa. Com companhia, fica ainda mais divertido: chame alguém querido para olhar a mesma nuvem e repare como cada um enxerga uma coisa diferente. Se quiser guardar, fotografe a nuvem mais engraçada e anote o que viu nela, ou mostre num post da Comunidade e descubra nos comentários o que as outras gestantes enxergam. Um minuto de céu cabe em qualquer dia.",
+    "teach": "Que tal um minuto olhando as nuvens? O convite de hoje é pequeno e não pede nada: nem ingresso, nem lista, nem hora marcada. Basta uma janela, uma varanda ou um pedaço de céu no caminho. Escolha uma nuvem e procure uma forma nela: um coelho, um barco, quem sabe uma das frutas do app. Se você esperar um pouquinho, a forma muda diante dos seus olhos, e o coelho vira barco, o barco vira pepino. É um passatempo antigo, sem regra e sem resposta certa. Com companhia, fica ainda mais divertido: chame alguém querido para olhar a mesma nuvem e repare como cada um enxerga uma coisa diferente. Se quiser guardar, fotografe a nuvem mais engraçada e anote o que viu nela, ou mande a foto para alguém querido e descubra o que essa pessoa enxerga. Um minuto de céu cabe em qualquer dia.",
     "funFact": "Quem deu nome às nuvens foi o inglês Luke Howard, um químico apaixonado pelo céu: em 1802, propôs palavras latinas que o mundo usa até hoje, como cúmulo, estrato e cirro.",
     "questions": [
       {
@@ -1577,7 +1581,7 @@
     ]
   },
   "225": {
-    "teach": "Um haicai para a barriga. O haicai é um poeminha japonês curtinho, em três partes: a primeira com cinco sons, a segunda com sete e a terceira com cinco de novo. Em português, as partes viraram versos, e os sons, sílabas. Não precisa rimar nem contar uma história inteira: guarda só um instante, como uma foto feita de palavras. O mais famoso de todos, escrito em 1686 pelo poeta Matsuo Bashô, fala de um velho tanque, de uma rã que pula e do barulhinho da água. Que tal escrever um haicai sobre a barriga ou sobre o bebê? Vale um instante bem simples: o carinho da manhã na barriga, o apelido dito baixinho, a fruta nova no app. E não precisa acertar a conta das sílabas: o que importa é o instante guardado. Se quiser, mostre o seu num post da Comunidade e leia os das outras gestantes.",
+    "teach": "Um haicai para a barriga. O haicai é um poeminha japonês curtinho, em três partes: a primeira com cinco sons, a segunda com sete e a terceira com cinco de novo. Em português, as partes viraram versos, e os sons, sílabas. Não precisa rimar nem contar uma história inteira: guarda só um instante, como uma foto feita de palavras. O mais famoso de todos, escrito em 1686 pelo poeta Matsuo Bashô, fala de um velho tanque, de uma rã que pula e do barulhinho da água. Que tal escrever um haicai sobre a barriga ou sobre o bebê? Vale um instante bem simples: o carinho da manhã na barriga, o apelido dito baixinho, a fruta nova no app. E não precisa acertar a conta das sílabas: o que importa é o instante guardado. Se quiser, leia o seu em voz alta para alguém querido.",
     "funFact": "No haicai tradicional japonês, costuma aparecer um kigo, uma palavra que lembra a estação do ano. No poema de Bashô, o kigo é a rã, que no haicai indica a primavera.",
     "questions": [
       {
@@ -1613,10 +1617,10 @@
           "Guardar um instante simples da semana",
           "Acertar a conta das sílabas, senão não vale",
           "Escrever sobre a barriga ou o bebê",
-          "Mostrar num post da Comunidade, se quiser"
+          "Ler em voz alta para alguém querido, se quiser"
         ],
         "a": [1, 3, 4],
-        "why": "O seu haicai guarda um instante simples, pode falar da barriga ou do bebê e pode ir para um post da Comunidade. Não precisa rimar nem acertar a conta das sílabas."
+        "why": "O seu haicai guarda um instante simples, pode falar da barriga ou do bebê e pode ser lido em voz alta para alguém querido. Não precisa rimar nem acertar a conta das sílabas."
       },
       {
         "type": "choice",
@@ -1699,7 +1703,7 @@
         "q": "Quem a aula sugere convidar para escrever os bilhetes?",
         "o": [
           "Só quem mora na mesma casa",
-          "Só as gestantes da Comunidade",
+          "Só as colegas do seu trabalho",
           "As amigas e quem é da família"
         ],
         "a": 2,
@@ -1968,7 +1972,7 @@
     ]
   },
   "232": {
-    "teach": "A sua curiosidade preferida. Desde que você chegou ao app, cada aula trouxe uma curiosidade: uma palavra com história, um bicho surpreendente, uma tradição de outro canto do mundo, um segredo da fruta da semana. Algumas passam, e outras ficam morando na cabeça. Hoje o convite é escolher a sua preferida e contar para alguém: quem está ao seu lado, uma amiga, alguém da família. Conte do seu jeito, com os detalhes de que você lembrar, e repare na cara de surpresa de quem ouve. Contar é também um jeito gostoso de guardar: cada vez que a gente lembra de algo e conta, a lembrança fica mais firme. É também para isso que o app tem um dia de revisão por semana. E, se quiser, leve a sua curiosidade para um post da Comunidade e descubra as preferidas das outras gestantes.",
+    "teach": "A sua curiosidade preferida. Desde que você chegou ao app, cada aula trouxe uma curiosidade: uma palavra com história, um bicho surpreendente, uma tradição de outro canto do mundo, um segredo da fruta da semana. Algumas passam, e outras ficam morando na cabeça. Hoje o convite é escolher a sua preferida e contar para alguém: quem está ao seu lado, uma amiga, alguém da família. Conte do seu jeito, com os detalhes de que você lembrar, e repare na cara de surpresa de quem ouve. Contar é também um jeito gostoso de guardar: cada vez que a gente lembra de algo e conta, a lembrança fica mais firme. É também para isso que o app tem um dia de revisão por semana. E, se quiser, pergunte de volta: quem ouve também costuma ter uma curiosidade preferida para contar.",
     "funFact": "Em 1885, o alemão Hermann Ebbinghaus descreveu a 'curva do esquecimento': sem revisão, a gente esquece depressa boa parte do que aprendeu. Ebbinghaus testou tudo em si mesmo, decorando sílabas sem sentido.",
     "questions": [
       {
@@ -2639,7 +2643,7 @@
     ]
   },
   "246": {
-    "teach": "As pérolas da espera. A espera costuma render frases que merecem ser guardadas: a pergunta de uma criança que quer saber se o bebê tem um quartinho aí dentro, o nome mais inesperado que alguém sugeriu, o comentário divertido de um desconhecido na fila do mercado, a piada que um amigo repete toda semana. Que tal colecionar essas pérolas? Basta uma lista no celular ou um caderninho: anote a frase do jeitinho que saiu, quem disse e onde foi. Com o tempo, a lista vira um retrato bem-humorado desta fase, e reler num dia comum pode render boas risadas. Na coleção, entra só o que fez você rir. E, se quiser, escolha a melhor pérola e conte num post da Comunidade do app: é bem capaz de outras gestantes contarem as suas nos comentários.",
+    "teach": "As pérolas da espera. A espera costuma render frases que merecem ser guardadas: a pergunta de uma criança que quer saber se o bebê tem um quartinho aí dentro, o nome mais inesperado que alguém sugeriu, o comentário divertido de um desconhecido na fila do mercado, a piada que um amigo repete toda semana. Que tal colecionar essas pérolas? Basta uma lista no celular ou um caderninho: anote a frase do jeitinho que saiu, quem disse e onde foi. Com o tempo, a lista vira um retrato bem-humorado desta fase, e reler num dia comum pode render boas risadas. Na coleção, entra só o que fez você rir. E, se quiser, escolha a melhor pérola e conte para uma amiga que já foi mãe: é bem capaz de ela lembrar, rindo, das pérolas da própria espera.",
     "funFact": "Nos anos 1950, o apresentador Art Linkletter entrevistava crianças num programa de TV dos Estados Unidos, e as respostas mais engraçadas viraram livro em 1957: 'Kids Say the Darndest Things', com desenhos de Charles Schulz, o criador do Snoopy.",
     "questions": [
       {
@@ -2691,7 +2695,7 @@
     ]
   },
   "247": {
-    "teach": "Depois do chá: agradecer, guardar e contar. Passada a festa, ainda sobra uma parte gostosa. Se o chá ainda vai acontecer, guarde a ideia para depois da festa. Primeiro, agradecer: com a lista de quem deu o quê, feita na hora por uma amiga ou montada depois com a ajuda das fotos, fica fácil mandar a cada pessoa um bilhete ou um áudio curtinho com a sua voz. Uma foto do presente já no cantinho do bebê deixa o 'obrigada' ainda mais bonito. Depois, guardar: os cartõezinhos que vieram com os pacotes, um laço de fita, o convite e a foto preferida do dia podem ir para uma caixinha ou para o álbum. Por fim, contar: num post da Comunidade do app, a brincadeira que mais fez rir. E, se não houve chá nem vai haver, vale o mesmo para os presentes e os carinhos que chegaram de outro jeito: a sacola de roupinhas de uma amiga, o pacote que veio pelo correio, a mensagem na hora certa.",
+    "teach": "Depois do chá: agradecer, guardar e contar. Passada a festa, ainda sobra uma parte gostosa. Se o chá ainda vai acontecer, guarde a ideia para depois da festa. Primeiro, agradecer: com a lista de quem deu o quê, feita na hora por uma amiga ou montada depois com a ajuda das fotos, fica fácil mandar a cada pessoa um bilhete ou um áudio curtinho com a sua voz. Uma foto do presente já no cantinho do bebê deixa o 'obrigada' ainda mais bonito. Depois, guardar: os cartõezinhos que vieram com os pacotes, um laço de fita, o convite e a foto preferida do dia podem ir para uma caixinha ou para o álbum. Por fim, contar: para quem não pôde ir, a brincadeira que mais fez rir. E, se não houve chá nem vai haver, vale o mesmo para os presentes e os carinhos que chegaram de outro jeito: a sacola de roupinhas de uma amiga, o pacote que veio pelo correio, a mensagem na hora certa.",
     "funFact": "Muita gente acha que o arigatô, o obrigado em japonês, veio do português. Não veio: nasceu de uma palavra japonesa bem mais antiga, que queria dizer algo como 'difícil de existir', raro.",
     "questions": [
       {
@@ -3417,7 +3421,7 @@
     ]
   },
   "262": {
-    "teach": "Uma noite de jogos em família. Chame a família, as amigas ou quem mais você quiser, ponha os jogos na mesa e deixe a noite correr: tabuleiro, cartas, dominó, mímica. Uma ideia divertida é cada pessoa trazer o seu jogo preferido e ensinar as regras para os outros, cada uma com o seu jeito de explicar. Na mímica, dá para inventar categorias da casa: filmes que vocês já viram juntos, músicas da playlist da espera, apelidos da família. Marque o placar num papel bonito e guarde de lembrança, com a data e a assinatura dos campeões da noite. Vale até um prêmio de brincadeira, como uma coroa de papel para quem vencer. O melhor, claro, não é ganhar: são as risadas, as regras inventadas na hora e a companhia. E, se quiser, conte depois num post da Comunidade qual jogo fez mais sucesso por aí.",
+    "teach": "Uma noite de jogos em família. Chame a família, as amigas ou quem mais você quiser, ponha os jogos na mesa e deixe a noite correr: tabuleiro, cartas, dominó, mímica. Uma ideia divertida é cada pessoa trazer o seu jogo preferido e ensinar as regras para os outros, cada uma com o seu jeito de explicar. Na mímica, dá para inventar categorias da casa: filmes que vocês já viram juntos, músicas da playlist da espera, apelidos da família. Marque o placar num papel bonito e guarde de lembrança, com a data e a assinatura dos campeões da noite. Vale até um prêmio de brincadeira, como uma coroa de papel para quem vencer. O melhor, claro, não é ganhar: são as risadas, as regras inventadas na hora e a companhia. E, se quiser, anote no verso do placar qual jogo fez mais sucesso.",
     "funFact": "O Jogo Real de Ur, encontrado no atual Iraque, tem cerca de 4.500 anos e está entre os tabuleiros mais antigos do mundo; as regras foram reconstituídas a partir de uma tabuleta de argila escrita séculos depois.",
     "questions": [
       {
@@ -3754,19 +3758,19 @@
     ]
   },
   "269": {
-    "teach": "O cantinho do bebê na Comunidade. Não precisa estar pronto para aparecer: arrumado, pela metade ou só com uma cesta e um quadrinho na parede, o cantinho do bebê de agora também conta uma história. Tire uma foto do cantinho do bebê como está hoje e conte no post um detalhe que só vocês conhecem: a manta que veio de alguém querido, o quadrinho feito em casa, a cor escolhida depois de muita conversa. Depois, veja nos posts das outras gestantes os cantinhos do bebê que elas mostraram e, se quiser, deixe um comentário carinhoso. Cada cantinho do bebê tem o jeito da casa onde está: ocupa um quarto inteiro, um pedaço da sala, uma prateleira perto da janela. Não é concurso nem vitrine: é inspiração e companhia, sem sair de casa. E, se um detalhe der vontade de copiar, guarde a ideia com carinho.",
+    "teach": "O cantinho do bebê, do jeito que está. Não precisa estar pronto para ganhar uma foto: arrumado, pela metade ou só com uma cesta e um quadrinho na parede, o cantinho do bebê de agora também conta uma história. Tire uma foto do cantinho do bebê como está hoje e anote junto um detalhe que só vocês conhecem: a manta que veio de alguém querido, o quadrinho feito em casa, a cor escolhida depois de muita conversa. Depois, mostre a foto para alguém querido e, se quiser, peça a uma amiga que já foi mãe para mostrar o cantinho que montou em casa. Cada cantinho do bebê tem o jeito da casa onde está: ocupa um quarto inteiro, um pedaço da sala, uma prateleira perto da janela. Não é concurso nem vitrine: é inspiração e companhia. E, se um detalhe der vontade de copiar, guarde a ideia com carinho.",
     "funFact": "'Inspiração' vem do latim inspirare, soprar para dentro. Por isso a mesma palavra serve para o ar que entra no peito e para a ideia boa que chega de repente.",
     "questions": [
       {
         "type": "choice",
-        "q": "Verdadeiro ou falso: o cantinho do bebê precisa estar pronto para aparecer no post.",
+        "q": "Verdadeiro ou falso: o cantinho do bebê precisa estar pronto para ganhar uma foto.",
         "o": ["Verdadeiro", "Falso"],
         "a": 1,
         "why": "Falso: arrumado, pela metade ou só com uma cesta e um quadrinho na parede, o cantinho do bebê de agora também conta uma história."
       },
       {
         "type": "multi",
-        "q": "Marque os detalhes que a aula sugere contar no post do cantinho do bebê (marque todas):",
+        "q": "Marque os detalhes que a aula sugere anotar junto da foto do cantinho do bebê (marque todas):",
         "o": [
           "A manta que veio de alguém querido",
           "O preço de cada peça comprada",
@@ -3779,14 +3783,14 @@
       },
       {
         "type": "choice",
-        "q": "Segundo a aula, o que é ver os cantinhos do bebê nos posts das outras gestantes?",
+        "q": "Segundo a aula, o que é ver o cantinho que uma amiga montou em casa?",
         "o": [
           "Um concurso para ver o mais bonito",
-          "Inspiração e companhia, sem sair de casa",
+          "Inspiração e companhia",
           "Uma vitrine de compras"
         ],
         "a": 1,
-        "why": "Não é concurso nem vitrine: ver os cantinhos do bebê das outras gestantes é inspiração e companhia, sem sair de casa."
+        "why": "Não é concurso nem vitrine: ver o cantinho que uma amiga montou em casa é inspiração e companhia."
       },
       {
         "type": "choice",
@@ -3893,7 +3897,7 @@
     ]
   },
   "272": {
-    "teach": "Revisão da semana 38: das bochechas às mãos. Do tamanho de um alho-poró, com cerca de 49,8 cm e 3,1 kg, o bebê está de bochechas redondinhas, graças a uma almofadinha de gordura dentro de cada uma. Você pensou na sua frase carinhosa, que só precisa ter a sua cara, e escreveu a lista do que pode esperar, com espaços em branco na agenda: dia livre também é plano. Na Comunidade, o cantinho do bebê apareceu como está, pronto ou pela metade, sem concurso nem vitrine. Com a abelha-europeia, veio uma conversa sem palavras: a dança em forma de oito, feita dentro da colmeia e decifrada por Karl von Frisch; já as caretas e os bocejos do bebê não pedem tradução. E a semana fechou com as mãos da família numa folha só, com nome e data, e quem não gosta de tinta contorna a mão com lápis.",
+    "teach": "Revisão da semana 38: das bochechas às mãos. Do tamanho de um alho-poró, com cerca de 49,8 cm e 3,1 kg, o bebê está de bochechas redondinhas, graças a uma almofadinha de gordura dentro de cada uma. Você pensou na sua frase carinhosa, que só precisa ter a sua cara, e escreveu a lista do que pode esperar, com espaços em branco na agenda: dia livre também é plano. Numa foto, o cantinho do bebê apareceu como está, pronto ou pela metade, sem concurso nem vitrine. Com a abelha-europeia, veio uma conversa sem palavras: a dança em forma de oito, feita dentro da colmeia e decifrada por Karl von Frisch; já as caretas e os bocejos do bebê não pedem tradução. E a semana fechou com as mãos da família numa folha só, com nome e data, e quem não gosta de tinta contorna a mão com lápis.",
     "funFact": "Na semana que vem, a figurinha do app vira a melancia pequena, que na tabela marca cerca de 50,7 cm e 3,3 kg, e a novidade é sobre a penugem.",
     "questions": [
       {
@@ -3922,9 +3926,9 @@
       },
       {
         "type": "multi",
-        "q": "Marque o que esta semana trouxe sobre a Comunidade e as abelhas (marque todas):",
+        "q": "Marque o que esta semana trouxe sobre o cantinho e as abelhas (marque todas):",
         "o": [
-          "Os posts do cantinho do bebê viram concurso",
+          "A foto do cantinho do bebê vira concurso",
           "O cantinho do bebê pode aparecer pela metade",
           "A abelha-europeia dança lá fora, nas flores",
           "A dança da abelha-europeia desenha um oito"
@@ -4090,19 +4094,19 @@
     ]
   },
   "276": {
-    "teach": "Filmes e séries para a espera. Que tal pedir indicações na Comunidade? Abra um post com as suas: a série boa para uma tarde, o filme que fez você rir alto, o documentário que encantou, a animação que dá vontade de rever. Conte numa frase por que cada um vale a pena, sem estragar o final, e convide as outras gestantes a indicarem de volta. Logo a lista cresce, e a espera ganha assunto além da barriga: personagens queridos, cenas que todo mundo lembra, frases que viraram bordão. Com as indicações que chegarem, dá para montar uma listinha de 'quero ver' no celular e escolher, a cada vez, o que combina com o dia. E, se quiser, chame quem está ao seu lado ou uma amiga para assistir junto.",
+    "teach": "Filmes e séries para a espera. Que tal trocar indicações com quem você conhece? Comece pelas suas: a série boa para uma tarde, o filme que fez você rir alto, o documentário que encantou, a animação que dá vontade de rever. Conte numa frase por que cada um vale a pena, sem estragar o final, e peça às amigas e à família que indiquem de volta. Logo a lista cresce, e a espera ganha assunto além da barriga: personagens queridos, cenas que todo mundo lembra, frases que viraram bordão. Com as indicações que chegarem, dá para montar uma listinha de 'quero ver' no celular e escolher, a cada vez, o que combina com o dia. E, se quiser, chame quem está ao seu lado ou uma amiga para assistir junto.",
     "funFact": "A primeira sessão de cinema no Brasil aconteceu em julho de 1896, no Rio de Janeiro, na Rua do Ouvidor, pouco mais de seis meses depois da famosa sessão dos irmãos Lumière, em Paris.",
     "questions": [
       {
         "type": "choice",
-        "q": "Onde a aula sugere trocar indicações de filmes e séries?",
+        "q": "Com quem a aula sugere trocar indicações de filmes e séries?",
         "o": [
-          "Num bilhete preso na geladeira",
-          "Num caderno guardado na gaveta",
-          "Num post da Comunidade do app"
+          "Só com um crítico de cinema",
+          "Só com quem trabalha num cinema",
+          "Com as amigas e com a família"
         ],
         "a": 2,
-        "why": "A ideia é abrir um post na Comunidade com as suas indicações e convidar as outras gestantes a indicarem de volta."
+        "why": "A ideia é contar as suas indicações e pedir às amigas e à família que indiquem de volta."
       },
       {
         "type": "multi",
@@ -4230,7 +4234,7 @@
     ]
   },
   "279": {
-    "teach": "Revisão da semana 39: da penugem ao lema. Do tamanho de uma melancia pequena, com cerca de 50,7 cm e 3,3 kg, o bebê está com a penugem do corpinho quase toda caída; os fios da cabeça, das sobrancelhas e dos cílios ficam, porque são de outro tipo. Você pensou num recado para quem você era no comecinho, escrito ou em áudio, do jeito que sair, e dobrou barquinhos de papel, um de cada vez e sem meta, com o papel que tiver à mão. Na Comunidade, a troca foi de filmes e séries, sem estragar o final. O cheiro de chuva ganhou nome, petricor, e vem de óleos das plantas guardados na terra; e o narizinho do bebê segue amadurecendo no seu tempo. E a semana fechou com o lema da família, uma frase curtinha sugerida e escolhida por todos, como 'devagar e juntos'.",
+    "teach": "Revisão da semana 39: da penugem ao lema. Do tamanho de uma melancia pequena, com cerca de 50,7 cm e 3,3 kg, o bebê está com a penugem do corpinho quase toda caída; os fios da cabeça, das sobrancelhas e dos cílios ficam, porque são de outro tipo. Você pensou num recado para quem você era no comecinho, escrito ou em áudio, do jeito que sair, e dobrou barquinhos de papel, um de cada vez e sem meta, com o papel que tiver à mão. Com as amigas e a família, a troca foi de filmes e séries, sem estragar o final. O cheiro de chuva ganhou nome, petricor, e vem de óleos das plantas guardados na terra; e o narizinho do bebê segue amadurecendo no seu tempo. E a semana fechou com o lema da família, uma frase curtinha sugerida e escolhida por todos, como 'devagar e juntos'.",
     "funFact": "Lembra das curiosidades? Uma fruta parecida com a melancia já aparece em pinturas do Egito antigo, origami junta as palavras japonesas para dobrar e papel, e a primeira sessão de cinema no Brasil foi em 1896, no Rio de Janeiro.",
     "questions": [
       {
@@ -4265,7 +4269,7 @@
           "O cheiro de chuva se chama maresia",
           "O cheiro de chuva se chama petricor",
           "O petricor vem de óleos das plantas guardados na terra",
-          "Na Comunidade, a troca foi de livros de cabeceira"
+          "Com as amigas, a troca foi de livros de cabeceira"
         ],
         "a": [0, 2, 3],
         "why": "Na troca de filmes e séries, nada de estragar o final; e o cheiro de chuva se chama petricor, que vem de óleos das plantas guardados na terra."
@@ -4503,7 +4507,7 @@
     ]
   },
   "285": {
-    "teach": "Um cartaz com as palavras da espera. Toda espera ganha um vocabulário só seu: o apelido da barriga, a fruta preferida do app, os nomes das pessoas queridas, 'cantinho', de tanto falar do cantinho do bebê, a palavrinha inventada que só você e as pessoas queridas entendem. Que tal juntar tudo isso num cartaz? Primeiro, faça uma lista, sozinha ou com quem está ao seu lado, das palavras que mais apareceram nestes meses. Depois vem a parte divertida: as que mais se repetiram ficam bem grandes, e as outras, menores, espalhadas em volta, em cores diferentes. Dá para fazer à mão, numa cartolina, ou num aplicativo do celular. No fim, o cartaz vira um retrato desta fase feito só de palavras, para pendurar no cantinho do bebê ou guardar no álbum. Se quiser, mostre o seu num post da Comunidade.",
+    "teach": "Um cartaz com as palavras da espera. Toda espera ganha um vocabulário só seu: o apelido da barriga, a fruta preferida do app, os nomes das pessoas queridas, 'cantinho', de tanto falar do cantinho do bebê, a palavrinha inventada que só você e as pessoas queridas entendem. Que tal juntar tudo isso num cartaz? Primeiro, faça uma lista, sozinha ou com quem está ao seu lado, das palavras que mais apareceram nestes meses. Depois vem a parte divertida: as que mais se repetiram ficam bem grandes, e as outras, menores, espalhadas em volta, em cores diferentes. Dá para fazer à mão, numa cartolina, ou num aplicativo do celular. No fim, o cartaz vira um retrato desta fase feito só de palavras, para pendurar no cantinho do bebê ou guardar no álbum. Se quiser, mostre o cartaz para alguém querido e veja se ficou faltando alguma palavra.",
     "funFact": "Nos anos 1950, os poetas Augusto de Campos, Haroldo de Campos e Décio Pignatari lançaram no Brasil a poesia concreta, em que o tamanho, a forma e o lugar das palavras na página também fazem parte do poema.",
     "questions": [
       {
@@ -4890,7 +4894,7 @@
     ]
   },
   "292": {
-    "teach": "Flores da espera guardadas num livro. Cada momento desta espera pode ter a sua flor: a do chá de bebê, se teve, a do vaso da sala, a que alguém querido trouxe de presente, a que você ganhou num dia especial. Que tal guardar algumas delas num herbário, um caderno de plantas secas? O jeito é simples: escolha flores sequinhas por fora, sem gotinhas de água, ponha cada uma entre duas folhas de papel, bem esticadinha, dentro de um livro grosso, com outros livros pesados por cima, e espere com calma. Quando estiver bem seca, cole numa página bonita com fitinhas adesivas e, ao lado, escreva de onde ela veio e uma frase sobre aquele dia. Página por página, o caderno vira um jardim de lembranças que não murcha. E, se quiser, mostre uma página num post da Comunidade do app.",
+    "teach": "Flores da espera guardadas num livro. Cada momento desta espera pode ter a sua flor: a do chá de bebê, se teve, a do vaso da sala, a que alguém querido trouxe de presente, a que você ganhou num dia especial. Que tal guardar algumas delas num herbário, um caderno de plantas secas? O jeito é simples: escolha flores sequinhas por fora, sem gotinhas de água, ponha cada uma entre duas folhas de papel, bem esticadinha, dentro de um livro grosso, com outros livros pesados por cima, e espere com calma. Quando estiver bem seca, cole numa página bonita com fitinhas adesivas e, ao lado, escreva de onde ela veio e uma frase sobre aquele dia. Página por página, o caderno vira um jardim de lembranças que não murcha. E, se quiser, mostre uma página para alguém querido, quem sabe a pessoa que trouxe aquela flor.",
     "funFact": "A poeta americana Emily Dickinson montou, ainda adolescente, um herbário com mais de 400 plantas, hoje guardado na Universidade Harvard.",
     "questions": [
       {
@@ -5168,19 +5172,19 @@
     ]
   },
   "297": {
-    "teach": "Um obrigado para a Comunidade. Talvez alguém da Comunidade já tenha deixado a sua espera mais leve: quem contou uma história que fez você rir, quem dividiu uma ideia que você copiou, quem escreveu uma frase que ficou com você. Hoje o convite é fazer um post de agradecimento para essas pessoas, sem precisar citar nomes: 'obrigada a quem contou a história do gato no cesto de roupinhas, ri o dia todo', 'foi lendo vocês que eu me animei a montar o cantinho do bebê'. O segredo é dizer o que aquilo significou, e não só 'obrigada a todas'. E vale também para quem mais lê do que escreve: ler já é fazer parte, e sempre tem um post para lembrar. O agradecimento fica ali, um carinho de volta para quem passar. E a curiosidade de hoje conta que, numa carta de agradecimento, quem escreve costuma imaginar menos alegria do que a que chega do outro lado.",
+    "teach": "Um obrigado de volta. Talvez alguém já tenha deixado a sua espera mais leve: quem contou uma história que fez você rir, quem dividiu uma ideia que você copiou, quem escreveu uma frase que ficou com você. Hoje o convite é mandar um bilhete ou um áudio de agradecimento para essa pessoa, curtinho mesmo: 'obrigada pela história do gato no cesto de roupinhas, ri o dia todo', 'foi vendo o seu cantinho que eu me animei a montar o cantinho do bebê'. O segredo é dizer o que aquilo significou, e não só 'obrigada por tudo'. E vale também para quem nem sabe que ajudou: a vizinha que sempre pergunta como você está, o amigo que manda uma piada na hora certa. O agradecimento chega como um carinho de volta. E a curiosidade de hoje conta que, numa carta de agradecimento, quem escreve costuma imaginar menos alegria do que a que chega do outro lado.",
     "funFact": "Num estudo de 2018, nos Estados Unidos, quem escreveu uma carta de agradecimento imaginou que a carta traria menos alegria do que de fato trouxe a quem a recebeu.",
     "questions": [
       {
         "type": "choice",
-        "q": "Qual é o segredo do post de agradecimento, segundo a aula?",
+        "q": "Qual é o segredo do bilhete de agradecimento, segundo a aula?",
         "o": [
-          "Escrever só 'obrigada a todas'",
+          "Escrever só 'obrigada por tudo'",
           "Dizer o que aquilo significou para você",
-          "Citar o nome de cada pessoa da Comunidade"
+          "Mandar a mesma mensagem para todo mundo"
         ],
         "a": 1,
-        "why": "O segredo é dizer o que aquilo significou para você, e não só 'obrigada a todas'."
+        "why": "O segredo é dizer o que aquilo significou para você, e não só 'obrigada por tudo'."
       },
       {
         "type": "multi",
@@ -5197,21 +5201,21 @@
       },
       {
         "type": "choice",
-        "q": "Verdadeiro ou falso: quem mais lê do que escreve na Comunidade também tem a quem agradecer.",
+        "q": "Verdadeiro ou falso: vale agradecer também a quem nem sabe que ajudou.",
         "o": ["Verdadeiro", "Falso"],
         "a": 0,
-        "why": "Verdadeiro: ler já é fazer parte, e sempre tem um post para lembrar."
+        "why": "Verdadeiro: vale também para quem nem sabe que ajudou, como a vizinha que sempre pergunta como você está."
       },
       {
         "type": "choice",
-        "q": "Segundo a aula, o post de agradecimento precisa citar nomes?",
+        "q": "Segundo a aula, o agradecimento precisa ser longo?",
         "o": [
-          "Sim, com o nome completo de cada pessoa",
-          "Só o nome de quem comentou mais vezes",
-          "Não, dá para agradecer sem citar nomes"
+          "Sim, uma carta longa, de várias páginas",
+          "Só se for escrito à mão, com letra bonita",
+          "Não, um bilhete ou áudio curtinho basta"
         ],
         "a": 2,
-        "why": "Não precisa: dá para agradecer sem citar nomes, contando o que aquela companhia significou."
+        "why": "Não precisa: um bilhete ou um áudio curtinho basta, contando o que aquela companhia significou."
       },
       {
         "type": "choice",
@@ -5340,7 +5344,7 @@
     ]
   },
   "300": {
-    "teach": "Revisão da semana 42, com carinho. Na semana da abóbora grande, os ossinhos do ouvido, com o estribo, o menor osso do corpo, já têm quase o mesmo tamanho dos seus. Você foi convidada a escrever a história que contavam para você, começando com 'era uma vez', e a recortar um cordão de bandeirinhas de papel, como as dos quadros de Volpi. Na Comunidade, a ideia foi um post de agradecimento a quem deixou a sua espera mais leve. Depois vieram o sabiá-laranjeira, símbolo das aves do Brasil, e a 'Canção do Exílio', onde canta um sabiá, com versos que foram parar no Hino. E veio a ideia de refazer uma foto antiga da família e guardar as duas lado a lado. Cada curiosidade, cada atividade e cada sementinha do caminho continua com você, e a Comunidade está aqui, cheia de companhia. Que a espera siga leve, do seu jeito, no tempo do bebê.",
+    "teach": "Revisão da semana 42, com carinho. Na semana da abóbora grande, os ossinhos do ouvido, com o estribo, o menor osso do corpo, já têm quase o mesmo tamanho dos seus. Você foi convidada a escrever a história que contavam para você, começando com 'era uma vez', e a recortar um cordão de bandeirinhas de papel, como as dos quadros de Volpi. Teve também a ideia de um bilhete ou de um áudio de agradecimento a quem deixou a sua espera mais leve. Depois vieram o sabiá-laranjeira, símbolo das aves do Brasil, e a 'Canção do Exílio', onde canta um sabiá, com versos que foram parar no Hino. E veio a ideia de refazer uma foto antiga da família e guardar as duas lado a lado. Cada curiosidade, cada atividade e cada sementinha do caminho continua com você, junto de quem faz companhia nesta espera. Que a espera siga leve, do seu jeito, no tempo do bebê.",
     "funFact": "As curiosidades desta semana foram da terra à poesia: a abóbora plantada há cerca de 10 mil anos, o 'era uma vez' pelo mundo, as bandeirinhas de Volpi, a carta de agradecimento, a 'Canção do Exílio' no Hino e as fotos refeitas de Irina Werning.",
     "questions": [
       {
@@ -5368,14 +5372,14 @@
       },
       {
         "type": "choice",
-        "q": "Na aula da Comunidade, o que o post de agradecimento conta?",
+        "q": "Na aula do agradecimento, o que o bilhete ou o áudio conta?",
         "o": [
-          "Uma lista de dicas para as outras",
+          "Uma lista de dicas para a pessoa",
           "O que aquela companhia significou",
-          "Os nomes de todas as pessoas do app"
+          "Um resumo de tudo o que aconteceu"
         ],
         "a": 1,
-        "why": "O post de agradecimento conta o que aquela companhia significou, sem precisar citar nomes."
+        "why": "O bilhete ou o áudio de agradecimento conta o que aquela companhia significou, e não só 'obrigada por tudo'."
       },
       {
         "type": "multi",

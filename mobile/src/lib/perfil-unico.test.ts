@@ -58,7 +58,7 @@ describe("um perfil só", () => {
     expect(gravamONome).toEqual([join("app", "ritual.tsx")]);
   });
 
-  test("a foto dela no topo das quatro abas leva ao Perfil", () => {
+  test("a foto dela no topo das abas leva ao Perfil", () => {
     const botao = fonte(join("componentes", "botao-do-perfil.tsx"));
     expect(botao).toContain('router.push(rota("/perfil")');
     for (const aba of ["jornada", "comunidade", "amigas", "inicio"])
@@ -66,6 +66,12 @@ describe("um perfil só", () => {
         aba,
         true,
       ]);
+    /* A aba da trilha desenha a trilha de `jornada.tsx`, cujo topo de aba
+       (`CabecalhoDaTrilha`) traz a foto. */
+    expect(fonte(join("app", "(abas)", "trilha.tsx"))).toContain('vista="aba"');
+    expect(fonte(join("app", "(abas)", "jornada.tsx"))).toMatch(
+      /function CabecalhoDaTrilha[\s\S]{0,1200}<BotaoDoPerfil \/>/,
+    );
   });
 
   test("o SOS e o nascimento levam aos dados (contato, médico, data), não ao topo do Perfil", () => {

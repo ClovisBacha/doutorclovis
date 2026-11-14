@@ -64,7 +64,7 @@ export default function Entrar() {
       >
         <Tela bordas={["top", "bottom"]} fundo="transparent" estilo={{ gap: espaco.lg }}>
           <Entrada>
-            <CabecalhoDaMarca subtitulo="Sua gestação, um dia de cada vez — com aulas, cuidado e outras gestantes do seu lado." />
+            <CabecalhoDaMarca subtitulo="Sua gestação, um dia de cada vez — com aulas, cuidado e amigas do seu lado." />
           </Entrada>
           <Entrada atraso={120}>
             <FrasesQueGiram />

@@ -18,12 +18,12 @@ import type { DocumentoJuridico } from "~/lib/juridico/documento";
 export const TERMOS: DocumentoJuridico = {
   titulo: "Termos de uso",
   resumo:
-    "O Obstétrica é um jogo para aprender sobre a gestação, um pouco por dia — como um Duolingo para gestantes. Ele não dá orientação médica e não substitui quem acompanha a sua gestação. Usando o app, você concorda com estes termos e com a Política de privacidade.",
+    "O app Mãe Esperta é um jogo para aprender sobre a gestação, um pouco por dia — como um Duolingo para gestantes. Ele não dá orientação médica e não substitui quem acompanha a sua gestação. Usando o app, você concorda com estes termos e com a Política de privacidade.",
   secoes: [
     {
       titulo: "1. Quem oferece o app",
       blocos: [
-        `O app Obstétrica é oferecido por Dr. Clóvis Bacha, ginecologista e obstetra (CRM-MG 22.333). Contato: ${CONTATO_EMAIL}.`,
+        `O app Mãe Esperta é oferecido por Dr. Clóvis Bacha, ginecologista e obstetra (CRM-MG 22.333). Contato: ${CONTATO_EMAIL}.`,
       ],
     },
     {

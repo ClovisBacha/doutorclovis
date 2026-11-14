@@ -11,8 +11,9 @@
  * conselho médico). Os do site eram um roteiro clínico — contar mamadas, olhar
  * os lóquios e o coto, vacinas, consulta puerperal, contracepção, "marcos
  * esperados" — e iam parar na tela Hoje, na trilha, no álbum e nas
- * notificações. Os desafios do app são vínculo, memória, rede de apoio e
- * Comunidade; o texto da semana, "O que esperar com o bebê" (o plano aprovado),
+ * notificações. Os desafios do app são vínculo, memória e rede de apoio (a da
+ * vida real, e as Amigas; a Comunidade saiu com o build 44 e, em 12/11/2026,
+ * saiu também dos desafios); o texto da semana, "O que esperar com o bebê" (o plano aprovado),
  * é um fato gentil do mundo do bebê — os sentidos, o corpinho —, e nunca um
  * marco com prazo: no pós-parto ela VÊ o bebê, e "o sorriso chega por volta da
  * 6ª semana" seria lido como régua por quem ainda não viu sorriso nenhum.

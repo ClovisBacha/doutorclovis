@@ -5,10 +5,11 @@ import { useJornada } from "~/componentes/jornada/usarJornada";
 import { JornadaDaGestacao, JornadaDoPosParto } from "~/app/(abas)/jornada";
 
 /**
- * MINHA JORNADA — o Caminho inteiro (fases, semanas, um nó por dia, o Cantinho
- * espalhado), aberto por "Ver minha jornada" na tela Hoje. A aba virou o
- * cuidado do dia; a trilha continua a mesma, a um toque. Depois do parto, a
- * trilha das 12 semanas de vida (o 4º trimestre).
+ * MINHA JORNADA, empilhada — o Caminho inteiro (fases, semanas, um nó por dia,
+ * o Cantinho espalhado) com a seta de voltar. Desde 13/11/2026 a trilha é a
+ * aba da direita (`(abas)/trilha.tsx`), e "Ver a trilha" troca para ela; esta
+ * rota fica para os links antigos. Depois do parto, a trilha das 12 semanas
+ * de vida (o 4º trimestre).
  *
  * Bancada: /jornada/trilha?bancada=1 (os mesmos parâmetros da aba) [&pos=1&idade=20]
  */

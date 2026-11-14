@@ -61,7 +61,7 @@ export default function Bebe() {
         <Botao
           rotulo="Voltar"
           tipo="secundario"
-          aoTocar={() => (router.canGoBack() ? router.back() : router.replace("/inicio"))}
+          aoTocar={() => (router.canGoBack() ? router.back() : router.replace("/jornada"))}
         />
       </Tela>
     );
@@ -85,7 +85,7 @@ export default function Bebe() {
     <Tela bordas={["top", "bottom"]}>
       <CabecalhoDaPilha
         titulo={perfil?.baby_name ? `${perfil.baby_name}, semana a semana` : "Semana a semana"}
-        voltarPara="/inicio"
+        voltarPara="/jornada"
       />
 
       <ScrollView

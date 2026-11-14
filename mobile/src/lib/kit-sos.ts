@@ -82,5 +82,5 @@ export function mensagemDeSocorro(
     lat != null && lon != null
       ? ` Minha localização: https://maps.google.com/?q=${lat.toFixed(5)},${lon.toFixed(5)}`
       : "";
-  return `${quem} (SOS do app Obstétrica).${onde} Se não conseguir falar comigo, ligue 192.`;
+  return `${quem} (SOS do app Mãe Esperta).${onde} Se não conseguir falar comigo, ligue 192.`;
 }

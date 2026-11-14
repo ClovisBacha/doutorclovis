@@ -40,6 +40,7 @@ export default function Porta() {
      de boas-vindas pede o que falta. */
   const temAncora = !!(perfil?.lmp_date || perfil?.reference_date || perfil?.birth_date);
   if (!perfil || !temAncora) return <Redirect href="/ritual" />;
-  /* O app abre na trilha, como no Duolingo (decisão do dono, 11/11/2026). */
+  /* O app abre na tela do bebê, a aba do meio (decisão do dono, 13/11/2026:
+     "quando o aplicativo abrir, deve estar naquela aba"). */
   return <Redirect href="/jornada" />;
 }

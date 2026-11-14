@@ -19,11 +19,17 @@ Apple, que é sua. Os campos com limite de caracteres foram contados.
 
 ## Identidade
 
+**O nome é Mãe Esperta** (decisão do dono, 12/11/2026 — antes, Obstétrica). O
+perfil do Instagram é `@maeesperta.app`. No INPI, o único pedido para "Mãe
+Esperta" é de 2014, de outra pessoa, na classe 45, e foi definitivamente
+arquivado: vale pedir o registro nas classes 9 e 41. O Bundle ID não muda (a
+pessoa não o vê, e trocá-lo seria outro app na loja).
+
 | campo                | valor                                                          |
 | -------------------- | -------------------------------------------------------------- |
 | Bundle ID            | `br.com.obstetrica.app`                                        |
-| Nome na loja         | `Obstétrica — Gestantes e Mães` (29 de 30)                     |
-| Nome no iPhone       | Obstétrica (o `name` do `app.json`, não muda)                  |
+| Nome na loja         | `Mãe Esperta: Aula da Gravidez` (29 de 30)                     |
+| Nome no iPhone       | Mãe Esperta (o `name` do `app.json`)                           |
 | Categoria primária   | **Educação**                                                   |
 | Categoria secundária | **Saúde e fitness**                                            |
 | Idioma principal     | Português (Brasil)                                             |
@@ -60,7 +66,7 @@ Sua gestação, uma aula por dia
 e sem repetir o que já está no nome e no subtítulo, que a loja já indexa)
 
 ```
-gravidez,grávida,bebê,semanas,aprender,jogo,maternidade,pós-parto,meditação,mamãe,gratidão,cuidado
+grávida,gestante,bebê,semanas,aprender,jogo,maternidade,pós-parto,meditação,mamãe,gratidão,cuidado
 ```
 
 **Texto promocional** (170 caracteres; este tem 145 — muda sem nova revisão)
@@ -72,7 +78,7 @@ Uma aula curta por dia sobre a sua semana de gestação, sementinhas a cada pass
 **Descrição**
 
 ```
-O Obstétrica é um jogo para aprender sobre a gestação, um pouco por dia —
+O Mãe Esperta é um jogo para aprender sobre a gestação, um pouco por dia —
 como um Duolingo para gestantes.
 
 A TRILHA
@@ -101,7 +107,7 @@ MODO CUIDADO
   acolhimento continua
 
 IMPORTANTE
-O Obstétrica não dá orientação médica: não faz diagnóstico, não indica
+O Mãe Esperta não dá orientação médica: não faz diagnóstico, não indica
 tratamento, exame, remédio ou dieta e não substitui consulta. Quem orienta é
 quem acompanha a sua gestação. Em emergência, ligue 192.
 ```
@@ -114,7 +120,7 @@ quem acompanha a sua gestação. Em emergência, ligue 192.
 **Novidades desta versão** (primeira submissão)
 
 ```
-Primeira versão do Obstétrica.
+Primeira versão do Mãe Esperta.
 ```
 
 ---

@@ -22,9 +22,21 @@ arquivo de `src/` que o app importa muda o que o app faz.
 
 Nas palavras dele: "o Duolingo para grávidas [...] tirar o SOS [...] tirar a
 rede social também. Eu quero deixar mais simples possível pra gente lançar
-esse aplicativo logo." A trilha é a primeira aba (Trilha · Amigas · Bebê); as
-Amigas são a única parte social ("a comunidade da gamificação"); o Bebê guarda
-o acompanhamento e o contato do médico. Exames ficaram para depois.
+esse aplicativo logo." As Amigas são a única parte social ("a comunidade da
+gamificação"). Exames ficaram para depois.
+
+- **⚠️ O BEBÊ É O CENTRO (decisão do dono, 13/11/2026):** a barra é **Amigas ·
+  Bebê · Trilha** e o app abre no Bebê. "Você deixou o aplicativo muito
+  simples [...] em certos pontos piorando": o build 44 tinha posto a trilha na
+  frente e tirado a tela do bebê. A aba do meio é a tela "Hoje" de 19/10 (o
+  céu da hora com o bebê da semana, "faltam N dias", o tamanho, a bolha, o
+  cuidado do dia) mais o acompanhamento da aba Bebê antiga (`BebeNestaSemana`:
+  peso, frase da semana, data provável, semana a semana, movimentos); a aula
+  diz o assunto do dia ("Aprender sobre a semana 24 · 2 min · Como vamos
+  dividir o cuidado"). O jogo (a trilha) fica à direita, em `(abas)/trilha.tsx`;
+  a abertura do dia (festa, reconciliação, avisos) roda só na aba do bebê.
+  `barra.test.ts` cobra a ordem e por onde o app abre. Não simplifique tirando
+  a tela do bebê: "é a alma do aplicativo".
 
 - **O SOS e a Comunidade estão desligados por chave, não apagados**:
   `SOS_NO_APP` e `COMUNIDADE_NO_APP` em `mobile/src/config.ts` (o padrão do
@@ -35,6 +47,16 @@ o acompanhamento e o contato do médico. Exames ficaram para depois.
   as duas estão desligadas enquanto os textos dizem isso.
 - A regra de 21/10 abaixo continua valendo, com uma troca: sem o SOS, o sinal
   de alerta vira "ligue 192"; o app segue sem conduta nenhuma.
+
+## O app se chama Mãe Esperta (decisão do dono, 12/11/2026)
+
+Antes era Obstétrica. O nome aparece embaixo do ícone (`name` do
+`app.json`), na marca da entrada, nos cartões, nos documentos e na loja
+(`Mãe Esperta: Aula da Gravidez`); o Instagram é `@maeesperta.app`. Ficam como
+estavam, de propósito: o Bundle ID `br.com.obstetrica.app` (trocá-lo seria
+outro app na loja), o `slug` e o `scheme` `obstetrica` (links e login), o
+domínio `obstetrica.com.br` e o site, que não muda mais. Escreva "o app Mãe
+Esperta", nunca "a Mãe Esperta" (o app não é uma mãe).
 
 ## ⚠️ O APP NÃO É CONSELHO MÉDICO (decisão do dono, 21/10/2026)
 

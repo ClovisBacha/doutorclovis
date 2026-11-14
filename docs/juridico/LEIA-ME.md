@@ -1,7 +1,7 @@
 # Os documentos jurídicos do app (fase 4)
 
-Os **Termos de uso** e a **Política de privacidade** do app Obstétrica (o React
-Native de `mobile/`). Escritos em 28/10/2026 para o app de hoje — comunidade de
+Os **Termos de uso** e a **Política de privacidade** do app Mãe Esperta (o React
+Native de `mobile/`; até 12/11/2026 ele se chamava Obstétrica). Escritos em 28/10/2026 para o app de hoje — comunidade de
 gestantes e mães, jogo de cuidado diário, SOS, sem orientação médica (decisão
 do dono de 21/10/2026) — e a partir do que o app coleta de fato. Corrigidos em
 29/10/2026 por um inventário independente do código, que achou o que o

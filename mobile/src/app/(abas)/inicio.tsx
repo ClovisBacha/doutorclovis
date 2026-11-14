@@ -3,7 +3,7 @@ import { ROTULO_DO_FILTRO } from "@/lib/fase-parecida";
 import { fruitEmojiForWeek, trimesterForWeek } from "@/lib/gestacao";
 import { diaLocalDe, periodoDaHora } from "@/lib/frases-do-mascote";
 import { Image } from "expo-image";
-import { router } from "expo-router";
+import { Redirect, router } from "expo-router";
 import {
   Apple,
   ChevronRight,
@@ -67,6 +67,12 @@ export default function Inicio() {
     hora: agora.getHours(),
     semanas: gest?.weeks ?? null,
   });
+
+  /* Fora do Modo Cuidado, o bebê, a semana e a agenda moram na aba do meio
+     (decisão do dono, 13/11/2026), e esta aba sai da barra: quem chegar aqui
+     por um "voltar" vai para lá. (`cuidado` é verdade enquanto o perfil
+     carrega — o app falha fechado —, então ninguém em luto é desviado.) */
+  if (!cuidado) return <Redirect href="/jornada" />;
 
   if (estadoDoPerfil === "falhou")
     return (

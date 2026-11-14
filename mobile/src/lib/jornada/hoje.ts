@@ -28,11 +28,19 @@ export function cuidadosDoDia(o: {
   flags: FlagsDoDia;
   semana: number;
   nomeDoBebe: string | null;
+  /** O assunto da aula de hoje (`tituloCurtoDaAula`): a tela diz o que ela
+   * aprende hoje, e não só "uma lição". */
+  assuntoDaAula?: string | null;
 }): Cuidado[] {
   const nome = o.nomeDoBebe?.trim() || null;
   const para = nome ?? "o bebê";
   const textos: Record<ChaveDoCuidado, { titulo: string; sub: string }> = {
-    aula: { titulo: `Aprender sobre a semana ${o.semana}`, sub: "2 min · uma lição e perguntas" },
+    aula: {
+      titulo: `Aprender sobre a semana ${o.semana}`,
+      sub: o.assuntoDaAula?.trim()
+        ? `2 min · ${o.assuntoDaAula.trim()}`
+        : "2 min · uma lição e perguntas",
+    },
     movement: { titulo: "Soltar o corpo", sub: "5 min · no ritmo do seu corpo" },
     meditation: { titulo: `Respirar com ${para}`, sub: "3 min · a mente desacelera junto" },
     bonding: {

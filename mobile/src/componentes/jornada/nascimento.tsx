@@ -111,7 +111,7 @@ export function CartaoDaChegada({
             color: "#7d5a72",
           }}
         >
-          feito com carinho no app Obstétrica 💛
+          feito com carinho no app Mãe Esperta 💛
         </Text>
       </View>
     </View>

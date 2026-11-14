@@ -191,6 +191,6 @@ export function codigoLimpo(t: string): string {
  * pessoa, sem promessa clínica.
  */
 export function mensagemDeConviteDoApp(codigo: string, link: string | null): string {
-  const base = `Estou usando o Obstétrica e queria você comigo lá 💛 No cadastro, use o meu código ${codigo}: a gente vira amiga lá dentro.`;
+  const base = `Estou usando o app Mãe Esperta e queria você comigo lá 💛 No cadastro, use o meu código ${codigo}: a gente vira amiga lá dentro.`;
   return link ? `${base} ${link}` : base;
 }

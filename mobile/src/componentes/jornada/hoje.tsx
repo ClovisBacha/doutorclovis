@@ -216,6 +216,7 @@ export function TelaDeHoje({
   chama,
   avisos,
   nascimento,
+  acompanhamento,
   amigas,
   agenda,
   aoAbrir,
@@ -243,6 +244,9 @@ export function TelaDeHoje({
   avisos?: ReactNode;
   /** A partir da semana 37: a porta para contar o nascimento. */
   nascimento?: ReactNode;
+  /** O acompanhamento da semana (peso, frase, data provável, semana a semana,
+   * movimentos), logo abaixo do céu: o bebê é o centro da tela (13/11/2026). */
+  acompanhamento?: ReactNode;
   /** As amigas e a dupla, logo depois do cuidado do dia (fase 3). */
   amigas?: ReactNode;
   /** A próxima consulta da agenda (ou o convite para marcar). */
@@ -385,6 +389,7 @@ export function TelaDeHoje({
         >
           {avisos}
           {nascimento}
+          {acompanhamento}
           <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.md }}>
             <View style={{ flex: 1 }}>
               <Text
@@ -453,7 +458,7 @@ export function TelaDeHoje({
 
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`${chama} dias seguidos. Ver minha jornada`}
+            accessibilityLabel={`${chama} dias seguidos. Ver a trilha`}
             onPress={() => {
               toque();
               aoVerJornada();
@@ -483,7 +488,7 @@ export function TelaDeHoje({
               )}
             </Text>
             <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: "#7a3fd1" }}>
-              Ver minha jornada ›
+              Ver a trilha ›
             </Text>
           </Pressable>
         </View>

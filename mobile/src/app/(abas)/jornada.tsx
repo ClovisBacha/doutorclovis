@@ -35,6 +35,9 @@ import { Caminho } from "~/componentes/caminho/caminho";
 import { useJornada, type DiaDaJornada } from "~/componentes/jornada/usarJornada";
 import { ehBancada, parametroDaBancada, recarregarNaBancada } from "~/lib/bancada";
 import { TelaDeHoje } from "~/componentes/jornada/hoje";
+import { BebeNestaSemana } from "~/componentes/jornada/bebe-nesta-semana";
+import { aulaDoAppNoDia } from "~/lib/jornada/aulas-do-app";
+import { tituloCurtoDaAula } from "~/lib/jornada/aula";
 import { TelaDoQuartoTrimestre } from "~/componentes/jornada/hoje-pos";
 import { FestaDoNascimento, PortaDoNascimento } from "~/componentes/jornada/nascimento";
 import { TrilhaDoPosParto } from "~/componentes/caminho/caminho-pos";
@@ -157,8 +160,9 @@ export default function AbaJornada() {
     );
   }
   if (dia.cuidado) return <JornadaDoCuidado uid={dia.uid} />;
-  /* A trilha é a aba, como no Duolingo (decisão do dono, 11/11/2026). */
-  if (dia.modo === "gestacao") return <JornadaDaGestacao dia={dia} loja={loja} vista="aba" />;
+  /* A aba do meio é a tela do bebê, e o app abre nela (decisão do dono,
+     13/11/2026: "o bebê é o centro"). A trilha mora na aba da direita. */
+  if (dia.modo === "gestacao") return <JornadaDaGestacao dia={dia} loja={loja} vista="hoje" />;
   if (dia.modo === "pos") return <JornadaDoPosParto dia={dia} loja={loja} />;
   return <JornadaSemData uid={dia.uid} />;
 }
@@ -304,13 +308,14 @@ function useReconciliacao(D: number, pronta: boolean, aoMudarSaldo: () => void) 
    ══════════════════════════════════════════════════════════════════════════ */
 
 /**
- * A gestação em três vistas: "aba" (a aba — a trilha inteira, como no
- * Duolingo, com os avisos, a festa dos marcos e a reconciliação da abertura
- * do dia; decisão do dono, 11/11/2026), "hoje" (a tela do cuidado do dia, que
- * foi a aba de 19/10 a 11/11) e "trilha" (a rota /jornada/trilha, que hoje
- * leva de volta à aba). Uma função só para todas lerem a mesma carteira e o
- * mesmo Cantinho; o que é da abertura do dia roda só na vista que abre o app,
- * para não festejar nem cobrar duas vezes.
+ * A gestação em três vistas: "hoje" (a aba do meio — a tela do bebê: o céu
+ * com o bebê da semana, o acompanhamento e o cuidado do dia; é ela que abre o
+ * app, com os avisos, a festa dos marcos e a reconciliação da abertura do
+ * dia — decisão do dono, 13/11/2026), "aba" (a aba da direita — a trilha
+ * inteira do jogo, como no Duolingo) e "trilha" (a rota /jornada/trilha, que
+ * leva à aba da trilha). Uma função só para todas lerem a mesma carteira e o
+ * mesmo Cantinho; o que é da abertura do dia roda só na tela do bebê, para
+ * não festejar nem cobrar duas vezes.
  */
 export function JornadaDaGestacao({
   dia,
@@ -322,9 +327,9 @@ export function JornadaDaGestacao({
   vista?: "aba" | "hoje" | "trilha";
 }) {
   const ehHoje = vista === "hoje";
-  /* O que é da abertura do dia (festa, reconciliação, avisos) roda na vista
-     que abre o app. */
-  const abre = vista !== "trilha";
+  /* O que é da abertura do dia (festa, reconciliação, avisos) roda na tela
+     do bebê, que abre o app. */
+  const abre = ehHoje;
   const { D, semana, perfil, hoje } = dia;
   const { carteira, recarregar } = useCarteira(true);
   /* A festa dos marcos chama a conferência das conquistas lá embaixo; os
@@ -383,10 +388,13 @@ export function JornadaDaGestacao({
   if (ehHoje) {
     const hora = horaDaTela();
     const flags = flagsDoDia(loja.blob, D);
+    const aulaDeHoje = aulaDoAppNoDia(D);
     const cuidados = cuidadosDoDia({
       flags,
       semana,
       nomeDoBebe,
+      /* "Você está na semana 24; hoje você aprende…": o assunto da aula do dia. */
+      assuntoDaAula: aulaDeHoje ? tituloCurtoDaAula(aulaDeHoje.teach) : null,
     });
     const feitos = cuidados.filter((c) => c.feito).length;
     return (
@@ -439,7 +447,8 @@ export function JornadaDaGestacao({
             </>
           }
           aoAbrir={(c) => ir(ROTA_DO_CUIDADO[c])}
-          aoVerJornada={() => ir("/jornada/trilha")}
+          acompanhamento={<BebeNestaSemana semana={semana} totalDias={D} nomeDoBebe={nomeDoBebe} />}
+          aoVerJornada={() => irParaAba("/trilha")}
           direita={<BotaoDoPerfil />}
         />
         <FestaDoMarco festa={marco.festa} nomeDoBebe={nomeDoBebe} aoFechar={marco.fechar} />
@@ -451,7 +460,7 @@ export function JornadaDaGestacao({
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: cor.fundo }}>
       <View style={{ paddingHorizontal: espaco.lg }}>
         {vista === "aba" ? (
-          <CabecalhoDaTrilha nomeDoBebe={nomeDoBebe} semana={semana} />
+          <CabecalhoDaTrilha sub={`Semana ${semana}${nomeDoBebe ? ` · ${nomeDoBebe}` : ""}`} />
         ) : (
           <BarraDoTopo titulo="Minha jornada" />
         )}
@@ -513,10 +522,10 @@ export function JornadaDaGestacao({
 }
 
 /**
- * O topo da trilha quando ela é a aba: o nome da trilha e a semana à
- * esquerda, o perfil à direita — sem voltar (a trilha é a porta do app).
+ * O topo da trilha quando ela é a aba da direita: o nome da trilha e a semana
+ * à esquerda, o perfil à direita — sem voltar (é uma aba).
  */
-function CabecalhoDaTrilha({ nomeDoBebe, semana }: { nomeDoBebe: string | null; semana: number }) {
+function CabecalhoDaTrilha({ sub }: { sub: string }) {
   return (
     <View
       style={{
@@ -538,8 +547,7 @@ function CabecalhoDaTrilha({ nomeDoBebe, semana }: { nomeDoBebe: string | null; 
           numberOfLines={1}
           style={{ fontFamily: fonte.media, fontSize: 13, color: cor.textoApagado }}
         >
-          Semana {semana}
-          {nomeDoBebe ? ` · ${nomeDoBebe}` : ""}
+          {sub}
         </Text>
       </View>
       <BotaoDoPerfil />
@@ -662,7 +670,9 @@ export function JornadaDoPosParto({
 }: {
   dia: Extract<DiaDaJornada, { modo: "pos" }>;
   loja: EstadoDaLoja;
-  vista?: "hoje" | "trilha";
+  /** "hoje": a aba do meio (o 4º trimestre); "aba": a trilha das 12 semanas
+   * na aba da direita; "trilha": a mesma trilha na rota empilhada. */
+  vista?: "hoje" | "aba" | "trilha";
 }) {
   const ehHoje = vista === "hoje";
   const { D, idadeDias, perfil, hoje } = dia;
@@ -720,7 +730,11 @@ export function JornadaDoPosParto({
     return (
       <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: cor.fundo }}>
         <View style={{ paddingHorizontal: espaco.lg }}>
-          <BarraDoTopo titulo="O 4º trimestre" />
+          {vista === "aba" ? (
+            <CabecalhoDaTrilha sub={`O 4º trimestre${nomeDoBebe ? ` · ${nomeDoBebe}` : ""}`} />
+          ) : (
+            <BarraDoTopo titulo="O 4º trimestre" />
+          )}
         </View>
         <TrilhaDoPosParto
           hojeD={hojeNaTrilha}
@@ -728,7 +742,7 @@ export function JornadaDoPosParto({
           chama={diasDeChama}
           figurinhas={figurinhas}
           formou={terminou}
-          aoAbrirHoje={voltarParaJornada}
+          aoAbrirHoje={vista === "aba" ? () => irParaAba("/jornada") : voltarParaJornada}
         />
       </SafeAreaView>
     );
@@ -785,7 +799,7 @@ export function JornadaDoPosParto({
         aoFazerDesafio={() => marcarNoPos(D, "desafio")}
         aoLerASemana={() => marcarNoPos(D, "leitura")}
         aoAbrir={(a) => ir(ROTA_DO_CUIDADO[a])}
-        aoVerTrilha={() => ir("/jornada/trilha")}
+        aoVerTrilha={() => irParaAba("/trilha")}
         aoVerAlbum={() => ir("/jornada/album")}
         direita={<BotaoDoPerfil />}
         amigas={<AmigasNoHoje pos />}
@@ -1052,7 +1066,7 @@ function AvisoDePresente({
   aoFechar: () => void;
 }) {
   /* Sem nome, quem deu é dito pelo papel, como no site: um presente do médico
-     dela não pode virar "da equipe da Obstétrica". */
+     dela não pode virar "da equipe do Mãe Esperta". */
   const deQuem = nome?.trim()
     ? `de ${nome.trim()}`
     : de === "medico"

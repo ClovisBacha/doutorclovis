@@ -114,7 +114,7 @@ export function CartaoDaSemana({ d }: { d: DadosDoCartao }) {
             color: "rgba(255,255,255,0.8)",
           }}
         >
-          feito com carinho no app Obstétrica 💛
+          feito com carinho no app Mãe Esperta 💛
         </Text>
       </View>
     </View>

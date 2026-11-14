@@ -19,6 +19,19 @@ describe("a tela Hoje", () => {
     expect(c[0]!.titulo).toBe("Aprender sobre a semana 24");
   });
 
+  test("a aula diz o que ela aprende hoje: o assunto da lição, quando ele existe", () => {
+    const com = cuidadosDoDia({
+      flags: {},
+      semana: 24,
+      nomeDoBebe: "Helena",
+      assuntoDaAula: "Como vamos dividir o cuidado",
+    });
+    expect(com[0]!.titulo).toBe("Aprender sobre a semana 24");
+    expect(com[0]!.sub).toBe("2 min · Como vamos dividir o cuidado");
+    const sem = cuidadosDoDia({ flags: {}, semana: 24, nomeDoBebe: null, assuntoDaAula: "  " });
+    expect(sem[0]!.sub).toBe("2 min · uma lição e perguntas");
+  });
+
   test("o nome vai sem artigo — a tela não supõe o sexo do bebê", () => {
     const c = cuidadosDoDia({ flags: {}, semana: 24, nomeDoBebe: "Helena" });
     const tudo = c.map((x) => `${x.titulo} ${x.sub}`).join(" ");

@@ -90,7 +90,7 @@ export function paraHtml(doc: DocumentoJuridico, data: string, contato: string):
     }
   }
   return pagina(
-    `${doc.titulo} — Obstétrica`,
+    `${doc.titulo} — Mãe Esperta`,
     `<h1>${escapar(doc.titulo)}</h1>
 <p class="data">Versão de ${escapar(data)}.</p>
 <p class="resumo">${escapar(doc.resumo)}</p>
@@ -109,12 +109,12 @@ ${RODAPE}`,
 export function paraSuporte(data: string, contato: string): string {
   const email = `<a href="mailto:${escapar(contato)}">${escapar(contato)}</a>`;
   return pagina(
-    "Obstétrica — Suporte",
-    `<h1>Obstétrica</h1>
+    "Mãe Esperta — Suporte",
+    `<h1>Mãe Esperta</h1>
 <p class="data">Suporte do app</p>
-<p class="resumo">O Obstétrica é uma comunidade de gestantes e mães, com um jogo de cuidado diário. Ele não dá orientação médica e não substitui quem acompanha a sua gestação.</p>
+<p class="resumo">O app Mãe Esperta é um jogo para aprender sobre a gestação, um pouco por dia. Ele não dá orientação médica e não substitui quem acompanha a sua gestação.</p>
 <h2>Fale com a gente</h2>
-<p>Dúvidas sobre o app, a sua conta ou a Comunidade: ${email}.</p>
+<p>Dúvidas sobre o app, a sua conta ou as Amigas: ${email}.</p>
 <p>Assuntos de saúde são com quem acompanha a sua gestação. Em emergência, ligue 192.</p>
 <h2>A sua conta</h2>
 <ul><li>Excluir a conta: no app, em Perfil → Excluir minha conta. A exclusão é feita na hora.</li><li>Uma cópia dos seus dados: no app, em Perfil → Baixar uma cópia dos meus dados.</li></ul>

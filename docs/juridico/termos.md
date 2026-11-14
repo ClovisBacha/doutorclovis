@@ -1,12 +1,12 @@
 # Termos de uso
 
-_Versão de 11 de novembro de 2026._
+_Versão de 12 de novembro de 2026._
 
-O Obstétrica é um jogo para aprender sobre a gestação, um pouco por dia — como um Duolingo para gestantes. Ele não dá orientação médica e não substitui quem acompanha a sua gestação. Usando o app, você concorda com estes termos e com a Política de privacidade.
+O app Mãe Esperta é um jogo para aprender sobre a gestação, um pouco por dia — como um Duolingo para gestantes. Ele não dá orientação médica e não substitui quem acompanha a sua gestação. Usando o app, você concorda com estes termos e com a Política de privacidade.
 
 ## 1. Quem oferece o app
 
-O app Obstétrica é oferecido por Dr. Clóvis Bacha, ginecologista e obstetra (CRM-MG 22.333). Contato: contato@drclovisbacha.com.br.
+O app Mãe Esperta é oferecido por Dr. Clóvis Bacha, ginecologista e obstetra (CRM-MG 22.333). Contato: contato@drclovisbacha.com.br.
 
 ## 2. O que é o app
 

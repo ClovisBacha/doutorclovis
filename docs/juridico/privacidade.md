@@ -1,12 +1,12 @@
 # Política de privacidade
 
-_Versão de 11 de novembro de 2026._
+_Versão de 12 de novembro de 2026._
 
 Guardamos o necessário para o app funcionar: a sua conta, a datação da gestação, os movimentos do bebê, a sua trilha e as suas amigas. Não vendemos dados, não usamos para publicidade e não rastreamos você em outros apps. Você pode baixar uma cópia dos seus dados e excluir tudo quando quiser, no Perfil.
 
 ## 1. Quem cuida dos seus dados
 
-O controlador dos dados é Dr. Clóvis Bacha, ginecologista e obstetra (CRM-MG 22.333), que oferece o app Obstétrica. O encarregado pelo tratamento de dados pessoais atende em contato@drclovisbacha.com.br.
+O controlador dos dados é Dr. Clóvis Bacha, ginecologista e obstetra (CRM-MG 22.333), que oferece o app Mãe Esperta. O encarregado pelo tratamento de dados pessoais atende em contato@drclovisbacha.com.br.
 
 ## 2. O que o app guarda, e para quê
 

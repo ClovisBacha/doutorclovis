@@ -59,7 +59,7 @@ export function CabecalhoDaMarca({
         centro
         estilo={{ fontSize: compacto ? 26 : 34, fontFamily: fonte.titulo, letterSpacing: -0.6 }}
       >
-        Obstétrica
+        Mãe Esperta
       </T>
       {subtitulo ? (
         <T tipo="apagado" centro estilo={{ maxWidth: 330, fontSize: 15, lineHeight: 22 }}>

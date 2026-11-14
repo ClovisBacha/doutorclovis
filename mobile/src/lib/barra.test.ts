@@ -4,10 +4,11 @@ import { join, relative } from "node:path";
 import { semComentarios } from "@/lib/sem-comentarios";
 
 /**
- * A BARRA (decisão do dono de 11/11/2026, "um Duolingo para gestantes"):
- * Trilha · Amigas · Bebê. A Comunidade e o SOS ficam no código, escondidos
- * pelas chaves `COMUNIDADE_NO_APP` e `SOS_NO_APP` de `config.ts`; ligadas,
- * a barra volta a ser Hoje · Comunidade · SOS · Amigas · Bebê (fase 3).
+ * A BARRA (decisão do dono de 13/11/2026: "o bebê é o centro [...] deve ficar
+ * no meio. O jogo deve ficar na direita e a questão das amigas [...] na
+ * esquerda"): Amigas · Bebê · Trilha, e o app abre no Bebê. No Modo Cuidado,
+ * Amigas · Hoje · Início (sem trilha). A Comunidade e o SOS ficam no código,
+ * escondidos pelas chaves `COMUNIDADE_NO_APP` e `SOS_NO_APP` de `config.ts`.
  *
  * Esta catraca cobra a ordem das abas, que a Saúde não volte por um link
  * esquecido, e que ninguém EMPURRE uma aba de uma tela empilhada — isso abre
@@ -33,11 +34,13 @@ const FONTES = arquivos(RAIZ).map((p) => ({
 
 const BARRA = FONTES.find((f) => f.arquivo === join("app", "(abas)", "_layout.tsx"))!.codigo;
 
-describe("a barra: Trilha · Amigas · Bebê", () => {
+describe("a barra: Amigas · Bebê · Trilha", () => {
   test("as abas, nesta ordem; a Comunidade e o SOS só com as chaves ligadas", async () => {
     const abas = [...BARRA.matchAll(/<Tabs\.Screen\s+name="(\w+)"/g)].map((m) => m[1]);
-    expect(abas).toEqual(["jornada", "comunidade", "amigas", "inicio"]);
-    expect(BARRA).toContain('options={{ title: "Trilha" }}');
+    expect(abas).toEqual(["amigas", "jornada", "trilha", "inicio", "comunidade"]);
+    expect(BARRA).toContain('name="jornada" options={{ title: cuidado ? "Hoje" : "Bebê" }}');
+    expect(BARRA).toMatch(/title: "Trilha", \.\.\.\(cuidado \? \{ href: null \} : \{\}\)/);
+    expect(BARRA).toMatch(/title: "Início", \.\.\.\(cuidado \? \{\} : \{ href: null \}\)/);
     expect(BARRA).toMatch(/COMUNIDADE_NO_APP \? \{\} : \{ href: null \}/);
     expect(BARRA).toContain("{SOS_NO_APP ? <BotaoDoSos /> : null}");
     const { COMUNIDADE_NO_APP, SOS_NO_APP } = await import("~/config");
@@ -65,6 +68,20 @@ describe("a barra: Trilha · Amigas · Bebê", () => {
       /\b(?:router\.push|ir)\(\s*(?:rota\()?["'`]\/amigas["'`?]/.test(f.codigo),
     ).map((f) => f.arquivo);
     expect(empurra).toEqual([]);
+  });
+
+  test("o app abre no Bebê, a aba do meio — e o Bebê é a tela do bebê, não a trilha", () => {
+    expect(BARRA).toContain('initialRouteName: "jornada"');
+    const porta = FONTES.find((f) => f.arquivo === join("app", "index.tsx"))!.codigo;
+    expect(porta).toContain('<Redirect href="/jornada" />');
+    const aba = FONTES.find((f) => f.arquivo === join("app", "(abas)", "jornada.tsx"))!.codigo;
+    expect(aba).toContain('<JornadaDaGestacao dia={dia} loja={loja} vista="hoje" />');
+    expect(aba).toContain("<BebeNestaSemana");
+    const trilha = FONTES.find((f) => f.arquivo === join("app", "(abas)", "trilha.tsx"))!.codigo;
+    expect(trilha).toContain('<JornadaDaGestacao dia={dia} loja={loja} vista="aba" />');
+    /* "Ver a trilha" troca de aba; empurrar a trilha abriria outra barra. */
+    expect(aba).toContain('irParaAba("/trilha")');
+    expect(aba).not.toMatch(/\bir\(\s*["'`]\/jornada\/trilha["'`]/);
   });
 
   test("os selos: a barra lê ao voltar para o app, e não no Modo Cuidado", () => {

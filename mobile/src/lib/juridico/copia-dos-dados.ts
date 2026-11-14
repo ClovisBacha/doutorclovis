@@ -16,7 +16,11 @@ import { ymdLocal } from "~/lib/gestacao";
  * Sem react-native aqui: é testado pelo bun.
  */
 
-export const PREFIXO_DA_COPIA = "obstetrica-meus-dados-";
+export const PREFIXO_DA_COPIA = "mae-esperta-meus-dados-";
+
+/** O nome de antes de 12/11/2026 (o app se chamava Obstétrica): a limpeza
+ * do cache ainda o reconhece, para não deixar uma cópia velha para trás. */
+const PREFIXO_ANTIGO = "obstetrica-meus-dados-";
 
 /** Sem o nome dela; a data é a do aparelho (nunca o dia em UTC). */
 export function nomeDaCopia(agora: Date): string {
@@ -24,7 +28,9 @@ export function nomeDaCopia(agora: Date): string {
 }
 
 export function ehCopiaDosDados(nome: string): boolean {
-  return nome.startsWith(PREFIXO_DA_COPIA) && nome.endsWith(".json");
+  return (
+    (nome.startsWith(PREFIXO_DA_COPIA) || nome.startsWith(PREFIXO_ANTIGO)) && nome.endsWith(".json")
+  );
 }
 
 export type RespostaDaCopia =

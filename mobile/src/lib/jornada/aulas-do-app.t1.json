@@ -166,7 +166,7 @@
     ]
   },
   "10": {
-    "teach": "Ninguém precisa atravessar uma jornada tão especial sozinha, e é aí que entra a rede de apoio: as pessoas com quem você pode contar ao longo do caminho. Essa rede pode incluir a família, as amigas, as vizinhas, as colegas e também outras gestantes, como as que você encontra na Comunidade do app. Cada pessoa costuma ter um papel diferente: tem quem escuta sem julgar, quem ajuda na prática, com uma tarefa da casa ou uma carona, e quem faz você rir quando o dia pesa. Uma brincadeira que ajuda a enxergar isso é desenhar um mapa: você no centro e, ao redor, os nomes de quem caminha com você, cada um com o seu papel. Quase sempre o desenho mostra que a rede é maior do que parece. E tudo bem ir acrescentando nomes com o tempo.",
+    "teach": "Ninguém precisa atravessar uma jornada tão especial sozinha, e é aí que entra a rede de apoio: as pessoas com quem você pode contar ao longo do caminho. Essa rede pode incluir a família, as amigas, as vizinhas, as colegas e também outras mães e gestantes que você conhece. Cada pessoa costuma ter um papel diferente: tem quem escuta sem julgar, quem ajuda na prática, com uma tarefa da casa ou uma carona, e quem faz você rir quando o dia pesa. Uma brincadeira que ajuda a enxergar isso é desenhar um mapa: você no centro e, ao redor, os nomes de quem caminha com você, cada um com o seu papel. Quase sempre o desenho mostra que a rede é maior do que parece. E tudo bem ir acrescentando nomes com o tempo.",
     "funFact": "O ditado 'é preciso uma aldeia para criar uma criança', atribuído a tradições africanas, lembra que cuidar de quem chega nunca foi tarefa de uma pessoa só.",
     "questions": [
       {
@@ -187,7 +187,7 @@
           "Só quem mora na mesma casa que você",
           "Pessoas da família",
           "Amigas e vizinhas",
-          "Outras gestantes da Comunidade"
+          "Outras mães e gestantes que você conhece"
         ],
         "a": [1, 2, 3],
         "why": "A rede pode ser bem variada: família, amigas, vizinhas e outras gestantes, morando perto ou longe."
@@ -1312,7 +1312,7 @@
     ]
   },
   "31": {
-    "teach": "Conversar com o bebê pode começar hoje mesmo, do jeitinho mais simples. Dar bom-dia ao acordar e boa-noite antes de dormir, contar como foi o dia: tudo vale. Muitas famílias dão um apelido carinhoso à barriga antes mesmo de escolher o nome, e às vezes a inspiração vem da fruta da semana. Nesta fase, quem sabe, Papoulinha ou Sementinha? O bebê é bem pequenino e ainda não ouve, e tudo bem: essa conversa é, antes de tudo, um laço que começa por você. Falar em voz alta ajuda a ir abrindo espaço para quem está chegando, na rotina e no coração. Quem divide a casa com você também pode entrar na conversa, com um 'oi' na barriga antes de sair de manhã. E, se quiser, conte na Comunidade do app qual é o apelido da sua barriga.",
+    "teach": "Conversar com o bebê pode começar hoje mesmo, do jeitinho mais simples. Dar bom-dia ao acordar e boa-noite antes de dormir, contar como foi o dia: tudo vale. Muitas famílias dão um apelido carinhoso à barriga antes mesmo de escolher o nome, e às vezes a inspiração vem da fruta da semana. Nesta fase, quem sabe, Papoulinha ou Sementinha? O bebê é bem pequenino e ainda não ouve, e tudo bem: essa conversa é, antes de tudo, um laço que começa por você. Falar em voz alta ajuda a ir abrindo espaço para quem está chegando, na rotina e no coração. Quem divide a casa com você também pode entrar na conversa, com um 'oi' na barriga antes de sair de manhã. E, se quiser, conte para alguém querido qual é o apelido da sua barriga.",
     "funFact": "Na Coreia do Sul, é costume dar ao bebê ainda na barriga um apelido só para a espera, chamado 'taemyeong', usado durante toda a gestação.",
     "questions": [
       {
@@ -1408,7 +1408,7 @@
     ]
   },
   "33": {
-    "teach": "Duas linhas no teste e mil emoções no coração: alegria, surpresa, incredulidade, euforia, talvez até um pouco de medo, tudo misturado. Tudo bem sentir tudo isso junto, mesmo quando a gravidez foi muito desejada. Não existe uma emoção certa para esse momento, nem um prazo obrigatório para contar a novidade. Você conta quando e para quem quiser: algumas contam na hora, outras guardam a surpresa por um tempo, só para si ou para planejar um jeito especial de contar. Falar sobre o que você sente com alguém de confiança, como o parceiro, a parceira, uma amiga ou as gestantes da Comunidade do app, também ajuda a acolher essa mistura. E vale guardar a lembrança: anotar onde você estava e o que sentiu transforma este dia numa memória para sempre. Acolha o que vier, sem culpa.",
+    "teach": "Duas linhas no teste e mil emoções no coração: alegria, surpresa, incredulidade, euforia, talvez até um pouco de medo, tudo misturado. Tudo bem sentir tudo isso junto, mesmo quando a gravidez foi muito desejada. Não existe uma emoção certa para esse momento, nem um prazo obrigatório para contar a novidade. Você conta quando e para quem quiser: algumas contam na hora, outras guardam a surpresa por um tempo, só para si ou para planejar um jeito especial de contar. Falar sobre o que você sente com alguém de confiança, como o parceiro, a parceira, uma amiga ou alguém da família, também ajuda a acolher essa mistura. E vale guardar a lembrança: anotar onde você estava e o que sentiu transforma este dia numa memória para sempre. Acolha o que vier, sem culpa.",
     "funFact": "Num livro do francês Marcel Proust, o narrador prova um bolinho chamado madeleine e, de repente, a infância inteira volta à memória. Detalhes assim, como a música que tocava, também podem guardar o dia do positivo.",
     "questions": [
       {
@@ -1658,38 +1658,38 @@
     ]
   },
   "38": {
-    "teach": "O app Obstétrica é também um lugar de encontro. Na Comunidade, você encontra outras gestantes, muitas vivendo uma fase parecida com a sua, com a mesma fruta da semana na tela e as mesmas expectativas no coração. Contar como está sendo a sua jornada e ler a experiência das outras cria uma companhia gostosa: dá para trocar ideias de nomes, contar como foi a revelação da novidade, celebrar a semana nova de alguém ou simplesmente descobrir que outra pessoa está sentindo a mesma alegria e o mesmo friozinho de expectativa. E não existe jeito certo de participar. Cada uma compartilha o que quiser, no seu próprio tempo: tem dia de escrever, tem dia de só ler, tem dia de deixar um carinho no relato de outra mãe. Um comentário gentil pode fazer a diferença no dia de alguém.",
+    "teach": "A gestação fica mais leve com amigas por perto. Tem a amiga de longa data, que ri com você de tudo; tem a que já foi mãe e lembra bem de como foi a própria espera; e tem aquela que escuta sem julgar, sem pressa de dar resposta. Contar como está sendo a sua jornada e ouvir a experiência delas cria uma companhia gostosa: dá para trocar ideias de nomes, contar como foi a revelação da novidade ou descobrir que outra pessoa já sentiu a mesma alegria e o mesmo friozinho de expectativa. E não existe jeito certo de fazer isso. Cada uma divide o que quiser, no seu próprio tempo: tem dia de falar muito, tem dia de só ouvir. Um gesto pequeno, como um bilhete, uma ligação ou um abraço, pode fazer a diferença no dia de alguém. E, se quiser, dá até para chamar uma amiga para jogar junto no app.",
     "funFact": "A palavra inglesa 'gossip', hoje 'fofoca', vem de 'godsibb', palavra antiga que chegou a nomear as amigas próximas que acompanhavam a mulher na chegada do bebê.",
     "questions": [
       {
         "type": "choice",
-        "q": "Quem você encontra na Comunidade do app?",
+        "q": "Segundo a aula, o que pode fazer a diferença no dia de alguém?",
         "o": [
-          "Só pessoas que já são mães há muitos anos",
-          "Outras gestantes, muitas numa fase parecida com a sua",
-          "Apenas a equipe do app"
+          "Um gesto pequeno, como um bilhete ou um abraço",
+          "Um presente caro, escolhido com muita antecedência",
+          "Uma lista de conselhos sobre a gestação"
         ],
-        "a": 1,
-        "why": "Na Comunidade estão outras gestantes, muitas vivendo uma fase parecida com a sua."
+        "a": 0,
+        "why": "Um bilhete, uma ligação ou um abraço: um gesto pequeno de carinho pode fazer a diferença no dia de alguém."
       },
       {
         "type": "multi",
-        "q": "Marque jeitos de participar da Comunidade (marque todas):",
+        "q": "Marque jeitos de dividir a espera com as amigas, segundo a aula (marque todas):",
         "o": [
-          "Contar como está sendo a sua jornada",
-          "Ler a experiência de outras gestantes",
-          "Deixar um comentário gentil",
-          "Postar todo dia, sem poder pular"
+          "Trocar ideias de nomes",
+          "Contar como foi a revelação da novidade",
+          "Ouvir a experiência de quem já foi mãe",
+          "Contar tudo no mesmo dia, sem poder esperar"
         ],
         "a": [0, 1, 2],
-        "why": "Dá para contar, ler e deixar carinho. E não existe obrigação: cada uma participa no seu tempo."
+        "why": "Dá para trocar ideias de nomes, contar a revelação e ouvir quem já viveu a espera. E não existe obrigação: cada uma divide no seu tempo."
       },
       {
         "type": "choice",
-        "q": "Verdadeiro ou falso: na Comunidade, cada uma compartilha o que quiser, no seu próprio tempo.",
+        "q": "Verdadeiro ou falso: entre amigas, cada uma divide o que quiser, no seu próprio tempo.",
         "o": ["Verdadeiro", "Falso"],
         "a": 0,
-        "why": "Verdadeiro! Tem dia de escrever, tem dia de só ler, e tudo bem."
+        "why": "Verdadeiro! Tem dia de falar muito, tem dia de só ouvir, e tudo bem."
       },
       {
         "type": "choice",
@@ -1791,7 +1791,7 @@
     ]
   },
   "41": {
-    "teach": "Revisão da semana 5! O embrião, com cerca de 3 mm, do tamanho de uma semente de gergelim, ganhou um formato curvadinho, como a letra C, e o coração começou a bater: primeiro como um tubinho que pulsa, que depois se dobra para formar as câmaras. É o primeiro órgão do corpinho a funcionar. Junto ao embrião, o saco vitelino, a lancheira do começo, ajuda a nutrir e forma as primeiras células do sangue; o nome vem de vitellus, gema de ovo. Você também sonhou acordada com o jeitinho do bebê, que vai ser único, colecionou ideias para contar a novidade, como a caixinha com sapatinho e o porta-retrato 'chegando em breve', conheceu a Comunidade do app, onde cada uma compartilha no seu tempo, e pensou na primeira carta para o bebê, em que uma frase sincera já vale. Uma semana com muito coração!",
+    "teach": "Revisão da semana 5! O embrião, com cerca de 3 mm, do tamanho de uma semente de gergelim, ganhou um formato curvadinho, como a letra C, e o coração começou a bater: primeiro como um tubinho que pulsa, que depois se dobra para formar as câmaras. É o primeiro órgão do corpinho a funcionar. Junto ao embrião, o saco vitelino, a lancheira do começo, ajuda a nutrir e forma as primeiras células do sangue; o nome vem de vitellus, gema de ovo. Você também sonhou acordada com o jeitinho do bebê, que vai ser único, colecionou ideias para contar a novidade, como a caixinha com sapatinho e o porta-retrato 'chegando em breve', lembrou das amigas que dividem a espera com você, cada uma no seu tempo, e pensou na primeira carta para o bebê, em que uma frase sincera já vale. Uma semana com muito coração!",
     "funFact": "Na semana que vem, a fruta do app muda para a lentilha: com cerca de 5 mm, o embrião vai ganhar os primeiros brotinhos de braços e pernas.",
     "questions": [
       {
@@ -1833,12 +1833,12 @@
         "q": "Marque tudo que esta semana sugeriu para contar a novidade, compartilhar a jornada e guardar memórias da espera:",
         "o": [
           "Gravar a reação de quem recebe a notícia",
-          "Contar a sua jornada na Comunidade, no seu tempo",
+          "Contar a sua jornada às amigas, no seu tempo",
           "Escrever a carta apenas se o texto sair perfeito",
           "Colocar a data na primeira carta e guardá-la"
         ],
         "a": [0, 1, 3],
-        "why": "Gravar a reação, contar na Comunidade e datar a carta guardam memórias da espera. E a carta não precisa ser perfeita: uma frase sincera já vale."
+        "why": "Gravar a reação, contar a jornada às amigas e datar a carta foram ideias da semana. E a carta não precisa ser perfeita: uma frase sincera já vale."
       }
     ]
   },
@@ -1886,7 +1886,7 @@
     ]
   },
   "43": {
-    "teach": "Toda mãe se inspira em alguém, mesmo sem perceber. Hoje o convite é pensar nas mulheres que marcaram a sua história: a sua mãe, uma avó, uma tia, uma professora, uma amiga, uma vizinha. Talvez você lembre de um jeito de rir, de um almoço de domingo, de uma frase dita na hora certa ou de um colo que acalmava. Essas lembranças ajudam a desenhar a mãe que você quer ser. E o mais bonito é que você pode escolher: levar adiante o que fez bem a você e fazer do seu jeito o que prefere viver diferente. Escolher outro caminho não diminui ninguém, é só a sua história ganhando a sua marca. Uma brincadeira para hoje: anote três coisas que você quer levar das mulheres que te inspiraram e uma que quer fazer diferente. Não existe lista certa. Se quiser, conte na Comunidade quem inspira você.",
+    "teach": "Toda mãe se inspira em alguém, mesmo sem perceber. Hoje o convite é pensar nas mulheres que marcaram a sua história: a sua mãe, uma avó, uma tia, uma professora, uma amiga, uma vizinha. Talvez você lembre de um jeito de rir, de um almoço de domingo, de uma frase dita na hora certa ou de um colo que acalmava. Essas lembranças ajudam a desenhar a mãe que você quer ser. E o mais bonito é que você pode escolher: levar adiante o que fez bem a você e fazer do seu jeito o que prefere viver diferente. Escolher outro caminho não diminui ninguém, é só a sua história ganhando a sua marca. Uma brincadeira para hoje: anote três coisas que você quer levar das mulheres que te inspiraram e uma que quer fazer diferente. Não existe lista certa. Se quiser, conte para alguém querido quem inspira você.",
     "funFact": "Em muitas línguas, a palavra para mãe tem o som de 'm', como mãe, mama, mother e Mutter. Uma explicação é que o 'm' está entre os primeiros sons que os bebês conseguem fazer.",
     "questions": [
       {
@@ -2272,7 +2272,7 @@
     ]
   },
   "52": {
-    "teach": "Muita gente sente culpa na hora de pedir ajuda, como se precisasse dar conta de tudo sozinha. Mas pedir ajuda não é fraqueza: é deixar a sua rede participar desta jornada. Um segredo é fazer pedidos concretos. Em vez de um vago 'se puder, me ajuda', experimente algo como 'você me ajuda a organizar o armário no sábado?'. Pedidos claros são mais fáceis de aceitar e de cumprir. E quando alguém oferecer ajuda, vale dizer sim: aceitar também é um presente para quem oferece, que se sente parte da história. Uma ideia é ter à mão uma listinha de tarefas em que as pessoas podem ajudar, para responder na hora quando perguntarem 'precisa de alguma coisa?'. E a Comunidade do app também é um lugar para trocar experiências e dicas com outras gestantes.",
+    "teach": "Muita gente sente culpa na hora de pedir ajuda, como se precisasse dar conta de tudo sozinha. Mas pedir ajuda não é fraqueza: é deixar a sua rede participar desta jornada. Um segredo é fazer pedidos concretos. Em vez de um vago 'se puder, me ajuda', experimente algo como 'você me ajuda a organizar o armário no sábado?'. Pedidos claros são mais fáceis de aceitar e de cumprir. E quando alguém oferecer ajuda, vale dizer sim: aceitar também é um presente para quem oferece, que se sente parte da história. Uma ideia é ter à mão uma listinha de tarefas em que as pessoas podem ajudar, para responder na hora quando perguntarem 'precisa de alguma coisa?'. E vale trocar experiências e dicas com amigas que já foram mães.",
     "funFact": "Mutirão é uma palavra de origem tupi para um costume antigo: vizinhos e amigos se juntam para fazer, juntos, uma tarefa grande de alguém, como erguer uma casa ou colher a roça.",
     "questions": [
       {
@@ -2497,7 +2497,7 @@
     ]
   },
   "57": {
-    "teach": "Basta abrir uma rede social para ver ensaios de fotos caprichados, quartinhos prontos e gestantes que parecem dar conta de tudo. Mas o que aparece ali é só um recorte: a foto escolhida, o ângulo bonito, o dia bom. Os dias comuns, as dúvidas e a louça na pia quase nunca entram no álbum. Por isso, comparar a sua jornada com o melhor momento da vida de outra pessoa é uma conta que nunca fecha. Cada família e cada jornada têm o próprio ritmo: tem quem monte o quarto logo no começo, tem quem prefira esperar, e as duas escolhas têm o seu valor. Mudar o olhar ajuda muito: em vez de régua, as histórias das outras podem virar inspiração. Na Comunidade do app, dá para contar a sua parte real e ouvir a parte real das outras, sem competição. Que tal reparar numa coisa da sua jornada que é só sua?",
+    "teach": "Basta abrir uma rede social para ver ensaios de fotos caprichados, quartinhos prontos e gestantes que parecem dar conta de tudo. Mas o que aparece ali é só um recorte: a foto escolhida, o ângulo bonito, o dia bom. Os dias comuns, as dúvidas e a louça na pia quase nunca entram no álbum. Por isso, comparar a sua jornada com o melhor momento da vida de outra pessoa é uma conta que nunca fecha. Cada família e cada jornada têm o próprio ritmo: tem quem monte o quarto logo no começo, tem quem prefira esperar, e as duas escolhas têm o seu valor. Mudar o olhar ajuda muito: em vez de régua, as histórias das outras podem virar inspiração. Com as amigas e outras mães que você conhece, dá para contar a sua parte real e ouvir a parte real das outras, sem competição. Que tal reparar numa coisa da sua jornada que é só sua?",
     "funFact": "Em 2013, o dicionário Oxford escolheu 'selfie' como a palavra do ano: o autorretrato feito com o celular tinha virado mania nas redes.",
     "questions": [
       {
@@ -2528,7 +2528,7 @@
         "q": "Em vez de virarem régua, as histórias das outras gestantes podem virar o quê?",
         "o": ["Inspiração", "Competição", "Lista de cobranças"],
         "a": 0,
-        "why": "Mudar o olhar transforma a comparação em inspiração, e a Comunidade do app é um bom lugar para essa troca."
+        "why": "Mudar o olhar transforma a comparação em inspiração, e uma conversa sincera com as amigas é um bom lugar para essa troca."
       },
       {
         "type": "choice",
@@ -2925,7 +2925,7 @@
         "type": "choice",
         "q": "Como você pode chamar uma amiga gestante para o app?",
         "o": [
-          "Postando o nome da amiga na Comunidade",
+          "Procurando o nome da amiga numa busca",
           "Pedindo para o app sortear uma amiga",
           "Pelo seu link de convite"
         ],
@@ -3183,15 +3183,19 @@
     ]
   },
   "72": {
-    "teach": "Montar o enxoval não precisa pesar no bolso. Roupinhas de bebê costumam servir por pouco tempo, porque o bebê cresce depressa, e por isso muitas peças passam de família em família quase novinhas. Brechós e bazares infantis costumam ter roupas e itens em ótimo estado por preços menores. Amigas, primas e vizinhas que já tiveram filhos muitas vezes adoram emprestar ou doar o que guardaram, e cada peça chega com uma história junto. Outra ajuda é a lista de presentes: quando você anota o que realmente vai usar, quem quer presentear acerta na escolha e nada fica encostado no armário. E na Comunidade do app dá para trocar dicas com outras gestantes sobre onde encontrar boas peças perto de você. Reaproveitar é bom para o bolso, faz bem ao planeta e ainda deixa o enxoval cheio de afeto.",
+    "teach": "Montar o enxoval não precisa pesar no bolso. Roupinhas de bebê costumam servir por pouco tempo, porque o bebê cresce depressa, e por isso muitas peças passam de família em família quase novinhas. Brechós e bazares infantis costumam ter roupas e itens em ótimo estado por preços menores. Amigas, primas e vizinhas que já tiveram filhos muitas vezes adoram emprestar ou doar o que guardaram, e cada peça chega com uma história junto. Outra ajuda é a lista de presentes: quando você anota o que realmente vai usar, quem quer presentear acerta na escolha e nada fica encostado no armário. E vale perguntar a amigas e vizinhas que já foram mães onde encontrar boas peças perto de você. Reaproveitar é bom para o bolso, faz bem ao planeta e ainda deixa o enxoval cheio de afeto.",
     "funFact": "A palavra brechó vem de Belchior, nome de um comerciante do Rio de Janeiro do século 19 que vendia objetos usados.",
     "questions": [
       {
         "type": "choice",
-        "q": "Segundo a aula, onde dá para trocar dicas com outras gestantes sobre onde encontrar boas peças?",
-        "o": ["Na lista de presentes", "Na Comunidade do app", "Na etiqueta das roupinhas"],
+        "q": "Por que muitas roupinhas de bebê passam de família em família quase novinhas?",
+        "o": [
+          "Porque saem de moda muito depressa",
+          "Porque servem pouco: o bebê cresce rápido",
+          "Porque as lojas param de vender esses modelos"
+        ],
         "a": 1,
-        "why": "Na Comunidade do app você troca dicas com outras gestantes sobre onde achar boas peças perto de você."
+        "why": "Roupinhas de bebê costumam servir por pouco tempo, porque o bebê cresce depressa; por isso muitas peças passam de família em família quase novinhas."
       },
       {
         "type": "multi",
@@ -3226,7 +3230,7 @@
     ]
   },
   "73": {
-    "teach": "Que tal escolher uma música só de vocês? Uma canção especial, para cantar ou ouvir juntos, pode virar um pequeno ritual da família. Vale uma cantiga de ninar da sua infância, aquela que alguém cantava para você dormir, ou uma música que marcou a sua história, como a de um encontro, de uma viagem ou de um dia feliz. O parceiro ou a parceira, os avós e até os irmãos mais velhos podem entrar na escolha, e decidir juntos já vira um momento gostoso. O segredo é repetir: cantar ou ouvir a mesma música ao longo dos meses cria uma verdadeira trilha sonora da espera. Mais adiante na gestação, o bebê começa a perceber os sons que chegam lá de fora. E se a voz desafinar, tudo bem: o que importa é o carinho. Na Comunidade do app, dá até para perguntar quais músicas as outras famílias escolheram.",
+    "teach": "Que tal escolher uma música só de vocês? Uma canção especial, para cantar ou ouvir juntos, pode virar um pequeno ritual da família. Vale uma cantiga de ninar da sua infância, aquela que alguém cantava para você dormir, ou uma música que marcou a sua história, como a de um encontro, de uma viagem ou de um dia feliz. O parceiro ou a parceira, os avós e até os irmãos mais velhos podem entrar na escolha, e decidir juntos já vira um momento gostoso. O segredo é repetir: cantar ou ouvir a mesma música ao longo dos meses cria uma verdadeira trilha sonora da espera. Mais adiante na gestação, o bebê começa a perceber os sons que chegam lá de fora. E se a voz desafinar, tudo bem: o que importa é o carinho. E vale até perguntar às amigas que já são mães quais músicas elas escolheram.",
     "funFact": "A melodia de Brilha, brilha, estrelinha vem de uma canção francesa antiga, e Mozart compôs 12 variações sobre essa melodia.",
     "questions": [
       {
@@ -3538,7 +3542,7 @@
     ]
   },
   "80": {
-    "teach": "Ler em voz alta pode virar um dos rituais mais gostosos desta fase. Um momento tranquilo, um livro querido, e a voz faz o resto. É um carinho para você e para quem divide a jornada com você: o parceiro ou a parceira, a avó, uma amiga, cada um com o seu jeito de contar. Por enquanto, o bebê ainda não escuta, mas o hábito já começa a nascer, e mais adiante a sua voz vai se tornar um som conhecido lá dentro. Uma ideia bonita é começar uma pequena biblioteca com os livros que marcaram a sua infância. Isso conecta gerações. E livros infantis são ótimos pedidos de presente: quem ama o bebê pode escrever uma dedicatória na primeira página, um recadinho que vai ser lido muitas vezes. Na Comunidade do app, dá até para trocar indicações de livros com outras gestantes.",
+    "teach": "Ler em voz alta pode virar um dos rituais mais gostosos desta fase. Um momento tranquilo, um livro querido, e a voz faz o resto. É um carinho para você e para quem divide a jornada com você: o parceiro ou a parceira, a avó, uma amiga, cada um com o seu jeito de contar. Por enquanto, o bebê ainda não escuta, mas o hábito já começa a nascer, e mais adiante a sua voz vai se tornar um som conhecido lá dentro. Uma ideia bonita é começar uma pequena biblioteca com os livros que marcaram a sua infância. Isso conecta gerações. E livros infantis são ótimos pedidos de presente: quem ama o bebê pode escrever uma dedicatória na primeira página, um recadinho que vai ser lido muitas vezes. E vale até trocar indicações de livros com amigas e outras mães que você conhece.",
     "funFact": "No Brasil, 18 de abril é o Dia Nacional do Livro Infantil, data escolhida em homenagem ao aniversário de Monteiro Lobato, o criador do Sítio do Picapau Amarelo.",
     "questions": [
       {
@@ -3870,7 +3874,7 @@
     ]
   },
   "87": {
-    "teach": "Basta a notícia se espalhar para os palpites chegarem: sobre o nome, o enxoval, a decoração do quarto e até o formato da barriga. Quase sempre os palpites vêm de carinho, mas nem por isso você precisa seguir todos. Dá para colocar limites com gentileza, sem briga. Frases simples encerram o assunto com carinho: 'obrigada, vou pensar', 'que bom que você se importa' ou 'a gente ainda está decidindo'. Se o palpite é sobre o nome, vale até guardar a escolha em segredo até a hora de contar. Quem caminha junto com você, como o parceiro ou a parceira, também pode ajudar a mudar de assunto. E lembre: você escolhe o que guarda e o que deixa passar. Na Comunidade do app, dá para trocar com outras gestantes as frases que funcionam melhor.",
+    "teach": "Basta a notícia se espalhar para os palpites chegarem: sobre o nome, o enxoval, a decoração do quarto e até o formato da barriga. Quase sempre os palpites vêm de carinho, mas nem por isso você precisa seguir todos. Dá para colocar limites com gentileza, sem briga. Frases simples encerram o assunto com carinho: 'obrigada, vou pensar', 'que bom que você se importa' ou 'a gente ainda está decidindo'. Se o palpite é sobre o nome, vale até guardar a escolha em segredo até a hora de contar. Quem caminha junto com você, como o parceiro ou a parceira, também pode ajudar a mudar de assunto. E lembre: você escolhe o que guarda e o que deixa passar. E vale trocar com amigas que já foram mães as frases que funcionam melhor.",
     "funFact": "Um ditado popular brasileiro brinca com isso: 'se conselho fosse bom, ninguém dava, vendia'. Dá para ouvir os palpites com bom humor e ficar só com o que faz sentido.",
     "questions": [
       {
@@ -4167,7 +4171,7 @@
     ]
   },
   "93": {
-    "teach": "A barriga está a caminho, e o guarda-roupa logo sente a novidade. Antes de sair comprando, vale olhar para o que você já tem: muita coisa acompanha você por mais tempo do que parece. Peças com elástico na cintura, vestidos soltinhos e blusas mais compridas costumam render vários meses. Para as calças de botão, existem os extensores: uma tirinha com casa e botão que aumenta a cintura da calça. Outra ideia esperta é trocar e pegar emprestado com amigas e parentes que já viveram a gestação: muita roupa de grávida é usada por poucos meses e passa de mão em mão quase nova. Na Comunidade do app, dá para trocar dicas com outras gestantes. E, se for comprar, pense no depois: vestidos transpassados, peças de malha e camisas com botão na frente continuam servindo quando o bebê chegar.",
+    "teach": "A barriga está a caminho, e o guarda-roupa logo sente a novidade. Antes de sair comprando, vale olhar para o que você já tem: muita coisa acompanha você por mais tempo do que parece. Peças com elástico na cintura, vestidos soltinhos e blusas mais compridas costumam render vários meses. Para as calças de botão, existem os extensores: uma tirinha com casa e botão que aumenta a cintura da calça. Outra ideia esperta é trocar e pegar emprestado com amigas e parentes que já viveram a gestação: muita roupa de grávida é usada por poucos meses e passa de mão em mão quase nova. E, se for comprar, pense no depois: vestidos transpassados, peças de malha e camisas com botão na frente continuam servindo quando o bebê chegar.",
     "funFact": "O corte império, com a cintura logo abaixo do busto, ganhou esse nome na França de Napoleão. Até hoje é queridinho de quem espera um bebê, porque deixa espaço para a barriga.",
     "questions": [
       {
@@ -4230,7 +4234,7 @@
     ]
   },
   "94": {
-    "teach": "A gestação traz muita gente nova para a sua vida, mas as amigas de sempre continuam sendo parte importante da sua história: aquelas que riem das mesmas piadas, que conhecem você de outras fases e que sabem do que você gosta além da barriga. Amigas com filhos podem trocar lembranças e dicas práticas; amigas sem filhos trazem outros assuntos, outras risadas e um olhar que lembra quem você é por inteiro. As duas trocas são valiosas. Às vezes, uma amiga não sabe bem como se aproximar nesta fase e fica com receio de incomodar: um convite simples ou uma mensagem carinhosa ajudam a manter a ponte. Vale combinar programas que caibam na rotina de agora e cultivar conversas que não giram só em torno da gestação: séries, planos, lembranças, bobagens. A Comunidade do app soma, sem substituir ninguém.",
+    "teach": "A gestação traz muita gente nova para a sua vida, mas as amigas de sempre continuam sendo parte importante da sua história: aquelas que riem das mesmas piadas, que conhecem você de outras fases e que sabem do que você gosta além da barriga. Amigas com filhos podem trocar lembranças e dicas práticas; amigas sem filhos trazem outros assuntos, outras risadas e um olhar que lembra quem você é por inteiro. As duas trocas são valiosas. Às vezes, uma amiga não sabe bem como se aproximar nesta fase e fica com receio de incomodar: um convite simples ou uma mensagem carinhosa ajudam a manter a ponte. Vale combinar programas que caibam na rotina de agora e cultivar conversas que não giram só em torno da gestação: séries, planos, lembranças, bobagens. Se quiser, convide uma amiga de sempre para as Amigas do app: a chama que vocês seguram juntas soma, sem substituir o encontro de verdade.",
     "funFact": "No Brasil, o Dia do Amigo é comemorado em 20 de julho. A data foi criada pelo argentino Enrique Febbraro, inspirado na chegada do ser humano à Lua, em 1969.",
     "questions": [
       {
@@ -4389,7 +4393,7 @@
     ]
   },
   "97": {
-    "teach": "O bebê, do tamanho de uma vagem, está formando as cordas vocais, que esperam em silêncio porque lá dentro não há ar, e as linhas das impressões digitais começam a se desenhar, únicas até entre gêmeos idênticos. As orelhinhas seguem subindo, e por dentro se formam a cóclea e os ossinhos do ouvido; os sons, e a sua voz, ainda vão chegar. Em você, a mão que pousa sozinha na barriga já é um primeiro colo, e tudo bem sentir encanto, estranheza ou os dois diante da nova silhueta. No guarda-roupa, vale usar o que você já tem, os extensores de botão e as trocas com amigas. Nas amizades, vale conversar sobre tudo, não só a gestação, e a Comunidade soma sem substituir ninguém. E, para fechar o primeiro trimestre, um ritual com a sua cara e o desfile das frutas, da papoula à vagem.",
+    "teach": "O bebê, do tamanho de uma vagem, está formando as cordas vocais, que esperam em silêncio porque lá dentro não há ar, e as linhas das impressões digitais começam a se desenhar, únicas até entre gêmeos idênticos. As orelhinhas seguem subindo, e por dentro se formam a cóclea e os ossinhos do ouvido; os sons, e a sua voz, ainda vão chegar. Em você, a mão que pousa sozinha na barriga já é um primeiro colo, e tudo bem sentir encanto, estranheza ou os dois diante da nova silhueta. No guarda-roupa, vale usar o que você já tem, os extensores de botão e as trocas com amigas. Nas amizades, vale conversar sobre tudo, não só a gestação, e a chama das Amigas soma sem substituir o encontro de verdade. E, para fechar o primeiro trimestre, um ritual com a sua cara e o desfile das frutas, da papoula à vagem.",
     "funFact": "As linhas que formam as digitais não ficam só nas pontinhas dos dedos: também desenham as palmas das mãos e as solas dos pés.",
     "questions": [
       {
@@ -4429,14 +4433,14 @@
       },
       {
         "type": "choice",
-        "q": "Na aula sobre amizades, qual foi o papel da Comunidade do app?",
+        "q": "Na aula sobre amizades, qual foi o papel da chama das Amigas do app?",
         "o": [
-          "Substituir as amigas de antes da gestação",
-          "Somar, sem substituir ninguém",
-          "Ficar só para depois que o bebê chegar"
+          "Substituir os encontros com as amigas de sempre",
+          "Somar, sem substituir o encontro de verdade",
+          "Mostrar quem tem mais dias seguidos"
         ],
         "a": 1,
-        "why": "A Comunidade do app soma às amizades de sempre, sem substituir ninguém."
+        "why": "A chama que você segura com uma amiga soma às amizades de sempre, sem substituir o encontro de verdade."
       },
       {
         "type": "choice",

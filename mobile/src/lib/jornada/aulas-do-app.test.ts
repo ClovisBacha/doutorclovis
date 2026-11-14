@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import SITE_BRUTO from "@/lib/daily-quizzes.data.json";
 import type { DailyQuiz, QuizQuestion } from "@/lib/daily-quizzes";
+import { COMUNIDADE_NO_APP } from "~/config";
 import { carregarAulaDoDia, DIAS_COM_AULA_DO_APP } from "~/lib/jornada/aulas-do-app";
 import T1 from "~/lib/jornada/aulas-do-app.t1.json";
 import T2 from "~/lib/jornada/aulas-do-app.t2.json";
@@ -153,5 +154,20 @@ describe("o banco de aulas do app", () => {
     for (const D of [7, 98, 200, 300])
       expect((await carregarAulaDoDia(D))?.teach).toBe(APP[String(D)]!.teach);
     expect(await carregarAulaDoDia(301)).toBeNull();
+  });
+
+  test("com a Comunidade desligada, nenhuma aula manda a mãe para ela (nem para postar, publicar ou seguir)", () => {
+    /* Até 12/11/2026, ~45 aulas ainda diziam "conte na Comunidade do app",
+       que saiu do app no build 44. "Um estudo publicado", os "post-its" e os
+       "seguidores" das redes da vida real não são a Comunidade: a regra pega
+       o verbo da rede do app, não a palavra do jornal. */
+    if (COMUNIDADE_NO_APP) return;
+    const REDE =
+      /\bcomunidade\b|\bpost(ar|ou)\b|\bposts?\b(?!-)|\bpublica(r|ção|ções)\b|\bpubliqu\w+|\bfeed\b|\bseguir (uma|outras?) m[ãa]es?\b/i;
+    const fora = Object.entries(APP).flatMap(([D, a]) => {
+      const m = textoDa(a).match(REDE);
+      return m ? [`D${D}: ${m[0]}`] : [];
+    });
+    expect(fora).toEqual([]);
   });
 });

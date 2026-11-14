@@ -7,9 +7,13 @@ describe("a cópia dos dados", () => {
     /* 23h30 no relógio dela — em São Paulo, já é amanhã em UTC: o arquivo diz
        o dia do aparelho, e não o do UTC (que `toISOString` daria). */
     const noite = new Date(2026, 9, 28, 23, 30);
-    expect(nomeDaCopia(noite)).toBe("obstetrica-meus-dados-2026-10-28.json");
+    expect(nomeDaCopia(noite)).toBe("mae-esperta-meus-dados-2026-10-28.json");
     expect(ehCopiaDosDados(nomeDaCopia(noite))).toBe(true);
     expect(ehCopiaDosDados("ViewShot-123.png")).toBe(false);
+  });
+
+  test("a limpeza do cache ainda acha a cópia com o nome de antes (Obstétrica)", () => {
+    expect(ehCopiaDosDados("obstetrica-meus-dados-2026-11-01.json")).toBe(true);
   });
 
   test("um arquivo com falhas nunca é dito completo", () => {

@@ -14,6 +14,6 @@
 export const AVISO_MEDICO = {
   titulo: "Aviso médico",
   completo:
-    "O Obstétrica é um jogo para aprender sobre a gestação, um pouco por dia. Ele não dá orientação médica, não faz diagnóstico e não substitui consultas, exames nem a avaliação do seu médico. Em emergência, ligue 192 ou vá ao pronto-socorro.",
-  curto: "O Obstétrica não dá orientação médica. Em emergência, ligue 192.",
+    "O app Mãe Esperta é um jogo para aprender sobre a gestação, um pouco por dia. Ele não dá orientação médica, não faz diagnóstico e não substitui consultas, exames nem a avaliação do seu médico. Em emergência, ligue 192 ou vá ao pronto-socorro.",
+  curto: "O app Mãe Esperta não dá orientação médica. Em emergência, ligue 192.",
 } as const;

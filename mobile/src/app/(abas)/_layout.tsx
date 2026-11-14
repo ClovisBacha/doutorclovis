@@ -1,5 +1,5 @@
 import { Redirect, router, Tabs } from "expo-router";
-import { Baby, House, MessageCircleHeart, Sprout, Users } from "lucide-react-native";
+import { Baby, House, MessageCircleHeart, Sprout, Sun, Users } from "lucide-react-native";
 import { useCallback, useEffect, useRef } from "react";
 import { Animated, AppState, Easing, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -13,10 +13,20 @@ import { useSessao } from "~/lib/sessao";
 import { COMUNIDADE_NO_APP, SOS_NO_APP } from "~/config";
 import { ALVO_MINIMO, cor, fonte } from "~/tema";
 
+/** O app abre na aba do bebê, a do meio — inclusive quando outra aba é a
+ * primeira da lista (as Amigas, à esquerda). */
+export const unstable_settings = { initialRouteName: "jornada" };
+
 /**
- * A BARRA: Trilha · Amigas · Bebê (11/11/2026, decisão do dono: "um Duolingo
- * para gestantes", o mais simples possível para lançar). A trilha abre o app,
- * como no Duolingo; as Amigas são a parte social do jogo; o bebê, na ponta.
+ * A BARRA: Amigas · Bebê · Trilha (13/11/2026, decisão do dono: "o bebê é o
+ * centro [...] ele realmente deve ficar no meio. O jogo deve ficar na direita
+ * e a questão das amigas [...] na esquerda"). A aba do meio é a tela do bebê
+ * (o céu com o bebê da semana, o acompanhamento e o cuidado do dia — a "Hoje"
+ * de 19/10), e o app abre nela; a trilha do jogo fica à direita.
+ *
+ * No Modo Cuidado a barra não fala do bebê nem do jogo: o meio vira "Hoje"
+ * (os cuidados com ela), a trilha sai e o "Início" (o acolhimento e a agenda)
+ * entra à direita.
  *
  * Com as chaves de `config.ts` ligadas, voltam a aba Comunidade
  * (`COMUNIDADE_NO_APP`) e o botão do SOS no meio (`SOS_NO_APP`): o SOS não é
@@ -35,15 +45,24 @@ export default function LayoutDasAbas() {
       screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: cor.fundo } }}
       tabBar={(props) => <BarraDeBaixo {...props} />}
     >
-      {/* A trilha é a porta do app, como no Duolingo. */}
-      <Tabs.Screen name="jornada" options={{ title: "Trilha" }} />
+      <Tabs.Screen name="amigas" options={{ title: "Amigas" }} />
+      {/* O bebê no meio, e o app abre nele. No Modo Cuidado a aba não fala do
+          bebê: vira "Hoje", com um sol. */}
+      <Tabs.Screen name="jornada" options={{ title: cuidado ? "Hoje" : "Bebê" }} />
+      {/* O jogo à direita; no Modo Cuidado não há trilha nem placar. */}
+      <Tabs.Screen
+        name="trilha"
+        options={{ title: "Trilha", ...(cuidado ? { href: null } : {}) }}
+      />
+      {/* O acolhimento e a agenda do Modo Cuidado; fora dele, leva à aba do bebê. */}
+      <Tabs.Screen
+        name="inicio"
+        options={{ title: "Início", ...(cuidado ? {} : { href: null }) }}
+      />
       <Tabs.Screen
         name="comunidade"
         options={{ title: "Comunidade", ...(COMUNIDADE_NO_APP ? {} : { href: null }) }}
       />
-      <Tabs.Screen name="amigas" options={{ title: "Amigas" }} />
-      {/* No Modo Cuidado a aba não fala do bebê: vira "Início", com uma casa. */}
-      <Tabs.Screen name="inicio" options={{ title: cuidado ? "Início" : "Bebê" }} />
     </Tabs>
   );
 }
@@ -88,10 +107,11 @@ function useSelosDaBarra(ligado: boolean, pos: boolean) {
 }
 
 const ICONES = {
-  jornada: Sprout,
-  comunidade: MessageCircleHeart,
   amigas: Users,
-  inicio: Baby,
+  jornada: Baby,
+  trilha: Sprout,
+  inicio: House,
+  comunidade: MessageCircleHeart,
 } as const;
 
 function BarraDeBaixo({ state, navigation, descriptors }: any) {
@@ -105,7 +125,7 @@ function BarraDeBaixo({ state, navigation, descriptors }: any) {
   const item = (rota: (typeof rotas)[number]) => {
     const ativo = state.routes[state.index]?.key === rota.key;
     const titulo = descriptors[rota.key]?.options?.title ?? rota.name;
-    const Icone = rota.name === "inicio" && titulo === "Início" ? House : ICONES[rota.name];
+    const Icone = rota.name === "jornada" && titulo === "Hoje" ? Sun : ICONES[rota.name];
     const n =
       rota.name === "comunidade" ? selos.comunidade : rota.name === "amigas" ? selos.amigas : 0;
     const selo = textoDoSelo(n);
