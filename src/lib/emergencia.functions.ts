@@ -30,6 +30,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { medicoCadastrado, nomeDoMedico, type MedicoCadastrado } from "./medico-da-gestante";
 
 export type CanaisAviso = {
   /** Quantos aparelhos do médico receberam o push. */
@@ -48,6 +49,8 @@ export type CanaisAviso = {
   destinos: { nome: string; via: string }[];
   /** Nome do contato que NÃO recebeu nada — a tela oferece o WhatsApp dele. */
   faltou: string | null;
+  /** O médico que ela cadastrou (medico_*) recebeu e-mail ou WhatsApp. */
+  medicoContato?: boolean;
 };
 
 /**
@@ -293,6 +296,27 @@ export const dispararEmergencia = createServerFn({ method: "POST" })
         ficha.medicoTel = paraExibir(d?.whatsapp as string | null);
         ficha.hospitais = ((d?.hospitals as string) || "").trim() || null;
       }
+      /* ── 1b. O médico que ELA cadastrou (app de gestantes) ─────────────
+         Contato que ela mesma digitou — não é vínculo da plataforma. Lido num
+         select À PARTE, e não nos DEGRAUS da ficha: as colunas vêm de
+         APLICAR_MEDICO_DA_GESTANTE.sql e, enquanto ele não roda, este select
+         falha sozinho sem derrubar o degrau que decide quem é avisado. */
+      let medicoProprio: MedicoCadastrado | null = null;
+      try {
+        const r = await sb
+          .from("patient_profiles")
+          .select("medico_nome, medico_celular, medico_email")
+          .eq("id", u.user.id)
+          .maybeSingle();
+        if (!r.error) medicoProprio = medicoCadastrado(r.data);
+      } catch {
+        /* coluna ausente ou rede: segue sem */
+      }
+      if (medicoProprio && !ficha.medico) {
+        ficha.medico = medicoProprio.nome;
+        ficha.medicoTel = medicoProprio.celular ? paraExibir(medicoProprio.celular) : null;
+      }
+
       /* Só agora: a linha do médico faz parte da ficha que vai no aviso. */
       const texto = textoDoAviso(ficha);
 
@@ -330,6 +354,61 @@ export const dispararEmergencia = createServerFn({ method: "POST" })
           canais.medicoEmail ? "e-mail" : null,
         ].filter(Boolean);
         canais.destinos.push({ nome: medicoNome, via: vias.join(" e ") });
+      }
+
+      /* ── 2b. Avisar o médico que ela cadastrou: e-mail e WhatsApp ────── */
+      if (medicoProprio) {
+        const vias: string[] = [];
+        let emailDoVinculado: string | null = null;
+        if (medicoUserId) {
+          try {
+            const { data: dUser } = await supabaseAdmin.auth.admin.getUserById(medicoUserId);
+            emailDoVinculado = dUser?.user?.email?.toLowerCase() ?? null;
+          } catch {
+            /* só serve para não mandar o mesmo e-mail duas vezes */
+          }
+        }
+        if (medicoProprio.email && medicoProprio.email !== emailDoVinculado) {
+          try {
+            const { sendEmail } = await import("@/lib/email.server");
+            if (
+              await sendEmail({
+                to: medicoProprio.email,
+                subject: `🆘 EMERGÊNCIA — ${nome} acionou o SOS`,
+                html: emailHtml(nome, ficha),
+              })
+            )
+              vias.push(medicoProprio.email);
+          } catch {
+            /* melhor esforço */
+          }
+        }
+        if (medicoProprio.celular) {
+          try {
+            const { waConfigured, waSendText, waSendTemplate } =
+              await import("@/lib/whatsapp.server");
+            if (waConfigured()) {
+              const modelo = process.env.SOS_WA_TEMPLATE;
+              if (modelo) {
+                await waSendTemplate(
+                  medicoProprio.celular,
+                  modelo,
+                  process.env.SOS_WA_TEMPLATE_LANG || "pt_BR",
+                  [nome, semana ?? "—", mapa ?? "localização indisponível"],
+                );
+              } else {
+                await waSendText(medicoProprio.celular, texto);
+              }
+              vias.push(`WhatsApp ${formatarTelefone(medicoProprio.celular)}`);
+            }
+          } catch {
+            /* o app oferece o WhatsApp do aparelho */
+          }
+        }
+        if (vias.length) {
+          canais.medicoContato = true;
+          canais.destinos.push({ nome: nomeDoMedico(medicoProprio), via: vias.join(" · ") });
+        }
       }
 
       /* ── 3. O contato de emergência, por e-mail ───────────────────────── */

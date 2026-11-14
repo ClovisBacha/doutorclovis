@@ -366,7 +366,7 @@ export function EscadaDeMensagens({
           >
             {dados.tempo}
           </motion.span>
-          <span className={`mt-0.5 block text-[11px] font-normal ${t.fraco}`}>
+          <span className={`mt-0.5 block text-xs font-normal ${t.fraco}`}>
             por mês, a {MINUTOS_PADRAO} min por resposta
           </span>
         </Selo>
@@ -404,7 +404,7 @@ function Selo({
 }) {
   return (
     <div className={`rounded-2xl border px-4 py-3 ${t.selo}`}>
-      <p className={`text-[11px] uppercase tracking-[0.1em] ${t.seloRotulo}`}>{titulo}</p>
+      <p className={`text-xs uppercase tracking-[0.1em] ${t.seloRotulo}`}>{titulo}</p>
       <p className={`mt-0.5 font-serif text-xl tabular-nums ${t.titulo}`}>{children}</p>
     </div>
   );

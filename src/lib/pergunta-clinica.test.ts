@@ -6,6 +6,7 @@ import {
   ENTREGA_DE_CONDUTA,
   PEDIDO_DE_CONDUTA,
   PERGUNTAS_POR_DIA,
+  PRESSAO_EM_NUMEROS,
   recadoDoDesfecho,
   SINTOMA_EM_PRIMEIRA_PESSOA,
   temTermoClinicoAlemDaAbertura,
@@ -232,5 +233,245 @@ describe("⚠️ uma lista só, dois usos", () => {
     const fonte = readFileSync("src/lib/pergunta-clinica.ts", "utf8");
     expect(fonte).toContain("REDUZ risco");
     expect(fonte).not.toMatch(/impede (?:toda|qualquer) pergunta cl(í|i)nica/i);
+  });
+});
+
+describe("⚠️ os quatro defeitos que a auditoria mediu (ago/2026)", () => {
+  /**
+   * Os quatro saíram de rodar a régua contra frases que uma gestante escreve de
+   * verdade — não de ler o código. Dois eram falsos NEGATIVOS (conduta passando
+   * inteira) e dois eram falsos POSITIVOS, que custam mais: o app acusando a
+   * paciente de dar conselho médico no post de nascimento dela.
+   */
+
+  test("⚠️ 'se eu fosse você' roteia — nas DUAS grafias", () => {
+    /* A regex tinha a pessoa trocada: só reconhecia "se fosse eu" e "se fosse
+       comigo", e a forma mais comum em português era justamente a que faltava.
+
+       ⚠️ E a primeira correção falhou pela metade: com `\b` no fim, a forma COM
+       acento não casava — `\b` do JavaScript é ASCII e não enxerga fronteira
+       depois do `ê`. É a mesma armadilha de `temPalavraOculta`. */
+    expect(triarTexto("se eu fosse você eu esperava até amanhã")).not.toBe("publicavel");
+    expect(triarTexto("se eu fosse voce eu nao ia")).not.toBe("publicavel");
+    expect(triarTexto("se eu fosse tu eu ficava em casa")).not.toBe("publicavel");
+  });
+
+  test("⚠️ o imperativo AFIRMATIVO de conduta roteia", () => {
+    /* A lista só tinha a negativa ("não tome", "não vá"). "Toma buscopan que
+       resolve" — uma paciente mandando outra tomar antiespasmódico — saía
+       publicável, com o nome do consultório em volta. */
+    for (const t of [
+      "toma buscopan que resolve",
+      "toma dipirona que passa",
+      "usa essa pomada que resolve",
+      "beba um chá de canela",
+      "toma o remédio dela",
+    ]) {
+      expect({ t, r: triarTexto(t) }).not.toEqual({ t, r: "publicavel" });
+    }
+  });
+
+  test("⚠️ mas o imperativo SEM objeto de tratamento é conversa normal", () => {
+    /* É o que salva o recurso: sem exigir o objeto, metade da conversa da aba
+       iria para o consultório. */
+    for (const t of [
+      "toma um café comigo?",
+      "toma cuidado com o degrau",
+      "usa esse carrinho, é ótimo",
+      "faz o bolo que eu levo o refri",
+    ]) {
+      expect({ t, r: triarTexto(t) }).toEqual({ t, r: "publicavel" });
+    }
+  });
+
+  test("⚠️ O POST DE NASCIMENTO NÃO É RECUSADO", () => {
+    /* "deu tudo certo" entrou como tranquilização anedótica, e é também — e
+       sobretudo — a frase com que se anuncia um nascimento. O post mais feliz
+       da paciente era barrado com um recado que a acusa de dar conselho
+       médico. A forma perigosa continua pega pelos outros ramos. */
+    expect(triarTexto("deu tudo certo, ele nasceu 3,2kg 🥹")).toBe("publicavel");
+    expect(triarTexto("nasceu! está tudo bem com os dois 💛")).toBe("publicavel");
+    expect(triarTexto("deu tudo certo no chá de bebê!")).toBe("publicavel");
+    /* E o que ela substituiu continua roteando. */
+    expect(triarTexto("comigo foi assim e não precisei ir")).not.toBe("publicavel");
+    expect(triarTexto("no meu caso passou sozinho")).not.toBe("publicavel");
+  });
+
+  test("⚠️ um par de números NÃO é pressão quando tem substantivo depois", () => {
+    /* O ramo do par solto não tinha faixa nenhuma: QUALQUER `N por N` abria a
+       Central de Emergência. Medido: "marcamos o chá pra 12 por 10 pessoas".
+       E esse falso positivo é o mais caro da régua — ela aprende que o alarme
+       dispara por qualquer coisa e passa a ignorá-lo. */
+    for (const t of [
+      "marcamos o chá de bebê pra 12 por 10 pessoas",
+      "12 por 10 convidados vieram",
+      "comprei 3 por 2 na farmácia",
+      "às 12 por volta do meio-dia",
+    ]) {
+      expect({ t, r: triarTexto(t) }).not.toEqual({ t, r: "emergencia" });
+    }
+  });
+
+  test("⚠️ e a pressão de verdade continua sendo emergência", () => {
+    expect(triarTexto("minha pressão deu 15 por 10 hoje")).toBe("emergencia");
+    expect(triarTexto("minha pressão deu 16 por 11")).toBe("emergencia");
+    expect(triarTexto("pa 160 por 110")).toBe("emergencia");
+    /* Sem a palavra `pressão`, o par solto ainda conta — desde que termine ali. */
+    expect(triarTexto("deu 15 por 10")).toBe("emergencia");
+  });
+});
+
+const PASSA = [
+  "deu tudo certo, nasceu 3,4kg às 5h da manhã 💛",
+  "nasceu! 48cm, tudo perfeito",
+  "meu chá é dia 12 por volta das 15h",
+  "comprei o berço 1 por 2 metros",
+  "quantas semanas vocês estavam quando sentiram?",
+  "alguém indica maternidade em BH?",
+  "tô com saudade de dormir de barriga pra baixo",
+  "que barriga linda!",
+  "a mala já tá pronta 🧳",
+  "fiz o enxoval todo em promoção 3 por 2",
+  "toma um sorvete comigo hoje?",
+  "usa esse aplicativo, é ótimo",
+  "faz o bolo que eu levo o refri",
+  "passa lá em casa depois",
+  "hoje completei 30 semanas 🎉",
+  "vou de cesárea marcada dia 20",
+  "meu médico é ótimo, recomendo",
+  "cansaço nível 1000 hoje",
+  "aplica o protetor solar sempre",
+  "bebe bastante água nesse calor",
+  "meu parto foi tranquilo, durou 6h",
+  "amanhã tenho ultrassom morfológico",
+  "se eu fosse rica comprava tudo",
+  "alguém já fez chá revelação?",
+];
+const ROTEIA = [
+  "toma buscopan que resolve",
+  "toma dipirona que passa",
+  "usa essa pomada que resolve",
+  "beba um chá de canela pra descer",
+  "se eu fosse você não ia no PS",
+  "se eu fosse voce esperava amanha",
+  "no seu lugar eu ficaria em casa",
+  "não precisa ir no pronto socorro",
+  "comigo foi assim e não precisei ir",
+  "no meu caso passou sozinho",
+  "minha pressão deu 16 por 11",
+  "deu 15 por 10 agora",
+  "pa 160 por 110",
+  "ficaria em casa e esperaria passar",
+  "toma o remédio dela que é o mesmo",
+  "não tome nada, espera passar",
+  /* O passado em primeira pessoa: a forma MAIS persuasiva, e passava inteira. */
+  "tomei buscopan e resolveu",
+  "eu tomei dipirona e passou",
+  /* A tranquilização anedótica, que a remoção de "deu tudo certo" reabriu. */
+  "comigo deu tudo certo",
+  "deu tudo certo comigo, relaxa",
+  "beba um chá de camomila",
+  "toma um chá de canela que ajuda",
+];
+
+/* ══════════════════════════════════════════════════════════════════════════
+   A BATERIA AMPLA — 40 frases que uma gestante brasileira escreveria
+   ══════════════════════════════════════════════════════════════════════════ */
+/**
+ * ⚠️ **ESTA BATERIA ACHOU UM FALSO NEGATIVO QUE OS TESTES PONTUAIS NÃO
+ * PEGARAM.** "deu 15 por 10 agora" saía publicável — a trava do par de números
+ * exigia que ele TERMINASSE ali, e quem relata pressão quase sempre põe uma
+ * palavra de tempo depois ("agora", "hoje", "de manhã").
+ *
+ * A lição de método: régua de texto se prova em VOLUME, contra frases reais.
+ * Um teste por regra pega o caso que o autor imaginou; quarenta frases pegam o
+ * que ele não imaginou.
+ *
+ * ⚠️ **AS DUAS DIREÇÕES IMPORTAM, e a de cima importa MAIS.** Um falso positivo
+ * é o app acusando a paciente de dar conselho médico no post de nascimento
+ * dela, ou abrindo a Central de Emergência por causa de um chá de bebê — e o
+ * custo é ela aprender que o alarme deste app não vale leitura.
+ */
+describe("⚠️ a régua contra 40 frases reais", () => {
+  test("nenhum falso POSITIVO — o app não acusa quem não deve", () => {
+    const maus = PASSA.filter((t) => triarTexto(t) !== "publicavel").map(
+      (t) => `${triarTexto(t)}: ${t}`,
+    );
+    expect(maus).toEqual([]);
+  });
+  test("nenhum falso NEGATIVO — conduta perigosa não passa", () => {
+    const maus = ROTEIA.filter((t) => triarTexto(t) === "publicavel");
+    expect(maus).toEqual([]);
+  });
+});
+
+/**
+ * ⚠️ A SEGUNDA BATERIA — as formas em que a paciente de VERDADE escreve
+ * (set/2026).
+ *
+ * A bateria de cima provou a régua contra frases de POST. Esta prova as
+ * BANDEIRAS contra a caixa de texto da nutrição, e ela nasceu de uma medição
+ * que achou **nove das onze formas naturais passando batidas**:
+ *
+ *  · `\w` do JavaScript é `[A-Za-z0-9_]` e **não atravessa "está"** — a folga
+ *    escrita com ele nunca ligava "visão" a "embaçada", que é a distância
+ *    exata de quase toda frase real. Cousin da lição de `\b` ser ASCII.
+ *  · a lista pedia "pontos"; ela escreve **"pontinhos"**.
+ *  · e pedia "não **para** de vomitar" — a terceira pessoa. Ela fala do
+ *    próprio corpo: "não paro", "não consigo parar", "vomitando sem parar".
+ *
+ * Os dois primeiros são a apresentação visual da PRÉ-ECLÂMPSIA; o terceiro, a
+ * metade da hiperêmese que este app mede por texto.
+ *
+ * ⚠️ E a metade de baixo vale mais: nutrição fala de vômito, de visão e de
+ * pontinhos o tempo todo, sem nada de errado acontecendo. **Falso positivo
+ * aqui é a Central de Emergência abrindo por causa de um enjoo de manhã** — e
+ * é assim que a paciente aprende a fechar o alarme sem ler.
+ */
+describe("⚠️ as bandeiras contra as frases que ela escreve", () => {
+  const vermelha = (t: string) => BANDEIRA_VERMELHA.test(t) || PRESSAO_EM_NUMEROS.test(t);
+
+  const ACENDE = [
+    "estou com dor de cabeça forte e vendo pontinhos",
+    "estou vendo pontinhos luminosos",
+    "vendo pontos pretos na visão",
+    "minha visão está embaçada desde ontem",
+    "minha vista está turva",
+    "estou com a visão meio turva",
+    "não paro de vomitar desde ontem",
+    "não consigo parar de vomitar",
+    "vomito tudo o que como, não para",
+    "estou vomitando sem parar",
+    "não para de vomitar",
+  ];
+
+  const NAO_ACENDE = [
+    "vomitei o café da manhã hoje",
+    "vomitei uma vez ontem, o que como?",
+    "vomito de vez em quando de manhã",
+    "tenho enjoo e às vezes vomito",
+    "meu enjoo melhorou, não vomito mais",
+    "a comida me dá vontade de vomitar",
+    "estou com visão de futuro pra dieta",
+    "minha visão sobre alimentação mudou",
+    "estou com pontinhos vermelhos na pele depois do morango",
+    "vi umas manchinhas na banana, pode comer?",
+    "estou com dor de cabeça de fome",
+    "dor de cabeça quando fico sem comer",
+    "posso comer pontas de aspargo?",
+  ];
+
+  test("as onze formas naturais acendem", () => {
+    expect(ACENDE.filter((t) => !vermelha(t))).toEqual([]);
+  });
+
+  test("⚠️ e nenhuma frase de nutrição acende", () => {
+    expect(NAO_ACENDE.filter((t) => vermelha(t))).toEqual([]);
+  });
+
+  test("⚠️ a folga entre substantivo e adjetivo aceita ACENTO", () => {
+    /* Se alguém trocar `[a-zà-ÿ]` por `\w` aqui, este é o caso que morre. */
+    expect(BANDEIRA_VERMELHA.test("minha visão está embaçada")).toBe(true);
+    expect(BANDEIRA_VERMELHA.test("a vista está escurecendo")).toBe(true);
   });
 });

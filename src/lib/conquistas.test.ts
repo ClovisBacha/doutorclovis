@@ -364,7 +364,10 @@ describe("maiorSequencia", () => {
    ═══════════════════════════════════════════════════════════════════════════ */
 describe("⚠️ desbloquear e pagar são operações separadas", () => {
   const servidor = readFileSync("src/lib/achievements.functions.ts", "utf8");
-  const tela = readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8");
+  /* ⚠️ A ABA MUDOU DE CASA em set/2026 (`minha-conta.tsx` → componente
+     próprio), e a garantia não mudou uma linha: o move foi verbatim,
+     conferido por hash. Este teste seguia o ARQUIVO; segue a aba agora. */
+  const tela = readFileSync("src/components/conquistas-tab.tsx", "utf8");
 
   /**
    * ⚠️ O CORPO DE `resgatarConquista`, e não "daqui até o fim do arquivo".

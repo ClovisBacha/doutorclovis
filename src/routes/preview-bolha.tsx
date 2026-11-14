@@ -69,7 +69,7 @@ function Preview() {
               key={nome}
               data-testid={`acao-${nome}`}
               onClick={fn}
-              className="rounded-full bg-sky-500 px-4 py-2 text-sm font-bold text-white"
+              className="rounded-full bg-sky-700 px-4 py-2 text-sm font-bold text-white"
             >
               {nome}
             </button>

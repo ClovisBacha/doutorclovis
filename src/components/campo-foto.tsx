@@ -17,6 +17,7 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { inicialDoMedico } from "@/lib/nome-do-medico";
 
 const LADO = 512;
 
@@ -53,11 +54,7 @@ export function CampoFoto({
 }) {
   const [enviando, setEnviando] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const inicial =
-    nome
-      .replace(/^(Dr|Dra)\.?\s*/i, "")
-      .charAt(0)
-      .toUpperCase() || "?";
+  const inicial = inicialDoMedico(nome);
 
   async function escolher(file: File) {
     setEnviando(true);
@@ -149,7 +146,7 @@ export function CampoFoto({
               </button>
             )}
           </div>
-          <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+          <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
             Um rosto é a maior diferença entre dois cards. A imagem é cortada em quadrado e reduzida
             no seu aparelho — não gasta seus dados.
           </p>

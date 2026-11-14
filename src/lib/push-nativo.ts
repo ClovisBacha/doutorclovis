@@ -26,7 +26,8 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { ehNativo, plataforma } from "@/lib/nativo";
-import { registrarTokenNativo } from "@/lib/push-nativo.functions";
+import { esquecerTokenNativo, registrarTokenNativo } from "@/lib/push-nativo.functions";
+import { caminhoSeguroDoPush } from "@/lib/destino-do-push";
 
 export type ResultadoPush = { ok: boolean; reason?: string };
 
@@ -69,6 +70,46 @@ export async function inscreverPushNativo(): Promise<ResultadoPush> {
 }
 
 /**
+ * DESLIGAR os avisos neste aparelho.
+ *
+ * ⚠️ **Só devolve `ok` quando a linha saiu do banco.** É ela que o servidor lê
+ * na hora de enviar: enquanto estiver lá, o push continua chegando — e um
+ * botão que diz "desliguei" sobre um canal que continua tocando é pior que não
+ * ter o botão, porque ela para de procurar o interruptor de verdade (o das
+ * Configurações do sistema, que leva o aviso de consulta e o retorno do SOS
+ * junto).
+ *
+ * ⚠️ **O token vem do MESMO `esperarToken` da inscrição**, e não de um cache: o
+ * Capacitor não guarda o token, quem guarda é o sistema, e ele pode ter sido
+ * rotacionado desde a última vez. Sem rede o token não chega — e aí a resposta
+ * é `sem-token`, nunca um "pronto" otimista.
+ */
+export async function cancelarPushNativo(): Promise<ResultadoPush> {
+  if (!ehNativo()) return { ok: false, reason: "nao-nativo" };
+  try {
+    const { PushNotifications } = await import("@capacitor/push-notifications");
+
+    const token = await esperarToken(PushNotifications);
+    if (!token) return { ok: false, reason: "sem-token" };
+
+    const { data: s } = await supabase.auth.getSession();
+    const accessToken = s.session?.access_token;
+    if (!accessToken) return { ok: false, reason: "no-session" };
+
+    const r = await esquecerTokenNativo({ data: { accessToken, token } });
+    if (!r.ok) return { ok: false, reason: r.reason };
+
+    /* Depois de a linha sair: o sistema para de entregar a este aparelho. Um
+       `unregister` que falhe não desfaz o que importa — o servidor já não tem
+       para onde mandar —, então ele não decide o desfecho. */
+    await PushNotifications.unregister().catch(() => {});
+    return { ok: true };
+  } catch {
+    return { ok: false, reason: "error" };
+  }
+}
+
+/**
  * O token não volta de `register()`: ele chega por EVENTO, e pode demorar — o
  * aparelho fala com a Apple ou com o Google antes. Daí a promessa com prazo:
  * sem ela, uma rede ruim deixaria o botão girando para sempre.
@@ -105,5 +146,47 @@ export async function pushNativoJaAutorizado(): Promise<boolean> {
     return (await PushNotifications.checkPermissions()).receive === "granted";
   } catch {
     return false;
+  }
+}
+
+/**
+ * TOCAR NUM AVISO LEVA AO LUGAR DO AVISO — no app nativo.
+ *
+ * ⚠️ O servidor manda `url` em todo push que dispara, e no nativo NINGUÉM
+ * lia: o app abria onde estava, e a paciente ficava procurando o que o aviso
+ * dizia. Tocar em "sua consulta é amanhã" tem de abrir a consulta.
+ *
+ * ⚠️ **O caminho passa pela régua** (`caminhoSeguroDoPush`), e nunca cru: o que
+ * chega aqui veio pelo serviço da Apple/Google como dado arbitrário. É a MESMA
+ * régua do service worker — ver `destino-do-push.ts` para o porquê de existirem
+ * duas implementações e do que as mantém iguais.
+ *
+ * ⚠️ **Navegação por `history`, não `location.href`.** Este app é uma rota só
+ * com estado por cima; recarregar a página inteira para trocar de aba custaria
+ * uma abertura completa — justamente no toque que deveria ser instantâneo. O
+ * `popstate` é o que o TanStack Router escuta.
+ *
+ * ⚠️ **E ele NÃO trata o aviso recebido com o app aberto** (`pushNotification
+ * Received`): mudar de tela sozinha, sem ela ter tocado em nada, é o oposto do
+ * que um aviso faz. Só o toque navega.
+ */
+export async function ligarToqueNoAviso(): Promise<void> {
+  if (!ehNativo()) return;
+  try {
+    const { PushNotifications } = await import("@capacitor/push-notifications");
+    await PushNotifications.addListener("pushNotificationActionPerformed", (acao) => {
+      const dados = (acao?.notification?.data ?? {}) as { url?: unknown };
+      const destino = caminhoSeguroDoPush(dados.url);
+      try {
+        window.history.pushState({}, "", destino);
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      } catch {
+        /* Último recurso: uma abertura inteira é pior que ficar onde está,
+           mas ficar sem resposta a um toque é pior que as duas. */
+        window.location.href = destino;
+      }
+    });
+  } catch {
+    /* Sem o plugin, o aviso continua chegando — só não navega. */
   }
 }

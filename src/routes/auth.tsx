@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getMyDoctor } from "@/lib/doctors.functions";
 import { checkIsAdmin } from "@/lib/admin.functions";
+import { destinoDaSessao } from "@/lib/destino-da-sessao";
 import { AppleButton, GoogleButton, OrDivider } from "@/components/google-button";
 
 export const Route = createFileRoute("/auth")({
@@ -91,68 +92,48 @@ function AuthPage() {
   const [msg, setMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
   const [showResend, setShowResend] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
+  /** Sessão viva a caminho do destino: o formulário não aparece. */
+  const [verificando, setVerificando] = useState(false);
 
   useEffect(() => {
     // Nunca redireciona durante o fluxo de redefinição de senha.
     if (isRecoveryLink) return;
+    let cancelado = false;
     supabase.auth.getSession().then(async ({ data }) => {
-      if (!data.session) return;
-      /* ADMIN PRIMEIRO, antes de qualquer outra pergunta.
-
-         O dono da plataforma caía no app da GESTANTE — 18 mil linhas de jornada
-         de gravidez — e o console dele, com faturamento, médicos e cupons, só
-         era alcançável digitando /admin na barra de endereço. Nenhum link
-         levava lá.
-
-         A ordem importa e não é detalhe: o e-mail do dono também está em
-         ADMIN_EMAILS como "equipe do consultório", então a pergunta "é médico?"
-         respondia sim e o mandava para o painel do consultório. Perguntar
-         "é dono?" primeiro é o que separa as duas identidades. */
+      if (!data.session || cancelado) return;
+      /* Sessão viva: a página vira "entrando", e o formulário não pisca. É o
+         caso de TODA abertura da casca nativa, que entra por aqui. */
+      setVerificando(true);
       try {
-        const adm = await checkIsAdmin({ data: { accessToken: data.session.access_token } });
-        if (adm.isAdmin) {
-          navigate({ to: "/admin" });
-          return;
-        }
+        const accessToken = data.session.access_token;
+        /* As duas perguntas ao servidor são independentes — em paralelo, e cada
+         uma falha sozinha (sem rede, o fluxo segue como paciente). A ordem de
+         decisão — dono, médico, cadastro começado, paciente — mora em
+         `destinoDaSessao`, com o porquê de cada degrau. */
+        const [adm, me, intencao] = await Promise.all([
+          checkIsAdmin({ data: { accessToken } }).catch(() => null),
+          getMyDoctor({ data: { accessToken } }).catch(() => null),
+          import("@/lib/intencao-medico"),
+        ]);
+        if (cancelado) return;
+        navigate({
+          to: destinoDaSessao({
+            isAdmin: adm?.isAdmin === true,
+            temPerfilMedico: me?.ok === true && !!me.doctor,
+            querSerMedico: intencao.querSerMedico(),
+          }),
+        });
       } catch {
-        /* sem rede: segue o fluxo normal */
+        /* ⚠️ A ESPERA TEM SAÍDA. O `import()` do pedaço pode falhar (deploy no
+           meio, rede caída) e o `navigate` também; sem isto, `verificando`
+           ficava verdadeiro para sempre e a tela era um "Entrando…" sem
+           formulário e sem volta. O formulário voltar é o pior caso aceitável. */
+        if (!cancelado) setVerificando(false);
       }
-
-      // Conta com perfil de médico ATIVO vai para o painel;
-      // as demais, para o app da paciente.
-      try {
-        const me = await getMyDoctor({ data: { accessToken: data.session.access_token } });
-        /* Basta TER perfil de médico — ativo ou não.
-           
-           Com `?.active` aqui, um médico com a conta inativa era mandado para o
-           app da gestante, batia no bloqueio "esta área é da gestante", clicava
-           em "ir para o meu painel" e recebia "área restrita": um ciclo fechado
-           sem nenhuma tela utilizável. Agora ele chega ao painel, que mostra o
-           perfil e a assinatura — que é justamente o que ele precisa mexer. */
-        if (me.ok && me.doctor) {
-          navigate({ to: "/painel" });
-          return;
-        }
-      } catch {
-        /* sem rede/perfil: segue como paciente */
-      }
-      /* Antes de despachar para o app da gestante: esta pessoa estava tentando
-         se cadastrar como médico?
-
-         Este redirecionamento era a porta pela qual o médico caía no app da
-         paciente. Ele roda no MOUNT, com a sessão que já existe — então acontece
-         antes de a pessoa poder tocar em "Sou médico(a)", e o botão de papel
-         (que o handler de login respeita) nunca entrava em jogo. Resultado: quem
-         voltava do link de confirmação de e-mail, ou reabria o site com sessão
-         viva, ia para "configure sua data de gestação" com o cadastro
-         profissional pela metade. */
-      const { querSerMedico } = await import("@/lib/intencao-medico");
-      if (querSerMedico()) {
-        navigate({ to: "/medicos/cadastro" });
-        return;
-      }
-      navigate({ to: "/minha-conta" });
     });
+    return () => {
+      cancelado = true;
+    };
   }, [navigate, isRecoveryLink]);
 
   // Catch PASSWORD_RECOVERY event from the magic link in the reset email
@@ -282,7 +263,7 @@ function AuthPage() {
     try {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
-      setMsg({ text: "Senha atualizada com sucesso! Redirecionando...", type: "success" });
+      setMsg({ text: "Senha atualizada com sucesso! Redirecionando…", type: "success" });
       setTimeout(() => navigate({ to: "/minha-conta" }), 1800);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "";
@@ -334,6 +315,10 @@ function AuthPage() {
           ? "Redefinir senha"
           : "Nova senha";
 
+  /* Sessão viva a caminho do destino: nada de formulário — só uma linha, o
+     tempo de o servidor responder. */
+  if (verificando) return <Entrando />;
+
   return (
     <section
       className="mx-auto flex max-w-md flex-col px-5 py-16"
@@ -355,7 +340,7 @@ function AuthPage() {
           <FaixaDeConvite />
         </div>
       )}
-      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Minha conta</p>
+      <p className="font-serif text-[15px] font-semibold text-primary">Minha conta</p>
       <h1 className="mt-3 font-serif text-3xl">{title}</h1>
       <p className="mt-3 text-sm text-muted-foreground">
         {mode === "forgot"
@@ -415,10 +400,10 @@ function AuthPage() {
                  botão — os outros dois quebram sozinhos ("Sou / paciente") e o
                  terceiro não tinha onde quebrar. Empilhado, os três ficam da
                  mesma altura e nenhum transborda, inclusive em 320px. */
-              className={`flex flex-col items-center gap-1 rounded-2xl border px-1.5 py-2.5 text-center text-[12.5px] font-semibold leading-tight transition-all ${
+              className={`flex flex-col items-center gap-1 rounded-2xl border px-1.5 py-2.5 text-center text-xs font-semibold leading-tight transition-all ${
                 role === r.key
                   ? "border-primary bg-primary/10 text-primary shadow-[var(--shadow-soft)]"
-                  : "border-border bg-card text-muted-foreground hover:border-primary/40"
+                  : "card-material text-muted-foreground hover:border-primary/40"
               }`}
             >
               <span aria-hidden className="text-lg leading-none">
@@ -461,7 +446,7 @@ function AuthPage() {
           checagem no cliente só poderia divergir dela — e diria "código
           inválido" para um convite que o servidor aceitaria. */}
       {(mode === "login" || mode === "signup") && role === "acompanhante" && (
-        <div className="mt-8 rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+        <div className="mt-8 card-material rounded-3xl p-6">
           <p className="text-4xl">🫶</p>
           <h2 className="mt-3 font-serif text-xl">Você foi convidado a acompanhar</h2>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
@@ -502,7 +487,7 @@ function AuthPage() {
 
       {/* ── Cadastro de médico tem fluxo próprio (CRM, perfil profissional) ── */}
       {mode === "signup" && role === "medico" && (
-        <div className="mt-8 rounded-3xl border border-border bg-card p-6 text-center shadow-[var(--shadow-card)]">
+        <div className="mt-8 card-material rounded-3xl p-6 text-center">
           <p className="text-4xl">🩺</p>
           <h2 className="mt-3 font-serif text-xl">Criar conta de médico</h2>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -524,7 +509,7 @@ function AuthPage() {
           </div>
           <Link
             to="/medicos/cadastro"
-            className="press inline-block rounded-full bg-primary px-7 py-3 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-soft)]"
+            className="btn-3d press inline-block rounded-full bg-primary px-7 py-3 text-sm font-semibold text-primary-foreground"
           >
             Continuar com e-mail e senha →
           </Link>
@@ -538,7 +523,7 @@ function AuthPage() {
       {mode === "forgot" && (
         <form
           onSubmit={submitForgot}
-          className="mt-8 space-y-4 rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
+          className="mt-8 space-y-4 card-material rounded-3xl p-6"
           noValidate
         >
           <div>
@@ -575,9 +560,9 @@ function AuthPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-opacity disabled:opacity-60 hover:opacity-90"
+            className="btn-3d press min-h-11 w-full rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60"
           >
-            {loading ? "Enviando..." : "Enviar link de redefinição"}
+            {loading ? "Enviando…" : "Enviar link de redefinição"}
           </button>
           <button
             type="button"
@@ -596,7 +581,7 @@ function AuthPage() {
       {mode === "reset" && (
         <form
           onSubmit={submitReset}
-          className="mt-8 space-y-4 rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
+          className="mt-8 space-y-4 card-material rounded-3xl p-6"
           noValidate
         >
           <div>
@@ -635,9 +620,9 @@ function AuthPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-opacity disabled:opacity-60 hover:opacity-90"
+            className="btn-3d press min-h-11 w-full rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60"
           >
-            {loading ? "Salvando..." : "Salvar nova senha"}
+            {loading ? "Salvando…" : "Salvar nova senha"}
           </button>
         </form>
       )}
@@ -658,7 +643,7 @@ function AuthPage() {
         (mode === "login" || (mode === "signup" && role !== "medico")) && (
           <form
             onSubmit={submit}
-            className="mt-8 space-y-4 rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
+            className="mt-8 space-y-4 card-material rounded-3xl p-6"
             noValidate
           >
             <GoogleButton role={role} />
@@ -756,18 +741,36 @@ function AuthPage() {
                 type="button"
                 onClick={handleResend}
                 disabled={resendLoading}
-                className="w-full rounded-full border border-primary px-5 py-2 text-sm font-medium text-primary transition-opacity disabled:opacity-60 hover:bg-primary/5"
+                className="pill-3d press min-h-11 w-full rounded-full px-5 py-2 text-sm font-semibold text-primary disabled:opacity-60"
               >
-                {resendLoading ? "Enviando..." : "Reenviar e-mail de confirmação"}
+                {resendLoading ? "Enviando…" : "Reenviar e-mail de confirmação"}
               </button>
+            )}
+
+            {mode === "signup" && (
+              /* ⚠️ Os Termos existiam (`/termos`) e nenhum link chegava neles; o
+                 cadastro não pedia aceite. Conteúdo de usuária (a Comunidade)
+                 exige termos aceitos — e é aqui, antes de criar a conta, que
+                 ela concorda. Abrem fora da tela para não perder o formulário. */
+              <p className="text-center text-[13px] leading-relaxed text-muted-foreground">
+                Ao criar a conta, você concorda com os{" "}
+                <a href="/termos" target="_blank" rel="noopener" className="underline">
+                  Termos de uso
+                </a>{" "}
+                e com a{" "}
+                <a href="/privacidade" target="_blank" rel="noopener" className="underline">
+                  Política de privacidade
+                </a>
+                .
+              </p>
             )}
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-opacity disabled:opacity-60 hover:opacity-90"
+              className="btn-3d press min-h-11 w-full rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60"
             >
-              {loading ? "Aguarde..." : mode === "login" ? "Entrar" : "Criar conta"}
+              {loading ? "Aguarde…" : mode === "login" ? "Entrar" : "Criar conta"}
             </button>
             <button
               type="button"
@@ -787,6 +790,23 @@ function AuthPage() {
       >
         ← Voltar ao início
       </Link>
+    </section>
+  );
+}
+
+/** A espera de quem já está logada e só passa por aqui para ser despachada. */
+function Entrando() {
+  return (
+    <section
+      className="mx-auto flex min-h-[60svh] max-w-md flex-col items-center justify-center px-5 py-16 text-center"
+      aria-busy="true"
+      aria-live="polite"
+    >
+      <span
+        className="h-8 w-8 animate-spin rounded-full border-2 border-primary/30 border-t-primary"
+        aria-hidden="true"
+      />
+      <p className="mt-4 text-sm text-muted-foreground">Entrando…</p>
     </section>
   );
 }

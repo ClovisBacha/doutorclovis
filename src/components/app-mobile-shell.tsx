@@ -7,9 +7,11 @@
  * Clima via Open-Meteo (gratuito, sem API key) com recomendações para gestantes.
  */
 import { useState, useEffect, useSyncExternalStore, type ComponentType } from "react";
-import { Baby, ChevronRight, Gamepad2, LifeBuoy, Heart, Menu } from "lucide-react";
+import { Baby, ChevronRight, Gamepad2, Heart, LifeBuoy, Menu } from "lucide-react";
 import { IconeAmigas } from "@/components/icones-jogo";
+import { inicialDoMedico } from "@/lib/nome-do-medico";
 import portrait from "@/assets/dr-clovis-portrait.jpg";
+import icMedico from "@/assets/avisos/medico.webp";
 import { DOCTOR } from "@/lib/doctor.config";
 import { BabyIllustration } from "@/components/baby-illustration";
 import { SkyRain, forcaDaChuva } from "@/components/sky-rain";
@@ -20,9 +22,16 @@ import { MascoteDaHome } from "@/components/mascote-da-home";
 import { humorDaJornada } from "@/components/bolha";
 import { diaLocalDe, fraseDoDia, periodoDaHora, tempoDoMomento } from "@/lib/frases-do-mascote";
 import { babyForWeek } from "@/lib/gestacao";
+import { cartaoDoMedico, type EstadoDoMedico } from "@/lib/cartao-do-medico";
 import { hapticTap } from "@/lib/haptics";
 import { barraDeStatus } from "@/lib/nativo";
 import { getApproxLocation } from "@/lib/local.functions";
+import {
+  aoReceberLocalizacao,
+  localizacaoJaAutorizada,
+  permissaoDeLocalizacao,
+  podePedirAoMontar,
+} from "@/lib/localizacao-do-ceu";
 import {
   assinarAtalhos,
   atalhosDe,
@@ -40,7 +49,7 @@ export type AppTab =
   | "Bebê"
   | "Caminho"
   | "Calendário"
-  | "Registros"
+  | "Meu dia a dia"
   | "Saúde"
   | "Nutrição"
   | "Bem-estar"
@@ -71,8 +80,7 @@ export type AppTab =
   /* A assinatura da PACIENTE. Vive fora das seções da barra de baixo, como a
      Loja: o caminho dela é o menu ☰ no celular e a categoria "Conta" no
      computador. */
-  | "Assinatura"
-  | "Exames";
+  | "Assinatura";
 
 /**
  * Barra de baixo enxuta (5 = Bebê + Jogo + Comunidade + Saúde + SOS). O "Bebê" é
@@ -92,12 +100,15 @@ export type AppTab =
  * as Amigas.
  */
 export type BottomSection = "home" | "jogo" | "comunidade" | "saude";
+/** O que o tutorial pode acender: um item da barra, o SOS, ou uma das duas
+ *  portas do TOPO da home (o ☰ e a bolha). */
+export type DestaqueDoTutorial = BottomSection | "sos" | "menu" | "bolha" | null;
 
 const SECTION_TABS: Record<BottomSection, readonly AppTab[]> = {
   home: [],
   jogo: ["Caminho"],
   comunidade: ["Comunidade", "Amigas", "Chá de bebê", "Feed"],
-  saude: ["Saúde", "Exames", "Nutrição", "Bem-estar", "Alertas", "Saúde da mulher"],
+  saude: ["Saúde", "Nutrição", "Bem-estar", "Alertas", "Saúde da mulher"],
 };
 
 /**
@@ -348,20 +359,35 @@ function useWeather(
     }
     void pisoAproximado();
 
-    if ("geolocation" in navigator) {
+    const usarGps = (lat: number, lon: number) => {
+      if (cancelled) return;
+      temGps = true;
+      setOrigemLocal({ tipo: "gps", cidade: null });
+      void load(lat, lon);
+    };
+    /* ⚠️ O GPS NÃO É PEDIDO AO MONTAR — só se o sistema já disse sim, ou se ela
+       já autorizou pelo cartão neste aparelho. Antes, a primeira caixa de
+       diálogo do app (na casca, com o texto de permissão do SOS) aparecia no
+       primeiro segundo da home, para pintar o clima. Quem ainda não autorizou
+       fica com o piso aproximado, e o cartão "Ativar localização" é a porta
+       (ver `localizacao-do-ceu.ts`). */
+    void permissaoDeLocalizacao().then((permissao) => {
+      if (cancelled || temGps) return;
+      if (!podePedirAoMontar(permissao, localizacaoJaAutorizada())) return;
+      if (!("geolocation" in navigator)) return;
       navigator.geolocation.getCurrentPosition(
-        ({ coords }) => {
-          temGps = true;
-          setOrigemLocal({ tipo: "gps", cidade: null });
-          void load(coords.latitude, coords.longitude);
-        },
+        ({ coords }) => usarGps(coords.latitude, coords.longitude),
         // Erro/negação/timeout: o piso já está na tela, não há o que fazer.
         () => {},
         { timeout: 8000, maximumAge: 300_000 },
       );
-    }
+    });
+    /* O cartão "Ativar localização" entrega a coordenada por evento: o céu
+       troca para o GPS no lugar, sem recarregar a página. */
+    const pararDeOuvir = aoReceberLocalizacao(({ lat, lon }) => usarGps(lat, lon));
     return () => {
       cancelled = true;
+      pararDeOuvir();
     };
   }, [cidadeCadastro?.lat, cidadeCadastro?.lon, cidadeCadastro?.nome]);
   return { weather, origem: origemLocal };
@@ -556,6 +582,14 @@ function IconeDoAtalho({ nome }: { nome: IconeDeAtalho }) {
           <path d="M20 12.6c0 3.6-3.6 6.5-8 6.5-.9 0-1.8-.1-2.6-.3L4.6 20.4l1.3-3.4C4.7 15.8 4 14.3 4 12.6 4 9 7.6 6.1 12 6.1s8 2.9 8 6.5z" />
         </svg>
       );
+    case "pontos":
+      return (
+        <svg {...comum}>
+          <circle cx="6" cy="12" r="1.4" fill="currentColor" />
+          <circle cx="12" cy="12" r="1.4" fill="currentColor" />
+          <circle cx="18" cy="12" r="1.4" fill="currentColor" />
+        </svg>
+      );
     case "engrenagem":
       return (
         <svg {...comum}>
@@ -612,13 +646,13 @@ function NuvemDeAtalhos({
             style={{ animationDelay: `${(atalhos.length - 1 - n) * 32}ms` }}
           >
             <span
-              className={`rounded-full px-2.5 py-1 text-[12px] font-medium shadow-sm ${
+              className={`rounded-full px-2.5 py-1 text-xs font-medium shadow-sm ${
                 escura ? "bg-white/90 text-neutral-900" : "bg-card text-foreground"
               }`}
             >
               {a.rotulo}
               {typeof a.emblema === "number" && a.emblema > 0 && (
-                <span className="ml-1 rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">
+                <span className="ml-1 rounded-full bg-rose-700 px-1.5 text-xs font-bold text-white">
                   {a.emblema > 9 ? "9+" : a.emblema}
                 </span>
               )}
@@ -634,7 +668,7 @@ function NuvemDeAtalhos({
                 a.aoTocar();
               }}
               aria-label={a.rotulo}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-sky-500 text-white shadow-[0_8px_20px_-8px_rgba(14,165,233,0.9)]"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-sky-700 text-white shadow-[0_8px_20px_-8px_rgba(14,165,233,0.9)]"
             >
               <IconeDoAtalho nome={a.icone} />
             </button>
@@ -663,7 +697,7 @@ export function AppBottomNav({
    * sozinho — o primeiro item que a paciente precisa conhecer seria justamente
    * o único que o tutorial não conseguiria apontar.
    */
-  destaque?: BottomSection | "sos" | null;
+  destaque?: DestaqueDoTutorial;
   /**
    * Vidro ESCURO. Verdadeiro só na home com céu de noite/madrugada.
    *
@@ -836,7 +870,7 @@ export function AppBottomNav({
               <span aria-hidden className={compact ? ALTURA_ICONE.compacto : ALTURA_ICONE.normal} />
               <span
                 data-nav-center
-                className={`absolute left-1/2 top-0 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-pink-500 text-white transition-all duration-300 [transition-timing-function:var(--ease-spring)] ${
+                className={`absolute left-1/2 top-0 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-pink-700 text-white transition-all duration-300 [transition-timing-function:var(--ease-spring)] ${
                   compact ? "h-11 w-11" : "h-14 w-14"
                 } ${activeSection === id ? "scale-105" : "scale-100"}`}
                 style={{
@@ -1065,6 +1099,7 @@ export function AppHomeScreen({
   onNavigate,
   onOpenMenu,
   medico,
+  estadoDoMedico = "respondeu",
   babyTone = 0,
   careMode = false,
   skyTheme = "v2",
@@ -1072,6 +1107,8 @@ export function AppHomeScreen({
   temNaoLidas = false,
   naoLidas = 0,
   mascoteCalado = false,
+  destaqueDoTopo = null,
+  dica = null,
   onOpenRecados,
   onOpenChat,
   onOrigemLocal,
@@ -1099,6 +1136,14 @@ export function AppHomeScreen({
    */
   medico?: { nome: string; title?: string; specialty?: string; crm?: string } | null;
   /**
+   * O DESFECHO da pergunta "ela tem médico?" — ver `lib/cartao-do-medico.ts`.
+   *
+   * ⚠️ Sem ele o cartão lia só `medico` e, com isso, AFIRMAVA "Você ainda não
+   * tem médico" enquanto a resposta estava em voo — ou seja, em toda abertura,
+   * porque `liberarCedo` solta a tela antes dela, de propósito.
+   */
+  estadoDoMedico?: EstadoDoMedico;
+  /**
    * Há notificação por abrir.
    *
    * ⚠️ **O ponto saiu do ☰ e foi para o mascote** (ago/2026), e isso não é
@@ -1125,6 +1170,15 @@ export function AppHomeScreen({
    * diferentes na mesma tela.
    */
   mascoteCalado?: boolean;
+  /** Tutorial: acende o ☰ ("menu") ou a bolha ("bolha") — a mesma pulsação
+   *  da barra de baixo, para a paciente achar do que o cartão fala. */
+  destaqueDoTopo?: "menu" | "bolha" | null;
+  /**
+   * O "Você sabia?" da semana (`dicaDaSemana`, em `mapa-do-app.ts`): a bolha
+   * apresenta UMA função que ela nunca abriu, e o toque no balão leva lá.
+   * Vence a frase do dia e perde para o recado — recado é o médico falando.
+   */
+  dica?: { texto: string; aria: string; aoTocar: () => void } | null;
   /**
    * Abre a central de recados DIRETO, sem passar pelo menu.
    *
@@ -1418,13 +1472,29 @@ export function AppHomeScreen({
      COM vínculo, valem só os dados dele; a foto (que é do dono) aparece apenas
      quando o médico É o dono, senão entra a inicial do nome. Melhor uma
      inicial certa que um rosto errado. */
-  const semMedico = !medico?.nome?.trim();
-  const vinculadaAoDono = !semMedico && medico!.nome.trim() === DOCTOR.name;
-  const medNome = semMedico ? "Você ainda não tem médico" : medico!.nome.trim();
-  const medEspec = semMedico
-    ? "Toque para encontrar um obstetra no app"
-    : (medico!.specialty ?? medico!.title ?? "").trim();
-  const medCrm = semMedico ? "" : (medico!.crm ?? "").trim();
+  /* ⚠️ QUATRO ESTADOS DE TELA, e não dois. "Ainda não perguntei", "perguntei e
+     não obtive resposta" e "ela não tem médico" são fatos diferentes, e só o
+     último autoriza a frase que nega o vínculo. Quem separa é a régua única
+     (`cartaoDoMedico`), a mesma que a Central de Emergência consome. */
+  const estadoDoCartao = cartaoDoMedico(!!medico?.nome?.trim(), estadoDoMedico);
+  const temMedico = estadoDoCartao === "com";
+  const semMedico = estadoDoCartao === "sem";
+  const vinculadaAoDono = temMedico && medico!.nome.trim() === DOCTOR.name;
+  const medNome = temMedico
+    ? medico!.nome.trim()
+    : semMedico
+      ? "Você ainda não tem médico"
+      : estadoDoCartao === "ilegivel"
+        ? "Não consegui carregar agora"
+        : "";
+  const medEspec = temMedico
+    ? (medico!.specialty ?? medico!.title ?? "").trim()
+    : semMedico
+      ? "Toque para encontrar um obstetra no app"
+      : estadoDoCartao === "ilegivel"
+        ? "Toque para ver o seu médico"
+        : "";
+  const medCrm = temMedico ? (medico!.crm ?? "").trim() : "";
 
   /* A MOLDURA do iOS em modo standalone.
 
@@ -1623,7 +1693,10 @@ export function AppHomeScreen({
                    desenho do botão, não a área que o dedo acerta — encolher o
                    toque para o tamanho do ícone seria "maneirar" cobrando o
                    preço no lugar errado. */
-                className="press relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+                /* z-[39]: acima do véu do tutorial (z-38) enquanto o cartão
+                   "O resto mora no ☰" o acende — senão ele pulsa embaçado
+                   atrás do véu, e o cartão aponta para um borrão. */
+                className={`press relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${destaqueDoTopo === "menu" ? "z-[39] dc-nav-destaque" : "z-10"}`}
               >
                 {/* ⚠️ O PONTO VERMELHO SAIU DAQUI (ago/2026) e foi para o
                     mascote, do outro lado da barra. Ele só quis dizer uma
@@ -1735,7 +1808,11 @@ export function AppHomeScreen({
                    rótulo do botão virava "Abrir recados" justamente nos dias
                    em que não há recado nenhum — a fala de conforto só existe
                    quando a caixa está vazia. */
-                fala={conforto ? { texto: conforto, aria: "Falar com a bolha" } : null}
+                fala={
+                  temNaoLidas
+                    ? null
+                    : (dica ?? (conforto ? { texto: conforto, aria: "Falar com a bolha" } : null))
+                }
                 /* DOBRO do tamanho, a pedido do dono. 44 → 88px: ele deixou de
                    ser um ícone no canto e virou personagem. O alvo do menu
                    continua com 40px do outro lado, e os dois seguem sem se
@@ -1747,6 +1824,7 @@ export function AppHomeScreen({
                    ficaria mudo justamente quando o app disse que há recado. */
                 recados={temNaoLidas ? Math.max(1, naoLidas) : 0}
                 calado={mascoteCalado}
+                destacado={destaqueDoTopo === "bolha"}
                 careMode={careMode}
                 /* O PERSONAGEM abre o chat; o BALÃO, quando está anunciando
                    recado, abre a central. Quem decide é `oBalaoAbreOsRecados`,
@@ -1759,7 +1837,7 @@ export function AppHomeScreen({
             </div>
 
             {isMadrugada && (
-              <p className="mt-3 text-center text-[11px] text-white/65">
+              <p className="mt-3 text-center text-xs text-white/65">
                 🌙 Madrugada — tente descansar um pouco
               </p>
             )}
@@ -1798,11 +1876,14 @@ export function AppHomeScreen({
              no 15 Pro, 12px no SE). Ver `deitada` em `styles.css`. */
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center deitada:bottom-[calc(var(--safe-bottom)+6rem)]">
               {/* Bebê protagonista dentro da bolha (o "ventre").
-                Toque abre a aba do Bebê com a semana detalhada — e pede a
-                sub-aba "semana" de propósito: a aba do Bebê agora abre numa
-                grade de seis, e este toque promete a semana, não um menu. */}
+                Toque abre a ABA do Bebê — a grade de seis, com "Semana" em
+                primeiro. Antes pulava direto para a sub-tela "semana", e a
+                grade (contagem, álbum, nomes, carta, enxoval) só aparecia
+                apertando "voltar" numa tela em que a paciente não sentia que
+                tinha entrado: cinco funções alcançáveis só andando para trás
+                (estudo de navegação, set/2026). */}
               <button
-                onClick={() => onNavigate("Bebê", "semana")}
+                onClick={() => onNavigate("Bebê")}
                 aria-label="Ver a semana do bebê"
                 className="press pointer-events-auto relative flex shrink-0 items-center justify-center transition-transform active:scale-[0.97]"
               >
@@ -1906,12 +1987,10 @@ export function AppHomeScreen({
                   className={`leading-[0.92] ${heroText}`}
                   style={{
                     color: corDoCorpo,
-                    /* HERDA a face do corpo, que é a geométrica do sistema (SF
-                       Pro Text no Apple, DM Sans de reserva). A `--font-serif`
-                       deste projeto é na verdade a ARREDONDADA — bonita nos
-                       títulos, mas a referência traz o número numa geométrica
-                       reta. Preso a uma fonte fixa, o maior número da tela era
-                       o único texto que NÃO seguia a fonte do sistema. */
+                    /* HERDA a face do corpo. Desde set/2026 o corpo e os títulos
+                       são a MESMA família (Nunito), então a herança aqui só
+                       garante que o maior número da tela nunca fique preso a
+                       uma face fixa se a letra do app mudar de novo. */
                     fontFamily: "inherit",
                     /* O termo em `svh` é irmão do que dimensiona a bolha: só
                        pela LARGURA, o número ficava com 104px numa tela de
@@ -2023,7 +2102,7 @@ export function AppHomeScreen({
           DOIS emojis de sol (um de cada lado do nome) e a dica ainda abria com
           "Céu aberto —". */}
       {gest && baby && weather && (
-        <div className="flex items-start gap-3 rounded-3xl border border-border bg-card px-4 py-3 shadow-[var(--shadow-card)]">
+        <div className="flex items-start gap-3 rounded-3xl card-material px-4 py-3">
           <span className="mt-0.5 text-xl leading-none">{weather.emoji}</span>
           <div className="min-w-0">
             <p className="text-[14px] font-extrabold text-foreground">
@@ -2034,7 +2113,7 @@ export function AppHomeScreen({
                 `muted` a 12px e peso normal lia bem mais claro que o `muted` a
                 11px em negrito do "% concluído" — mesma cor no código, dois
                 cinzas diferentes no olho. */}
-            <p className="mt-0.5 text-[12px] leading-snug text-foreground">{weather.tip}</p>
+            <p className="mt-0.5 text-xs leading-snug text-foreground">{weather.tip}</p>
           </div>
         </div>
       )}
@@ -2073,17 +2152,17 @@ export function AppHomeScreen({
           cinza. Este cartão passa a usar o mesmo material do cartão do
           médico, que é o vizinho dele. */}
       {gest && baby && (
-        <div className="mb-3 rounded-3xl border border-border bg-card px-4 py-3.5 shadow-[var(--shadow-card)]">
+        <div className="mb-3 rounded-3xl card-material px-4 py-3.5">
           <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3">
             <div className="text-left">
-              <p className="text-[10px] font-medium text-muted-foreground">Início</p>
-              <p className="text-[11px] font-bold text-foreground">
+              <p className="text-xs font-medium text-muted-foreground">Início</p>
+              <p className="text-xs font-bold text-foreground">
                 {dateOffsetLabel(-(gest.totalDays ?? 0))}
               </p>
             </div>
 
             <div>
-              <p className="text-center text-[11px] font-bold text-muted-foreground">
+              <p className="text-center text-xs font-bold text-muted-foreground">
                 {Math.round(progress ?? 0)}% concluído
               </p>
               {/* Trilho com o coração na posição de hoje */}
@@ -2098,7 +2177,7 @@ export function AppHomeScreen({
                 />
                 <span
                   aria-hidden
-                  className="absolute top-1/2 flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white text-[10px] shadow-md transition-all duration-700"
+                  className="absolute top-1/2 flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white text-xs shadow-md transition-all duration-700"
                   style={{ left: `${progress ?? 0}%` }}
                 >
                   💜
@@ -2107,10 +2186,8 @@ export function AppHomeScreen({
             </div>
 
             <div className="text-right">
-              <p className="text-[10px] font-medium text-muted-foreground">Parto previsto</p>
-              <p className="text-[11px] font-bold text-foreground">
-                {dateOffsetLabel(daysLeft ?? 0)}
-              </p>
+              <p className="text-xs font-medium text-muted-foreground">Parto previsto</p>
+              <p className="text-xs font-bold text-foreground">{dateOffsetLabel(daysLeft ?? 0)}</p>
             </div>
           </div>
         </div>
@@ -2119,7 +2196,7 @@ export function AppHomeScreen({
       {/* ── Card do médico ──────────────────────────────────────────── */}
       <button
         onClick={() => onNavigate("Médico")}
-        className="shine group w-full rounded-3xl border border-border bg-card overflow-hidden text-left shadow-[var(--shadow-card)] transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] active:scale-[0.98]"
+        className="shine group w-full rounded-3xl card-material overflow-hidden text-left transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] active:scale-[0.98]"
       >
         <div className="flex items-center gap-4 p-4">
           {/* A FOTO é do dono da instalação e não temos foto dos outros médicos:
@@ -2134,16 +2211,52 @@ export function AppHomeScreen({
             />
           ) : (
             <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-primary/12 font-serif text-2xl text-primary ring-1 ring-primary/20">
-              {semMedico ? "🔍" : medNome.replace(/^(Dr|Dra)\.?\s*/i, "").charAt(0) || "?"}
+              {!temMedico ? (
+                /* A peça do médico (a mesma do aviso de convite), no lugar da 🔍.
+                   ⚠️ `!temMedico` e não `semMedico`: sem NOME não há inicial, e
+                   o recuo `|| "?"` desenhava uma interrogação gigante nos dois
+                   estados em que o app ainda não sabe de nada. */
+                <img src={icMedico} alt="" aria-hidden className="h-11 w-11 object-contain" />
+              ) : (
+                inicialDoMedico(medNome)
+              )}
             </span>
           )}
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
+            <p className="font-serif text-[15px] font-semibold text-primary">
               {semMedico ? "Encontre o seu médico" : "Seu médico"}
             </p>
-            <p className="mt-0.5 font-serif text-lg leading-tight text-foreground">{medNome}</p>
-            <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{medEspec}</p>
-            {medCrm && <p className="mt-1 text-[10px] text-muted-foreground">{medCrm}</p>}
+            {/* ⚠️ O esqueleto vai DENTRO do mesmo `<p>`, e não no lugar dele: é
+                o `<p>` que define a altura da linha, e trocar as duas frases por
+                caixas soltas faria o cartão encolher e crescer — o mesmo pisca,
+                por outro caminho. */}
+            <p className="mt-0.5 font-serif text-lg leading-tight text-foreground">
+              {estadoDoCartao === "carregando" ? (
+                <span className="skeleton inline-block h-[0.8em] w-36 rounded align-middle" />
+              ) : (
+                medNome
+              )}
+            </p>
+            <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+              {estadoDoCartao === "carregando" ? (
+                <span className="skeleton inline-block h-[0.8em] w-28 rounded align-middle" />
+              ) : (
+                medEspec
+              )}
+            </p>
+            {/* ⚠️ A QUARTA LINHA existe no carregando só para a caixa não PULAR.
+                Medido a 393px: sem ela o cartão nascia com 98px e crescia para
+                117 quando a resposta chegava — trocaríamos o pisca do texto por
+                um pisca de layout, que empurra o cartão do médico e tudo abaixo
+                dele. A altura reservada é a do caso COMUM (ela tem médico:
+                nome numa linha mais o CRM), e não a de um estado raro. */}
+            {estadoDoCartao === "carregando" ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                <span className="skeleton inline-block h-[0.8em] w-20 rounded align-middle" />
+              </p>
+            ) : (
+              medCrm && <p className="mt-1 text-xs text-muted-foreground">{medCrm}</p>
+            )}
           </div>
           <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 group-hover:translate-x-1" />
         </div>

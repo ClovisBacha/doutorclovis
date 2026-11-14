@@ -68,7 +68,18 @@ describe("Modo Cuidado", () => {
     // asserção tem de ser sobre a GUARDA.
     const i = CODIGO.indexOf("async function listaViva");
     const corpo = CODIGO.slice(i, CODIGO.indexOf("\n}\n", i));
-    expect(corpo.replace(/\s+/g, " ")).toContain("if (p?.care_mode) return null;");
+    /* ⚠️ **E ESTA ASSERÇÃO TAMBÉM PRECISOU DE UMA SEGUNDA VOLTA.** Ela
+       travava `if (p?.care_mode) return null;` — a grafia exata — e reprovou o
+       conserto que a torna mais forte: com `p` nulo (leitura falhada),
+       `p?.care_mode` é `undefined`, o `if` NÃO dispara, e a lista continuava
+       no ar depois de uma perda. O portão falhava ABERTO justamente no recurso
+       cujo objeto vive fora do aparelho dela.
+
+       Hoje se cobra as duas metades: perfil ilegível fecha, e Modo Cuidado
+       fecha. Qualquer grafia que garanta isso passa. */
+    const guarda = corpo.replace(/\s+/g, " ");
+    expect(guarda).toMatch(/if \(!p \|\| p\.care_mode\) return null;/);
+    expect(guarda).not.toMatch(/if \(p\?\.care_mode\) return null;/);
   });
 
   test("⚠️ as DUAS funções públicas passam por `listaViva`", () => {

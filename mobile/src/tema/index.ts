@@ -1,0 +1,93 @@
+/**
+ * As cores da marca, convertidas dos tokens oklch de ../src/styles.css
+ * (creme pêssego, vinho, rosé). Uma cor nova entra aqui, nunca solta numa tela.
+ */
+export const cor = {
+  fundo: "#fffaf6",
+  texto: "#291413",
+  cartao: "#fffdfc",
+  primaria: "#ab5e5c",
+  primariaEscura: "#8f4b49",
+  primariaSuave: "#d79d9a",
+  rosaMarca: "#FEE2EA",
+  // A entrada (login/cadastro): o degradê do rosa da marca ao creme, as bolhas
+  // que flutuam atrás e o "vidro" das pílulas sobre o degradê.
+  entradaPessego: "#FFEDE4",
+  entradaLilas: "#E9DDF6",
+  entradaVidro: "rgba(255,253,252,0.82)",
+  apagado: "#f9eee8",
+  textoApagado: "#6d5855",
+  destaque: "#ffe2de",
+  textoDestaque: "#581b1d",
+  borda: "#ede0db",
+  divisor: "#f3ece8",
+  branco: "#ffffff",
+  /** Só para o QR da ficha: leitor de QR quer preto puro no branco. */
+  preto: "#000000",
+  // Famílias (mesmas do site): a cor diz de que assunto é a tela.
+  chutes: "#0369a1",
+  chutesFundo: "#e0f2fe",
+  contracoes: "#c2410c",
+  contracoesFundo: "#ffedd5",
+  saude: "#047857",
+  saudeFundo: "#d1fae5",
+  nutricao: "#4d7c0f",
+  nutricaoFundo: "#ecfccb",
+  agenda: "#4338ca",
+  agendaFundo: "#e0e7ff",
+  jogo: "#6d28d9",
+  jogoFundo: "#ede9fe",
+  sementinha: "#15803d",
+  // Gravidade clínica — só para o que a régua de sinais-clinicos devolve.
+  urgente: "#b91c1c",
+  urgenteFundo: "#fee2e2",
+  urgenteBorda: "#fecaca",
+  urgentePressionado: "#991b1b",
+  // O SOS, nas cores do desenho aprovado do site (emergency-sheet.tsx):
+  // o círculo vermelho vivo, o âmbar de "ninguém foi avisado", o rosa dos
+  // detalhes e o verde do WhatsApp.
+  sosTopo: "#fd1010",
+  sosBase: "#e80709",
+  sosHalo: "rgba(253,16,16,0.16)",
+  sosAmbarTopo: "#f0a30a",
+  sosAmbarBase: "#d98600",
+  sosRosa: "#e11d48",
+  sosRosaFundo: "#ffe4e6",
+  sosRosaAro: "#fda4af",
+  sosRosaLinha: "rgba(244,63,94,0.08)",
+  sosRosaPonto: "#f43f5e",
+  zapTopo: "#2da348",
+  zapBase: "#259941",
+  okPonto: "#059669",
+  okClaro: "#ecfdf5",
+  atencaoClaro: "#fffbeb",
+  atencaoTexto: "#92400e",
+  atencaoForte: "#78350f",
+  aro: "rgba(0,0,0,0.06)",
+  sosFicha: "#fcf4f1",
+  atencao: "#b45309",
+  atencaoFundo: "#fef3c7",
+  ok: "#047857",
+  okFundo: "#d1fae5",
+} as const;
+
+export const fonte = {
+  normal: "Nunito_500Medium",
+  media: "Nunito_600SemiBold",
+  forte: "Nunito_700Bold",
+  titulo: "Nunito_800ExtraBold",
+} as const;
+
+export const espaco = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;
+export const raio = { sm: 10, md: 16, lg: 24, pilula: 999 } as const;
+
+/** Alvo de toque mínimo (Apple HIG: 44 pt). */
+export const ALVO_MINIMO = 44;
+
+export const sombra = {
+  shadowColor: "#581b1d",
+  shadowOpacity: 0.08,
+  shadowRadius: 12,
+  shadowOffset: { width: 0, height: 4 },
+  elevation: 2,
+} as const;

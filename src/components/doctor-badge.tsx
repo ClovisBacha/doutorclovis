@@ -27,7 +27,7 @@ export function DoctorBadge({
           ? "bg-primary/15 text-primary"
           : "bg-slate-100 text-slate-500";
 
-  const dims = size === "xs" ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-0.5 text-[10px]";
+  const dims = size === "xs" ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-0.5 text-xs";
 
   return (
     <span

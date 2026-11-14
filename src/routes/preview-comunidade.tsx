@@ -13,11 +13,14 @@
  *   /preview-comunidade?luto=1    → Modo Cuidado (sem "Nome do bebê")
  */
 import { createFileRoute } from "@tanstack/react-router";
-import { ComunidadeTab } from "@/components/comunidade";
+import { CabecalhoDaPorta, ComunidadeTab } from "@/components/comunidade";
+import { PORTAS } from "@/lib/comunidade";
 
 export const Route = createFileRoute("/preview-comunidade")({
   component: Bancada,
   validateSearch: (q: Record<string, unknown>) => ({
+    /* `?cabecalhos=1`: os seis cabeçalhos de porta, no lugar da aba. */
+    cabecalhos: q.cabecalhos === "1" || q.cabecalhos === 1 || q.cabecalhos === true,
     /* ⚠️ `q.luto == null` e NÃO `=== undefined`: o router serializa e revalida,
        e na segunda passada chega `null`. Mesma armadilha de `preview-saude`. */
     luto: q.luto == null ? false : !!q.luto,
@@ -27,7 +30,18 @@ export const Route = createFileRoute("/preview-comunidade")({
 });
 
 function Bancada() {
-  const { luto, vivo, ilegivel } = Route.useSearch();
+  const { luto, vivo, ilegivel, cabecalhos } = Route.useSearch();
+  if (cabecalhos) {
+    return (
+      <div className="fixed inset-0 z-[50] overflow-y-auto bg-background px-4 py-5">
+        <div className="space-y-3">
+          {PORTAS.map((p) => (
+            <CabecalhoDaPorta key={p.key} chave={p.key} />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   /* ⚠️ A bancada injeta o DADO nas mesmas props da produção, nunca o desenho —
      é a régua da casa. E o `?ilegivel=1` fabrica o estado que nenhuma conta de

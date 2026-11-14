@@ -97,7 +97,9 @@ describe("⚠️ e a loja não abre no Modo Cuidado", () => {
 
   test("e os dois chamadores passam a bandeira", () => {
     const jogo = semComentarios("src/components/gestacao-path.tsx");
-    const conta = semComentarios("src/routes/_authenticated/minha-conta.tsx");
+    /* ⚠️ O Cantinho saiu de `minha-conta.tsx` em set/2026 — move verbatim,
+       conferido por hash. */
+    const conta = semComentarios("src/components/cantinho-tab.tsx");
     for (const fonte of [jogo, conta]) {
       const i = fonte.indexOf("<LojaSementinhas");
       expect(i).toBeGreaterThan(-1);

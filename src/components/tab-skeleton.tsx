@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export function TabSkeleton() {
   return (
-    <div className="space-y-4 py-6" aria-busy="true" aria-label="Carregando...">
+    <div className="space-y-4 py-6" aria-busy="true" aria-label="Carregando…">
       <div className="flex items-center gap-3">
         <Skeleton className="h-10 w-10 rounded-full" />
         <div className="space-y-2">

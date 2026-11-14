@@ -81,7 +81,7 @@ export function CampoComOutro({
           aria-label={`${label} — outro`}
         />
       )}
-      {ajuda && <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{ajuda}</p>}
+      {ajuda && <p className="mt-1 text-xs leading-snug text-muted-foreground">{ajuda}</p>}
     </div>
   );
 }

@@ -394,6 +394,36 @@ export function ofertaveis(luto: boolean): readonly SomKey[] {
 }
 
 /**
+ * AS FAMÍLIAS COM OS SONS DE CADA UMA, JÁ RECORTADAS PELO MODO CUIDADO.
+ *
+ * ⚠️ A mesma expressão estava escrita TRÊS vezes — nos grupos do motor ao vivo,
+ * na folha dos Sons para dormir, e numa terceira constante
+ * (`SOUNDSCAPES_POR_FAMILIA`) que não tinha chamador nenhum.
+ *
+ * ⚠️ **E o perigo não era a repetição: era que uma das três não passava por
+ * `ofertaveis`.** Um agrupamento sem esse recorte oferece "Coração do bebê" e
+ * "Ventre" a quem acabou de perder a gestação — o furo de Modo Cuidado que a
+ * folha de sons já pagou uma vez. A cópia morta era exatamente essa, ou seja
+ * uma armadilha armada para quem fosse ligá-la amanhã: ela falhava ABERTO, e
+ * nada no `tsc` nem no lint diria nada. Com uma régua só, o portão não tem
+ * como ficar de fora.
+ *
+ * Mora aqui porque a pergunta — "quais sons tem cada família?" — é do
+ * CATÁLOGO, e não do motor ao vivo (`soundscapes.ts`) nem do render em WAV
+ * (`som-continuo.ts`), que são dois consumidores dele.
+ *
+ * ⚠️ Família VAZIA não vira grupo: um título com nada embaixo lê como um som
+ * que sumiu — e no Modo Cuidado "Corpo" fica sem nenhum dos dois.
+ */
+export function familiasDeSom(luto: boolean): { familia: Familia; sons: SomKey[] }[] {
+  const ok = new Set<string>(ofertaveis(luto));
+  return FAMILIAS.map((f) => ({
+    familia: f,
+    sons: SONS_CONTINUOS.filter((k) => FAMILIA_DO_SOM[k] === f && ok.has(k)),
+  })).filter((g) => g.sons.length > 0);
+}
+
+/**
  * ⚠️ NÓS QUE PRECISAM SOBREVIVER ENTRE AS JANELAS.
  *
  * `base` só é verdadeiro na PRIMEIRA janela ao vivo — as seguintes só agendam

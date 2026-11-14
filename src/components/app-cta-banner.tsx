@@ -45,16 +45,27 @@ export function AppCtaBanner() {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
+          {/* ⚠️ Medidos a 393px: 133×34 e 28×28 — os dois abaixo do alvo de
+              toque. Este banner é montado DENTRO da página (não na moldura do
+              site), então ele aparece por cima de telas que a paciente usa a
+              sério — inclusive `/epds`, a Escala de Edinburgh, cuja questão 10
+              é ideação de autolesão. Um ✕ de 28px ali é um banner que ela não
+              consegue tirar da frente.
+
+              As caixas crescem por LAYOUT (`min-h-11`, `h-11 w-11`), e não por
+              `after:-inset`: os dois são adjacentes, e um pseudo-elemento
+              esticado faria o de trás roubar a borda do da frente — o
+              encavalamento que este repositório já mediu duas vezes. */}
           <Link
             to="/auth"
-            className="rounded-full bg-primary px-4 py-2 text-xs font-medium text-primary-foreground whitespace-nowrap transition-opacity hover:opacity-90"
+            className="inline-flex min-h-11 items-center rounded-full bg-primary px-4 text-xs font-medium text-primary-foreground whitespace-nowrap transition-opacity hover:opacity-90"
           >
             Criar conta grátis
           </Link>
           <button
             onClick={dismiss}
             aria-label="Fechar"
-            className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
           >
             <X className="h-4 w-4" />
           </button>

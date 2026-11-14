@@ -15,6 +15,54 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+/**
+ * ESQUECER ESTE APARELHO — o outro lado de `registrarTokenNativo`.
+ *
+ * ⚠️ **Sem ela, "desligar os avisos" seria um botão que não cumpre.** A marca
+ * local impede a RE-inscrição, e só; a linha gravada continua em
+ * `native_push_tokens`, e é ela que o servidor lê na hora de enviar. O push
+ * continuaria chegando com a tela dizendo que está desligado — que é a classe
+ * de defeito que este repositório vem consertando há levas ("diz pronto sem
+ * ler o retorno").
+ *
+ * ⚠️ **Passa pelo SERVIDOR pela MESMA razão que a inscrição passa**: a tabela é
+ * escrita com a chave de serviço, e o navegador não tem como apagar a linha.
+ *
+ * ⚠️ **E o recorte é `(user_id, token)`, nunca só o token.** Apagar por token
+ * puro deixaria uma conta remover o aparelho de outra pessoa que tenha usado o
+ * mesmo celular — é o simétrico do `neq` que a inscrição já faz.
+ */
+export const esquecerTokenNativo = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        token: z.string().min(20).max(4096),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }): Promise<{ ok: boolean; reason?: string }> => {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: u } = await supabaseAdmin.auth.getUser(data.accessToken);
+      if (!u.user) return { ok: false, reason: "no-session" };
+
+      const { error } = await (supabaseAdmin as any)
+        .from("native_push_tokens")
+        .delete()
+        .eq("user_id", u.user.id)
+        .eq("token", data.token);
+
+      /* ⚠️ Erro aqui é RECUSA, e não "melhor esforço": a linha sobrevivendo
+         significa que o push continua saindo. Quem chama precisa saber para
+         não afirmar à paciente que desligou. */
+      if (error) return { ok: false, reason: "db" };
+      return { ok: true };
+    } catch {
+      return { ok: false, reason: "indisponivel" };
+    }
+  });
+
 export const registrarTokenNativo = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z

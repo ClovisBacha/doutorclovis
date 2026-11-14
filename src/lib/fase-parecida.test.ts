@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { faseDe, mesmaFase, ROTULO_DO_FILTRO, VAZIO_DO_FILTRO } from "./fase-parecida";
+import {
+  faseDe,
+  mesmaFase,
+  ROTULO_DO_FILTRO,
+  VAZIO_DO_FILTRO,
+  fasePosParto,
+} from "./fase-parecida";
 
 const semComentarios = (s: string) =>
   s.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/g, "$1 ");
@@ -10,7 +16,14 @@ describe("a fase", () => {
     expect(faseDe(8, false)).toBe("t1");
     expect(faseDe(20, false)).toBe("t2");
     expect(faseDe(32, false)).toBe("t3");
-    expect(faseDe(32, true)).toBe("pos");
+    /* ⚠️ ERA `"pos"` PARA TODA MÃE, e o teste guardava esse balde único.
+       Ele foi reescrito, não apagado: o pós-parto virou três faixas porque a
+       mãe de nove dias e a mãe de dois anos são as duas pessoas com MENOS em
+       comum no app, e a régua as chamava de parecidas. Sem idade informada, a
+       resposta é a faixa mais recente — ver `fasePosParto`. */
+    expect(faseDe(32, true)).toBe("pos_recem");
+    expect(faseDe(32, true, 6)).toBe("pos_bebe");
+    expect(faseDe(32, true, 18)).toBe("pos_crianca");
   });
 
   /**
@@ -170,5 +183,43 @@ describe("o recorte por fase não publica a fase de ninguém", () => {
     expect(servidor).toContain("mesmaFase: z.boolean().optional()");
     /* `!data.mesmaFase` é o caminho sem filtro — ou seja, ausente = desligado. */
     expect(servidor).toContain("!data.mesmaFase");
+  });
+});
+
+describe("⚠️ o pós-parto deixou de ser um balde só", () => {
+  test("a mãe de nove dias NÃO é da mesma fase que a de dois anos", () => {
+    /* Era o "app morre no parto" aparecendo na régua de pareamento: `faseDe`
+       devolvia "pos" para toda mãe, e o filtro juntava justamente as duas
+       pessoas com MENOS em comum no aplicativo inteiro. */
+    const recem = faseDe(null, true, 0);
+    const crianca = faseDe(null, true, 26);
+    expect(mesmaFase(recem, crianca)).toBe(false);
+  });
+
+  test("os três cortes são de vida, não de aritmética", () => {
+    expect(fasePosParto(0)).toBe("pos_recem");
+    expect(fasePosParto(2)).toBe("pos_recem");
+    expect(fasePosParto(3)).toBe("pos_bebe");
+    expect(fasePosParto(11)).toBe("pos_bebe");
+    expect(fasePosParto(12)).toBe("pos_crianca");
+    expect(fasePosParto(40)).toBe("pos_crianca");
+  });
+
+  test("⚠️ idade desconhecida cai em `pos_recem`, e NÃO em null", () => {
+    /* `null` a tiraria do filtro inteiro — o mesmo que dizer que ela não tem
+       par. `birth_date` existe, então ela é mãe, e o pós-parto recente é onde a
+       companhia mais importa. */
+    expect(fasePosParto(null)).toBe("pos_recem");
+    expect(fasePosParto(undefined)).toBe("pos_recem");
+    expect(faseDe(null, true, null)).toBe("pos_recem");
+  });
+
+  test("duas mães da mesma faixa continuam parecidas", () => {
+    expect(mesmaFase(faseDe(null, true, 1), faseDe(null, true, 2))).toBe(true);
+    expect(mesmaFase(faseDe(null, true, 5), faseDe(null, true, 9))).toBe(true);
+  });
+
+  test("gestante nunca é da mesma fase que mãe", () => {
+    expect(mesmaFase(faseDe(30, false), faseDe(null, true, 0))).toBe(false);
   });
 });
