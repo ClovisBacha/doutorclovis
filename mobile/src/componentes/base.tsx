@@ -1,5 +1,6 @@
 import * as Haptics from "expo-haptics";
-import type { ReactNode } from "react";
+import { LinearGradient } from "expo-linear-gradient";
+import { createContext, useContext, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -16,8 +17,10 @@ import {
   type ViewStyle,
 } from "react-native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
+import { FundoDeLuz } from "~/componentes/luz";
 import { useMolaDeToque } from "~/componentes/movimento";
-import { ALVO_MINIMO, cor, espaco, fonte, raio, sombra } from "~/tema";
+import { clarear, comAlfa, escurecer } from "~/lib/cor";
+import { ALVO_MINIMO, aperto, cor, curva, espaco, fonte, luz, raio, sombra } from "~/tema";
 
 export function toque(leve = true) {
   if (Platform.OS === "web") return;
@@ -26,12 +29,30 @@ export function toque(leve = true) {
   ).catch(() => {});
 }
 
+/**
+ * A FOLGA DA BARRA: a barra de abas FLUTUA sobre o conteúdo (o vidro de
+ * 16/11/2026), então quem rola dentro de uma aba precisa terminar acima dela.
+ * A barra mede a própria altura (com a distância até a borda de baixo) e a
+ * entrega aqui; fora das abas (as telas empilhadas) a folga é zero.
+ */
+export const FolgaDaBarra = createContext(0);
+export const useFolgaDaBarra = () => useContext(FolgaDaBarra);
+
+/** O espaço que sobra embaixo de uma rolagem: o de sempre, ou mais, se a barra flutua por cima. */
+export function useFimDaRolagem(minimo = 120): number {
+  return Math.max(minimo, useFolgaDaBarra() + espaco.xl);
+}
+
+/**
+ * A tela. Sem `fundo`, o fundo é a LUZ (`FundoDeLuz`); com ele, a cor pedida
+ * (a entrada usa "transparent", por cima do degradê dela).
+ */
 export function Tela({
   children,
   rolar = true,
   bordas = ["top"],
   estilo,
-  fundo = cor.fundo,
+  fundo,
 }: {
   children: ReactNode;
   rolar?: boolean;
@@ -39,12 +60,14 @@ export function Tela({
   estilo?: StyleProp<ViewStyle>;
   fundo?: string;
 }) {
+  const fim = useFimDaRolagem();
   return (
-    <SafeAreaView edges={bordas} style={{ flex: 1, backgroundColor: fundo }}>
+    <SafeAreaView edges={bordas} style={{ flex: 1, backgroundColor: fundo ?? luz.base }}>
+      {fundo ? null : <FundoDeLuz />}
       {rolar ? (
         <ScrollView
           contentContainerStyle={[
-            { padding: espaco.lg, paddingBottom: 120, gap: espaco.md },
+            { padding: espaco.lg, paddingBottom: fim, gap: espaco.md },
             estilo,
           ]}
           keyboardShouldPersistTaps="handled"
@@ -91,23 +114,29 @@ export function T({
 }
 
 const estilosTexto = StyleSheet.create({
-  titulo: { fontFamily: fonte.titulo, fontSize: 26, color: cor.texto, letterSpacing: -0.3 },
-  subtitulo: { fontFamily: fonte.forte, fontSize: 18, color: cor.texto },
-  corpo: { fontFamily: fonte.normal, fontSize: 16, lineHeight: 24, color: cor.texto },
-  apagado: { fontFamily: fonte.normal, fontSize: 14, lineHeight: 20, color: cor.textoApagado },
-  rotulo: { fontFamily: fonte.forte, fontSize: 15, color: cor.texto },
+  titulo: { ...fonte.titulo, fontSize: 28, color: cor.texto, letterSpacing: aperto.titulo },
+  subtitulo: { ...fonte.forte, fontSize: 19, color: cor.texto, letterSpacing: aperto.subtitulo },
+  corpo: { ...fonte.normal, fontSize: 16, lineHeight: 24, color: cor.texto },
+  apagado: { ...fonte.normal, fontSize: 14, lineHeight: 20, color: cor.textoApagado },
+  rotulo: { ...fonte.forte, fontSize: 15, color: cor.texto },
   numero: {
-    fontFamily: fonte.titulo,
+    ...fonte.titulo,
     fontSize: 40,
     color: cor.texto,
+    letterSpacing: -1,
     fontVariant: ["tabular-nums"],
   },
 });
 
+/**
+ * O CARTÃO: material, e não vidro (o vidro é da camada que flutua). Branco com
+ * um tico da luz do fundo passando, o canto contínuo do iPhone, um fio de luz
+ * na borda e a sombra em três camadas do tema.
+ */
 export function Cartao({
   children,
   estilo,
-  fundo = cor.cartao,
+  fundo = luz.cartao,
   aoTocar,
   rotuloAcessivel,
 }: {
@@ -118,7 +147,15 @@ export function Cartao({
   rotuloAcessivel?: string;
 }) {
   const base = [
-    { backgroundColor: fundo, borderRadius: raio.lg, padding: espaco.lg, gap: espaco.sm },
+    {
+      backgroundColor: fundo,
+      borderRadius: raio.lg,
+      ...curva,
+      padding: espaco.lg,
+      gap: espaco.sm,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: "rgba(255,255,255,0.9)",
+    },
     sombra,
     estilo,
   ];
@@ -227,6 +264,10 @@ export function Botao({
   const corTexto =
     tipo === "secundario" ? cor.primariaEscura : tipo === "texto" ? cor.primariaEscura : cor.branco;
   const off = desabilitado || carregando;
+  /* A LUZ do botão cheio: o degradê de cima (mais claro) para baixo (mais
+     escuro) e o brilho colorido embaixo — o relevo de um botão da Apple, e
+     não um retângulo chapado. */
+  const cheio = tipo === "primario" || tipo === "perigo";
   const { escala, aoPressionar, aoSoltar } = useMolaDeToque(0.96);
   const [fora, dentro] = separarLayout(estilo);
   return (
@@ -248,6 +289,7 @@ export function Botao({
           {
             minHeight: ALVO_MINIMO + 4,
             borderRadius: raio.pilula,
+            ...curva,
             backgroundColor: fundo,
             paddingHorizontal: espaco.xl,
             alignItems: "center",
@@ -257,12 +299,21 @@ export function Botao({
             opacity: off ? 0.5 : 1,
           },
           tipo === "secundario" && { borderWidth: 1, borderColor: cor.borda },
+          cheio && !off ? { boxShadow: `0px 10px 22px -10px ${comAlfa(fundo, 0.75)}` } : null,
           dentro,
           { transform: [{ scale: escala }] },
         ]}
       >
+        {cheio ? (
+          <LinearGradient
+            pointerEvents="none"
+            colors={[clarear(fundo, 0.16), fundo, escurecer(fundo, 0.1)]}
+            locations={[0, 0.5, 1]}
+            style={[StyleSheet.absoluteFill, { borderRadius: raio.pilula, ...curva }]}
+          />
+        ) : null}
         {carregando ? <ActivityIndicator color={corTexto} /> : icone}
-        <Text style={{ fontFamily: fonte.forte, fontSize: 16, color: corTexto }}>{rotulo}</Text>
+        <Text style={{ ...fonte.forte, fontSize: 16, color: corTexto }}>{rotulo}</Text>
       </Animated.View>
     </Pressable>
   );
@@ -285,12 +336,13 @@ export function Campo({
           {
             minHeight: ALVO_MINIMO + 4,
             borderRadius: raio.md,
+            ...curva,
             borderWidth: 1,
             borderColor: cor.borda,
             backgroundColor: cor.cartao,
             paddingHorizontal: espaco.lg,
             paddingVertical: espaco.md,
-            fontFamily: fonte.normal,
+            ...fonte.normal,
             fontSize: 16,
             color: cor.texto,
           },
@@ -318,11 +370,12 @@ export function Pilula({
         alignSelf: "flex-start",
         backgroundColor: fundo,
         borderRadius: raio.pilula,
+        ...curva,
         paddingHorizontal: 12,
         paddingVertical: 4,
       }}
     >
-      <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: corTexto }}>{texto}</Text>
+      <Text style={{ ...fonte.forte, fontSize: 13, color: corTexto }}>{texto}</Text>
     </View>
   );
 }

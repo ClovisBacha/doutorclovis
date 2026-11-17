@@ -50,7 +50,7 @@ export function CartaoDaSemana({ d }: { d: DadosDoCartao }) {
       <View style={{ flex: 1, alignItems: "center", paddingTop: 34, paddingHorizontal: 22 }}>
         <Text
           style={{
-            fontFamily: fonte.titulo,
+            ...fonte.titulo,
             fontSize: 13,
             letterSpacing: 2,
             textTransform: "uppercase",
@@ -62,7 +62,7 @@ export function CartaoDaSemana({ d }: { d: DadosDoCartao }) {
         <Text
           style={{
             marginTop: 4,
-            fontFamily: fonte.titulo,
+            ...fonte.titulo,
             fontSize: 46,
             lineHeight: 52,
             letterSpacing: -1,
@@ -83,7 +83,7 @@ export function CartaoDaSemana({ d }: { d: DadosDoCartao }) {
           style={{
             marginTop: 6,
             textAlign: "center",
-            fontFamily: fonte.titulo,
+            ...fonte.titulo,
             fontSize: 17,
             color: cor.branco,
           }}
@@ -108,7 +108,7 @@ export function CartaoDaSemana({ d }: { d: DadosDoCartao }) {
         <Text
           style={{
             marginBottom: 22,
-            fontFamily: fonte.forte,
+            ...fonte.forte,
             fontSize: 12,
             letterSpacing: 0.5,
             color: "rgba(255,255,255,0.8)",
@@ -138,7 +138,7 @@ function Linha({ emoji, texto }: { emoji: string; texto: string }) {
       <Text
         style={{
           flex: 1,
-          fontFamily: fonte.forte,
+          ...fonte.forte,
           fontSize: 14,
           lineHeight: 19,
           color: cor.branco,
@@ -184,19 +184,17 @@ export function CompartilharASemana({ d }: { d: DadosDoCartao }) {
             justifyContent: "center",
           }}
         >
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 15, color: cor.branco }}>
-            {d.semana}
-          </Text>
+          <Text style={{ ...fonte.titulo, fontSize: 15, color: cor.branco }}>{d.semana}</Text>
         </LinearGradient>
         <View style={{ flex: 1 }}>
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 15, color: "#3a2230" }}>
+          <Text style={{ ...fonte.titulo, fontSize: 15, color: "#3a2230" }}>
             O cartão da semana {d.semana}
           </Text>
-          <Text style={{ fontFamily: fonte.media, fontSize: 13, color: "#9a7486" }}>
+          <Text style={{ ...fonte.media, fontSize: 13, color: "#9a7486" }}>
             Pronto para os Stories e o WhatsApp
           </Text>
         </View>
-        <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: "#7a3fd1" }}>Ver ›</Text>
+        <Text style={{ ...fonte.titulo, fontSize: 14, color: "#7a3fd1" }}>Ver ›</Text>
       </Pressable>
 
       <FolhaDeCompartilhar

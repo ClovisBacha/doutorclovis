@@ -72,7 +72,7 @@ export function Avatar({
         backgroundColor: corDoAvatar(id),
       }}
     >
-      <Text style={{ fontFamily: fonte.titulo, fontSize: tamanho * 0.42, color: cor.branco }}>
+      <Text style={{ ...fonte.titulo, fontSize: tamanho * 0.42, color: cor.branco }}>
         {inicialDoNome(nome)}
       </Text>
     </View>
@@ -86,7 +86,7 @@ export function CabecalhoDaSecao({ titulo, direita }: { titulo: string; direita?
     >
       <Text
         accessibilityRole="header"
-        style={{ flex: 1, fontFamily: fonte.titulo, fontSize: 18, color: tinta.titulo }}
+        style={{ flex: 1, ...fonte.titulo, fontSize: 18, color: tinta.titulo }}
       >
         {titulo}
       </Text>
@@ -111,7 +111,7 @@ function PilulaDeTrofeus({ quantos }: { quantos: number }) {
       }}
     >
       <Text style={{ fontSize: 13 }}>🏆</Text>
-      <Text style={{ fontFamily: fonte.titulo, fontSize: 13, color: tinta.ambar }}>{quantos}</Text>
+      <Text style={{ ...fonte.titulo, fontSize: 13, color: tinta.ambar }}>{quantos}</Text>
     </View>
   );
 }
@@ -143,10 +143,7 @@ export function LinhaDaAmiga({ a, aoAbrir }: { a: PerfilDeAmiga; aoAbrir: () => 
     >
       <Avatar nome={a.nome} id={a.id} url={a.avatarUrl} />
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text
-          numberOfLines={1}
-          style={{ fontFamily: fonte.titulo, fontSize: 15, color: tinta.titulo }}
-        >
+        <Text numberOfLines={1} style={{ ...fonte.titulo, fontSize: 15, color: tinta.titulo }}>
           {a.nome}
         </Text>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 1 }}>
@@ -160,7 +157,7 @@ export function LinhaDaAmiga({ a, aoAbrir }: { a: PerfilDeAmiga; aoAbrir: () => 
               }}
             />
           ) : null}
-          <Text style={{ fontFamily: fonte.media, fontSize: 13, color: tinta.sub }}>
+          <Text style={{ ...fonte.media, fontSize: 13, color: tinta.sub }}>
             {vista ? `vista ${vista}` : tempoNoApp(a.diasNoApp)}
           </Text>
         </View>
@@ -207,9 +204,7 @@ function BotaoPilula({
         opacity: desabilitado ? 0.5 : pressed ? 0.85 : 1,
       })}
     >
-      <Text
-        style={{ fontFamily: fonte.titulo, fontSize: 14, color: cheio ? cor.branco : tinta.sub }}
-      >
+      <Text style={{ ...fonte.titulo, fontSize: 14, color: cheio ? cor.branco : tinta.sub }}>
         {rotulo}
       </Text>
     </Pressable>
@@ -270,17 +265,15 @@ export function CartaoDaDupla({
         <Text
           style={{
             flex: 1,
-            fontFamily: fonte.media,
+            ...fonte.media,
             fontSize: 14,
             lineHeight: 20,
             color: tinta.sub,
           }}
         >
           Vocês duas seguram a mesma chama: o dia conta quando as duas aparecem, e cada uma ganha{" "}
-          <Text style={{ fontFamily: fonte.titulo, color: tinta.titulo }}>
-            +{BONUS_DA_DUPLA} 🌱
-          </Text>{" "}
-          por dia juntas. Ninguém fica atrás de ninguém.
+          <Text style={{ ...fonte.titulo, color: tinta.titulo }}>+{BONUS_DA_DUPLA} 🌱</Text> por dia
+          juntas. Ninguém fica atrás de ninguém.
         </Text>
       </View>
 
@@ -300,9 +293,7 @@ export function CartaoDaDupla({
                 borderColor: cor.branco,
               }}
             >
-              <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: cor.branco }}>
-                Você
-              </Text>
+              <Text style={{ ...fonte.titulo, fontSize: 14, color: cor.branco }}>Você</Text>
             </View>
             <View style={{ marginLeft: -8 }}>
               <Avatar
@@ -330,7 +321,7 @@ export function CartaoDaDupla({
               <Text style={{ fontSize: 15, lineHeight: 18, color: "#db2777" }}>♥</Text>
             </View>
           </View>
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 17, color: tinta.titulo }}>
+          <Text style={{ ...fonte.titulo, fontSize: 17, color: tinta.titulo }}>
             Você + {dupla.nome}
           </Text>
           {dupla.sequencia > 0 ? (
@@ -343,24 +334,22 @@ export function CartaoDaDupla({
                 paddingVertical: 5,
               }}
             >
-              <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: tinta.ambar }}>
+              <Text style={{ ...fonte.titulo, fontSize: 14, color: tinta.ambar }}>
                 {linhaDaDupla(dupla)}
               </Text>
             </View>
           ) : (
-            <Text style={{ fontFamily: fonte.media, fontSize: 14, color: tinta.sub }}>
+            <Text style={{ ...fonte.media, fontSize: 14, color: tinta.sub }}>
               {linhaDaDupla(dupla)}
             </Text>
           )}
           {memoriaDaDupla(dupla) ? (
-            <Text style={{ fontFamily: fonte.media, fontSize: 13, color: tinta.sub }}>
+            <Text style={{ ...fonte.media, fontSize: 13, color: tinta.sub }}>
               {memoriaDaDupla(dupla)}
             </Text>
           ) : null}
           {emPausa(dupla) ? (
-            <Text
-              style={{ fontFamily: fonte.normal, fontSize: 13, lineHeight: 19, color: tinta.sub }}
-            >
+            <Text style={{ ...fonte.normal, fontSize: 13, lineHeight: 19, color: tinta.sub }}>
               A chama de vocês está parada há uns dias — ela volta a contar no dia em que as duas
               aparecerem, e nada do que vocês já fizeram se perdeu.
             </Text>
@@ -392,8 +381,8 @@ export function CartaoDaDupla({
 
       {estado === "convite-recebido" && dupla ? (
         <View style={{ gap: espaco.sm }}>
-          <Text style={{ fontFamily: fonte.media, fontSize: 15, color: tinta.titulo }}>
-            <Text style={{ fontFamily: fonte.titulo }}>{dupla.nome}</Text> te chamou para uma dupla.
+          <Text style={{ ...fonte.media, fontSize: 15, color: tinta.titulo }}>
+            <Text style={{ ...fonte.titulo }}>{dupla.nome}</Text> te chamou para uma dupla.
           </Text>
           <View style={{ flexDirection: "row", gap: espaco.sm }}>
             <BotaoPilula
@@ -419,9 +408,9 @@ export function CartaoDaDupla({
 
       {estado === "convite-enviado" && dupla ? (
         <View style={{ gap: espaco.sm }}>
-          <Text style={{ fontFamily: fonte.media, fontSize: 15, color: tinta.titulo }}>
-            Convite enviado para <Text style={{ fontFamily: fonte.titulo }}>{dupla.nome}</Text>.
-            Esperando ela aceitar.
+          <Text style={{ ...fonte.media, fontSize: 15, color: tinta.titulo }}>
+            Convite enviado para <Text style={{ ...fonte.titulo }}>{dupla.nome}</Text>. Esperando
+            ela aceitar.
           </Text>
           <View style={{ flexDirection: "row" }}>
             <BotaoPilula
@@ -435,12 +424,12 @@ export function CartaoDaDupla({
 
       {estado === "sem" ? (
         amigas.length === 0 ? (
-          <Text style={{ fontFamily: fonte.media, fontSize: 14, color: tinta.sub }}>
+          <Text style={{ ...fonte.media, fontSize: 14, color: tinta.sub }}>
             Quando uma amiga entrar pelo seu convite, ela aparece aqui para formar dupla.
           </Text>
         ) : (
           <View style={{ gap: espaco.sm }}>
-            <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: tinta.titulo }}>
+            <Text style={{ ...fonte.titulo, fontSize: 14, color: tinta.titulo }}>
               Chamar para a dupla
             </Text>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: espaco.sm }}>
@@ -469,7 +458,7 @@ export function CartaoDaDupla({
                   })}
                 >
                   <Avatar nome={a.nome} id={a.id} url={a.avatarUrl} tamanho={34} />
-                  <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: tinta.ambar }}>
+                  <Text style={{ ...fonte.titulo, fontSize: 14, color: tinta.ambar }}>
                     {a.nome.split(/\s+/)[0]}
                   </Text>
                 </Pressable>
@@ -519,11 +508,11 @@ export function FolhaDeConfirmar({
       >
         <Text
           accessibilityRole="header"
-          style={{ fontFamily: fonte.titulo, fontSize: 20, color: tinta.titulo }}
+          style={{ ...fonte.titulo, fontSize: 20, color: tinta.titulo }}
         >
           {titulo}
         </Text>
-        <Text style={{ fontFamily: fonte.media, fontSize: 15, lineHeight: 22, color: tinta.sub }}>
+        <Text style={{ ...fonte.media, fontSize: 15, lineHeight: 22, color: tinta.sub }}>
           {texto}
         </Text>
         <View style={{ flexDirection: "row", gap: espaco.sm }}>

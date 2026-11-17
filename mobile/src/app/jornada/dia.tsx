@@ -146,7 +146,7 @@ export default function FolhaDoDia() {
               <Text
                 style={{
                   textAlign: "center",
-                  fontFamily: fonte.normal,
+                  ...fonte.normal,
                   fontSize: 15,
                   lineHeight: 22.5,
                   color: corCaminho.tinta,
@@ -158,9 +158,7 @@ export default function FolhaDoDia() {
           </View>
         </View>
 
-        <Text
-          style={{ marginTop: 14, fontFamily: fonte.media, fontSize: 16, color: corCaminho.tinta }}
-        >
+        <Text style={{ marginTop: 14, ...fonte.media, fontSize: 16, color: corCaminho.tinta }}>
           {ehHoje ? "Atividades de hoje" : "As atividades deste dia"}{" "}
           <Text style={{ opacity: 0.55 }}>✦</Text>
         </Text>
@@ -168,7 +166,7 @@ export default function FolhaDoDia() {
           <Text
             style={{
               marginTop: 4,
-              fontFamily: fonte.normal,
+              ...fonte.normal,
               fontSize: 13,
               color: corCaminho.tintaSec,
             }}
@@ -215,7 +213,7 @@ export default function FolhaDoDia() {
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text
                       style={{
-                        fontFamily: fonte.media,
+                        ...fonte.media,
                         fontSize: 14.5,
                         lineHeight: 18,
                         color: meta.tinta,
@@ -226,7 +224,7 @@ export default function FolhaDoDia() {
                     <Text
                       style={{
                         marginTop: 2,
-                        fontFamily: fonte.normal,
+                        ...fonte.normal,
                         fontSize: 13,
                         lineHeight: 17.5,
                         color: corCaminho.tintaSec,
@@ -253,14 +251,12 @@ export default function FolhaDoDia() {
                       }}
                     >
                       {fez ? (
-                        <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: cor.branco }}>
-                          ✓
-                        </Text>
+                        <Text style={{ ...fonte.forte, fontSize: 13, color: cor.branco }}>✓</Text>
                       ) : null}
                     </View>
                     <Text
                       style={{
-                        fontFamily: fonte.normal,
+                        ...fonte.normal,
                         fontSize: 13.5,
                         color: corCaminho.tintaSec,
                         fontVariant: ["tabular-nums"],
@@ -304,7 +300,7 @@ export default function FolhaDoDia() {
           <Text
             style={{
               textAlign: "center",
-              fontFamily: fonte.media,
+              ...fonte.media,
               fontSize: 14.5,
               color: corCaminho.tinta,
             }}
@@ -325,14 +321,14 @@ export default function FolhaDoDia() {
             style={{
               marginTop: 12,
               textAlign: "center",
-              fontFamily: fonte.normal,
+              ...fonte.normal,
               fontSize: 13,
               color: corCaminho.tintaSec,
             }}
           >
             <Text
               style={{
-                fontFamily: fonte.forte,
+                ...fonte.forte,
                 fontSize: 16,
                 color: corCaminho.tinta,
                 fontVariant: ["tabular-nums"],
@@ -347,7 +343,7 @@ export default function FolhaDoDia() {
               style={{
                 marginTop: 4,
                 textAlign: "center",
-                fontFamily: fonte.normal,
+                ...fonte.normal,
                 fontSize: 13,
                 color: corCaminho.tintaSec,
               }}
@@ -359,7 +355,7 @@ export default function FolhaDoDia() {
                   {feitos > 0
                     ? "Continue assim! Acenda as 5 e ganhe "
                     : "Comece por onde quiser — acenda as 5 e ganhe "}
-                  <Text style={{ fontFamily: fonte.media, color: corCaminho.sementinhasTexto }}>
+                  <Text style={{ ...fonte.media, color: corCaminho.sementinhasTexto }}>
                     Sementinhas
                   </Text>{" "}
                   🌱

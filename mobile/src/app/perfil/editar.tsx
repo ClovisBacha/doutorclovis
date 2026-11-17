@@ -274,7 +274,7 @@ export default function EditarPerfil() {
                   <Text
                     style={{
                       alignSelf: "flex-end",
-                      fontFamily: fonte.normal,
+                      ...fonte.normal,
                       fontSize: 13,
                       color: cor.textoApagado,
                     }}
@@ -291,7 +291,7 @@ export default function EditarPerfil() {
                     >
                       <Text
                         style={{
-                          fontFamily: fonte.media,
+                          ...fonte.media,
                           fontSize: 14,
                           lineHeight: 20,
                           color: cor.texto,
@@ -330,9 +330,7 @@ export default function EditarPerfil() {
                         paddingLeft: espaco.md,
                       }}
                     >
-                      <Text
-                        style={{ fontFamily: fonte.forte, fontSize: 16, color: cor.textoApagado }}
-                      >
+                      <Text style={{ ...fonte.forte, fontSize: 16, color: cor.textoApagado }}>
                         @
                       </Text>
                       <TextInput
@@ -352,7 +350,7 @@ export default function EditarPerfil() {
                           flex: 1,
                           minHeight: ALVO_MINIMO,
                           paddingHorizontal: 4,
-                          fontFamily: fonte.normal,
+                          ...fonte.normal,
                           fontSize: 16,
                           color: cor.texto,
                         }}

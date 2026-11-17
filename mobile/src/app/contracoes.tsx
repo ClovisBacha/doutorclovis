@@ -250,7 +250,7 @@ function TelaDasContracoes() {
             <Text
               accessibilityLabel={`Duração ${relogio(agora - new Date(ativa.started_at).getTime())}`}
               style={{
-                fontFamily: fonte.titulo,
+                ...fonte.titulo,
                 fontSize: 64,
                 color: cor.contracoes,
                 fontVariant: ["tabular-nums"],
@@ -314,10 +314,7 @@ function TelaDasContracoes() {
             {["Hora", "Duração", "Intervalo", "Intensidade"].map((c, i) => (
               <Text
                 key={c}
-                style={[
-                  COLUNAS[i],
-                  { fontFamily: fonte.forte, fontSize: 13, color: cor.textoApagado },
-                ]}
+                style={[COLUNAS[i], { ...fonte.forte, fontSize: 13, color: cor.textoApagado }]}
               >
                 {c}
               </Text>
@@ -377,7 +374,7 @@ function BotaoRedondo({
         shadowOffset: { width: 0, height: 5 },
       })}
     >
-      <Text style={{ fontFamily: fonte.titulo, fontSize: cheio ? 22 : 28, color: cor.branco }}>
+      <Text style={{ ...fonte.titulo, fontSize: cheio ? 22 : 28, color: cor.branco }}>
         {rotulo}
       </Text>
     </Pressable>
@@ -414,7 +411,7 @@ function LinhaDaContracao({
         ? `${Math.floor(l.intervaloSeg / 3600)} h ${String(Math.round((l.intervaloSeg % 3600) / 60)).padStart(2, "0")}`
         : `${Math.max(1, Math.round(l.intervaloSeg / 60))} min`;
   const texto = {
-    fontFamily: fonte.media,
+    ...fonte.media,
     fontSize: 15,
     color: cor.texto,
     fontVariant: ["tabular-nums" as const],
@@ -444,12 +441,12 @@ function LinhaDaContracao({
           opacity: pressed ? 0.7 : 1,
         })}
       >
-        <Text style={[COLUNAS[0], texto, { fontFamily: fonte.forte }]}>{l.hora}</Text>
+        <Text style={[COLUNAS[0], texto, { ...fonte.forte }]}>{l.hora}</Text>
         <Text style={[COLUNAS[1], texto]}>
           {l.duracaoSeg != null ? relogio(l.duracaoSeg * 1000) : "sem fim"}
         </Text>
         <Text style={[COLUNAS[2], texto]}>{intervalo}</Text>
-        <Text style={[COLUNAS[3], texto, { color: cor.contracoes, fontFamily: fonte.forte }]}>
+        <Text style={[COLUNAS[3], texto, { color: cor.contracoes, ...fonte.forte }]}>
           {l.intensidade ?? "—"}
         </Text>
       </Pressable>
@@ -486,7 +483,7 @@ function LinhaDaContracao({
               onPress={aoPedirApagar}
               style={{ minHeight: ALVO_MINIMO, justifyContent: "center", alignSelf: "flex-start" }}
             >
-              <Text style={{ fontFamily: fonte.forte, fontSize: 15, color: cor.urgente }}>
+              <Text style={{ ...fonte.forte, fontSize: 15, color: cor.urgente }}>
                 Apagar esta contração
               </Text>
             </Pressable>

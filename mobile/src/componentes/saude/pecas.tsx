@@ -101,7 +101,7 @@ export function Escolha<V extends string | number>({
           >
             <Text
               style={{
-                fontFamily: ativo ? fonte.forte : fonte.media,
+                ...(ativo ? fonte.forte : fonte.media),
                 fontSize: 15,
                 color: ativo ? cor.branco : cor.texto,
               }}

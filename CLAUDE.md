@@ -58,6 +58,45 @@ outro app na loja), o `slug` e o `scheme` `obstetrica` (links e login), o
 domínio `obstetrica.com.br` e o site, que não muda mais. Escreva "o app Mãe
 Esperta", nunca "a Mãe Esperta" (o app não é uma mãe).
 
+## O visual é "Amanhecer": vidro, luz e profundidade (pedido do dono, 16/11/2026)
+
+"Está com muita cara de feito no Claude [...] efeito Apple 3D caro [...]
+liberdade criativa máxima [...] a experiência WOW." O creme com vinho do site
+ERA a paleta do Claude; não volte a ela.
+
+- **Paleta** (`mobile/src/tema`): tinta ameixa-noite, framboesa para agir, névoa
+  lilás no fundo, luz de pêssego; o degradê `amanhecer` só em vitrine, nunca
+  atrás de texto pequeno. Cor nova entra no tema, com o contraste medido.
+- **Letra**: sempre por `fonte.*` (`...fonte.forte`). Títulos, números e botões
+  na arredondada do sistema (SF Pro Rounded); texto corrido na SF Pro.
+- **Vidro** (`componentes/vidro.tsx`): o Liquid Glass é só a camada que FLUTUA
+  (a barra de abas, o placar da trilha, a barra que nasce, os botões soltos, as
+  etiquetas sobre a arte), sempre no esquema claro. Cartão de conteúdo é
+  material com luz e sombra, nunca vidro. A barra flutua: rolagem dentro de uma
+  aba termina com `useFimDaRolagem`/`useFolgaDaBarra`.
+- **O céu vivo** (`componentes/ceu-vivo.tsx`): o céu da hora é a TELA INTEIRA,
+  vivo (estrelas, estrela cadente, nuvens, o sol respirando). Nas abas é UM
+  céu só, em `(abas)/_layout.tsx`, atrás das três; cada aba fica transparente
+  e o lê por `useCeuDasAbas`. A entrada tem o dela. Não volte a cortá-lo com
+  uma folha branca nem com um fundo cor-de-rosa: os blocos são painéis de vidro
+  soltos sobre ele (`componentes/painel.tsx`).
+- **A bolha** (`BolhaViva`, em `movimento.tsx`): a arte de fundo transparente,
+  animada por código. NADA a acompanha — sem vídeo, sem disco, sem brilho atrás
+  ("vamos tirar esse fundo rosa", o dono).
+- **Profundidade** (`componentes/jornada/ceu-do-bebe.tsx`): o número da semana
+  atrás do bebê, em camadas que andam com o celular (`useParalaxe`) e com a
+  rolagem; a régua do tempo (arrastar para ver o bebê crescer, com os dados de
+  `bebeDaSemana`) e o toque no bebê. Movimento só no fio nativo, e nada com
+  "reduzir movimento".
+- **Para VER no simulador**: build Debug + `EXPO_PUBLIC_BANCADA=1
+EXPO_PUBLIC_BANCADA_PARAMS="hora=8" npx expo start --clear` (a receita está
+  no diário). ⚠️ O que a web aprova o iPhone pode
+  reprovar: o degradê corta o filho que passa da borda, e a `FlatList` refaz a
+  rolagem inicial depois da sua.
+
+`vidro-e-luz.test.ts` cobra tudo isso. Ver o diário, "16/11 — o vidro e a
+luz", "16/11 (noite) — Amanhecer" e os dois "16/11 (madrugada)".
+
 ## ⚠️ O APP NÃO É CONSELHO MÉDICO (decisão do dono, 21/10/2026)
 
 Nas palavras dele: "Essa questão de conselhos médicos etc queria tirar a ideia,

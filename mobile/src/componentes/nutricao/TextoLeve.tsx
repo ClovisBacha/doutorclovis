@@ -9,10 +9,10 @@ import { cor, espaco, fonte } from "~/tema";
  */
 export function TextoLeve({ texto, corTexto = cor.texto }: { texto: string; corTexto?: string }) {
   const blocos = blocosDe(texto);
-  const base = { fontFamily: fonte.normal, fontSize: 16, lineHeight: 23, color: corTexto };
+  const base = { ...fonte.normal, fontSize: 16, lineHeight: 23, color: corTexto };
   const trechos = (linha: Trecho[]) =>
     linha.map((t, i) => (
-      <Text key={i} style={t.negrito ? { fontFamily: fonte.forte } : null}>
+      <Text key={i} style={t.negrito ? { ...fonte.forte } : null}>
         {t.texto}
       </Text>
     ));
@@ -32,7 +32,7 @@ export function TextoLeve({ texto, corTexto = cor.texto }: { texto: string; corT
           <View key={i} style={{ gap: 6 }}>
             {b.itens.map((item, j) => (
               <View key={j} style={{ flexDirection: "row", gap: espaco.sm }}>
-                <Text style={[base, { fontFamily: fonte.forte, minWidth: 14 }]}>
+                <Text style={[base, { ...fonte.forte, minWidth: 14 }]}>
                   {b.ordenada ? `${j + 1}.` : "•"}
                 </Text>
                 <Text style={[base, { flex: 1 }]}>{trechos(item)}</Text>

@@ -33,7 +33,14 @@ export function ConversaNaTela({
       {visiveis.length > 0 ? (
         <View style={{ marginLeft: 44, gap: espaco.xs }}>
           {visiveis.map((r) => (
-            <LinhaDoComentario key={r.id} c={r} raiz={conversa.raiz} agora={agora} acoes={acoes} pequeno />
+            <LinhaDoComentario
+              key={r.id}
+              c={r}
+              raiz={conversa.raiz}
+              agora={agora}
+              acoes={acoes}
+              pequeno
+            />
           ))}
           {escondidas > 0 ? (
             <Pressable
@@ -44,7 +51,7 @@ export function ConversaNaTela({
               }}
               style={{ minHeight: ALVO_MINIMO, justifyContent: "center" }}
             >
-              <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: cor.textoApagado }}>
+              <Text style={{ ...fonte.forte, fontSize: 14, color: cor.textoApagado }}>
                 ── Ver mais {escondidas} {escondidas === 1 ? "resposta" : "respostas"}
               </Text>
             </Pressable>
@@ -80,13 +87,18 @@ function LinhaDoComentario({
         accessibilityRole="button"
         accessibilityLabel={`Abrir o perfil de ${c.autorNome}`}
         onPress={() => router.push(`/comunidade/perfil/${c.autorId}`)}
-        style={{ width: ALVO_MINIMO - 8, minHeight: ALVO_MINIMO, alignItems: "center", paddingTop: 4 }}
+        style={{
+          width: ALVO_MINIMO - 8,
+          minHeight: ALVO_MINIMO,
+          alignItems: "center",
+          paddingTop: 4,
+        }}
       >
         <Avatar id={c.autorId} nome={c.autorNome} url={c.autorAvatar} tamanho={tamanho} />
       </Pressable>
       <View style={{ flex: 1 }}>
-        <Text style={{ fontFamily: fonte.normal, fontSize: 13, color: cor.textoApagado, paddingTop: 4 }}>
-          <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: cor.texto }}>{c.autorNome}</Text>
+        <Text style={{ ...fonte.normal, fontSize: 13, color: cor.textoApagado, paddingTop: 4 }}>
+          <Text style={{ ...fonte.forte, fontSize: 14, color: cor.texto }}>{c.autorNome}</Text>
           {"  "}
           {haQuantoPublicou(c.criadoEm, agora)}
           {c.fixadoEm && !c.respondeA ? "  · Fixado" : ""}
@@ -101,13 +113,23 @@ function LinhaDoComentario({
             }}
             style={{ minHeight: ALVO_MINIMO, justifyContent: "center" }}
           >
-            <Text style={{ fontFamily: fonte.media, fontSize: 15, color: cor.textoApagado, fontStyle: "italic" }}>
+            <Text
+              style={{ ...fonte.media, fontSize: 15, color: cor.textoApagado, fontStyle: "italic" }}
+            >
               Comentário recolhido · tocar para ver
             </Text>
           </Pressable>
         ) : (
           <>
-            <Text style={{ fontFamily: fonte.normal, fontSize: 15, lineHeight: 21, color: cor.texto, marginTop: 1 }}>
+            <Text
+              style={{
+                ...fonte.normal,
+                fontSize: 15,
+                lineHeight: 21,
+                color: cor.texto,
+                marginTop: 1,
+              }}
+            >
               {c.texto}
             </Text>
             <View style={{ flexDirection: "row", alignItems: "center", marginLeft: -espaco.sm }}>
@@ -119,9 +141,15 @@ function LinhaDoComentario({
                     toque();
                     acoes.aoResponder?.(raiz);
                   }}
-                  style={{ minHeight: ALVO_MINIMO, paddingHorizontal: espaco.sm, justifyContent: "center" }}
+                  style={{
+                    minHeight: ALVO_MINIMO,
+                    paddingHorizontal: espaco.sm,
+                    justifyContent: "center",
+                  }}
                 >
-                  <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: cor.textoApagado }}>Responder</Text>
+                  <Text style={{ ...fonte.forte, fontSize: 13, color: cor.textoApagado }}>
+                    Responder
+                  </Text>
                 </Pressable>
               ) : null}
               <Pressable
@@ -131,7 +159,12 @@ function LinhaDoComentario({
                   toque();
                   acoes.aoMenu(c);
                 }}
-                style={{ width: ALVO_MINIMO, height: ALVO_MINIMO, alignItems: "center", justifyContent: "center" }}
+                style={{
+                  width: ALVO_MINIMO,
+                  height: ALVO_MINIMO,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
               >
                 <MoreHorizontal size={18} color={cor.textoApagado} />
               </Pressable>
@@ -148,7 +181,13 @@ function LinhaDoComentario({
             toque();
             acoes.aoCurtir(c);
           }}
-          style={{ width: ALVO_MINIMO, minHeight: ALVO_MINIMO, alignItems: "center", justifyContent: "center", gap: 1 }}
+          style={{
+            width: ALVO_MINIMO,
+            minHeight: ALVO_MINIMO,
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 1,
+          }}
         >
           <Heart
             size={17}
@@ -156,7 +195,9 @@ function LinhaDoComentario({
             fill={c.euCurti ? cor.urgente : "transparent"}
           />
           {curtidas > 0 ? (
-            <Text style={{ fontFamily: fonte.media, fontSize: 13, color: cor.textoApagado }}>{curtidas}</Text>
+            <Text style={{ ...fonte.media, fontSize: 13, color: cor.textoApagado }}>
+              {curtidas}
+            </Text>
           ) : null}
         </Pressable>
       ) : null}

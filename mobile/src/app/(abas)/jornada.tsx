@@ -3,7 +3,16 @@ import { Award, ChevronRight, PenLine, Wind } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Botao, Cartao, Carregando, NaoConsegueLer, T, Tela, toque } from "~/componentes/base";
+import {
+  Botao,
+  Cartao,
+  Carregando,
+  NaoConsegueLer,
+  T,
+  Tela,
+  toque,
+  useFimDaRolagem,
+} from "~/componentes/base";
 import { AmigasNoHoje } from "~/componentes/amigas/faixa-do-hoje";
 import { BotaoDoPerfil } from "~/componentes/botao-do-perfil";
 import { irParaAba } from "~/componentes/cabecalho";
@@ -73,6 +82,8 @@ import {
 import { primeiroNome } from "~/lib/gestacao";
 import { recadoDaBolhaNoApp } from "~/lib/recado-da-bolha";
 import { BarraDoTopo, voltarParaJornada } from "~/componentes/jornada/pecas";
+import { FundoDeLuz } from "~/componentes/luz";
+import { CEUS, sombraDoTexto, useCeuDasAbas, type Ceu } from "~/componentes/ceu-vivo";
 import { useSessao } from "~/lib/sessao";
 import {
   conquistaNoApp,
@@ -373,6 +384,8 @@ export function JornadaDaGestacao({
 
   /* ── O Cantinho na trilha: o que ela tem, o cenário e a pele ── */
   const cantinho = useCantinhoDaTrilha();
+  /* O céu das abas, atrás da trilha (se ela não equipou um cenário da lojinha). */
+  const dasAbas = useCeuDasAbas();
   const decorGravada = loja.blob[CHAVE_DECOR];
   const decoracao = useMemo(() => lerDecoracao(decorGravada), [decorGravada]);
   const possuidos = cantinho ? (cantinho.careMode ? [] : cantinho.owned) : null;
@@ -381,6 +394,9 @@ export function JornadaDaGestacao({
   const skin = loja.blob[SKIN_KEY];
   const pele = typeof skin === "string" ? (TRILHA_SKINS[skin] ?? null) : null;
   const aoGravarDecoracao = useCallback((d: Decoracao) => gravarChave(CHAVE_DECOR, d), []);
+
+  /* A trilha no céu: só como aba, e só sem cenário da lojinha (ele cobre). */
+  const noCeu = vista === "aba" && !!dasAbas && !cenario;
 
   /* Passou de 42 semanas: a trilha (presa no dia 300) dá lugar à tela da reta final. */
   if (dia.passouDe42) return <AlertaDas42Semanas nomeDoBebe={nomeDoBebe} />;
@@ -398,7 +414,7 @@ export function JornadaDaGestacao({
     });
     const feitos = cuidados.filter((c) => c.feito).length;
     return (
-      <View style={{ flex: 1, backgroundColor: cor.fundo }}>
+      <View style={{ flex: 1, backgroundColor: dasAbas ? "transparent" : cor.fundo }}>
         <TelaDeHoje
           D={D}
           pronto={loja.pronto}
@@ -457,10 +473,20 @@ export function JornadaDaGestacao({
   }
 
   return (
-    <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: cor.fundo }}>
+    <SafeAreaView
+      edges={["top"]}
+      style={{ flex: 1, backgroundColor: noCeu ? "transparent" : cor.fundo }}
+    >
+      {/* Na aba, a trilha sobe pelo céu da hora (o das três abas). Com um
+          cenário da lojinha equipado, ou aberta fora das abas, a luz de fundo
+          (e o cenário, por cima). */}
+      {noCeu ? null : <FundoDeLuz />}
       <View style={{ paddingHorizontal: espaco.lg }}>
         {vista === "aba" ? (
-          <CabecalhoDaTrilha sub={`Semana ${semana}${nomeDoBebe ? ` · ${nomeDoBebe}` : ""}`} />
+          <CabecalhoDaTrilha
+            sub={`Semana ${semana}${nomeDoBebe ? ` · ${nomeDoBebe}` : ""}`}
+            ceu={noCeu && dasAbas ? CEUS[dasAbas.fase] : null}
+          />
         ) : (
           <BarraDoTopo titulo="Minha jornada" />
         )}
@@ -525,7 +551,8 @@ export function JornadaDaGestacao({
  * O topo da trilha quando ela é a aba da direita: o nome da trilha e a semana
  * à esquerda, o perfil à direita — sem voltar (é uma aba).
  */
-function CabecalhoDaTrilha({ sub }: { sub: string }) {
+function CabecalhoDaTrilha({ sub, ceu }: { sub: string; ceu: Ceu | null }) {
+  const sombra = ceu ? sombraDoTexto(ceu) : null;
   return (
     <View
       style={{
@@ -539,13 +566,25 @@ function CabecalhoDaTrilha({ sub }: { sub: string }) {
         <Text
           accessibilityRole="header"
           numberOfLines={1}
-          style={{ fontFamily: fonte.titulo, fontSize: 20, color: cor.texto }}
+          style={{
+            ...fonte.titulo,
+            fontSize: 28,
+            lineHeight: 33,
+            letterSpacing: -0.6,
+            color: ceu?.tinta ?? cor.texto,
+            ...sombra,
+          }}
         >
           Sua trilha
         </Text>
         <Text
           numberOfLines={1}
-          style={{ fontFamily: fonte.media, fontSize: 13, color: cor.textoApagado }}
+          style={{
+            ...fonte.media,
+            fontSize: 14,
+            color: ceu?.sec ?? cor.textoApagado,
+            ...sombra,
+          }}
         >
           {sub}
         </Text>
@@ -731,7 +770,10 @@ export function JornadaDoPosParto({
       <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: cor.fundo }}>
         <View style={{ paddingHorizontal: espaco.lg }}>
           {vista === "aba" ? (
-            <CabecalhoDaTrilha sub={`O 4º trimestre${nomeDoBebe ? ` · ${nomeDoBebe}` : ""}`} />
+            <CabecalhoDaTrilha
+              sub={`O 4º trimestre${nomeDoBebe ? ` · ${nomeDoBebe}` : ""}`}
+              ceu={null}
+            />
           ) : (
             <BarraDoTopo titulo="O 4º trimestre" />
           )}
@@ -1023,8 +1065,8 @@ function BotaoDeConquistas({
         <Award size={26} color={corJornada.trofeu} strokeWidth={2.2} />
       </View>
       <View style={{ flex: 1, gap: 2 }}>
-        <Text style={{ fontFamily: fonte.forte, fontSize: 17, color: cor.texto }}>Conquistas</Text>
-        <Text style={{ fontFamily: fonte.normal, fontSize: 14, color: cor.textoApagado }}>
+        <Text style={{ ...fonte.forte, fontSize: 17, color: cor.texto }}>Conquistas</Text>
+        <Text style={{ ...fonte.normal, fontSize: 14, color: cor.textoApagado }}>
           {leitura === "carregando"
             ? "Conferindo…"
             : resumo
@@ -1042,7 +1084,7 @@ function BotaoDeConquistas({
               paddingVertical: 5,
             }}
           >
-            <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: cor.branco }}>
+            <Text style={{ ...fonte.forte, fontSize: 13, color: cor.branco }}>
               {resumo.resgatar} para resgatar
             </Text>
           </View>
@@ -1127,7 +1169,7 @@ function AvisoDeConquista({
           }}
           style={{ alignSelf: "flex-start", minWidth: 28, minHeight: 28, alignItems: "center" }}
         >
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 18, color: corJornada.roxo }}>×</Text>
+          <Text style={{ ...fonte.titulo, fontSize: 18, color: corJornada.roxo }}>×</Text>
         </Pressable>
       </View>
       <Botao rotulo="Ver as conquistas" corFundo={corJornada.roxo} aoTocar={aoPegar} />
@@ -1152,10 +1194,11 @@ function AvisoDeConquista({
  * contar o nascimento.
  */
 function AlertaDas42Semanas({ nomeDoBebe }: { nomeDoBebe: string | null }) {
+  const fim = useFimDaRolagem();
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: cor.fundo }}>
       <ScrollView
-        contentContainerStyle={{ padding: espaco.lg, gap: espaco.lg, paddingBottom: 120 }}
+        contentContainerStyle={{ padding: espaco.lg, gap: espaco.lg, paddingBottom: fim }}
       >
         <View
           style={{
@@ -1167,7 +1210,7 @@ function AlertaDas42Semanas({ nomeDoBebe }: { nomeDoBebe: string | null }) {
         >
           <Text
             style={{
-              fontFamily: fonte.media,
+              ...fonte.media,
               fontSize: 13,
               letterSpacing: 0.6,
               textTransform: "uppercase",
@@ -1178,13 +1221,11 @@ function AlertaDas42Semanas({ nomeDoBebe }: { nomeDoBebe: string | null }) {
           </Text>
           <Text
             accessibilityRole="header"
-            style={{ fontFamily: fonte.forte, fontSize: 18, lineHeight: 24, color: cor.texto }}
+            style={{ ...fonte.forte, fontSize: 18, lineHeight: 24, color: cor.texto }}
           >
             {nomeDoBebe ?? "O bebê"} está chegando 💛
           </Text>
-          <Text
-            style={{ fontFamily: fonte.normal, fontSize: 14, lineHeight: 22, color: cor.texto }}
-          >
+          <Text style={{ ...fonte.normal, fontSize: 14, lineHeight: 22, color: cor.texto }}>
             Falta pouquíssimo para vocês se encontrarem. O seu caminho, as figurinhas e tudo o que
             vocês viveram até aqui estão guardados. {SE_PRECISAR}
           </Text>
@@ -1201,7 +1242,7 @@ function AlertaDas42Semanas({ nomeDoBebe }: { nomeDoBebe: string | null }) {
                 opacity: pressed ? 0.85 : 1,
               })}
             >
-              <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: cor.branco }}>
+              <Text style={{ ...fonte.forte, fontSize: 14, color: cor.branco }}>
                 {ROTULO_DO_SOCORRO}
               </Text>
             </Pressable>
@@ -1217,12 +1258,12 @@ function AlertaDas42Semanas({ nomeDoBebe }: { nomeDoBebe: string | null }) {
             borderColor: cor.borda,
           }}
         >
-          <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: cor.texto }}>
+          <Text style={{ ...fonte.forte, fontSize: 14, color: cor.texto }}>
             {nomeDoBebe ?? "O bebê"} já nasceu? 🎉
           </Text>
           <Text
             style={{
-              fontFamily: fonte.normal,
+              ...fonte.normal,
               fontSize: 13,
               lineHeight: 19,
               color: cor.textoApagado,

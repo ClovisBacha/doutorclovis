@@ -30,7 +30,7 @@ export function Passo({
         style={{
           minWidth: 72,
           textAlign: "center",
-          fontFamily: fonte.titulo,
+          ...fonte.titulo,
           fontSize: 40,
           color: cor.texto,
           fontVariant: ["tabular-nums"],

@@ -3,7 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useState, type ReactNode } from "react";
 import { Animated, Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { toque } from "~/componentes/base";
+import { toque, useFimDaRolagem } from "~/componentes/base";
 import { BotaoDaAtividade, Brilho, sombraDe } from "~/componentes/jornada/atividade";
 import {
   AnelDoDia,
@@ -142,6 +142,7 @@ export function TelaDoQuartoTrimestre({
   const total = TAREFAS_DO_POS.length;
   const { pulso, brilho, festa } = useMomentoDoDia(D, feitos, total, "pos", pronto);
   const [semanaAberta, setSemanaAberta] = useState(false);
+  const fim = useFimDaRolagem(espaco.xxl);
   const fase = faseDoPos(semana);
   const humorDaBolha: HumorDaArte =
     feitos >= total ? "orgulhosa" : humorPedeApoio(humorDeHoje) ? "apaixonado" : "feliz";
@@ -150,7 +151,7 @@ export function TelaDoQuartoTrimestre({
     <View style={{ flex: 1, backgroundColor: FUNDO }}>
       <ScrollView
         style={{ flex: 1, backgroundColor: FUNDO }}
-        contentContainerStyle={{ paddingBottom: espaco.xxl }}
+        contentContainerStyle={{ paddingBottom: fim }}
         showsVerticalScrollIndicator={false}
       >
         {/* O céu da hora, com o recém-nascido — o herói da tela. */}
@@ -189,7 +190,7 @@ export function TelaDoQuartoTrimestre({
             <View style={{ flex: 1 }}>
               <Text
                 style={{
-                  fontFamily: fonte.titulo,
+                  ...fonte.titulo,
                   fontSize: 12,
                   letterSpacing: 1.4,
                   textTransform: "uppercase",
@@ -202,7 +203,7 @@ export function TelaDoQuartoTrimestre({
                 accessibilityRole="header"
                 style={{
                   marginTop: 2,
-                  fontFamily: fonte.titulo,
+                  ...fonte.titulo,
                   fontSize: 31,
                   lineHeight: 37,
                   letterSpacing: -0.5,
@@ -227,16 +228,14 @@ export function TelaDoQuartoTrimestre({
               </Flutuar>
             </View>
             {nomeDoBebe ? (
-              <Text style={{ fontFamily: fonte.titulo, fontSize: 22, color: "#2e2348" }}>
-                {nomeDoBebe}
-              </Text>
+              <Text style={{ ...fonte.titulo, fontSize: 22, color: "#2e2348" }}>{nomeDoBebe}</Text>
             ) : null}
             <Text
               style={{
                 marginTop: 2,
                 paddingHorizontal: espaco.lg,
                 textAlign: "center",
-                fontFamily: fonte.forte,
+                ...fonte.forte,
                 fontSize: 14,
                 color: "#5d4d84",
               }}
@@ -282,7 +281,7 @@ export function TelaDoQuartoTrimestre({
                   <Text
                     accessibilityRole="header"
                     style={{
-                      fontFamily: fonte.titulo,
+                      ...fonte.titulo,
                       fontSize: 24,
                       letterSpacing: -0.3,
                       color: "#3a2230",
@@ -293,7 +292,7 @@ export function TelaDoQuartoTrimestre({
                   <Text
                     style={{
                       marginTop: 2,
-                      fontFamily: fonte.media,
+                      ...fonte.media,
                       fontSize: 14,
                       color: "#9a7486",
                     }}
@@ -322,7 +321,7 @@ export function TelaDoQuartoTrimestre({
                 >
                   <Text
                     style={{
-                      fontFamily: fonte.media,
+                      ...fonte.media,
                       fontSize: 14,
                       lineHeight: 20,
                       color: "#5b3a4a",
@@ -369,7 +368,7 @@ export function TelaDoQuartoTrimestre({
             accessibilityRole="header"
             style={{
               marginTop: espaco.sm,
-              fontFamily: fonte.titulo,
+              ...fonte.titulo,
               fontSize: 18,
               color: "#3a2230",
             }}
@@ -418,15 +417,15 @@ export function TelaDoQuartoTrimestre({
               contentFit="contain"
             />
             <View style={{ flex: 1 }}>
-              <Text style={{ fontFamily: fonte.titulo, fontSize: 15, color: "#3a2230" }}>
+              <Text style={{ ...fonte.titulo, fontSize: 15, color: "#3a2230" }}>
                 O álbum de vocês
               </Text>
-              <Text style={{ fontFamily: fonte.media, fontSize: 13, color: "#9a7486" }}>
+              <Text style={{ ...fonte.media, fontSize: 13, color: "#9a7486" }}>
                 {figurinhas} {figurinhas === 1 ? "figurinha" : "figurinhas"} · a gestação inteira e
                 o 4º trimestre
               </Text>
             </View>
-            <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: "#b0306a" }}>Ver ›</Text>
+            <Text style={{ ...fonte.titulo, fontSize: 14, color: "#b0306a" }}>Ver ›</Text>
           </Pressable>
 
           {extra}
@@ -450,10 +449,10 @@ export function TelaDoQuartoTrimestre({
               opacity: pressed ? 0.8 : 1,
             })}
           >
-            <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: "#075985" }}>
+            <Text style={{ ...fonte.forte, fontSize: 14, color: "#075985" }}>
               {chama > 0 ? (
                 <>
-                  <Text style={{ fontFamily: fonte.titulo, color: "#c2571a" }}>
+                  <Text style={{ ...fonte.titulo, color: "#c2571a" }}>
                     🔥 {chama} {chama === 1 ? "dia" : "dias"}
                   </Text>{" "}
                   cuidando de vocês
@@ -462,9 +461,7 @@ export function TelaDoQuartoTrimestre({
                 "🍼 Um dia de cada vez"
               )}
             </Text>
-            <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: "#0369a1" }}>
-              Ver a trilha ›
-            </Text>
+            <Text style={{ ...fonte.titulo, fontSize: 14, color: "#0369a1" }}>Ver a trilha ›</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -512,10 +509,10 @@ function ComoVoceEsta({
       }}
     >
       <View>
-        <Text style={{ fontFamily: fonte.titulo, fontSize: 16, color: "#3a2230" }}>
+        <Text style={{ ...fonte.titulo, fontSize: 16, color: "#3a2230" }}>
           Como você está hoje, mamãe?
         </Text>
-        <Text style={{ fontFamily: fonte.media, fontSize: 13, color: "#9a7486" }}>
+        <Text style={{ ...fonte.media, fontSize: 13, color: "#9a7486" }}>
           Seu bem-estar importa tanto quanto o do bebê 💜
         </Text>
       </View>
@@ -541,9 +538,7 @@ function ComoVoceEsta({
             })}
           >
             <Text style={{ fontSize: 24 }}>{h.emoji}</Text>
-            <Text style={{ fontFamily: fonte.media, fontSize: 13, color: "#6d5855" }}>
-              {h.label}
-            </Text>
+            <Text style={{ ...fonte.media, fontSize: 13, color: "#6d5855" }}>{h.label}</Text>
           </Pressable>
         ))}
       </View>
@@ -564,10 +559,10 @@ function Apoio() {
         borderColor: "#e4d8ff",
       }}
     >
-      <Text style={{ fontFamily: fonte.titulo, fontSize: 16, color: "#4c1d95" }}>
+      <Text style={{ ...fonte.titulo, fontSize: 16, color: "#4c1d95" }}>
         Você não está sozinha 💜
       </Text>
-      <Text style={{ fontFamily: fonte.media, fontSize: 14, lineHeight: 20, color: "#4b3a63" }}>
+      <Text style={{ ...fonte.media, fontSize: 14, lineHeight: 20, color: "#4b3a63" }}>
         Dias assim acontecem, e você não precisa atravessá-los sozinha. A qualquer hora, o CVV
         escuta de graça{SOS_NO_APP ? " — e o SOS do app fica a um toque" : ""}.
       </Text>
@@ -589,7 +584,7 @@ function Apoio() {
             opacity: pressed ? 0.85 : 1,
           })}
         >
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: cor.branco }}>
+          <Text style={{ ...fonte.titulo, fontSize: 14, color: cor.branco }}>
             Ligar {CVV} · CVV
           </Text>
         </Pressable>
@@ -611,7 +606,7 @@ function Apoio() {
             opacity: pressed ? 0.85 : 1,
           })}
         >
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: "#6d28d9" }}>
+          <Text style={{ ...fonte.titulo, fontSize: 14, color: "#6d28d9" }}>
             {SOS_NO_APP ? "Abrir o SOS" : "Ligar 192"}
           </Text>
         </Pressable>
@@ -667,7 +662,7 @@ function TarefaDoDia({
       <View style={{ flex: 1, gap: 2 }}>
         <Text
           style={{
-            fontFamily: fonte.titulo,
+            ...fonte.titulo,
             fontSize: 11,
             letterSpacing: 1.2,
             textTransform: "uppercase",
@@ -676,7 +671,7 @@ function TarefaDoDia({
         >
           {eyebrow}
         </Text>
-        <Text style={{ fontFamily: fonte.titulo, fontSize: 16, lineHeight: 21, color: "#0c3a5a" }}>
+        <Text style={{ ...fonte.titulo, fontSize: 16, lineHeight: 21, color: "#0c3a5a" }}>
           {titulo}
         </Text>
         <View style={{ marginTop: 6, alignSelf: "flex-start" }}>
@@ -730,17 +725,17 @@ function LinhaFeita({ emoji, titulo, sub }: { emoji: string; titulo: string; sub
             borderColor: cor.branco,
           }}
         >
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 11, color: cor.branco }}>✓</Text>
+          <Text style={{ ...fonte.titulo, fontSize: 11, color: cor.branco }}>✓</Text>
         </View>
       </View>
       <View style={{ flex: 1 }}>
         <Text
           numberOfLines={2}
-          style={{ fontFamily: fonte.titulo, fontSize: 15, lineHeight: 20, color: "#8a7280" }}
+          style={{ ...fonte.titulo, fontSize: 15, lineHeight: 20, color: "#8a7280" }}
         >
           {titulo}
         </Text>
-        <Text style={{ fontFamily: fonte.media, fontSize: 13, color: "#9a7486" }}>{sub}</Text>
+        <Text style={{ ...fonte.media, fontSize: 13, color: "#9a7486" }}>{sub}</Text>
       </View>
     </View>
   );
@@ -807,14 +802,14 @@ function LinhaDaAtividade({
               borderColor: cor.branco,
             }}
           >
-            <Text style={{ fontFamily: fonte.titulo, fontSize: 12, color: cor.branco }}>✓</Text>
+            <Text style={{ ...fonte.titulo, fontSize: 12, color: cor.branco }}>✓</Text>
           </View>
         ) : null}
       </View>
       <View style={{ flex: 1 }}>
         <Text
           style={{
-            fontFamily: fonte.titulo,
+            ...fonte.titulo,
             fontSize: 15.5,
             lineHeight: 20,
             color: feito ? "#8a7280" : "#3a2230",
@@ -825,7 +820,7 @@ function LinhaDaAtividade({
         <Text
           style={{
             marginTop: 1,
-            fontFamily: fonte.media,
+            ...fonte.media,
             fontSize: 13,
             lineHeight: 18,
             color: "#9a7486",
@@ -834,9 +829,7 @@ function LinhaDaAtividade({
           {feito ? "Feito hoje 💛" : sub}
         </Text>
       </View>
-      {feito ? null : (
-        <Text style={{ fontFamily: fonte.titulo, fontSize: 24, color: "#d3b5c4" }}>›</Text>
-      )}
+      {feito ? null : <Text style={{ ...fonte.titulo, fontSize: 24, color: "#d3b5c4" }}>›</Text>}
     </Pressable>
   );
 }
@@ -857,10 +850,8 @@ function DiaCheioDoPos({ semana }: { semana: number }) {
     >
       <Text style={{ fontSize: 56 }}>{figurinhaDoPos(semana)}</Text>
       <View style={{ flex: 1, gap: 2 }}>
-        <Text style={{ fontFamily: fonte.titulo, fontSize: 19, color: "#0c3a5a" }}>
-          Dia completo 💛
-        </Text>
-        <Text style={{ fontFamily: fonte.media, fontSize: 14, lineHeight: 20, color: "#1e4f72" }}>
+        <Text style={{ ...fonte.titulo, fontSize: 19, color: "#0c3a5a" }}>Dia completo 💛</Text>
+        <Text style={{ ...fonte.media, fontSize: 14, lineHeight: 20, color: "#1e4f72" }}>
           A figurinha da semana {semana} de vida é sua. Agora descanse quando der.
         </Text>
       </View>
@@ -882,15 +873,13 @@ function Formatura({ quem }: { quem: string }) {
       }}
     >
       <Text style={{ fontSize: 44 }}>🎓</Text>
-      <Text
-        style={{ textAlign: "center", fontFamily: fonte.titulo, fontSize: 19, color: "#065f46" }}
-      >
+      <Text style={{ textAlign: "center", ...fonte.titulo, fontSize: 19, color: "#065f46" }}>
         Jornada do 4º trimestre completa!
       </Text>
       <Text
         style={{
           textAlign: "center",
-          fontFamily: fonte.media,
+          ...fonte.media,
           fontSize: 14,
           lineHeight: 20,
           color: "#047857",
@@ -945,7 +934,7 @@ function FolhaDaSemana({
         />
         <Text
           style={{
-            fontFamily: fonte.titulo,
+            ...fonte.titulo,
             fontSize: 12,
             letterSpacing: 1.2,
             textTransform: "uppercase",
@@ -956,11 +945,11 @@ function FolhaDaSemana({
         </Text>
         <Text
           accessibilityRole="header"
-          style={{ fontFamily: fonte.titulo, fontSize: 22, color: "#3a2230" }}
+          style={{ ...fonte.titulo, fontSize: 22, color: "#3a2230" }}
         >
           O que esperar com o bebê
         </Text>
-        <Text style={{ fontFamily: fonte.media, fontSize: 16, lineHeight: 24, color: "#3a2230" }}>
+        <Text style={{ ...fonte.media, fontSize: 16, lineHeight: 24, color: "#3a2230" }}>
           {nestaSemanaDoPos(semana)}
         </Text>
         <BotaoDaAtividade

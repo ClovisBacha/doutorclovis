@@ -167,7 +167,7 @@ export function AberturaDaAula({
             style={[
               {
                 marginTop: 32,
-                fontFamily: fonte.titulo,
+                ...fonte.titulo,
                 fontSize: 12,
                 letterSpacing: 3.6,
                 textTransform: "uppercase",
@@ -184,7 +184,7 @@ export function AberturaDaAula({
                 marginTop: 8,
                 maxWidth: 260,
                 textAlign: "center",
-                fontFamily: fonte.titulo,
+                ...fonte.titulo,
                 fontSize: 26,
                 lineHeight: 32,
                 color: cor.branco,
@@ -195,9 +195,7 @@ export function AberturaDaAula({
             {nomeDoBebe ? `2 minutinhos por ${nomeDoBebe} 💛` : "2 minutinhos pelo bebê 💛"}
           </Animated.Text>
           <Animated.View style={[{ marginTop: 12 }, subindo(sub)]}>
-            <Text
-              style={{ fontFamily: fonte.forte, fontSize: 13, color: "rgba(255,255,255,0.75)" }}
-            >
+            <Text style={{ ...fonte.forte, fontSize: 13, color: "rgba(255,255,255,0.75)" }}>
               toque para começar
             </Text>
           </Animated.View>

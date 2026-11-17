@@ -1,7 +1,7 @@
 import { DeviceMotion } from "expo-sensors";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { useVideoPlayer, VideoView } from "expo-video";
+import { Flame } from "lucide-react-native";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   AccessibilityInfo,
@@ -16,6 +16,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import * as Haptics from "expo-haptics";
+import { parametroDaBancada } from "~/lib/bancada";
 
 /**
  * O MOVIMENTO DO APP — um lugar só para tudo que se mexe.
@@ -26,9 +27,10 @@ import * as Haptics from "expo-haptics";
  * - "Reduzir movimento" do iOS desliga tudo aqui: a tela fica parada e
  *   completa, nunca vazia (useMovimentoReduzido).
  * - Só o motor nativo (useNativeDriver): opacidade e transform, nunca layout.
- * - A bolha viva é um vídeo curto em laço (gerado a partir da arte da
- *   própria bolha, fundo rosa da marca). Na web e com movimento reduzido,
- *   fica a arte parada — que é o primeiro quadro do vídeo.
+ * - A bolha viva é a ARTE dela (fundo transparente, nítida), animada aqui:
+ *   flutua e balança de leve. Até 16/11/2026 era um vídeo
+ *   em laço com fundo rosa — vinha num disco rosa e ficava desfocado quando
+ *   ampliado ("vamos tirar esse fundo rosa que veio acompanhando", o dono).
  */
 
 /* Cópia do `toque` de base.tsx: base importa este arquivo (a mola do
@@ -56,21 +58,6 @@ export function useMovimentoReduzido(): boolean {
 
 /* ── A bolha viva ─────────────────────────────────────────────────────── */
 
-const VIDEOS = {
-  feliz: require("../../assets/animacoes/bolha-ola.mp4"),
-  comemorando: require("../../assets/animacoes/bolha-festa.mp4"),
-  dormindo: require("../../assets/animacoes/bolha-sono.mp4"),
-  estudiosa: require("../../assets/animacoes/bolha-estudiosa.mp4"),
-  exercicio: require("../../assets/animacoes/bolha-exercicio.mp4"),
-  apaixonado: require("../../assets/animacoes/bolha-apaixonado.mp4"),
-  orgulhosa: require("../../assets/animacoes/bolha-orgulhosa.mp4"),
-  /* Da gamificação: a festa das cinco estrelas (estrelas em órbita), o
-     presente do dia (a caixa que abre e brotam sementinhas) e a chama. */
-  estrelas: require("../../assets/animacoes/bolha-estrelas.mp4"),
-  presente: require("../../assets/animacoes/bolha-presente.mp4"),
-  chama: require("../../assets/animacoes/bolha-chama.mp4"),
-} as const;
-
 const ARTES = {
   feliz: require("../../../src/assets/bolha/feliz.webp"),
   comemorando: require("../../../src/assets/bolha/comemorando.webp"),
@@ -79,20 +66,20 @@ const ARTES = {
   exercicio: require("../../../src/assets/bolha/exercicio.webp"),
   apaixonado: require("../../../src/assets/bolha/apaixonado.webp"),
   orgulhosa: require("../../../src/assets/bolha/orgulhosa.webp"),
-  /* O primeiro quadro de cada vídeo novo é a arte de onde ele nasceu. */
+  /* Os três da gamificação usam a arte mais próxima, com o enfeite por cima
+     (as estrelas em órbita, o presente, a chama): ver `EnfeiteDoHumor`. */
   estrelas: require("../../../src/assets/bolha/comemorando.webp"),
   presente: require("../../../src/assets/bolha/feliz.webp"),
   chama: require("../../../src/assets/bolha/orgulhosa.webp"),
 } as const;
 
-export type HumorDaBolha = keyof typeof VIDEOS;
+export type HumorDaBolha = keyof typeof ARTES;
 
 /** A arte parada também tem a SURPRESA (a visita de madrugada, o dia cheio). */
 export type HumorDaArte = HumorDaBolha | "surpresa";
 
 /**
- * A bolha como ARTE parada (fundo transparente), flutuando devagar — para
- * telas de fundo em degradê, onde o quadrado rosa do vídeo apareceria.
+ * A bolha pequena, só flutuando devagar (ao lado de uma fala, num cartão).
  */
 export function ArteDaBolha({ humor, tamanho }: { humor: HumorDaArte; tamanho: number }) {
   const fonte = humor === "surpresa" ? ARTE_SURPRESA : ARTES[humor];
@@ -110,91 +97,148 @@ export function ArteDaBolha({ humor, tamanho }: { humor: HumorDaArte; tamanho: n
 
 const ARTE_SURPRESA = require("../../../src/assets/bolha/surpresa.webp");
 
-/** O rosa do fundo dos vídeos (medido nos quadros), para o recorte sumir. */
-export const ROSA_DO_VIDEO = "#FDDFE7";
-
 /**
- * A bolha em movimento. `moldura` põe o vídeo num círculo rosa (para fundos
- * que não são rosa); sem moldura, o vídeo ocupa o quadrado, para cartões que
- * já são rosa da marca.
+ * A BOLHA VIVA: a arte da bolha, solta sobre qualquer fundo (o céu, um cartão,
+ * uma folha), sem moldura, disco nem brilho atrás — NADA acompanha a bolha
+ * (uma aura clara que testei virava um quadrado sobre o céu escuro, no
+ * iPhone). Ela flutua e balança de leve; nos humores da gamificação, o
+ * enfeite por cima. Com "reduzir movimento", a mesma bolha, parada.
+ *
+ * `moldura` ficou no contrato por quem ainda a passa: não faz mais nada (era o
+ * círculo rosa do vídeo).
  */
 export function BolhaViva({
   humor,
   tamanho = 120,
-  moldura = true,
 }: {
   humor: HumorDaBolha;
   tamanho?: number;
   moldura?: boolean;
 }) {
   const reduzido = useMovimentoReduzido();
-  const parada = reduzido || Platform.OS === "web";
-  const forma: ViewStyle = {
-    width: tamanho,
-    height: tamanho,
-    borderRadius: moldura ? tamanho / 2 : 0,
-    overflow: "hidden",
-    backgroundColor: moldura ? ROSA_DO_VIDEO : "transparent",
-    alignItems: "center",
-    justifyContent: "center",
-  };
-  if (parada) {
-    return (
-      <View style={forma} accessible={false}>
-        <Flutuar desligado={reduzido}>
+  const v = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (reduzido) return;
+    const passo = (para: number) =>
+      Animated.timing(v, {
+        toValue: para,
+        duration: 2600,
+        easing: Easing.inOut(Easing.sin),
+        useNativeDriver: true,
+      });
+    const laco = Animated.loop(Animated.sequence([passo(1), passo(0)]));
+    laco.start();
+    return () => laco.stop();
+  }, [reduzido, v]);
+  return (
+    <View
+      accessible={false}
+      pointerEvents="none"
+      style={{ width: tamanho, height: tamanho, alignItems: "center", justifyContent: "center" }}
+    >
+      <Flutuar desligado={reduzido} amplitude={Math.max(3, tamanho * 0.035)} periodo={3600}>
+        <Animated.View
+          style={{
+            transform: [
+              {
+                rotate: v.interpolate({ inputRange: [0, 1], outputRange: ["-3deg", "3deg"] }),
+              },
+            ],
+          }}
+        >
           <Image
             source={ARTES[humor]}
-            style={{
-              width: tamanho * (moldura ? 0.72 : 1),
-              height: tamanho * (moldura ? 0.72 : 1),
-            }}
+            style={{ width: tamanho * 0.94, height: tamanho * 0.94 }}
             contentFit="contain"
           />
-        </Flutuar>
-      </View>
-    );
-  }
-  return <VideoDaBolha humor={humor} forma={forma} tamanho={tamanho} moldura={moldura} />;
-}
-
-function VideoDaBolha({
-  humor,
-  forma,
-  tamanho,
-  moldura,
-}: {
-  humor: HumorDaBolha;
-  forma: ViewStyle;
-  tamanho: number;
-  moldura: boolean;
-}) {
-  const player = useVideoPlayer(VIDEOS[humor], (p) => {
-    p.loop = true;
-    p.muted = true;
-    p.audioMixingMode = "mixWithOthers";
-    p.play();
-  });
-  /* Volta do segundo plano: o iOS pausa o vídeo; aqui ele volta a correr. */
-  useEffect(() => {
-    const sub = AppState.addEventListener("change", (s) => {
-      if (s === "active") player.play();
-    });
-    return () => sub.remove();
-  }, [player]);
-  /* O vídeo é 1:1 com a bolha ocupando ~62% do quadro: na moldura ele é
-     ampliado para a bolha preencher o círculo como a arte parada preenche. */
-  const escala = moldura ? 1.18 : 1;
-  return (
-    <View style={forma} accessible={false} pointerEvents="none">
-      <VideoView
-        player={player}
-        style={{ width: tamanho * escala, height: tamanho * escala }}
-        contentFit="cover"
-        nativeControls={false}
-        allowsPictureInPicture={false}
-      />
+        </Animated.View>
+      </Flutuar>
+      <EnfeiteDoHumor humor={humor} tamanho={tamanho} v={v} parado={reduzido} />
     </View>
   );
+}
+
+/** O que cada humor da gamificação traz por cima da bolha. */
+function EnfeiteDoHumor({
+  humor,
+  tamanho,
+  v,
+  parado,
+}: {
+  humor: HumorDaBolha;
+  tamanho: number;
+  v: Animated.Value;
+  parado: boolean;
+}) {
+  const gira = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (parado || humor !== "estrelas") return;
+    const laco = Animated.loop(
+      Animated.timing(gira, {
+        toValue: 1,
+        duration: 7000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+    laco.start();
+    return () => laco.stop();
+  }, [parado, humor, gira]);
+  const canto = { position: "absolute", right: 0, bottom: 0 } as const;
+  const pulsa = { scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.12] }) };
+  if (humor === "estrelas") {
+    const raio = tamanho * 0.5;
+    return (
+      <Animated.View
+        style={{
+          position: "absolute",
+          width: tamanho,
+          height: tamanho,
+          transform: [
+            { rotate: gira.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] }) },
+          ],
+        }}
+      >
+        {[0, 120, 240].map((graus) => {
+          const rad = (graus * Math.PI) / 180;
+          return (
+            <Animated.Text
+              key={graus}
+              allowFontScaling={false}
+              style={{
+                position: "absolute",
+                left: tamanho / 2 + Math.cos(rad) * raio - tamanho * 0.08,
+                top: tamanho / 2 + Math.sin(rad) * raio - tamanho * 0.1,
+                fontSize: tamanho * 0.16,
+                color: "#ffd24a",
+                textShadowColor: "rgba(255,190,60,0.9)",
+                textShadowRadius: 6,
+                transform: [pulsa],
+              }}
+            >
+              ★
+            </Animated.Text>
+          );
+        })}
+      </Animated.View>
+    );
+  }
+  if (humor === "presente")
+    return (
+      <Animated.Text
+        allowFontScaling={false}
+        style={{ ...canto, fontSize: tamanho * 0.3, transform: [pulsa] }}
+      >
+        🎁
+      </Animated.Text>
+    );
+  if (humor === "chama")
+    return (
+      <Animated.View style={{ ...canto, transform: [pulsa] }}>
+        <Flame size={tamanho * 0.34} color="#e2560f" fill="#ff9d4d" strokeWidth={2} />
+      </Animated.View>
+    );
+  return null;
 }
 
 /* ── Entrada: o que chega na tela chega subindo ───────────────────────── */
@@ -374,6 +418,71 @@ function assinarInclinacao(o: Ouvinte): () => void {
       assinaturaDoApp = null;
     }
   };
+}
+
+/**
+ * A PARALAXE do topo do bebê (16/11/2026): dois valores de -1 a 1 que seguem a
+ * inclinação do celular — `x` de um lado para o outro, `y` para frente e para
+ * trás. Cada camada do céu os multiplica por uma distância diferente (o fundo
+ * anda pouco e ao contrário, o bebê anda mais), e é isso que dá a profundidade
+ * da tela de bloqueio do iPhone.
+ *
+ * Sem sensor (o simulador, a web), uma deriva lenta no lugar: o céu continua
+ * vivo. Com "reduzir movimento", os dois ficam em zero. Tudo no fio nativo
+ * (`useNativeDriver`), para andar junto da rolagem sem engasgar.
+ */
+export function useParalaxe(): { x: Animated.Value; y: Animated.Value } {
+  const reduzido = useMovimentoReduzido();
+  const x = useRef(new Animated.Value(0)).current;
+  const y = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (reduzido) return;
+    let deriva: Animated.CompositeAnimation | null = null;
+    const ate = (v: Animated.Value, para: number, ms: number) =>
+      Animated.timing(v, {
+        toValue: para,
+        duration: ms,
+        easing: Easing.inOut(Easing.sin),
+        useNativeDriver: true,
+      });
+    const derivar = () => {
+      deriva = Animated.parallel([
+        Animated.loop(Animated.sequence([ate(x, 0.7, 3400), ate(x, -0.7, 6800), ate(x, 0, 3400)])),
+        Animated.loop(Animated.sequence([ate(y, -0.5, 2600), ate(y, 0.5, 5200), ate(y, 0, 2600)])),
+      ]);
+      deriva.start();
+    };
+    if (Platform.OS === "web") {
+      /* Na bancada as fotos precisam sair iguais: parado. `&mover=1` liga a deriva. */
+      if (parametroDaBancada("mover") === "1") derivar();
+      return () => deriva?.stop();
+    }
+    let vivo = true;
+    let soltar: (() => void) | null = null;
+    const seguir = (v: Animated.Value, para: number) =>
+      Animated.timing(v, {
+        toValue: para,
+        duration: 90,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }).start();
+    void DeviceMotion.isAvailableAsync()
+      .then((ok) => {
+        if (!vivo) return;
+        if (!ok) return derivar();
+        soltar = assinarInclinacao((frente, lado) => {
+          seguir(x, lado);
+          seguir(y, frente);
+        });
+      })
+      .catch(() => vivo && derivar());
+    return () => {
+      vivo = false;
+      soltar?.();
+      deriva?.stop();
+    };
+  }, [reduzido, x, y]);
+  return { x, y };
 }
 
 /**

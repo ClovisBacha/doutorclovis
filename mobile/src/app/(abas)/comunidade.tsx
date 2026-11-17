@@ -245,7 +245,7 @@ function ComunidadeNoApp() {
           accessibilityRole="header"
           style={{
             flex: 1,
-            fontFamily: fonte.titulo,
+            ...fonte.titulo,
             fontSize: 28,
             color: cor.texto,
             letterSpacing: -0.4,
@@ -319,7 +319,7 @@ function ComunidadeNoApp() {
           ]}
         >
           <Avatar id={uid ?? "eu"} nome={meuNome} url={meuAvatar} tamanho={40} />
-          <Text style={{ flex: 1, fontFamily: fonte.media, fontSize: 16, color: cor.textoApagado }}>
+          <Text style={{ flex: 1, ...fonte.media, fontSize: 16, color: cor.textoApagado }}>
             Conte como você está hoje…
           </Text>
           <View
@@ -482,16 +482,13 @@ function PessoasSugeridas({
                 style={{ alignItems: "center", gap: 6, minHeight: ALVO_MINIMO }}
               >
                 <Avatar id={p.id} nome={p.nome} url={p.avatarUrl} tamanho={60} />
-                <Text
-                  numberOfLines={1}
-                  style={{ fontFamily: fonte.forte, fontSize: 15, color: cor.texto }}
-                >
+                <Text numberOfLines={1} style={{ ...fonte.forte, fontSize: 15, color: cor.texto }}>
                   {p.nome}
                 </Text>
                 <Text
                   numberOfLines={2}
                   style={{
-                    fontFamily: fonte.normal,
+                    ...fonte.normal,
                     fontSize: 13,
                     lineHeight: 17,
                     color: cor.textoApagado,

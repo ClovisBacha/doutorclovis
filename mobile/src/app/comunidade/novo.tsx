@@ -189,7 +189,7 @@ function NovoPostNoApp() {
           >
             <Text
               style={{
-                fontFamily: fonte.titulo,
+                ...fonte.titulo,
                 fontSize: 16,
                 color: podePublicar ? cor.primaria : cor.primariaSuave,
               }}
@@ -228,7 +228,7 @@ function NovoPostNoApp() {
                 borderColor: cor.borda,
                 backgroundColor: cor.cartao,
                 padding: espaco.lg,
-                fontFamily: fonte.normal,
+                ...fonte.normal,
                 fontSize: 17,
                 lineHeight: 24,
                 color: cor.texto,
@@ -237,7 +237,7 @@ function NovoPostNoApp() {
             <Text
               style={{
                 alignSelf: "flex-end",
-                fontFamily: fonte.normal,
+                ...fonte.normal,
                 fontSize: 13,
                 color: texto.length > LIMITE_DO_TEXTO - 40 ? cor.atencao : cor.textoApagado,
               }}
@@ -284,9 +284,7 @@ function NovoPostNoApp() {
                         paddingVertical: 2,
                       }}
                     >
-                      <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: cor.branco }}>
-                        Capa
-                      </Text>
+                      <Text style={{ ...fonte.forte, fontSize: 13, color: cor.branco }}>Capa</Text>
                     </View>
                   ) : null}
                   <Pressable
@@ -341,9 +339,7 @@ function NovoPostNoApp() {
                   }}
                 >
                   <ImagePlus size={26} color={cor.primaria} />
-                  <Text
-                    style={{ fontFamily: fonte.forte, fontSize: 13, color: cor.primariaEscura }}
-                  >
+                  <Text style={{ ...fonte.forte, fontSize: 13, color: cor.primariaEscura }}>
                     {preparando ? "Preparando…" : "Adicionar"}
                   </Text>
                 </Pressable>
@@ -364,7 +360,7 @@ function NovoPostNoApp() {
                   gap: espaco.sm,
                 }}
               >
-                <Text style={{ flex: 1, fontFamily: fonte.forte, fontSize: 15, color: cor.texto }}>
+                <Text style={{ flex: 1, ...fonte.forte, fontSize: 15, color: cor.texto }}>
                   Descrever a foto{alt.trim() ? " ✓" : ""}
                 </Text>
                 {descricaoAberta ? (
@@ -417,12 +413,10 @@ function NovoPostNoApp() {
                   >
                     <Icone size={20} color={ativa ? cor.primariaEscura : cor.textoApagado} />
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontFamily: fonte.forte, fontSize: 15, color: cor.texto }}>
+                      <Text style={{ ...fonte.forte, fontSize: 15, color: cor.texto }}>
                         {v.rotulo}
                       </Text>
-                      <Text
-                        style={{ fontFamily: fonte.normal, fontSize: 13, color: cor.textoApagado }}
-                      >
+                      <Text style={{ ...fonte.normal, fontSize: 13, color: cor.textoApagado }}>
                         {v.sub}
                       </Text>
                     </View>
@@ -479,7 +473,7 @@ function NovoPostNoApp() {
                     >
                       <Text
                         style={{
-                          fontFamily: fonte.forte,
+                          ...fonte.forte,
                           fontSize: 14,
                           color: ativo ? cor.textoDestaque : cor.texto,
                         }}

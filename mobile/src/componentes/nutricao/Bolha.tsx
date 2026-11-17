@@ -28,7 +28,7 @@ export function Bolha({ turno }: { turno: Turno }) {
             paddingVertical: espaco.md,
           }}
         >
-          <Text style={{ fontFamily: fonte.media, fontSize: 16, lineHeight: 22, color: cor.branco }}>
+          <Text style={{ ...fonte.media, fontSize: 16, lineHeight: 22, color: cor.branco }}>
             {turno.texto}
           </Text>
         </View>

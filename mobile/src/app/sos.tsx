@@ -215,7 +215,7 @@ function TelaDoSos() {
             accessibilityRole="header"
             style={{
               flex: 1,
-              fontFamily: fonte.titulo,
+              ...fonte.titulo,
               fontSize: 32,
               lineHeight: 34,
               letterSpacing: -0.6,
@@ -306,7 +306,7 @@ function TelaDoSos() {
                       <Sirene cor={cor.branco} />
                       <Text
                         style={{
-                          fontFamily: fonte.titulo,
+                          ...fonte.titulo,
                           fontSize: lado * 0.28,
                           lineHeight: lado * 0.3,
                           letterSpacing: -1,
@@ -318,7 +318,7 @@ function TelaDoSos() {
                       </Text>
                       <Text
                         style={{
-                          fontFamily: fonte.media,
+                          ...fonte.media,
                           fontSize: Math.max(17, lado * 0.078),
                           color: cor.branco,
                           textAlign: "center",
@@ -330,7 +330,7 @@ function TelaDoSos() {
                   ) : (
                     <Text
                       style={{
-                        fontFamily: fonte.forte,
+                        ...fonte.forte,
                         fontSize: Math.max(18, lado * 0.082),
                         lineHeight: Math.max(24, lado * 0.11),
                         color: cor.branco,
@@ -382,7 +382,7 @@ function TelaDoSos() {
               <Text
                 style={{
                   flex: 1,
-                  fontFamily: fonte.normal,
+                  ...fonte.normal,
                   fontSize: 13.5,
                   lineHeight: 19,
                   color: cor.texto,
@@ -390,7 +390,7 @@ function TelaDoSos() {
               >
                 Avisa {quem || "quem você cadastrou"}
                 {ponto ? " com a sua localização" : ""},{" "}
-                <Text style={{ fontFamily: fonte.forte, color: cor.sosRosa }}>
+                <Text style={{ ...fonte.forte, color: cor.sosRosa }}>
                   sem você precisar escrever nada.
                 </Text>
               </Text>
@@ -416,25 +416,25 @@ function TelaDoSos() {
           >
             {destinos.length ? (
               <>
-                <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: cor.ok }}>
+                <Text style={{ ...fonte.forte, fontSize: 14, color: cor.ok }}>
                   SOS enviado para:
                 </Text>
                 {destinos.map((d) => (
                   <Text
                     key={d.nome + d.via}
-                    style={{ fontFamily: fonte.normal, fontSize: 14, color: cor.texto }}
+                    style={{ ...fonte.normal, fontSize: 14, color: cor.texto }}
                   >
-                    <Text style={{ fontFamily: fonte.forte }}>{d.nome}</Text> — {d.via}
+                    <Text style={{ ...fonte.forte }}>{d.nome}</Text> — {d.via}
                   </Text>
                 ))}
                 {aviso.canais.faltou ? (
-                  <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: cor.atencaoTexto }}>
+                  <Text style={{ ...fonte.forte, fontSize: 14, color: cor.atencaoTexto }}>
                     Não chegou em {aviso.canais.faltou}. Mande pelo WhatsApp abaixo ou ligue.
                   </Text>
                 ) : null}
               </>
             ) : (
-              <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: cor.atencaoForte }}>
+              <Text style={{ ...fonte.forte, fontSize: 14, color: cor.atencaoForte }}>
                 Ninguém foi avisado automaticamente. Ligue 192.
               </Text>
             )}
@@ -461,7 +461,7 @@ function TelaDoSos() {
                   style={{
                     marginTop: 6,
                     textAlign: "center",
-                    fontFamily: fonte.normal,
+                    ...fonte.normal,
                     fontSize: 13,
                     color: cor.textoApagado,
                   }}
@@ -481,23 +481,23 @@ function TelaDoSos() {
                     gap: 4,
                   }}
                 >
-                  <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: cor.ok }}>
+                  <Text style={{ ...fonte.forte, fontSize: 13, color: cor.ok }}>
                     Se você estiver a caminho do hospital, compartilhe onde você está
                   </Text>
                   <Text
                     style={{
-                      fontFamily: fonte.normal,
+                      ...fonte.normal,
                       fontSize: 13,
                       lineHeight: 19,
                       color: cor.texto,
                     }}
                   >
                     Dentro da conversa do WhatsApp: toque em{" "}
-                    <Text style={{ fontFamily: fonte.forte }}>+</Text> →{" "}
-                    <Text style={{ fontFamily: fonte.forte }}>Localização</Text> →{" "}
-                    <Text style={{ fontFamily: fonte.forte }}>Localização em tempo real</Text> →{" "}
-                    <Text style={{ fontFamily: fonte.forte }}>8 horas</Text>. Quem estiver te
-                    procurando passa a ver você se movendo.
+                    <Text style={{ ...fonte.forte }}>+</Text> →{" "}
+                    <Text style={{ ...fonte.forte }}>Localização</Text> →{" "}
+                    <Text style={{ ...fonte.forte }}>Localização em tempo real</Text> →{" "}
+                    <Text style={{ ...fonte.forte }}>8 horas</Text>. Quem estiver te procurando
+                    passa a ver você se movendo.
                   </Text>
                 </View>
               </>
@@ -519,7 +519,7 @@ function TelaDoSos() {
           >
             <Text
               style={{
-                fontFamily: fonte.forte,
+                ...fonte.forte,
                 fontSize: 14,
                 lineHeight: 20,
                 color: cor.atencaoForte,
@@ -556,9 +556,7 @@ function TelaDoSos() {
           }}
         >
           <View style={{ flex: 1, height: 1, backgroundColor: cor.borda }} />
-          <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: cor.texto }}>
-            Outras opções
-          </Text>
+          <Text style={{ ...fonte.forte, fontSize: 14, color: cor.texto }}>Outras opções</Text>
           <View style={{ flex: 1, height: 1, backgroundColor: cor.borda }} />
         </View>
 
@@ -601,7 +599,7 @@ function TelaDoSos() {
                 <LogoWhatsApp cor={cor.branco} />
                 <Text
                   style={{
-                    fontFamily: fonte.titulo,
+                    ...fonte.titulo,
                     fontSize: 17,
                     lineHeight: 21,
                     color: cor.branco,
@@ -657,7 +655,7 @@ function TelaDoSos() {
             <Text
               style={{
                 textAlign: "center",
-                fontFamily: fonte.normal,
+                ...fonte.normal,
                 fontSize: 13,
                 lineHeight: 18,
                 color: cor.atencaoForte,
@@ -709,15 +707,12 @@ function TelaDoSos() {
         >
           <Image source={CORACAO} style={{ width: 36, height: 36 }} contentFit="contain" />
           <View style={{ flex: 1 }}>
-            <Text
-              style={{ fontFamily: fonte.normal, fontSize: 13, lineHeight: 18, color: cor.texto }}
-            >
-              <Text style={{ fontFamily: fonte.forte }}>CVV:</Text> apoio emocional gratuito, 24h,
-              sigiloso.
+            <Text style={{ ...fonte.normal, fontSize: 13, lineHeight: 18, color: cor.texto }}>
+              <Text style={{ ...fonte.forte }}>CVV:</Text> apoio emocional gratuito, 24h, sigiloso.
             </Text>
             <Text
               style={{
-                fontFamily: fonte.normal,
+                ...fonte.normal,
                 fontSize: 13,
                 lineHeight: 18,
                 color: cor.textoApagado,
@@ -750,10 +745,8 @@ function TelaDoSos() {
             })}
           >
             <Text style={{ fontSize: 16 }}>🚒</Text>
-            <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: cor.texto }}>
-              {BOMBEIROS}
-            </Text>
-            <Text style={{ fontFamily: fonte.normal, fontSize: 14, color: cor.textoApagado }}>
+            <Text style={{ ...fonte.forte, fontSize: 14, color: cor.texto }}>{BOMBEIROS}</Text>
+            <Text style={{ ...fonte.normal, fontSize: 14, color: cor.textoApagado }}>
               Bombeiros
             </Text>
           </Pressable>
@@ -775,9 +768,7 @@ function TelaDoSos() {
 
         {/* ── SINAIS DE ALERTA ─────────────────────────────────────────── */}
         <View style={{ marginTop: espaco.xl, gap: 6 }}>
-          <Text
-            style={{ fontFamily: fonte.media, fontSize: 15, color: cor.texto, marginBottom: 2 }}
-          >
+          <Text style={{ ...fonte.media, fontSize: 15, color: cor.texto, marginBottom: 2 }}>
             Procure atendimento agora se sentir:
           </Text>
           {sinaisDeSocorro({
@@ -808,7 +799,7 @@ function TelaDoSos() {
               <Text
                 style={{
                   flex: 1,
-                  fontFamily: fonte.normal,
+                  ...fonte.normal,
                   fontSize: 15,
                   lineHeight: 21,
                   color: cor.texto,
@@ -831,7 +822,7 @@ function TelaDoSos() {
           style={{
             marginTop: espaco.lg,
             textAlign: "center",
-            fontFamily: fonte.normal,
+            ...fonte.normal,
             fontSize: 12,
             color: cor.textoApagado,
           }}
@@ -892,9 +883,7 @@ function PilulaDoLugar({ estado }: { estado: EstadoDoLugar }) {
     return (
       <View style={[base, { backgroundColor: cor.okClaro }]}>
         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: cor.okPonto }} />
-        <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: cor.ok }}>
-          Localização pronta
-        </Text>
+        <Text style={{ ...fonte.forte, fontSize: 14, color: cor.ok }}>Localização pronta</Text>
       </View>
     );
   if (estado === "negado")
@@ -908,7 +897,7 @@ function PilulaDoLugar({ estado }: { estado: EstadoDoLugar }) {
         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: cor.atencao }} />
         <Text
           style={{
-            fontFamily: fonte.forte,
+            ...fonte.forte,
             fontSize: 14,
             color: cor.atencaoTexto,
             textDecorationLine: "underline",
@@ -922,7 +911,7 @@ function PilulaDoLugar({ estado }: { estado: EstadoDoLugar }) {
     return (
       <View style={[base, { backgroundColor: cor.atencaoClaro }]}>
         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: cor.atencao }} />
-        <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: cor.atencaoTexto }}>
+        <Text style={{ ...fonte.forte, fontSize: 14, color: cor.atencaoTexto }}>
           Sem sinal de localização — o aviso vai sem ela
         </Text>
       </View>
@@ -930,7 +919,7 @@ function PilulaDoLugar({ estado }: { estado: EstadoDoLugar }) {
   return (
     <View style={[base, { backgroundColor: cor.apagado }]}>
       <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: cor.textoApagado }} />
-      <Text style={{ fontFamily: fonte.media, fontSize: 14, color: cor.textoApagado }}>
+      <Text style={{ ...fonte.media, fontSize: 14, color: cor.textoApagado }}>
         Buscando sua localização…
       </Text>
     </View>
@@ -969,12 +958,10 @@ function CartaoDeLigar({
     >
       <Text style={{ fontSize: 42, lineHeight: 46 }}>{emoji}</Text>
       <View style={{ alignItems: "center" }}>
-        <Text style={{ fontFamily: fonte.titulo, fontSize: 17, lineHeight: 21, color: cor.texto }}>
+        <Text style={{ ...fonte.titulo, fontSize: 17, lineHeight: 21, color: cor.texto }}>
           {linha1}
         </Text>
-        <Text
-          style={{ fontFamily: fonte.titulo, fontSize: 17, lineHeight: 21, color: cor.sosRosa }}
-        >
+        <Text style={{ ...fonte.titulo, fontSize: 17, lineHeight: 21, color: cor.sosRosa }}>
           {linha2}
         </Text>
       </View>
@@ -1028,7 +1015,7 @@ function BotaoLinha({
       })}
     >
       {ligacao ? <Fone cor={cor.texto} tamanho={18} /> : null}
-      <Text style={{ fontFamily: fonte.media, fontSize: 14, color: cor.texto }}>{rotulo}</Text>
+      <Text style={{ ...fonte.media, fontSize: 14, color: cor.texto }}>{rotulo}</Text>
     </Pressable>
   );
 }
@@ -1065,7 +1052,7 @@ function BotaoCheio({
       })}
     >
       {icone}
-      <Text style={{ fontFamily: fonte.forte, fontSize: 15, color: cor.branco }}>{rotulo}</Text>
+      <Text style={{ ...fonte.forte, fontSize: 15, color: cor.branco }}>{rotulo}</Text>
     </Pressable>
   );
 }
@@ -1131,12 +1118,12 @@ function Carteirinha({
         }}
       >
         <View style={{ flex: 1 }}>
-          <Text style={{ fontFamily: fonte.media, fontSize: 15, color: cor.texto }}>
+          <Text style={{ ...fonte.media, fontSize: 15, color: cor.texto }}>
             Carteirinha de emergência
           </Text>
           <Text
             style={{
-              fontFamily: fonte.normal,
+              ...fonte.normal,
               fontSize: 13,
               color: cor.textoApagado,
               marginTop: 2,
@@ -1203,7 +1190,7 @@ function Carteirinha({
             >
               <Text
                 style={{
-                  fontFamily: fonte.media,
+                  ...fonte.media,
                   fontSize: 13,
                   lineHeight: 18,
                   color: cor.atencao,
@@ -1219,7 +1206,7 @@ function Carteirinha({
         <Text
           style={{
             marginTop: espaco.md,
-            fontFamily: fonte.normal,
+            ...fonte.normal,
             fontSize: 13,
             lineHeight: 18,
             color: cor.textoApagado,
@@ -1235,13 +1222,8 @@ function Carteirinha({
 function LinhaDaFicha({ rotulo, valor }: { rotulo: string; valor: string | null | undefined }) {
   return (
     <View style={{ flexDirection: "row", gap: 6 }}>
-      <Text style={{ fontFamily: fonte.media, fontSize: 13, color: cor.textoApagado }}>
-        {rotulo}:
-      </Text>
-      <Text
-        numberOfLines={1}
-        style={{ flex: 1, fontFamily: fonte.normal, fontSize: 13, color: cor.texto }}
-      >
+      <Text style={{ ...fonte.media, fontSize: 13, color: cor.textoApagado }}>{rotulo}:</Text>
+      <Text numberOfLines={1} style={{ flex: 1, ...fonte.normal, fontSize: 13, color: cor.texto }}>
         {valor || "—"}
       </Text>
     </View>

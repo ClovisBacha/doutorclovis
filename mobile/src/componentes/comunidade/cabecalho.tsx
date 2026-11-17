@@ -30,7 +30,7 @@ export function Cabecalho({ titulo, direita }: { titulo: string; direita?: React
         numberOfLines={1}
         style={{
           flex: 1,
-          fontFamily: fonte.titulo,
+          ...fonte.titulo,
           fontSize: 18,
           color: cor.texto,
           textAlign: "center",
@@ -93,9 +93,7 @@ export function BotaoIcone({
             borderColor: cor.fundo,
           }}
         >
-          <Text
-            style={{ fontFamily: fonte.titulo, fontSize: 13, lineHeight: 16, color: cor.branco }}
-          >
+          <Text style={{ ...fonte.titulo, fontSize: 13, lineHeight: 16, color: cor.branco }}>
             {selo > 9 ? "9+" : selo}
           </Text>
         </View>

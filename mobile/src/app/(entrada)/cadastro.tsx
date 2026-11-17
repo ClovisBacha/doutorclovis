@@ -75,7 +75,7 @@ export default function Cadastro() {
   if (enviado) {
     return (
       <FundoDaEntrada>
-        <Tela bordas={["top", "bottom"]} fundo="transparent">
+        <Tela bordas={["top"]} fundo="transparent">
           <CabecalhoDaMarca compacto />
           <Cartao>
             <T tipo="subtitulo">Falta um passo</T>
@@ -97,7 +97,7 @@ export default function Cadastro() {
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <Tela bordas={["top", "bottom"]} fundo="transparent">
+        <Tela bordas={["top"]} fundo="transparent">
           <CabecalhoDaMarca compacto subtitulo="Crie sua conta." />
           <FolhaDaEntrada estilo={{ marginTop: espaco.sm }}>
             <Campo

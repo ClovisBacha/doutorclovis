@@ -44,9 +44,7 @@ export function FolhaDasRegras({
               justifyContent: "center",
             }}
           >
-            <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: cor.textoDestaque }}>
-              {i + 1}
-            </Text>
+            <Text style={{ ...fonte.titulo, fontSize: 14, color: cor.textoDestaque }}>{i + 1}</Text>
           </View>
           <View style={{ flex: 1, gap: 2 }}>
             <T tipo="rotulo">{p.titulo}</T>
@@ -110,11 +108,13 @@ export function BoasVindas({
               accessibilityRole="button"
               accessibilityLabel="Pular as boas-vindas"
               onPress={aoTerminar}
-              style={{ minHeight: ALVO_MINIMO, justifyContent: "center", paddingHorizontal: espaco.sm }}
+              style={{
+                minHeight: ALVO_MINIMO,
+                justifyContent: "center",
+                paddingHorizontal: espaco.sm,
+              }}
             >
-              <Text style={{ fontFamily: fonte.media, fontSize: 15, color: cor.textoApagado }}>
-                Pular
-              </Text>
+              <Text style={{ ...fonte.media, fontSize: 15, color: cor.textoApagado }}>Pular</Text>
             </Pressable>
           ) : null}
           <Botao

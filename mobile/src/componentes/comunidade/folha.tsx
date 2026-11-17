@@ -30,7 +30,14 @@ export function Folha({
           accessibilityRole="button"
           accessibilityLabel="Fechar"
           onPress={presa ? undefined : aoFechar}
-          style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(41,20,19,0.45)" }}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(41,20,19,0.45)",
+          }}
         />
         <View
           accessibilityViewIsModal
@@ -59,7 +66,10 @@ export function Folha({
               {titulo}
             </T>
           ) : null}
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: espaco.sm }}>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ gap: espaco.sm }}
+          >
             {children}
           </ScrollView>
         </View>
@@ -103,7 +113,7 @@ export function LinhaDeOpcao({ opcao, aoEscolher }: { opcao: Opcao; aoEscolher?:
       <View style={{ flex: 1 }}>
         <Text
           style={{
-            fontFamily: fonte.forte,
+            ...fonte.forte,
             fontSize: 16,
             color: opcao.perigo ? cor.urgente : cor.texto,
           }}
@@ -111,7 +121,7 @@ export function LinhaDeOpcao({ opcao, aoEscolher }: { opcao: Opcao; aoEscolher?:
           {opcao.rotulo}
         </Text>
         {opcao.sub ? (
-          <Text style={{ fontFamily: fonte.normal, fontSize: 13, color: cor.textoApagado, marginTop: 2 }}>
+          <Text style={{ ...fonte.normal, fontSize: 13, color: cor.textoApagado, marginTop: 2 }}>
             {opcao.sub}
           </Text>
         ) : null}
@@ -190,7 +200,7 @@ export function useAviso() {
         paddingVertical: espaco.md,
       }}
     >
-      <Text style={{ fontFamily: fonte.media, fontSize: 15, lineHeight: 21, color: cor.branco }}>
+      <Text style={{ ...fonte.media, fontSize: 15, lineHeight: 21, color: cor.branco }}>
         {texto.t}
       </Text>
     </Animated.View>

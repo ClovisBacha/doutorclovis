@@ -29,7 +29,7 @@ export default function Esqueci() {
 
   return (
     <FundoDaEntrada>
-      <Tela bordas={["top", "bottom"]} fundo="transparent">
+      <Tela bordas={["top"]} fundo="transparent">
         <CabecalhoDaMarca compacto subtitulo="Vamos criar uma senha nova." />
         {enviado ? (
           <Cartao>
@@ -57,7 +57,12 @@ export default function Esqueci() {
             <Botao rotulo="Enviar link" aoTocar={enviar} carregando={carregando} />
           </FolhaDaEntrada>
         )}
-        <Botao rotulo="Voltar para entrar" tipo="texto" aoTocar={() => router.replace("/entrar")} />
+        {/* Fora da folha, sobre o céu: um botão branco se lê em qualquer hora. */}
+        <Botao
+          rotulo="Voltar para entrar"
+          tipo="secundario"
+          aoTocar={() => router.replace("/entrar")}
+        />
       </Tela>
     </FundoDaEntrada>
   );

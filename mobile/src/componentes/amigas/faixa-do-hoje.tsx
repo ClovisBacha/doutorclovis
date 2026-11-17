@@ -95,11 +95,11 @@ export function AmigasNoHoje({ pos }: { pos: boolean }) {
       >
         <Text
           accessibilityRole="header"
-          style={{ flex: 1, fontFamily: fonte.titulo, fontSize: 18, color: "#3a2230" }}
+          style={{ flex: 1, ...fonte.titulo, fontSize: 18, color: "#3a2230" }}
         >
           Suas amigas
         </Text>
-        <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: "#b0306a" }}>
+        <Text style={{ ...fonte.titulo, fontSize: 14, color: "#b0306a" }}>
           {amigas.length ? "Ver todas" : "Abrir"}
         </Text>
         <ChevronRight size={18} color="#b0306a" />
@@ -143,10 +143,7 @@ export function AmigasNoHoje({ pos }: { pos: boolean }) {
                     />
                   ) : null}
                 </View>
-                <Text
-                  numberOfLines={1}
-                  style={{ fontFamily: fonte.media, fontSize: 13, color: tinta.sub }}
-                >
+                <Text numberOfLines={1} style={{ ...fonte.media, fontSize: 13, color: tinta.sub }}>
                   {primeiroNomeDaAmiga(a.nome)}
                 </Text>
               </Pressable>
@@ -169,15 +166,13 @@ export function AmigasNoHoje({ pos }: { pos: boolean }) {
                   backgroundColor: "#f6e9fb",
                 }}
               >
-                <Text style={{ fontFamily: fonte.titulo, fontSize: 15, color: tinta.violeta }}>
-                  +{mais}
-                </Text>
+                <Text style={{ ...fonte.titulo, fontSize: 15, color: tinta.violeta }}>+{mais}</Text>
               </View>
             </Pressable>
           ) : null}
         </View>
       ) : (
-        <Text style={{ fontFamily: fonte.media, fontSize: 14, lineHeight: 20, color: "#9a7486" }}>
+        <Text style={{ ...fonte.media, fontSize: 14, lineHeight: 20, color: "#9a7486" }}>
           Convide uma amiga pelo seu link: vocês duas ganham sementinhas, e ela aparece aqui.
         </Text>
       )}
@@ -198,11 +193,11 @@ export function AmigasNoHoje({ pos }: { pos: boolean }) {
             opacity: pressed ? 0.85 : 1,
           })}
         >
-          <Text style={{ flex: 1, fontFamily: fonte.titulo, fontSize: 14, color: tinta.ambar }}>
+          <Text style={{ flex: 1, ...fonte.titulo, fontSize: 14, color: tinta.ambar }}>
             {linhaDaDupla}
           </Text>
           {ganho > 0 ? (
-            <Text style={{ fontFamily: fonte.titulo, fontSize: 13, color: "#15803d" }}>
+            <Text style={{ ...fonte.titulo, fontSize: 13, color: "#15803d" }}>
               +{ganho} 🌱 hoje
             </Text>
           ) : null}
@@ -216,12 +211,10 @@ export function AmigasNoHoje({ pos }: { pos: boolean }) {
           onPress={abrirAmigas}
           style={{ flexDirection: "row", alignItems: "center", minHeight: ALVO_MINIMO - 4 }}
         >
-          <Text style={{ flex: 1, fontFamily: fonte.titulo, fontSize: 14, color: tinta.rosa }}>
+          <Text style={{ flex: 1, ...fonte.titulo, fontSize: 14, color: tinta.rosa }}>
             💛 {pedidos === 1 ? "Um pedido de amizade" : `${pedidos} pedidos de amizade`}
           </Text>
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: tinta.rosa }}>
-            Responder ›
-          </Text>
+          <Text style={{ ...fonte.titulo, fontSize: 14, color: tinta.rosa }}>Responder ›</Text>
         </Pressable>
       ) : null}
 
@@ -240,7 +233,7 @@ export function AmigasNoHoje({ pos }: { pos: boolean }) {
             opacity: pressed ? 0.85 : 1,
           })}
         >
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: cor.branco }}>
+          <Text style={{ ...fonte.titulo, fontSize: 14, color: cor.branco }}>
             Convidar uma amiga
           </Text>
         </Pressable>

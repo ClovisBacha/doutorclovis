@@ -144,7 +144,7 @@ export function Botao3D({
       ) : null}
       <Text
         numberOfLines={1}
-        style={{ fontFamily: fonte.forte, fontSize: 13, lineHeight: 17, color: corDaLetra }}
+        style={{ ...fonte.forte, fontSize: 13, lineHeight: 17, color: corDaLetra }}
       >
         {rotulo}
       </Text>
@@ -181,7 +181,7 @@ export function SilencioDoCuidado() {
     <CartaoMaterial estilo={{ padding: 32, alignItems: "center", gap: espaco.lg }}>
       <Text
         style={{
-          fontFamily: fonte.normal,
+          ...fonte.normal,
           fontSize: 15,
           lineHeight: 22,
           textAlign: "center",
@@ -204,7 +204,7 @@ export function SilencioDoCuidado() {
           opacity: pressed ? 0.7 : 1,
         })}
       >
-        <Text style={{ fontFamily: fonte.media, fontSize: 14, color: cor.texto }}>
+        <Text style={{ ...fonte.media, fontSize: 14, color: cor.texto }}>
           Ajustes do Modo Cuidado
         </Text>
       </Pressable>

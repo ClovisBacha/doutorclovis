@@ -1,3 +1,4 @@
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { X } from "lucide-react-native";
 import { useEffect, useRef, type ReactNode } from "react";
@@ -18,7 +19,7 @@ import { BolhaViva, type HumorDaBolha } from "~/componentes/movimento";
 import { BotaoVoltar, PilulaSos } from "~/componentes/cabecalho";
 import { Estouro } from "~/componentes/jornada/efeitos";
 import { CORES_DO_CONFETE, corJornada } from "~/componentes/jornada/cores";
-import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
+import { ALVO_MINIMO, cor, espaco, fonte, raio, amanhecer } from "~/tema";
 
 /* ── A bolha, porta-voz do app ─────────────────────────────────────────── */
 
@@ -55,7 +56,7 @@ export function BolhaFalando({
           paddingVertical: espaco.sm,
         }}
       >
-        <Text style={{ fontFamily: fonte.media, fontSize: 15, lineHeight: 21, color: cor.texto }}>
+        <Text style={{ ...fonte.media, fontSize: 15, lineHeight: 21, color: cor.texto }}>
           {fala}
         </Text>
       </View>
@@ -263,7 +264,7 @@ export function Folha({
           </View>
           {titulo ? (
             <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
-              <Text style={{ flex: 1, fontFamily: fonte.titulo, fontSize: 20, color: cor.texto }}>
+              <Text style={{ flex: 1, ...fonte.titulo, fontSize: 20, color: cor.texto }}>
                 {titulo}
               </Text>
               <BotaoRedondo rotulo="Fechar" aoTocar={aoFechar}>
@@ -357,10 +358,7 @@ export function BarraDoTopo({
           <BarraQueEnche fracao={Math.min(1, Math.max(0, progresso))} />
         </View>
       ) : (
-        <Text
-          numberOfLines={1}
-          style={{ flex: 1, fontFamily: fonte.forte, fontSize: 17, color: cor.texto }}
-        >
+        <Text numberOfLines={1} style={{ flex: 1, ...fonte.forte, fontSize: 17, color: cor.texto }}>
           {titulo}
         </Text>
       )}
@@ -408,7 +406,7 @@ export function Ficha({
     >
       <Text
         style={{
-          fontFamily: ativa ? fonte.forte : fonte.media,
+          ...(ativa ? fonte.forte : fonte.media),
           fontSize: 15,
           color: ativa ? textoAtivo : cor.texto,
         }}
@@ -436,8 +434,17 @@ function BarraQueEnche({ fracao }: { fracao: number }) {
         width: v.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] }),
         height: "100%",
         borderRadius: 6,
+        overflow: "hidden",
         backgroundColor: corJornada.roxoMedio,
       }}
-    />
+    >
+      {/* O degradê do amanhecer, do violeta ao coral: o progresso é uma luz. */}
+      <LinearGradient
+        colors={[amanhecer[2], amanhecer[1], amanhecer[0]]}
+        start={{ x: 0, y: 0.5 }}
+        end={{ x: 1, y: 0.5 }}
+        style={{ flex: 1 }}
+      />
+    </Animated.View>
   );
 }

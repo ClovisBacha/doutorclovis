@@ -201,7 +201,7 @@ export function FolhaDeCompartilhar({
                   <Text
                     style={{
                       textAlign: "center",
-                      fontFamily: fonte.media,
+                      ...fonte.media,
                       fontSize: 13,
                       color: cor.branco,
                     }}
@@ -224,7 +224,7 @@ export function FolhaDeCompartilhar({
             >
               <Text
                 accessibilityRole="header"
-                style={{ fontFamily: fonte.titulo, fontSize: 18, color: cor.texto }}
+                style={{ ...fonte.titulo, fontSize: 18, color: cor.texto }}
               >
                 Publicar na Comunidade
               </Text>
@@ -257,14 +257,14 @@ export function FolhaDeCompartilhar({
                     borderColor: cor.borda,
                     backgroundColor: cor.fundo,
                     padding: espaco.sm,
-                    fontFamily: fonte.normal,
+                    ...fonte.normal,
                     fontSize: 15,
                     color: cor.texto,
                   }}
                 />
               </View>
               <View style={{ gap: espaco.xs }}>
-                <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: cor.texto }}>
+                <Text style={{ ...fonte.forte, fontSize: 14, color: cor.texto }}>
                   Quem pode ver
                 </Text>
                 <View accessibilityRole="radiogroup" style={{ flexDirection: "row", gap: 6 }}>
@@ -296,7 +296,7 @@ export function FolhaDeCompartilhar({
                           numberOfLines={2}
                           style={{
                             textAlign: "center",
-                            fontFamily: fonte.forte,
+                            ...fonte.forte,
                             fontSize: 13,
                             color: cor.texto,
                           }}
@@ -308,7 +308,7 @@ export function FolhaDeCompartilhar({
                   })}
                 </View>
                 {quemVe ? (
-                  <Text style={{ fontFamily: fonte.normal, fontSize: 13, color: cor.textoApagado }}>
+                  <Text style={{ ...fonte.normal, fontSize: 13, color: cor.textoApagado }}>
                     {quemVe.sub}
                   </Text>
                 ) : null}
@@ -323,7 +323,7 @@ export function FolhaDeCompartilhar({
                 >
                   <Text
                     style={{
-                      fontFamily: fonte.media,
+                      ...fonte.media,
                       fontSize: 14,
                       lineHeight: 20,
                       color: cor.texto,
@@ -357,14 +357,14 @@ export function FolhaDeCompartilhar({
               </Text>
               <Text
                 accessibilityRole="header"
-                style={{ fontFamily: fonte.titulo, fontSize: 18, color: cor.texto }}
+                style={{ ...fonte.titulo, fontSize: 18, color: cor.texto }}
               >
                 Publicado na Comunidade
               </Text>
               <Text
                 style={{
                   textAlign: "center",
-                  fontFamily: fonte.normal,
+                  ...fonte.normal,
                   fontSize: 14,
                   lineHeight: 20,
                   color: cor.textoApagado,
@@ -402,7 +402,7 @@ function BotaoClaro({ rotulo, aoTocar }: { rotulo: string; aoTocar: () => void }
         opacity: pressed ? 0.8 : 1,
       })}
     >
-      <Text style={{ fontFamily: fonte.titulo, fontSize: 16, color: cor.branco }}>{rotulo}</Text>
+      <Text style={{ ...fonte.titulo, fontSize: 16, color: cor.branco }}>{rotulo}</Text>
     </Pressable>
   );
 }
@@ -424,7 +424,7 @@ function BotaoDeTexto({
     >
       <Text
         style={{
-          fontFamily: fonte.forte,
+          ...fonte.forte,
           fontSize: 15,
           color: escuro ? cor.textoApagado : "rgba(255,255,255,0.85)",
         }}

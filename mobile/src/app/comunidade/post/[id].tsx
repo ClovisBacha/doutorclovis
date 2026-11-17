@@ -276,7 +276,7 @@ function TelaDoPostNoApp() {
               >
                 <Text
                   style={{
-                    fontFamily: fonte.media,
+                    ...fonte.media,
                     fontSize: 14,
                     lineHeight: 20,
                     color: cor.texto,
@@ -291,7 +291,7 @@ function TelaDoPostNoApp() {
                 <Text
                   style={{
                     flex: 1,
-                    fontFamily: fonte.media,
+                    ...fonte.media,
                     fontSize: 13,
                     color: cor.textoApagado,
                   }}
@@ -336,7 +336,7 @@ function TelaDoPostNoApp() {
                   paddingHorizontal: espaco.md,
                   paddingTop: 11,
                   paddingBottom: 11,
-                  fontFamily: fonte.normal,
+                  ...fonte.normal,
                   fontSize: 16,
                   color: cor.texto,
                 }}
@@ -366,7 +366,7 @@ function TelaDoPostNoApp() {
             {texto.length > LIMITE_DO_COMENTARIO - 80 ? (
               <Text
                 style={{
-                  fontFamily: fonte.normal,
+                  ...fonte.normal,
                   fontSize: 13,
                   color: cor.textoApagado,
                   textAlign: "right",

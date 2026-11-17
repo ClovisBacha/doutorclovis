@@ -55,7 +55,7 @@ export function CartaoDaChegada({
       <View style={{ flex: 1, alignItems: "center", paddingTop: 40, paddingHorizontal: 22 }}>
         <Text
           style={{
-            fontFamily: fonte.titulo,
+            ...fonte.titulo,
             fontSize: 13,
             letterSpacing: 2.4,
             textTransform: "uppercase",
@@ -69,7 +69,7 @@ export function CartaoDaChegada({
           style={{
             marginTop: 4,
             textAlign: "center",
-            fontFamily: fonte.titulo,
+            ...fonte.titulo,
             fontSize: nome && nome.length > 10 ? 38 : 46,
             lineHeight: 52,
             letterSpacing: -1,
@@ -83,7 +83,7 @@ export function CartaoDaChegada({
           <Image source={RECEM_NASCIDO} style={{ width: 200, height: 200 }} contentFit="contain" />
         </View>
         <View style={{ marginTop: 18, alignItems: "center", gap: 6 }}>
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 18, color: "#2e2348" }}>
+          <Text style={{ ...fonte.titulo, fontSize: 18, color: "#2e2348" }}>
             {nascimentoPorExtenso(dados)}
           </Text>
           {medidas ? (
@@ -95,9 +95,7 @@ export function CartaoDaChegada({
                 paddingVertical: 6,
               }}
             >
-              <Text style={{ fontFamily: fonte.titulo, fontSize: 15, color: "#7d1d45" }}>
-                {medidas}
-              </Text>
+              <Text style={{ ...fonte.titulo, fontSize: 15, color: "#7d1d45" }}>{medidas}</Text>
             </View>
           ) : null}
         </View>
@@ -105,7 +103,7 @@ export function CartaoDaChegada({
         <Text
           style={{
             marginBottom: 22,
-            fontFamily: fonte.forte,
+            ...fonte.forte,
             fontSize: 12,
             letterSpacing: 0.5,
             color: "#7d5a72",
@@ -169,7 +167,7 @@ export function FestaDoNascimento({
         >
           <Text
             style={{
-              fontFamily: fonte.titulo,
+              ...fonte.titulo,
               fontSize: 13,
               letterSpacing: 2,
               textTransform: "uppercase",
@@ -182,7 +180,7 @@ export function FestaDoNascimento({
             accessibilityRole="header"
             style={{
               textAlign: "center",
-              fontFamily: fonte.titulo,
+              ...fonte.titulo,
               fontSize: 38,
               lineHeight: 44,
               letterSpacing: -0.8,
@@ -205,7 +203,7 @@ export function FestaDoNascimento({
           <Text
             style={{
               textAlign: "center",
-              fontFamily: fonte.media,
+              ...fonte.media,
               fontSize: 16,
               lineHeight: 23,
               color: "#5b3a4a",
@@ -228,14 +226,14 @@ export function FestaDoNascimento({
           >
             <Text style={{ fontSize: 40 }}>🏆</Text>
             <View style={{ flex: 1, gap: 2 }}>
-              <Text style={{ fontFamily: fonte.titulo, fontSize: 16, color: "#8a4b00" }}>
+              <Text style={{ ...fonte.titulo, fontSize: 16, color: "#8a4b00" }}>
                 Jornada da gestação completa
               </Text>
-              <Text style={{ fontFamily: fonte.media, fontSize: 14, color: "#9a6a2a" }}>
+              <Text style={{ ...fonte.media, fontSize: 14, color: "#9a6a2a" }}>
                 {diasCompletos} {diasCompletos === 1 ? "dia" : "dias"} de cuidado completo ·{" "}
                 {figurinhas} {figurinhas === 1 ? "figurinha" : "figurinhas"}
               </Text>
-              <Text style={{ fontFamily: fonte.normal, fontSize: 13, color: "#9a6a2a" }}>
+              <Text style={{ ...fonte.normal, fontSize: 13, color: "#9a6a2a" }}>
                 O álbum da gestação fica guardado para sempre 💝
               </Text>
             </View>
@@ -250,7 +248,7 @@ export function FestaDoNascimento({
                 paddingVertical: espaco.sm,
               }}
             >
-              <Text style={{ fontFamily: fonte.titulo, fontSize: 16, color: "#15803d" }}>
+              <Text style={{ ...fonte.titulo, fontSize: 16, color: "#15803d" }}>
                 +{sementinhas} sementinhas de boas-vindas 🌱
               </Text>
             </View>
@@ -281,7 +279,7 @@ export function FestaDoNascimento({
                 opacity: pressed ? 0.85 : 1,
               })}
             >
-              <Text style={{ fontFamily: fonte.titulo, fontSize: 16, color: "#b0306a" }}>
+              <Text style={{ ...fonte.titulo, fontSize: 16, color: "#b0306a" }}>
                 Anunciar a chegada 💌
               </Text>
             </Pressable>
@@ -292,7 +290,7 @@ export function FestaDoNascimento({
             <Text
               style={{
                 flex: 1,
-                fontFamily: fonte.media,
+                ...fonte.media,
                 fontSize: 13,
                 lineHeight: 18,
                 color: "#7d5a72",
@@ -312,7 +310,7 @@ export function FestaDoNascimento({
                 padding: espaco.lg,
               }}
             >
-              <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: "#7d1d45" }}>
+              <Text style={{ ...fonte.forte, fontSize: 14, color: "#7d1d45" }}>
                 Voltar para a gestação? O nascimento sai do perfil e a jornada da gestação volta
                 como estava.
               </Text>
@@ -334,7 +332,7 @@ export function FestaDoNascimento({
                     opacity: desfazendo ? 0.6 : 1,
                   }}
                 >
-                  <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: cor.branco }}>
+                  <Text style={{ ...fonte.titulo, fontSize: 14, color: cor.branco }}>
                     {desfazendo ? "Voltando…" : "Sim, voltar"}
                   </Text>
                 </Pressable>
@@ -350,7 +348,7 @@ export function FestaDoNascimento({
                     backgroundColor: cor.branco,
                   }}
                 >
-                  <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: "#7d5a72" }}>
+                  <Text style={{ ...fonte.titulo, fontSize: 14, color: "#7d5a72" }}>
                     Não, já nasceu
                   </Text>
                 </Pressable>
@@ -364,7 +362,7 @@ export function FestaDoNascimento({
             >
               <Text
                 style={{
-                  fontFamily: fonte.media,
+                  ...fonte.media,
                   fontSize: 13,
                   color: "#9a7486",
                   textDecorationLine: "underline",
@@ -420,14 +418,14 @@ export function PortaDoNascimento({ nome, aoTocar }: { nome: string | null; aoTo
       >
         <Image source={RECEM_NASCIDO} style={{ width: 52, height: 52 }} contentFit="contain" />
         <View style={{ flex: 1 }}>
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 17, color: cor.branco }}>
+          <Text style={{ ...fonte.titulo, fontSize: 17, color: cor.branco }}>
             🎉 {nome ?? "O bebê"} nasceu?
           </Text>
-          <Text style={{ fontFamily: fonte.media, fontSize: 13, color: "rgba(255,255,255,0.9)" }}>
+          <Text style={{ ...fonte.media, fontSize: 13, color: "rgba(255,255,255,0.9)" }}>
             Conte aqui e a jornada vira o 4º trimestre
           </Text>
         </View>
-        <Text style={{ fontFamily: fonte.titulo, fontSize: 22, color: cor.branco }}>›</Text>
+        <Text style={{ ...fonte.titulo, fontSize: 22, color: cor.branco }}>›</Text>
       </LinearGradient>
     </Pressable>
   );

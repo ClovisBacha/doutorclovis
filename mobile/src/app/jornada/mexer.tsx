@@ -223,7 +223,7 @@ export default function Mexer() {
             style={{
               marginTop: espaco.lg,
               textAlign: "center",
-              fontFamily: fonte.titulo,
+              ...fonte.titulo,
               fontSize: 28,
               lineHeight: 34,
               letterSpacing: -0.3,
@@ -351,14 +351,14 @@ export default function Mexer() {
           <Text
             style={{
               flex: 1,
-              fontFamily: fonte.media,
+              ...fonte.media,
               fontSize: 15,
               lineHeight: 20,
               color: corMovimento.alertaTexto,
             }}
           >
             Sentiu algo estranho?{" "}
-            <Text style={{ fontFamily: fonte.titulo }}>
+            <Text style={{ ...fonte.titulo }}>
               {SOS_NO_APP ? "Pare e abra o SOS." : "Pare e, se precisar, ligue 192."}
             </Text>
           </Text>
@@ -368,7 +368,7 @@ export default function Mexer() {
         <Text
           style={{
             marginTop: espaco.lg,
-            fontFamily: fonte.normal,
+            ...fonte.normal,
             fontSize: 13,
             lineHeight: 21,
             color: corMovimento.discreto,
@@ -425,7 +425,7 @@ function SemChao({ ligado, aoTocar }: { ligado: boolean; aoTocar: () => void }) 
       <View style={{ flex: 1 }}>
         <Text
           style={{
-            fontFamily: fonte.titulo,
+            ...fonte.titulo,
             fontSize: 14,
             lineHeight: 19,
             color: corMovimento.titulo,
@@ -435,7 +435,7 @@ function SemChao({ ligado, aoTocar }: { ligado: boolean; aoTocar: () => void }) 
         </Text>
         <Text
           style={{
-            fontFamily: fonte.normal,
+            ...fonte.normal,
             fontSize: 13,
             lineHeight: 18,
             color: corMovimento.discreto,
@@ -659,7 +659,7 @@ function Sessao({
             style={{
               flex: 1,
               textAlign: "center",
-              fontFamily: fonte.forte,
+              ...fonte.forte,
               fontSize: 13,
               letterSpacing: 0.8,
               textTransform: "uppercase",
@@ -722,7 +722,7 @@ function Sessao({
             paddingHorizontal: espaco.xl,
             paddingBottom: 4,
             textAlign: "center",
-            fontFamily: fonte.normal,
+            ...fonte.normal,
             fontSize: 13,
             lineHeight: 18,
             color: corMovimento.aviso,
@@ -772,7 +772,7 @@ function Sessao({
                 <Text
                   accessibilityLabel={troca ? `Prepare-se, ${resta} segundos` : `${resta} segundos`}
                   style={{
-                    fontFamily: fonte.titulo,
+                    ...fonte.titulo,
                     fontSize: 16,
                     lineHeight: 22,
                     color: cor.branco,
@@ -787,7 +787,7 @@ function Sessao({
               style={{
                 marginTop: espaco.xl,
                 textAlign: "center",
-                fontFamily: fonte.titulo,
+                ...fonte.titulo,
                 fontSize: 26,
                 lineHeight: 32,
                 letterSpacing: -0.3,
@@ -801,7 +801,7 @@ function Sessao({
                 marginTop: 6,
                 maxWidth: 320,
                 textAlign: "center",
-                fontFamily: fonte.media,
+                ...fonte.media,
                 fontSize: 15,
                 lineHeight: 22,
                 color: corMovimento.dica,
@@ -816,16 +816,14 @@ function Sessao({
             >
               <Text
                 accessibilityRole="header"
-                style={{ fontFamily: fonte.titulo, fontSize: 15, color: corMovimento.titulo }}
+                style={{ ...fonte.titulo, fontSize: 15, color: corMovimento.titulo }}
               >
                 Como fazer
               </Text>
               {m.passos.map((p, i) => (
                 <View key={i} style={{ flexDirection: "row", gap: espaco.md }}>
                   <Ficha fundo={MATERIAL.ficha} tamanho={26}>
-                    <Text
-                      style={{ fontFamily: fonte.titulo, fontSize: 13, color: corMovimento.forte }}
-                    >
+                    <Text style={{ ...fonte.titulo, fontSize: 13, color: corMovimento.forte }}>
                       {i + 1}
                     </Text>
                   </Ficha>
@@ -833,7 +831,7 @@ function Sessao({
                     style={{
                       flex: 1,
                       paddingTop: 3,
-                      fontFamily: fonte.normal,
+                      ...fonte.normal,
                       fontSize: 14,
                       lineHeight: 20,
                       color: corMovimento.passoTexto,
@@ -911,10 +909,10 @@ function Caixa({
         {icone}
       </Ficha>
       <View style={{ flex: 1, gap: 2 }}>
-        <Text style={{ fontFamily: fonte.titulo, fontSize: 14, lineHeight: 19, color: tinta }}>
+        <Text style={{ ...fonte.titulo, fontSize: 14, lineHeight: 19, color: tinta }}>
           {titulo}
         </Text>
-        <Text style={{ fontFamily: fonte.normal, fontSize: 14, lineHeight: 20, color: tinta }}>
+        <Text style={{ ...fonte.normal, fontSize: 14, lineHeight: 20, color: tinta }}>
           {children}
         </Text>
       </View>

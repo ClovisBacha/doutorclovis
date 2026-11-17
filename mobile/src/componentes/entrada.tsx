@@ -1,4 +1,3 @@
-import { LinearGradient } from "expo-linear-gradient";
 import {
   BookOpen,
   HeartHandshake,
@@ -8,7 +7,7 @@ import {
   type LucideIcon,
 } from "lucide-react-native";
 import { SOS_NO_APP } from "~/config";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Animated,
   Easing,
@@ -20,16 +19,19 @@ import {
   type ViewStyle,
 } from "react-native";
 import { T } from "~/componentes/base";
+import { CEUS, CeuVivo, faseDeAgora, type Ceu } from "~/componentes/ceu-vivo";
 import { useMovimentoReduzido } from "~/componentes/movimento";
 import { cor, espaco, fonte, raio, sombra } from "~/tema";
+import { Vidro } from "~/componentes/vidro";
 
 /**
  * A CARA DA ENTRADA — login, cadastro e "esqueci a senha".
  *
- * É a primeira tela que a gestante vê, e antes era um formulário solto no
- * creme. Agora: um degradê do rosa da marca ao creme, bolhas translúcidas que
- * sobem e descem devagar atrás de tudo (a bolha é o personagem do app), umas
- * faíscas que piscam, e o formulário numa folha branca por cima.
+ * É a primeira tela de quem baixa o app, e ela abre no MESMO céu vivo da tela
+ * do bebê (16/11/2026): o céu da hora em que ela abriu, na tela inteira — de
+ * manhã o amanhecer com nuvens, à noite as estrelas piscando e a estrela
+ * cadente. Por cima, as bolhas translúcidas que sobem e descem devagar (a
+ * bolha é o personagem do app) e o formulário numa folha branca.
  *
  * Tudo decorativo: fora da acessibilidade, sem toque, só opacidade e
  * transform no motor nativo. Com "Reduzir movimento", a mesma cena, parada.
@@ -37,34 +39,29 @@ import { cor, espaco, fonte, raio, sombra } from "~/tema";
 
 /* ── O fundo ──────────────────────────────────────────────────────────── */
 
-type Bolha = { x: number; y: number; d: number; tom: string; periodo: number; sobe: number };
+/** O céu sob a entrada: quem escreve direto no fundo lê a tinta dele. */
+const CeuDaEntrada = createContext<Ceu>(CEUS.amanhecer);
+export const useCeuDaEntrada = () => useContext(CeuDaEntrada);
 
-/* Posições em fração da tela; tamanhos em pt. Poucas e grandes perto das
-   bordas, para não disputar com o formulário no meio. */
+type Bolha = { x: number; y: number; d: number; periodo: number; sobe: number };
+
+/* Posições em fração da tela; tamanhos em pt. Poucas e perto das bordas, para
+   não disputar com o formulário no meio. */
 const BOLHAS: Bolha[] = [
-  { x: -0.12, y: 0.04, d: 150, tom: cor.branco, periodo: 7000, sobe: 14 },
-  { x: 0.78, y: 0.1, d: 96, tom: cor.entradaLilas, periodo: 6200, sobe: 18 },
-  { x: 0.84, y: 0.27, d: 50, tom: cor.rosaMarca, periodo: 5200, sobe: 12 },
-  { x: 0.04, y: 0.42, d: 40, tom: cor.entradaLilas, periodo: 4800, sobe: 16 },
-  { x: -0.08, y: 0.72, d: 120, tom: cor.rosaMarca, periodo: 7600, sobe: 20 },
-  { x: 0.72, y: 0.82, d: 140, tom: cor.entradaLilas, periodo: 8200, sobe: 16 },
-];
-
-const FAISCAS = [
-  { x: 0.2, y: 0.07, t: 14, atraso: 0 },
-  { x: 0.7, y: 0.05, t: 10, atraso: 900 },
-  { x: 0.9, y: 0.24, t: 12, atraso: 1700 },
-  { x: 0.1, y: 0.3, t: 9, atraso: 2400 },
+  { x: -0.1, y: 0.05, d: 130, periodo: 7000, sobe: 14 },
+  { x: 0.86, y: 0.44, d: 48, periodo: 5200, sobe: 12 },
+  { x: 0.03, y: 0.4, d: 40, periodo: 4800, sobe: 16 },
+  { x: -0.08, y: 0.74, d: 110, periodo: 7600, sobe: 20 },
+  { x: 0.74, y: 0.84, d: 130, periodo: 8200, sobe: 16 },
 ];
 
 export function FundoDaEntrada({ children }: { children: ReactNode }) {
+  /* A hora é a de quando a tela abriu: o céu não troca no meio do login. */
+  const [fase] = useState(faseDeAgora);
+  const ceu = CEUS[fase];
   return (
-    <View style={{ flex: 1, backgroundColor: cor.fundo }}>
-      <LinearGradient
-        colors={[cor.rosaMarca, cor.entradaPessego, cor.fundo]}
-        locations={[0, 0.42, 0.85]}
-        style={StyleSheet.absoluteFill}
-      />
+    <View style={{ flex: 1, backgroundColor: ceu.chao }}>
+      <CeuVivo fase={fase} />
       {/* overflow: as bolhas das bordas saem da tela de propósito, e sem o
           corte a web ganha rolagem lateral. */}
       <View
@@ -75,11 +72,8 @@ export function FundoDaEntrada({ children }: { children: ReactNode }) {
         {BOLHAS.map((b, i) => (
           <BolhaQueFlutua key={i} bolha={b} />
         ))}
-        {FAISCAS.map((f, i) => (
-          <Faisca key={i} {...f} />
-        ))}
       </View>
-      {children}
+      <CeuDaEntrada.Provider value={ceu}>{children}</CeuDaEntrada.Provider>
     </View>
   );
 }
@@ -127,10 +121,9 @@ function BolhaQueFlutua({ bolha }: { bolha: Bolha }) {
         width: bolha.d,
         height: bolha.d,
         borderRadius: bolha.d / 2,
-        backgroundColor: bolha.tom,
-        opacity: 0.55,
+        backgroundColor: "rgba(255,255,255,0.16)",
         borderWidth: 1,
-        borderColor: cor.branco,
+        borderColor: "rgba(255,255,255,0.65)",
         transform: [
           {
             translateY: v.interpolate({
@@ -153,31 +146,11 @@ function BolhaQueFlutua({ bolha }: { bolha: Bolha }) {
           height: bolha.d * 0.12,
           borderRadius: bolha.d,
           backgroundColor: cor.branco,
-          opacity: 0.9,
+          opacity: 0.85,
           transform: [{ rotate: "-30deg" }],
         }}
       />
     </Animated.View>
-  );
-}
-
-function Faisca({ x, y, t, atraso }: { x: number; y: number; t: number; atraso: number }) {
-  const { width, height } = useWindowDimensions();
-  const v = useLaco(2600, atraso);
-  return (
-    <Animated.Text
-      style={{
-        position: "absolute",
-        left: x * width,
-        top: y * height,
-        fontSize: t,
-        color: cor.primariaSuave,
-        opacity: v.interpolate({ inputRange: [0, 1], outputRange: [0.25, 0.95] }),
-        transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1.15] }) }],
-      }}
-    >
-      ✦
-    </Animated.Text>
   );
 }
 
@@ -272,23 +245,24 @@ export function FrasesQueGiram() {
     >
       <Animated.View
         style={{
-          flexDirection: "row",
-          alignItems: "center",
-          gap: espaco.sm,
-          paddingHorizontal: espaco.md,
-          paddingVertical: espaco.sm,
-          borderRadius: raio.pilula,
-          backgroundColor: cor.entradaVidro,
-          borderWidth: 1,
-          borderColor: cor.branco,
           opacity: v,
           transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [6, 0] }) }],
         }}
       >
-        <Icone size={16} color={cor.primaria} />
-        <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: cor.textoDestaque }}>
-          {texto}
-        </Text>
+        {/* Uma pílula de vidro sobre as bolhas do degradê (16/11/2026). */}
+        <Vidro
+          flutua={false}
+          estilo={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: espaco.sm,
+            paddingHorizontal: espaco.md,
+            paddingVertical: espaco.sm,
+          }}
+        >
+          <Icone size={16} color={cor.primaria} />
+          <Text style={{ ...fonte.forte, fontSize: 14, color: cor.textoDestaque }}>{texto}</Text>
+        </Vidro>
       </Animated.View>
     </View>
   );

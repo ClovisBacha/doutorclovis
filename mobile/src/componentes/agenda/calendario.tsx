@@ -63,7 +63,7 @@ export function CalendarioDoMes({
           style={{
             flex: 1,
             textAlign: "center",
-            fontFamily: fonte.titulo,
+            ...fonte.titulo,
             fontSize: 17,
             color: cor.texto,
           }}
@@ -81,7 +81,7 @@ export function CalendarioDoMes({
             style={{
               flex: 1,
               textAlign: "center",
-              fontFamily: fonte.forte,
+              ...fonte.forte,
               fontSize: 13,
               color: cor.textoApagado,
             }}
@@ -204,7 +204,7 @@ function Dia({
         ) : (
           <Text
             style={{
-              fontFamily: ehHoje || escolhido ? fonte.titulo : fonte.media,
+              ...(ehHoje || escolhido ? fonte.titulo : fonte.media),
               fontSize: 16,
               color: escolhido ? cor.branco : cor.texto,
               fontVariant: ["tabular-nums"],

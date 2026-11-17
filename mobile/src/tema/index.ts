@@ -1,26 +1,34 @@
+import { Platform } from "react-native";
+
 /**
- * As cores da marca, convertidas dos tokens oklch de ../src/styles.css
- * (creme pêssego, vinho, rosé). Uma cor nova entra aqui, nunca solta numa tela.
+ * A PALETA "AMANHECER" (16/11/2026, o dono: "se quiser mudar a paleta de
+ * cores [...] liberdade criativa máxima"). Antes era a do site — creme,
+ * vinho e rosé —, que é, cor por cor, a paleta do Claude: daí a "cara de feito
+ * no Claude". A nova sai do céu que o app já pinta atrás do bebê e da bolha
+ * furta-cor: a tinta é ameixa-noite, a cor de agir é framboesa, o fundo é uma
+ * névoa lilás, e a luz é de pêssego. Uma cor nova entra aqui, nunca solta numa
+ * tela. Os contrastes (AA, 4,5:1) foram medidos: framboesa no branco 5,1;
+ * apagado na névoa 5,4; tinta na névoa 15,6.
  */
 export const cor = {
-  fundo: "#fffaf6",
-  texto: "#291413",
-  cartao: "#fffdfc",
-  primaria: "#ab5e5c",
-  primariaEscura: "#8f4b49",
-  primariaSuave: "#d79d9a",
-  rosaMarca: "#FEE2EA",
-  // A entrada (login/cadastro): o degradê do rosa da marca ao creme, as bolhas
-  // que flutuam atrás e o "vidro" das pílulas sobre o degradê.
-  entradaPessego: "#FFEDE4",
-  entradaLilas: "#E9DDF6",
-  entradaVidro: "rgba(255,253,252,0.82)",
-  apagado: "#f9eee8",
-  textoApagado: "#6d5855",
-  destaque: "#ffe2de",
-  textoDestaque: "#581b1d",
-  borda: "#ede0db",
-  divisor: "#f3ece8",
+  fundo: "#fbf9fe",
+  texto: "#231942",
+  cartao: "#ffffff",
+  primaria: "#cf2468",
+  primariaEscura: "#a8164f",
+  primariaSuave: "#f3a5c3",
+  rosaMarca: "#ffe1ec",
+  // A entrada (login/cadastro): o degradê do amanhecer, as bolhas que flutuam
+  // atrás e o "vidro" das pílulas sobre o degradê.
+  entradaPessego: "#ffe4d6",
+  entradaLilas: "#e3d9fb",
+  entradaVidro: "rgba(255,255,255,0.82)",
+  apagado: "#f4f0fa",
+  textoApagado: "#6b6384",
+  destaque: "#ffe4ee",
+  textoDestaque: "#7c1140",
+  borda: "#e9e3f2",
+  divisor: "#f1ecf7",
   branco: "#ffffff",
   /** Só para o QR da ficha: leitor de QR quer preto puro no branco. */
   preto: "#000000",
@@ -71,23 +79,112 @@ export const cor = {
   okFundo: "#d1fae5",
 } as const;
 
-export const fonte = {
-  normal: "Nunito_500Medium",
-  media: "Nunito_600SemiBold",
-  forte: "Nunito_700Bold",
-  titulo: "Nunito_800ExtraBold",
-} as const;
+/**
+ * A LETRA (16/11/2026, pedido do dono: "está com muita cara de feito no
+ * Claude [...] precisamos de efeito Apple"). A do sistema — SF Pro no iPhone —
+ * no lugar da Nunito, um degrau mais leve que ela (o SF é mais encorpado).
+ * Para voltar à Nunito, `LETRA_DO_SISTEMA = false`: a raiz volta a carregá-la.
+ *
+ * Use espalhando no estilo (`...fonte.forte`): a letra do sistema precisa do
+ * `fontWeight` junto, e a Nunito traz o peso no nome.
+ */
+export const LETRA_DO_SISTEMA = true;
+
+type Letra = {
+  readonly fontFamily: string;
+  readonly fontWeight?: "400" | "500" | "600" | "700" | "800";
+};
+
+/** O número de vitrine (a semana atrás do bebê, o contador): a arredondada, pesada. */
+export const fonteDoNumero: Letra = LETRA_DO_SISTEMA
+  ? {
+      fontFamily:
+        Platform.OS === "web" ? "ui-rounded, system-ui, -apple-system, sans-serif" : "ui-rounded",
+      fontWeight: "800",
+    }
+  : { fontFamily: "Nunito_800ExtraBold" };
+
+/**
+ * A letra de TÍTULO, número e botão é a ARREDONDADA do sistema (SF Pro
+ * Rounded, a do Fitness e dos Lembretes): o calor que a Nunito tinha, com o
+ * acabamento da Apple. O texto corrido fica na SF Pro. Na web (a bancada) o
+ * Chrome não tem a arredondada, e cai na do sistema.
+ */
+const REDONDA =
+  Platform.OS === "web" ? "ui-rounded, system-ui, -apple-system, sans-serif" : "ui-rounded";
+
+export const fonte: Readonly<Record<"normal" | "media" | "forte" | "titulo", Letra>> =
+  LETRA_DO_SISTEMA
+    ? {
+        normal: { fontFamily: "System", fontWeight: "400" },
+        media: { fontFamily: "System", fontWeight: "500" },
+        forte: { fontFamily: REDONDA, fontWeight: "600" },
+        titulo: { fontFamily: REDONDA, fontWeight: "700" },
+      }
+    : {
+        normal: { fontFamily: "Nunito_500Medium" },
+        media: { fontFamily: "Nunito_600SemiBold" },
+        forte: { fontFamily: "Nunito_700Bold" },
+        titulo: { fontFamily: "Nunito_800ExtraBold" },
+      };
+
+/**
+ * O DEGRADÊ DO AMANHECER: do coral ao rosa e ao violeta, como o céu às seis
+ * da manhã. Só em momentos de vitrine (o anel da gestação, o número da semana,
+ * um brilho) — nunca atrás de texto pequeno: o coral não segura contraste.
+ */
+export const amanhecer = ["#ff9a6c", "#f4478f", "#8f5cf7"] as const;
+
+/** O aperto das letras grandes, como nos títulos da Apple (SF Pro Display). */
+export const aperto = { titulo: -0.6, subtitulo: -0.3 } as const;
 
 export const espaco = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;
-export const raio = { sm: 10, md: 16, lg: 24, pilula: 999 } as const;
+export const raio = { sm: 12, md: 18, lg: 26, pilula: 999 } as const;
+
+/** O canto contínuo do iPhone (a "squircle"), e não o arco de círculo. */
+export const curva = { borderCurve: "continuous" } as const;
 
 /** Alvo de toque mínimo (Apple HIG: 44 pt). */
 export const ALVO_MINIMO = 44;
 
+/**
+ * A profundidade: três camadas, como a luz de um estúdio — o contato (junto
+ * da borda), a chave (o corpo da sombra) e o ambiente (largo e fraco). Uma
+ * sombra só, borrada, é o que denuncia o desenho genérico.
+ */
 export const sombra = {
-  shadowColor: "#581b1d",
-  shadowOpacity: 0.08,
-  shadowRadius: 12,
-  shadowOffset: { width: 0, height: 4 },
-  elevation: 2,
+  boxShadow:
+    "0px 1px 1px rgba(35,25,66,0.04), 0px 4px 10px -2px rgba(35,25,66,0.06), 0px 18px 36px -12px rgba(35,25,66,0.16)",
+} as const;
+
+/** A sombra do que flutua (a barra, os botões soltos): mais alta e mais larga. */
+export const sombraFlutuante = {
+  boxShadow:
+    "0px 2px 4px rgba(35,25,66,0.06), 0px 12px 32px -8px rgba(35,25,66,0.22), 0px 28px 56px -20px rgba(35,25,66,0.20)",
+} as const;
+
+/**
+ * O VIDRO e a LUZ. O vidro de verdade (Liquid Glass, iOS 26) mora em
+ * `componentes/vidro.tsx`; estas são as cores da reserva (web e iOS antigo) e
+ * do fundo de luz que fica atrás de tudo (`componentes/luz.tsx`).
+ */
+export const vidro = {
+  /** A reserva sem desfoque (iOS antes do 26): quase opaca, para ler bem. */
+  reserva: "rgba(255,255,255,0.94)",
+  /** A reserva na web, que desfoca de verdade (`backdropFilter`). */
+  reservaWeb: "rgba(255,255,255,0.62)",
+  /** O fio de luz na borda do vidro. */
+  borda: "rgba(255,255,255,0.85)",
+  /** A lente sob a aba escolhida: uma gota clara, erguida (a seleção do iOS 26). */
+  lente: "rgba(255,255,255,0.82)",
+  lenteSombra: "0px 2px 10px -3px rgba(35,25,66,0.22)",
+} as const;
+
+export const luz = {
+  base: "#fbf9fe",
+  pessego: "#ffdccb",
+  lilas: "#dcd2fb",
+  rose: "#ffd3e2",
+  /** O cartão: branco, com um tico do fundo passando. */
+  cartao: "rgba(255,255,255,0.86)",
 } as const;

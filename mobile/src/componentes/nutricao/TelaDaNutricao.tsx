@@ -707,7 +707,7 @@ function PerguntaPronta({ texto, aoTocar }: { texto: string; aoTocar: () => void
         backgroundColor: pressed ? cor.nutricaoFundo : cor.cartao,
       })}
     >
-      <Text style={{ fontFamily: fonte.media, fontSize: 15, color: cor.nutricao }}>{texto}</Text>
+      <Text style={{ ...fonte.media, fontSize: 15, color: cor.nutricao }}>{texto}</Text>
     </Pressable>
   );
 }
@@ -846,7 +846,7 @@ function Compositor({
             paddingHorizontal: espaco.lg,
             paddingTop: 13,
             paddingBottom: 13,
-            fontFamily: fonte.normal,
+            ...fonte.normal,
             fontSize: 16,
             color: cor.texto,
           }}
@@ -912,7 +912,7 @@ function BotaoDeFoto({
       })}
     >
       <Icone size={18} color={cor.nutricao} />
-      <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: cor.nutricao }}>{rotulo}</Text>
+      <Text style={{ ...fonte.forte, fontSize: 14, color: cor.nutricao }}>{rotulo}</Text>
     </Pressable>
   );
 }

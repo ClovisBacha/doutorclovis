@@ -13,17 +13,17 @@ import { useEffect, useRef } from "react";
 import { Platform } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ProvedorDeSessao, useSessao } from "~/lib/sessao";
-import { cor } from "~/tema";
+import { cor, LETRA_DO_SISTEMA } from "~/tema";
 
 void SplashScreen.preventAutoHideAsync().catch(() => {});
 
+/** A Nunito só é carregada se o tema voltar a ela (a letra hoje é a do sistema). */
+const NUNITO = LETRA_DO_SISTEMA
+  ? {}
+  : { Nunito_500Medium, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold };
+
 export default function Raiz() {
-  const [fontesProntas, erroFonte] = useFonts({
-    Nunito_500Medium,
-    Nunito_600SemiBold,
-    Nunito_700Bold,
-    Nunito_800ExtraBold,
-  });
+  const [fontesProntas, erroFonte] = useFonts(NUNITO);
   /* Fonte que falhou não pode prender a splash para sempre: o app abre com a
      letra do sistema. */
   const pronto = fontesProntas || !!erroFonte;

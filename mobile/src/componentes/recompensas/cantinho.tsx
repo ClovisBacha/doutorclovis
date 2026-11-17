@@ -249,15 +249,13 @@ export function AbaDoCantinho({
         }}
       >
         <View style={{ flex: 1 }}>
-          <Text
-            style={{ fontFamily: fonte.media, fontSize: 15, color: corRecompensas.esmeralda700 }}
-          >
+          <Text style={{ ...fonte.media, fontSize: 15, color: corRecompensas.esmeralda700 }}>
             Meu Cantinho
           </Text>
           <Text
             style={{
               marginTop: 2,
-              fontFamily: fonte.normal,
+              ...fonte.normal,
               fontSize: 14,
               lineHeight: 19,
               /* O peso mais leve do app (500) é mais largo que o 400 do site:
@@ -298,7 +296,7 @@ export function AbaDoCantinho({
           <Text style={{ fontSize: 18 }}>🌱</Text>
           <Text
             style={{
-              fontFamily: fonte.titulo,
+              ...fonte.titulo,
               fontSize: 16,
               color: corRecompensas.esmeralda600,
               fontVariant: ["tabular-nums"],
@@ -306,9 +304,7 @@ export function AbaDoCantinho({
           >
             {saldo ?? "—"}
           </Text>
-          <Text
-            style={{ fontFamily: fonte.forte, fontSize: 13, color: corRecompensas.esmeralda500 }}
-          >
+          <Text style={{ ...fonte.forte, fontSize: 13, color: corRecompensas.esmeralda500 }}>
             +
           </Text>
         </Pressable>
@@ -319,7 +315,7 @@ export function AbaDoCantinho({
         <View style={{ gap: espaco.sm, paddingHorizontal: 4 }}>
           <Text
             style={{
-              fontFamily: fonte.normal,
+              ...fonte.normal,
               fontSize: 14,
               lineHeight: 20,
               color: cor.textoApagado,
@@ -383,14 +379,14 @@ export function AbaDoCantinho({
                   ) : (
                     <Text style={{ fontSize: 18 }}>{p.conjunto.emoji}</Text>
                   )}
-                  <Text style={{ fontFamily: fonte.titulo, fontSize: 13, color: cor.texto }}>
+                  <Text style={{ ...fonte.titulo, fontSize: 13, color: cor.texto }}>
                     {p.conjunto.nome}
                   </Text>
                 </View>
                 <Text
                   style={{
                     marginTop: 2,
-                    fontFamily: fonte.normal,
+                    ...fonte.normal,
                     fontSize: 13,
                     lineHeight: 18,
                     color: cor.textoApagado,
@@ -401,7 +397,7 @@ export function AbaDoCantinho({
                 <Text
                   style={{
                     marginTop: 6,
-                    fontFamily: fonte.forte,
+                    ...fonte.forte,
                     fontSize: 13,
                     color: p.completo ? corRecompensas.esmeralda600 : cor.textoApagado,
                   }}
@@ -433,17 +429,14 @@ export function AbaDoCantinho({
           <Text
             style={{
               flex: 1,
-              fontFamily: fonte.media,
+              ...fonte.media,
               fontSize: 14,
               lineHeight: 19,
               color: corRecompensas.ambar800,
             }}
           >
             A cada fase da gestação chegam enfeites novos. Os próximos chegam{" "}
-            <Text style={{ fontFamily: fonte.titulo }}>
-              {quandoAbre(proximaFase).toLowerCase()}
-            </Text>
-            .
+            <Text style={{ ...fonte.titulo }}>{quandoAbre(proximaFase).toLowerCase()}</Text>.
           </Text>
         </View>
       ) : null}
@@ -478,7 +471,7 @@ export function AbaDoCantinho({
               >
                 <Text
                   style={{
-                    fontFamily: fonte.media,
+                    ...fonte.media,
                     fontSize: 13,
                     color: ativa ? corRecompensas.esmeralda700 : corRecompensas.texto60,
                   }}
@@ -597,7 +590,7 @@ function Ladrilho({
         numberOfLines={2}
         style={{
           marginTop: espaco.sm,
-          fontFamily: fonte.media,
+          ...fonte.media,
           fontSize: 13,
           lineHeight: 17,
           textAlign: "center",
@@ -663,7 +656,7 @@ function Ladrilho({
             <Text
               style={{
                 marginTop: 4,
-                fontFamily: fonte.media,
+                ...fonte.media,
                 fontSize: 13,
                 color: corRecompensas.ardosia400,
               }}
@@ -728,7 +721,7 @@ function Selo({
     >
       <Text
         style={{
-          fontFamily: fonte.forte,
+          ...fonte.forte,
           fontSize: 13,
           letterSpacing: 0.4,
           color: corRecompensas.ambar800,
@@ -743,14 +736,14 @@ function Selo({
 const estilo = {
   rotuloDeSecao: {
     marginBottom: espaco.sm,
-    fontFamily: fonte.forte,
+    ...fonte.forte,
     fontSize: 13,
     letterSpacing: 1,
     color: cor.textoApagado,
   },
   legendaAmbar: {
     marginTop: 4,
-    fontFamily: fonte.media,
+    ...fonte.media,
     fontSize: 13,
     textAlign: "center" as const,
     color: corRecompensas.ambar700_70,

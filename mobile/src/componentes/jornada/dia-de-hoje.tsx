@@ -65,7 +65,7 @@ export function CartaoDoDia({
           >
             <Text
               style={{
-                fontFamily: fonte.titulo,
+                ...fonte.titulo,
                 fontSize: 13,
                 color: cor.branco,
                 letterSpacing: 0.6,
@@ -74,18 +74,16 @@ export function CartaoDoDia({
               HOJE
             </Text>
           </View>
-          <Text style={{ flex: 1, fontFamily: fonte.forte, fontSize: 15, color: cor.jogoFundo }}>
+          <Text style={{ flex: 1, ...fonte.forte, fontSize: 15, color: cor.jogoFundo }}>
             {sobre}
           </Text>
           {mostrarEstrelas ? <Estrelas feitos={feitos} total={total} tamanho={17} /> : null}
         </View>
-        <Text
-          style={{ fontFamily: fonte.titulo, fontSize: 24, color: cor.branco, letterSpacing: -0.3 }}
-        >
+        <Text style={{ ...fonte.titulo, fontSize: 24, color: cor.branco, letterSpacing: -0.3 }}>
           {titulo}
         </Text>
         {linha ? (
-          <Text style={{ fontFamily: fonte.media, fontSize: 14, color: "#ddd6fe" }}>{linha}</Text>
+          <Text style={{ ...fonte.media, fontSize: 14, color: "#ddd6fe" }}>{linha}</Text>
         ) : null}
       </LinearGradient>
       <View style={{ paddingVertical: espaco.xs }}>
@@ -153,13 +151,11 @@ function LinhaDoMomento({ item, ultimo }: { item: ItemDoDia; ultimo: boolean }) 
         )}
       </View>
       <View style={{ flex: 1, gap: 2 }}>
-        <Text style={{ fontFamily: fonte.forte, fontSize: 16, color: cor.texto }}>
-          {item.titulo}
-        </Text>
+        <Text style={{ ...fonte.forte, fontSize: 16, color: cor.texto }}>{item.titulo}</Text>
         <Text
           numberOfLines={item.linhasDoSub ?? 1}
           style={{
-            fontFamily: fonte.normal,
+            ...fonte.normal,
             fontSize: 14,
             lineHeight: 19,
             color: cor.textoApagado,
@@ -169,7 +165,7 @@ function LinhaDoMomento({ item, ultimo }: { item: ItemDoDia; ultimo: boolean }) 
         </Text>
       </View>
       {item.feito ? (
-        <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: corJornada.feito }}>
+        <Text style={{ ...fonte.forte, fontSize: 13, color: corJornada.feito }}>
           {item.rotuloDoFeito ?? "Feito"}
         </Text>
       ) : item.marcaPorToque ? (

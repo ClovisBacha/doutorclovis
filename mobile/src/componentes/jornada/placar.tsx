@@ -128,7 +128,7 @@ function EscadaDosTrofeus({ trofeus }: { trofeus: number }) {
           >
             <Text
               style={{
-                fontFamily: fonte.titulo,
+                ...fonte.titulo,
                 fontSize: 13,
                 color: d.feito ? corJornada.trofeu : cor.textoApagado,
               }}
@@ -173,12 +173,8 @@ function LinhaDeGanho({ rotulo, valor }: { rotulo: string; valor: string }) {
         borderRadius: raio.sm,
       }}
     >
-      <Text style={{ flex: 1, fontFamily: fonte.media, fontSize: 15, color: cor.texto }}>
-        {rotulo}
-      </Text>
-      <Text style={{ fontFamily: fonte.forte, fontSize: 15, color: corJornada.sementinha }}>
-        {valor}
-      </Text>
+      <Text style={{ flex: 1, ...fonte.media, fontSize: 15, color: cor.texto }}>{rotulo}</Text>
+      <Text style={{ ...fonte.forte, fontSize: 15, color: corJornada.sementinha }}>{valor}</Text>
     </View>
   );
 }

@@ -80,7 +80,7 @@ export function FestaDoMarco({
         >
           <Text
             style={{
-              fontFamily: fonte.forte,
+              ...fonte.forte,
               fontSize: 13,
               letterSpacing: 1,
               textTransform: "uppercase",
@@ -97,7 +97,7 @@ export function FestaDoMarco({
             accessibilityRole="header"
             style={{
               textAlign: "center",
-              fontFamily: fonte.titulo,
+              ...fonte.titulo,
               fontSize: 28,
               lineHeight: 34,
               letterSpacing: -0.3,
@@ -109,7 +109,7 @@ export function FestaDoMarco({
           <Text
             style={{
               textAlign: "center",
-              fontFamily: fonte.normal,
+              ...fonte.normal,
               fontSize: 15,
               lineHeight: 22,
               color: cor.textoApagado,
@@ -125,7 +125,7 @@ export function FestaDoMarco({
               paddingVertical: espaco.sm,
             }}
           >
-            <Text style={{ fontFamily: fonte.titulo, fontSize: 16, color: corJornada.sementinha }}>
+            <Text style={{ ...fonte.titulo, fontSize: 16, color: corJornada.sementinha }}>
               +{festa.sementinhas} sementinhas 🌱
             </Text>
           </View>

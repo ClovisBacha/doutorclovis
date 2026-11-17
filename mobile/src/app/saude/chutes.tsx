@@ -252,7 +252,7 @@ export default function Chutes() {
           >
             <Text
               style={{
-                fontFamily: fonte.titulo,
+                ...fonte.titulo,
                 fontSize: 72,
                 color: cor.branco,
                 fontVariant: ["tabular-nums"],
@@ -301,7 +301,7 @@ export default function Chutes() {
             >
               <Text
                 style={{
-                  fontFamily: fonte.media,
+                  ...fonte.media,
                   fontSize: 14,
                   color: cor.textoApagado,
                   textDecorationLine: "underline",
@@ -423,9 +423,9 @@ function LinhaDoSos() {
         opacity: pressed ? 0.8 : 1,
       })}
     >
-      <Text style={{ flex: 1, fontFamily: fonte.media, fontSize: 15, color: cor.texto }}>
+      <Text style={{ flex: 1, ...fonte.media, fontSize: 15, color: cor.texto }}>
         Sentiu o bebê diferente?{" "}
-        <Text style={{ fontFamily: fonte.forte, color: cor.urgente }}>{ROTULO_DO_SOCORRO}</Text>
+        <Text style={{ ...fonte.forte, color: cor.urgente }}>{ROTULO_DO_SOCORRO}</Text>
       </Text>
       <ChevronRight size={20} color={cor.urgente} />
     </Pressable>

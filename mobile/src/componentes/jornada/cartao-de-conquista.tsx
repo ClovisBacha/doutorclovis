@@ -50,7 +50,7 @@ export function CartaoDeConquista({ d }: { d: DadosDoCartaoDeConquista }) {
       <View style={{ flex: 1, alignItems: "center", paddingTop: 44, paddingHorizontal: 24 }}>
         <Text
           style={{
-            fontFamily: fonte.titulo,
+            ...fonte.titulo,
             fontSize: 13,
             letterSpacing: 2.2,
             textTransform: "uppercase",
@@ -77,7 +77,7 @@ export function CartaoDeConquista({ d }: { d: DadosDoCartaoDeConquista }) {
           >
             <Text
               style={{
-                fontFamily: fonte.titulo,
+                ...fonte.titulo,
                 fontSize: 12,
                 letterSpacing: 1.2,
                 textTransform: "uppercase",
@@ -93,7 +93,7 @@ export function CartaoDeConquista({ d }: { d: DadosDoCartaoDeConquista }) {
           style={{
             marginTop: 14,
             textAlign: "center",
-            fontFamily: fonte.titulo,
+            ...fonte.titulo,
             fontSize: 32,
             lineHeight: 38,
             letterSpacing: -0.6,
@@ -108,7 +108,7 @@ export function CartaoDeConquista({ d }: { d: DadosDoCartaoDeConquista }) {
             style={{
               marginTop: 10,
               textAlign: "center",
-              fontFamily: fonte.media,
+              ...fonte.media,
               fontSize: 15,
               lineHeight: 21,
               color: "rgba(255,255,255,0.9)",
@@ -121,7 +121,7 @@ export function CartaoDeConquista({ d }: { d: DadosDoCartaoDeConquista }) {
         <Text
           style={{
             marginBottom: 22,
-            fontFamily: fonte.forte,
+            ...fonte.forte,
             fontSize: 12,
             letterSpacing: 0.5,
             color: "rgba(255,255,255,0.85)",
@@ -169,9 +169,7 @@ export function CompartilharConquista({
           opacity: pressed ? 0.85 : 1,
         })}
       >
-        <Text style={{ fontFamily: fonte.titulo, fontSize: 15, color: tinta }}>
-          Compartilhar 💌
-        </Text>
+        <Text style={{ ...fonte.titulo, fontSize: 15, color: tinta }}>Compartilhar 💌</Text>
       </Pressable>
       <FolhaDeCompartilhar
         aberta={aberta}

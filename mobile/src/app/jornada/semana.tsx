@@ -153,7 +153,7 @@ export default function Semana() {
           <ChevronLeft size={22} color={semana > SEMANA_MINIMA ? corJornada.roxo : cor.borda} />
         </BotaoRedondo>
         <View style={{ flex: 1, alignItems: "center" }}>
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 24, color: cor.texto }}>
+          <Text style={{ ...fonte.titulo, fontSize: 24, color: cor.texto }}>
             {fruitEmojiForWeek(semana)} Semana {semana}
           </Text>
           <T tipo="apagado">
@@ -213,28 +213,28 @@ export default function Semana() {
               <View style={{ width: 44, alignItems: "center" }}>
                 <Text
                   style={{
-                    fontFamily: fonte.titulo,
+                    ...fonte.titulo,
                     fontSize: 18,
                     color: ehHoje ? corJornada.roxo : cor.texto,
                   }}
                 >
                   {String(data.getDate()).padStart(2, "0")}
                 </Text>
-                <Text style={{ fontFamily: fonte.media, fontSize: 13, color: cor.textoApagado }}>
+                <Text style={{ ...fonte.media, fontSize: 13, color: cor.textoApagado }}>
                   {ehHoje ? "hoje" : diaCurto(data)}
                 </Text>
               </View>
               <View style={{ flex: 1, gap: 2 }}>
                 <Text
                   style={{
-                    fontFamily: fonte.forte,
+                    ...fonte.forte,
                     fontSize: 15,
                     color: no.tipo === "futuro" ? cor.textoApagado : cor.texto,
                   }}
                 >
                   📖 {assunto}
                 </Text>
-                <Text style={{ fontFamily: fonte.normal, fontSize: 13, color: cor.textoApagado }}>
+                <Text style={{ ...fonte.normal, fontSize: 13, color: cor.textoApagado }}>
                   {no.tipo === "futuro"
                     ? `Abre ${quandoAbre(D, hojeD, hoje)}`
                     : no.fechado
@@ -315,7 +315,7 @@ function MemoriaDaSemana({
           <ChevronLeft size={22} color={semana > SEMANA_MINIMA ? corJornada.roxo : cor.borda} />
         </BotaoRedondo>
         <View style={{ flex: 1, alignItems: "center" }}>
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 24, color: cor.texto }}>
+          <Text style={{ ...fonte.titulo, fontSize: 24, color: cor.texto }}>
             {fruitEmojiForWeek(semana)} Semana {semana}
           </Text>
           <T tipo="apagado">

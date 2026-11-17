@@ -96,9 +96,7 @@ export function PilulaSos() {
         backgroundColor: pressed ? cor.urgentePressionado : cor.urgente,
       })}
     >
-      <Text
-        style={{ fontFamily: fonte.titulo, fontSize: 14, color: cor.branco, letterSpacing: 0.5 }}
-      >
+      <Text style={{ ...fonte.titulo, fontSize: 14, color: cor.branco, letterSpacing: 0.5 }}>
         SOS
       </Text>
     </Pressable>
@@ -134,15 +132,12 @@ export function CabecalhoDaPilha({
         <Text
           accessibilityRole="header"
           numberOfLines={1}
-          style={{ fontFamily: fonte.titulo, fontSize: 18, color: cor.texto }}
+          style={{ ...fonte.titulo, fontSize: 18, color: cor.texto }}
         >
           {titulo}
         </Text>
         {subtitulo ? (
-          <Text
-            numberOfLines={1}
-            style={{ fontFamily: fonte.media, fontSize: 13, color: cor.textoApagado }}
-          >
+          <Text numberOfLines={1} style={{ ...fonte.media, fontSize: 13, color: cor.textoApagado }}>
             {subtitulo}
           </Text>
         ) : null}

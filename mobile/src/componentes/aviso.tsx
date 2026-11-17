@@ -74,7 +74,7 @@ function Aviso({
         transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
       }}
     >
-      <Text style={{ fontFamily: fonte.media, fontSize: 14, lineHeight: 20, color: cor.texto }}>
+      <Text style={{ ...fonte.media, fontSize: 14, lineHeight: 20, color: cor.texto }}>
         {texto}
       </Text>
     </Animated.View>

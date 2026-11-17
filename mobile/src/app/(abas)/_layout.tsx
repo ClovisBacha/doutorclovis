@@ -1,17 +1,19 @@
 import { Redirect, router, Tabs } from "expo-router";
 import { Baby, House, MessageCircleHeart, Sprout, Sun, Users } from "lucide-react-native";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, AppState, Easing, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { contarParaOSelo } from "~/componentes/amigas/economia";
-import { toque } from "~/componentes/base";
+import { FolgaDaBarra, toque } from "~/componentes/base";
+import { CEUS, CeuCompartilhado, CeuVivo, useFaseDoCeu } from "~/componentes/ceu-vivo";
 import { useDiaDaJornada } from "~/componentes/jornada/usarJornada";
-import { Pulso, useMovimentoReduzido } from "~/componentes/movimento";
+import { Pulso, useMovimentoReduzido, useParalaxe } from "~/componentes/movimento";
+import { Vidro } from "~/componentes/vidro";
 import { api } from "~/lib/comunidade/api";
 import { mudarSelos, rotuloDaAba, textoDoSelo, useSelos, zerarSelos } from "~/lib/selos";
 import { useSessao } from "~/lib/sessao";
 import { COMUNIDADE_NO_APP, SOS_NO_APP } from "~/config";
-import { ALVO_MINIMO, cor, fonte } from "~/tema";
+import { ALVO_MINIMO, cor, curva, fonte, raio, vidro } from "~/tema";
 
 /** O app abre na aba do bebê, a do meio — inclusive quando outra aba é a
  * primeira da lista (as Amigas, à esquerda). */
@@ -39,32 +41,59 @@ export default function LayoutDasAbas() {
      selo e a tela nunca contarem diferente. */
   const pos = useDiaDaJornada().modo === "pos";
   useSelosDaBarra(!!sessao && !cuidado, pos);
+  /* A barra flutua: as telas recebem quanto ela ocupa embaixo (a estimativa
+     até ela se medir) para a rolagem terminar acima do vidro. */
+  const baixo = useSafeAreaInsets().bottom;
+  const [folga, setFolga] = useState(() => ALTURA_DA_BARRA + distanciaDaBorda(baixo));
+  /* UM CÉU SÓ atrás das três abas: a aba que quer o céu fica transparente, e
+     trocar de aba é trocar o que flutua sobre o mesmo lugar. */
+  const fase = useFaseDoCeu();
+  const { x, y } = useParalaxe();
+  const ceuDasAbas = useMemo(() => ({ fase, x, y }), [fase, x, y]);
   if (!carregandoSessao && !sessao) return <Redirect href="/entrar" />;
   return (
-    <Tabs
-      screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: cor.fundo } }}
-      tabBar={(props) => <BarraDeBaixo {...props} />}
-    >
-      <Tabs.Screen name="amigas" options={{ title: "Amigas" }} />
-      {/* O bebê no meio, e o app abre nele. No Modo Cuidado a aba não fala do
+    <View style={{ flex: 1, backgroundColor: CEUS[fase].chao }}>
+      <CeuVivo fase={fase} x={x} y={y} />
+      <CeuCompartilhado.Provider value={ceuDasAbas}>
+        <FolgaDaBarra.Provider value={folga}>
+          <Tabs
+            screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: "transparent" } }}
+            tabBar={(props) => <BarraDeBaixo {...props} aoMedir={setFolga} />}
+          >
+            <Tabs.Screen name="amigas" options={{ title: "Amigas" }} />
+            {/* O bebê no meio, e o app abre nele. No Modo Cuidado a aba não fala do
           bebê: vira "Hoje", com um sol. */}
-      <Tabs.Screen name="jornada" options={{ title: cuidado ? "Hoje" : "Bebê" }} />
-      {/* O jogo à direita; no Modo Cuidado não há trilha nem placar. */}
-      <Tabs.Screen
-        name="trilha"
-        options={{ title: "Trilha", ...(cuidado ? { href: null } : {}) }}
-      />
-      {/* O acolhimento e a agenda do Modo Cuidado; fora dele, leva à aba do bebê. */}
-      <Tabs.Screen
-        name="inicio"
-        options={{ title: "Início", ...(cuidado ? {} : { href: null }) }}
-      />
-      <Tabs.Screen
-        name="comunidade"
-        options={{ title: "Comunidade", ...(COMUNIDADE_NO_APP ? {} : { href: null }) }}
-      />
-    </Tabs>
+            <Tabs.Screen name="jornada" options={{ title: cuidado ? "Hoje" : "Bebê" }} />
+            {/* O jogo à direita; no Modo Cuidado não há trilha nem placar. */}
+            <Tabs.Screen
+              name="trilha"
+              options={{ title: "Trilha", ...(cuidado ? { href: null } : {}) }}
+            />
+            {/* O acolhimento e a agenda do Modo Cuidado; fora dele, leva à aba do bebê. */}
+            <Tabs.Screen
+              name="inicio"
+              options={{ title: "Início", ...(cuidado ? {} : { href: null }) }}
+            />
+            <Tabs.Screen
+              name="comunidade"
+              options={{ title: "Comunidade", ...(COMUNIDADE_NO_APP ? {} : { href: null }) }}
+            />
+          </Tabs>
+        </FolgaDaBarra.Provider>
+      </CeuCompartilhado.Provider>
+    </View>
   );
+}
+
+/** O vão entre uma aba e outra, dentro da cápsula. */
+const VAO = 2;
+
+/** A altura da cápsula de vidro da barra. */
+const ALTURA_DA_BARRA = 66;
+
+/** Da borda de baixo da tela até a cápsula: acima do traço do iPhone, como a barra do iOS 26. */
+function distanciaDaBorda(baixo: number): number {
+  return baixo > 0 ? Math.max(baixo - 10, 12) : 12;
 }
 
 /** De quanto em quanto tempo a barra relê os selos com o app aberto. */
@@ -114,14 +143,49 @@ const ICONES = {
   comunidade: MessageCircleHeart,
 } as const;
 
-function BarraDeBaixo({ state, navigation, descriptors }: any) {
+/**
+ * A BARRA DE VIDRO (16/11/2026): uma cápsula de Liquid Glass solta do rodapé,
+ * como a do iOS 26 — o conteúdo rola por baixo e aparece através dela. A aba
+ * escolhida ganha a "lente", uma pílula clara por baixo do ícone.
+ */
+function BarraDeBaixo({
+  state,
+  navigation,
+  descriptors,
+  aoMedir,
+}: any & { aoMedir: (folga: number) => void }) {
   const baixo = useSafeAreaInsets().bottom;
+  const distancia = distanciaDaBorda(baixo);
   const selos = useSelos();
   /* As abas escondidas por uma chave (`href: null`, que o expo-router troca
      por `tabBarItemStyle: { display: "none" }`) ficam fora da barra. */
   const rotas = (state.routes as { key: string; name: keyof typeof ICONES }[]).filter(
     (r) => descriptors[r.key]?.options?.tabBarItemStyle?.display !== "none",
   );
+  /* A LENTE: a gota clara da aba escolhida DESLIZA de uma aba para a outra,
+     com mola — não pula. (Com o SOS no meio da barra as abas não têm a mesma
+     largura, e a lente volta a ser o fundo de cada uma.) */
+  const comLente = !SOS_NO_APP;
+  const reduzido = useMovimentoReduzido();
+  const qual = Math.max(
+    0,
+    rotas.findIndex((r) => r.key === state.routes[state.index]?.key),
+  );
+  const [fila, setFila] = useState(0);
+  const passo = rotas.length ? (fila + VAO) / rotas.length : 0;
+  const lente = useRef(new Animated.Value(qual)).current;
+  useEffect(() => {
+    if (reduzido) {
+      lente.setValue(qual);
+      return;
+    }
+    Animated.spring(lente, {
+      toValue: qual,
+      useNativeDriver: true,
+      speed: 14,
+      bounciness: 9,
+    }).start();
+  }, [qual, reduzido, lente]);
   const item = (rota: (typeof rotas)[number]) => {
     const ativo = state.routes[state.index]?.key === rota.key;
     const titulo = descriptors[rota.key]?.options?.title ?? rota.name;
@@ -143,17 +207,21 @@ function BarraDeBaixo({ state, navigation, descriptors }: any) {
           flex: 1,
           alignItems: "center",
           justifyContent: "center",
-          minHeight: ALVO_MINIMO + 8,
+          minHeight: ALVO_MINIMO + 10,
           gap: 2,
+          borderRadius: raio.pilula,
+          ...curva,
+          backgroundColor: ativo && !comLente ? vidro.lente : "transparent",
+          boxShadow: ativo && !comLente ? vidro.lenteSombra : undefined,
         }}
       >
         {Icone ? (
           <View>
             <Pulso chave={ativo ? "ativo" : "inativo"}>
               <Icone
-                size={26}
-                color={ativo ? cor.primaria : cor.textoApagado}
-                strokeWidth={ativo ? 2.4 : 1.8}
+                size={24}
+                color={ativo ? cor.primariaEscura : cor.textoApagado}
+                strokeWidth={ativo ? 2.3 : 1.8}
               />
             </Pulso>
             {selo ? <SeloDaAba texto={selo} /> : null}
@@ -161,9 +229,9 @@ function BarraDeBaixo({ state, navigation, descriptors }: any) {
         ) : null}
         <Text
           style={{
-            fontFamily: ativo ? fonte.forte : fonte.media,
+            ...(ativo ? fonte.forte : fonte.media),
             fontSize: 13,
-            color: ativo ? cor.primaria : cor.textoApagado,
+            color: ativo ? cor.primariaEscura : cor.textoApagado,
           }}
         >
           {titulo}
@@ -173,20 +241,49 @@ function BarraDeBaixo({ state, navigation, descriptors }: any) {
   };
   return (
     <View
+      pointerEvents="box-none"
+      onLayout={(e) => aoMedir(Math.round(e.nativeEvent.layout.height))}
       style={{
-        flexDirection: "row",
-        alignItems: "center",
-        backgroundColor: cor.cartao,
-        borderTopWidth: 1,
-        borderTopColor: cor.borda,
-        paddingBottom: Math.max(baixo, 8),
-        paddingTop: 6,
-        paddingHorizontal: 4,
+        position: "absolute",
+        left: 0,
+        right: 0,
+        bottom: 0,
+        paddingHorizontal: 20,
+        paddingBottom: distancia,
       }}
     >
-      {rotas.slice(0, SOS_NO_APP ? 2 : rotas.length).map((r) => item(r))}
-      {SOS_NO_APP ? <BotaoDoSos /> : null}
-      {SOS_NO_APP ? rotas.slice(2).map((r) => item(r)) : null}
+      {/* Um tom de branco no vidro: o texto que passa por baixo não briga com
+          os nomes das abas. */}
+      <Vidro
+        tinta="rgba(255,255,255,0.55)"
+        estilo={{ minHeight: ALTURA_DA_BARRA, padding: 5, justifyContent: "center" }}
+      >
+        <View
+          onLayout={(e) => setFila(e.nativeEvent.layout.width)}
+          style={{ flexDirection: "row", alignItems: "center", gap: VAO }}
+        >
+          {comLente && passo > 0 ? (
+            <Animated.View
+              pointerEvents="none"
+              style={{
+                position: "absolute",
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: passo - VAO,
+                borderRadius: raio.pilula,
+                ...curva,
+                backgroundColor: vidro.lente,
+                boxShadow: vidro.lenteSombra,
+                transform: [{ translateX: Animated.multiply(lente, passo) }],
+              }}
+            />
+          ) : null}
+          {rotas.slice(0, SOS_NO_APP ? 2 : rotas.length).map((r) => item(r))}
+          {SOS_NO_APP ? <BotaoDoSos /> : null}
+          {SOS_NO_APP ? rotas.slice(2).map((r) => item(r)) : null}
+        </View>
+      </Vidro>
     </View>
   );
 }
@@ -223,7 +320,7 @@ function BotaoDoSos() {
       >
         <Text
           style={{
-            fontFamily: fonte.titulo,
+            ...fonte.titulo,
             fontSize: 18,
             color: cor.branco,
             letterSpacing: 0.5,
@@ -256,7 +353,7 @@ function SeloDaAba({ texto }: { texto: string }) {
         borderColor: cor.cartao,
       }}
     >
-      <Text style={{ fontFamily: fonte.titulo, fontSize: 13, lineHeight: 16, color: cor.branco }}>
+      <Text style={{ ...fonte.titulo, fontSize: 13, lineHeight: 16, color: cor.branco }}>
         {texto}
       </Text>
     </View>

@@ -222,7 +222,7 @@ export default function Casal() {
               accessibilityRole="header"
               style={{
                 marginTop: espaco.lg,
-                fontFamily: fonte.media,
+                ...fonte.media,
                 fontSize: 27,
                 lineHeight: 32,
                 color: corNoite.branco,
@@ -233,7 +233,7 @@ export default function Casal() {
             <Text
               style={{
                 marginTop: espaco.sm,
-                fontFamily: fonte.normal,
+                ...fonte.normal,
                 fontSize: 14,
                 lineHeight: 22,
                 color: corNoite.branco70,
@@ -251,7 +251,7 @@ export default function Casal() {
                 <Text
                   key={l}
                   style={{
-                    fontFamily: fonte.normal,
+                    ...fonte.normal,
                     fontSize: 13,
                     lineHeight: 18,
                     color: corNoite.branco60,
@@ -264,7 +264,7 @@ export default function Casal() {
             <Text
               style={{
                 marginTop: espaco.xl,
-                fontFamily: fonte.normal,
+                ...fonte.normal,
                 fontSize: 13,
                 lineHeight: 20,
                 color: corNoite.branco40,
@@ -289,7 +289,7 @@ export default function Casal() {
               accessibilityRole="header"
               style={{
                 marginTop: espaco.lg,
-                fontFamily: fonte.media,
+                ...fonte.media,
                 fontSize: 24,
                 lineHeight: 30,
                 color: corNoite.branco,
@@ -302,7 +302,7 @@ export default function Casal() {
                 marginTop: espaco.sm,
                 maxWidth: 320,
                 textAlign: "center",
-                fontFamily: fonte.normal,
+                ...fonte.normal,
                 fontSize: 14,
                 lineHeight: 22,
                 color: corNoite.branco70,
@@ -336,7 +336,7 @@ export default function Casal() {
             >
               <Text
                 style={{
-                  fontFamily: fonte.titulo,
+                  ...fonte.titulo,
                   fontSize: 13,
                   letterSpacing: 1.8,
                   textTransform: "uppercase",
@@ -357,7 +357,7 @@ export default function Casal() {
                 marginTop: 28,
                 maxWidth: 384,
                 textAlign: "center",
-                fontFamily: fonte.titulo,
+                ...fonte.titulo,
                 fontSize: 19,
                 lineHeight: 31,
                 letterSpacing: -0.19,
@@ -370,7 +370,7 @@ export default function Casal() {
               <Text
                 style={{
                   marginTop: espaco.xl,
-                  fontFamily: fonte.normal,
+                  ...fonte.normal,
                   fontSize: 13,
                   color: corNoite.branco45,
                 }}
@@ -408,9 +408,7 @@ function BotaoClaro({ rotulo, aoTocar }: { rotulo: string; aoTocar: () => void }
         opacity: pressed ? 0.85 : 1,
       })}
     >
-      <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: corNoite.tintaDoBotao }}>
-        {rotulo}
-      </Text>
+      <Text style={{ ...fonte.titulo, fontSize: 14, color: corNoite.tintaDoBotao }}>{rotulo}</Text>
     </Pressable>
   );
 }

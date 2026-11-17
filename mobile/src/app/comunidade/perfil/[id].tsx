@@ -177,19 +177,19 @@ function TelaDoPerfilNoApp() {
         </View>
       </View>
       <View style={{ gap: 2 }}>
-        <Text style={{ fontFamily: fonte.titulo, fontSize: 20, color: cor.texto }}>
+        <Text style={{ ...fonte.titulo, fontSize: 20, color: cor.texto }}>
           {perfil.nome}
           {perfil.oficial ? <Text style={{ color: cor.primaria }}> ✓</Text> : null}
         </Text>
         {perfil.handle ? (
-          <Text style={{ fontFamily: fonte.media, fontSize: 14, color: cor.textoApagado }}>
+          <Text style={{ ...fonte.media, fontSize: 14, color: cor.textoApagado }}>
             @{perfil.handle}
           </Text>
         ) : null}
         {perfil.bio ? (
           <Text
             style={{
-              fontFamily: fonte.normal,
+              ...fonte.normal,
               fontSize: 15,
               lineHeight: 21,
               color: cor.texto,
@@ -422,7 +422,7 @@ function EscolhaDoEspelho({
                 numberOfLines={2}
                 style={{
                   textAlign: "center",
-                  fontFamily: fonte.forte,
+                  ...fonte.forte,
                   fontSize: 13,
                   color: ativo ? cor.branco : cor.texto,
                 }}
@@ -447,7 +447,7 @@ function Numero({ valor, rotulo, mais }: { valor: number; rotulo: string; mais?:
     >
       <Text
         style={{
-          fontFamily: fonte.titulo,
+          ...fonte.titulo,
           fontSize: 19,
           color: cor.texto,
           fontVariant: ["tabular-nums"],
@@ -456,9 +456,7 @@ function Numero({ valor, rotulo, mais }: { valor: number; rotulo: string; mais?:
         {contagemCurta(valor)}
         {mais ? "+" : ""}
       </Text>
-      <Text style={{ fontFamily: fonte.normal, fontSize: 13, color: cor.textoApagado }}>
-        {rotulo}
-      </Text>
+      <Text style={{ ...fonte.normal, fontSize: 13, color: cor.textoApagado }}>{rotulo}</Text>
     </View>
   );
 }
@@ -495,9 +493,7 @@ function Ladrilho({ post, lado }: { post: PostNaTela; lado: number }) {
       {veu ? (
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 4 }}>
           <EyeOff size={22} color={cor.textoApagado} />
-          <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: cor.textoApagado }}>
-            Sensível
-          </Text>
+          <Text style={{ ...fonte.forte, fontSize: 13, color: cor.textoApagado }}>Sensível</Text>
         </View>
       ) : fotos[0] ? (
         <>
@@ -523,7 +519,7 @@ function Ladrilho({ post, lado }: { post: PostNaTela; lado: number }) {
         >
           <Text
             numberOfLines={6}
-            style={{ fontFamily: fonte.media, fontSize: 13, lineHeight: 17, color: cor.texto }}
+            style={{ ...fonte.media, fontSize: 13, lineHeight: 17, color: cor.texto }}
           >
             {post.texto}
           </Text>

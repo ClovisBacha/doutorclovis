@@ -167,7 +167,7 @@ export function AbaDasConquistas({
             <View style={{ flex: 1 }}>
               <Text
                 style={{
-                  fontFamily: fonte.media,
+                  ...fonte.media,
                   fontSize: 15,
                   color: corRecompensas.esmeralda700,
                 }}
@@ -177,7 +177,7 @@ export function AbaDasConquistas({
               <View style={{ marginTop: 4, flexDirection: "row", alignItems: "baseline", gap: 6 }}>
                 <Text
                   style={{
-                    fontFamily: fonte.titulo,
+                    ...fonte.titulo,
                     fontSize: 30,
                     color: corRecompensas.esmeralda900,
                     fontVariant: ["tabular-nums"],
@@ -190,7 +190,7 @@ export function AbaDasConquistas({
               <Text
                 style={{
                   marginTop: 2,
-                  fontFamily: fonte.normal,
+                  ...fonte.normal,
                   fontSize: 13,
                   lineHeight: 17.5,
                   color: corRecompensas.esmeralda700_80,
@@ -215,13 +215,13 @@ export function AbaDasConquistas({
           >
             <Text
               style={{
-                fontFamily: fonte.normal,
+                ...fonte.normal,
                 fontSize: 13,
                 lineHeight: 17.5,
                 color: corRecompensas.esmeralda800_80,
               }}
             >
-              Gaste no <Text style={{ fontFamily: fonte.forte }}>Meu Cantinho</Text>, aqui do lado —
+              Gaste no <Text style={{ ...fonte.forte }}>Meu Cantinho</Text>, aqui do lado —
               plantinhas, bichinhos e cenários pro seu Caminho. 💛
             </Text>
           </Pressable>
@@ -233,15 +233,13 @@ export function AbaDasConquistas({
           style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
         >
           <View>
-            <Text style={{ fontFamily: fonte.media, fontSize: 15, color: cor.primaria }}>
+            <Text style={{ ...fonte.media, fontSize: 15, color: cor.primaria }}>
               Suas conquistas
             </Text>
-            <Text
-              style={{ marginTop: 4, fontFamily: fonte.titulo, fontSize: 24, color: cor.texto }}
-            >
+            <Text style={{ marginTop: 4, ...fonte.titulo, fontSize: 24, color: cor.texto }}>
               {r.feitas} de {r.total}
             </Text>
-            <Text style={{ fontFamily: fonte.normal, fontSize: 14, color: cor.textoApagado }}>
+            <Text style={{ ...fonte.normal, fontSize: 14, color: cor.textoApagado }}>
               conquistas desbloqueadas
             </Text>
           </View>
@@ -256,9 +254,7 @@ export function AbaDasConquistas({
               justifyContent: "center",
             }}
           >
-            <Text style={{ fontFamily: fonte.forte, fontSize: 16, color: cor.primaria }}>
-              {r.pct}%
-            </Text>
+            <Text style={{ ...fonte.forte, fontSize: 16, color: cor.primaria }}>{r.pct}%</Text>
           </View>
         </View>
         <View
@@ -283,7 +279,7 @@ export function AbaDasConquistas({
           <Text
             style={{
               marginTop: espaco.sm,
-              fontFamily: fonte.normal,
+              ...fonte.normal,
               fontSize: 13,
               lineHeight: 21,
               color: cor.textoApagado,
@@ -307,7 +303,7 @@ export function AbaDasConquistas({
           }}
         >
           <Text style={{ fontSize: 24, marginBottom: 4 }}>🎉</Text>
-          <Text style={{ fontFamily: fonte.media, fontSize: 16, color: cor.texto }}>
+          <Text style={{ ...fonte.media, fontSize: 16, color: cor.texto }}>
             {novas.length === 1
               ? "Nova conquista desbloqueada!"
               : `${novas.length} novas conquistas!`}
@@ -321,7 +317,7 @@ export function AbaDasConquistas({
             accessibilityRole="header"
             style={{
               marginBottom: espaco.md,
-              fontFamily: fonte.media,
+              ...fonte.media,
               fontSize: 16,
               color: cor.texto,
             }}
@@ -386,7 +382,7 @@ export function AbaDasConquistas({
             <Text
               style={{
                 marginTop: espaco.sm,
-                fontFamily: fonte.forte,
+                ...fonte.forte,
                 fontSize: 13,
                 letterSpacing: 0.8,
                 textTransform: "uppercase",
@@ -398,7 +394,7 @@ export function AbaDasConquistas({
             <Text
               style={{
                 marginTop: 4,
-                fontFamily: fonte.titulo,
+                ...fonte.titulo,
                 fontSize: 20,
                 lineHeight: 24,
                 textAlign: "center",
@@ -426,9 +422,7 @@ export function AbaDasConquistas({
                 transform: [{ scale: pressed ? 0.97 : 1 }],
               })}
             >
-              <Text style={{ fontFamily: fonte.media, fontSize: 14, color: cor.branco }}>
-                Fechar
-              </Text>
+              <Text style={{ ...fonte.media, fontSize: 14, color: cor.branco }}>Fechar</Text>
             </Pressable>
           </Pressable>
         </Pressable>
@@ -513,15 +507,13 @@ function CartaoDaConquista({
         />
       ) : null}
       <Text style={{ fontSize: 30, lineHeight: 36, marginBottom: espaco.sm }}>{c.def.emoji}</Text>
-      <Text
-        style={{ fontFamily: fonte.media, fontSize: 13, textAlign: "center", color: cor.texto }}
-      >
+      <Text style={{ ...fonte.media, fontSize: 13, textAlign: "center", color: cor.texto }}>
         {c.def.title}
       </Text>
       <Text
         style={{
           marginTop: 2,
-          fontFamily: fonte.normal,
+          ...fonte.normal,
           fontSize: 13,
           lineHeight: 16,
           textAlign: "center",
@@ -533,7 +525,7 @@ function CartaoDaConquista({
       <Text
         style={{
           marginTop: 6,
-          fontFamily: fonte.forte,
+          ...fonte.forte,
           fontSize: 13,
           letterSpacing: 0.4,
           textTransform: "uppercase",
@@ -553,19 +545,17 @@ function CartaoDaConquista({
             paddingVertical: 4,
           }}
         >
-          <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: cor.branco }}>
+          <Text style={{ ...fonte.forte, fontSize: 13, color: cor.branco }}>
             {emVoo ? "Resgatando…" : `Resgatar +${rar.sementinhas} 🌱`}
           </Text>
         </View>
       ) : desbloqueada && c.quando ? (
-        <Text style={{ marginTop: 4, fontFamily: fonte.normal, fontSize: 13, color: cor.primaria }}>
+        <Text style={{ marginTop: 4, ...fonte.normal, fontSize: 13, color: cor.primaria }}>
           {dataCompleta(c.quando)}
         </Text>
       ) : null}
       {!desbloqueada ? (
-        <Text
-          style={{ marginTop: 4, fontFamily: fonte.normal, fontSize: 13, color: cor.textoApagado }}
-        >
+        <Text style={{ marginTop: 4, ...fonte.normal, fontSize: 13, color: cor.textoApagado }}>
           🔒 bloqueada
         </Text>
       ) : null}

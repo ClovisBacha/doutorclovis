@@ -165,7 +165,7 @@ function Pilula({
     >
       <Text
         style={{
-          fontFamily: fonte.media,
+          ...fonte.media,
           fontSize: 14,
           color: ativa ? cor.branco : cor.textoApagado,
         }}
@@ -184,9 +184,7 @@ function Pilula({
             backgroundColor: corRecompensas.esmeralda700,
           }}
         >
-          <Text
-            style={{ fontFamily: fonte.titulo, fontSize: 13, lineHeight: 15, color: cor.branco }}
-          >
+          <Text style={{ ...fonte.titulo, fontSize: 13, lineHeight: 15, color: cor.branco }}>
             {selo > 9 ? "9+" : selo}
           </Text>
         </View>

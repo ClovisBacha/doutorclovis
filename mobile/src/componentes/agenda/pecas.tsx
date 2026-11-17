@@ -46,7 +46,7 @@ export function FolhaDoDia({ quando, tamanho = 56 }: { quando: string; tamanho?:
       <View style={{ backgroundColor: cor.agenda, paddingVertical: 2, alignItems: "center" }}>
         <Text
           style={{
-            fontFamily: fonte.titulo,
+            ...fonte.titulo,
             fontSize: 11,
             letterSpacing: 1,
             color: cor.branco,
@@ -59,7 +59,7 @@ export function FolhaDoDia({ quando, tamanho = 56 }: { quando: string; tamanho?:
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
         <Text
           style={{
-            fontFamily: fonte.titulo,
+            ...fonte.titulo,
             fontSize: tamanho * 0.44,
             color: cor.texto,
             fontVariant: ["tabular-nums"],
@@ -106,13 +106,10 @@ export function CartaoDoCompromisso({
     >
       <FolhaDoDia quando={c.quando} />
       <View style={{ flex: 1, gap: 2 }}>
-        <Text
-          numberOfLines={1}
-          style={{ fontFamily: fonte.titulo, fontSize: 16, color: cor.texto }}
-        >
+        <Text numberOfLines={1} style={{ ...fonte.titulo, fontSize: 16, color: cor.texto }}>
           {emojiDo(c.tipo)} {nomeDo(c)}
         </Text>
-        <Text style={{ fontFamily: fonte.media, fontSize: 14, color: cor.agenda }}>
+        <Text style={{ ...fonte.media, fontSize: 14, color: cor.agenda }}>
           {d ? horaDe(d) : ""}
           {passado ? "" : ` · ${faltaQuanto(c.quando, agora)}`}
         </Text>
@@ -121,7 +118,7 @@ export function CartaoDoCompromisso({
             <MapPin size={13} color={cor.textoApagado} />
             <Text
               numberOfLines={1}
-              style={{ flex: 1, fontFamily: fonte.normal, fontSize: 13, color: cor.textoApagado }}
+              style={{ flex: 1, ...fonte.normal, fontSize: 13, color: cor.textoApagado }}
             >
               {c.onde}
             </Text>
@@ -130,7 +127,7 @@ export function CartaoDoCompromisso({
         {passado ? (
           <Text
             numberOfLines={2}
-            style={{ fontFamily: fonte.normal, fontSize: 13, color: cor.textoApagado }}
+            style={{ ...fonte.normal, fontSize: 13, color: cor.textoApagado }}
           >
             {c.nota ? `📝 ${c.nota}` : "Toque para anotar o que foi dito"}
           </Text>
@@ -189,17 +186,14 @@ export function ProximaNaHoje({ c, agora }: { c: Compromisso | null; agora: Date
         </View>
       )}
       <View style={{ flex: 1 }}>
-        <Text
-          numberOfLines={1}
-          style={{ fontFamily: fonte.titulo, fontSize: 15, color: "#3a2230" }}
-        >
+        <Text numberOfLines={1} style={{ ...fonte.titulo, fontSize: 15, color: "#3a2230" }}>
           {c ? nomeDo(c) : "Minha próxima consulta"}
         </Text>
-        <Text numberOfLines={1} style={{ fontFamily: fonte.media, fontSize: 13, color: "#9a7486" }}>
+        <Text numberOfLines={1} style={{ ...fonte.media, fontSize: 13, color: "#9a7486" }}>
           {c ? quandoPorExtenso(c.quando, agora) : "Marque e eu te lembro na véspera"}
         </Text>
       </View>
-      <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: cor.agenda }}>
+      <Text style={{ ...fonte.titulo, fontSize: 14, color: cor.agenda }}>
         {c ? "Agenda ›" : "Marcar ›"}
       </Text>
     </Pressable>
@@ -270,12 +264,10 @@ export function PortaDaAgenda({ c, agora }: { c: Compromisso | null; agora: Date
         </View>
       )}
       <View style={{ flex: 1, gap: 2 }}>
-        <Text style={{ fontFamily: fonte.titulo, fontSize: 19, color: cor.agenda }}>
-          Minha agenda
-        </Text>
+        <Text style={{ ...fonte.titulo, fontSize: 19, color: cor.agenda }}>Minha agenda</Text>
         <Text
           numberOfLines={2}
-          style={{ fontFamily: fonte.media, fontSize: 14, lineHeight: 19, color: cor.texto }}
+          style={{ ...fonte.media, fontSize: 14, lineHeight: 19, color: cor.texto }}
         >
           {c
             ? `${nomeDo(c)} · ${quandoPorExtenso(c.quando, agora)}`

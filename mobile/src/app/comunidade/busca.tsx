@@ -102,7 +102,7 @@ function BuscaNoApp() {
             style={{
               flex: 1,
               minHeight: ALVO_MINIMO,
-              fontFamily: fonte.normal,
+              ...fonte.normal,
               fontSize: 16,
               color: cor.texto,
             }}
@@ -163,21 +163,18 @@ function BuscaNoApp() {
             >
               <Avatar id={item.id} nome={item.nome} url={item.avatarUrl} tamanho={48} />
               <View style={{ flex: 1 }}>
-                <Text
-                  numberOfLines={1}
-                  style={{ fontFamily: fonte.forte, fontSize: 16, color: cor.texto }}
-                >
+                <Text numberOfLines={1} style={{ ...fonte.forte, fontSize: 16, color: cor.texto }}>
                   {item.nome}
                 </Text>
                 <Text
                   numberOfLines={1}
-                  style={{ fontFamily: fonte.normal, fontSize: 14, color: cor.textoApagado }}
+                  style={{ ...fonte.normal, fontSize: 14, color: cor.textoApagado }}
                 >
                   {[item.handle ? `@${item.handle}` : null, item.bio].filter(Boolean).join(" · ")}
                 </Text>
               </View>
               {item.meuVinculo === "ativo" ? (
-                <Text style={{ fontFamily: fonte.media, fontSize: 13, color: cor.textoApagado }}>
+                <Text style={{ ...fonte.media, fontSize: 13, color: cor.textoApagado }}>
                   Seguindo
                 </Text>
               ) : null}
@@ -275,14 +272,14 @@ function Descoberta({ faseNoInicio }: { faseNoInicio: boolean }) {
                   <View style={{ flex: 1 }}>
                     <Text
                       numberOfLines={1}
-                      style={{ fontFamily: fonte.forte, fontSize: 16, color: cor.texto }}
+                      style={{ ...fonte.forte, fontSize: 16, color: cor.texto }}
                     >
                       {p.nome}
                     </Text>
                     {p.bio ? (
                       <Text
                         numberOfLines={1}
-                        style={{ fontFamily: fonte.normal, fontSize: 14, color: cor.textoApagado }}
+                        style={{ ...fonte.normal, fontSize: 14, color: cor.textoApagado }}
                       >
                         {p.bio}
                       </Text>

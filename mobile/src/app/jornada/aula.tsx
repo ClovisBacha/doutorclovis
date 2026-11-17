@@ -1,12 +1,14 @@
 import * as Haptics from "expo-haptics";
 import { Check, X } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
-import { Animated, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { Animated, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { isMultiQuestion, type DailyQuiz } from "@/lib/daily-quizzes";
 import { carregarAulaDoDia } from "~/lib/jornada/aulas-do-app";
 import { Cartao, Carregando, NaoConsegueLer, T, Tela, toque } from "~/componentes/base";
 import { BotaoDaAtividade } from "~/componentes/jornada/atividade";
+import { FundoDeLuz } from "~/componentes/luz";
+import { ArteDaBolha, Entrada } from "~/componentes/movimento";
 import { corJornada } from "~/componentes/jornada/cores";
 import { concluirMomento, FimDoMomento, type Desfecho } from "~/componentes/jornada/fim";
 import { pagarAula } from "~/componentes/jornada/economia";
@@ -29,7 +31,17 @@ import {
 } from "~/lib/jornada/aula";
 import { tocarConquista } from "~/lib/audio/som-de-conquista";
 import { feito, flagsDoDia, sementesDaAula } from "~/lib/jornada/momentos";
-import { ALVO_MINIMO, cor, espaco, fonte } from "~/tema";
+import {
+  ALVO_MINIMO,
+  aperto,
+  cor,
+  curva,
+  espaco,
+  fonte,
+  luz,
+  sombra,
+  sombraFlutuante,
+} from "~/tema";
 import { AvisoMedico } from "~/componentes/aviso-medico";
 
 /**
@@ -310,27 +322,48 @@ function AulaDoDia() {
   const q = quiz.questions[Math.min(e.indice, total - 1)];
   const multi = isMultiQuestion(q);
   return (
-    <SafeAreaView edges={["top", "bottom"]} style={{ flex: 1, backgroundColor: cor.fundo }}>
+    <SafeAreaView edges={["top", "bottom"]} style={{ flex: 1, backgroundColor: luz.base }}>
+      {/* A pergunta sobre a luz do app, e não num branco chapado (16/11/2026). */}
+      <FundoDeLuz />
       <View style={{ paddingHorizontal: espaco.lg, paddingTop: espaco.sm }}>
         <BarraDoTopo fechar progresso={(e.indice + (e.verificada ? 1 : 0)) / total} />
       </View>
       <ScrollView
         contentContainerStyle={{ padding: espaco.lg, gap: espaco.md, paddingBottom: espaco.xl }}
+        showsVerticalScrollIndicator={false}
       >
+        <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
+          <Text
+            style={{
+              flex: 1,
+              ...fonte.forte,
+              fontSize: 13,
+              color: corJornada.roxo,
+              letterSpacing: 0.6,
+            }}
+          >
+            PERGUNTA {e.indice + 1} DE {total}
+            {multi ? " · MARQUE TODAS AS CERTAS" : ""}
+          </Text>
+          {/* A bolha acompanha a pergunta e reage à resposta — festeja o
+              acerto, e no erro só segue por perto, sem comentário. */}
+          <ArteDaBolha
+            humor={!e.verificada ? "estudiosa" : e.acertou ? "comemorando" : "feliz"}
+            tamanho={56}
+          />
+        </View>
         <Text
+          accessibilityRole="header"
           style={{
-            fontFamily: fonte.forte,
-            fontSize: 14,
-            color: corJornada.roxo,
-            letterSpacing: 0.4,
+            ...fonte.titulo,
+            fontSize: 24,
+            lineHeight: 31,
+            letterSpacing: aperto.subtitulo,
+            color: cor.texto,
           }}
         >
-          PERGUNTA {e.indice + 1} DE {total}
-          {multi ? " · MARQUE TODAS AS CERTAS" : ""}
-        </Text>
-        <T tipo="subtitulo" estilo={{ fontSize: 21, lineHeight: 28 }}>
           {q.q}
-        </T>
+        </Text>
         <View style={{ gap: espaco.sm, marginTop: espaco.xs }}>
           {q.o.map((texto, i) => (
             <Opcao
@@ -345,81 +378,94 @@ function AulaDoDia() {
           ))}
         </View>
       </ScrollView>
-      <View
-        style={{
-          padding: espaco.lg,
-          gap: espaco.md,
-          borderTopWidth: 1,
-          borderTopColor: e.verificada ? "transparent" : cor.borda,
-          backgroundColor: !e.verificada
-            ? cor.fundo
-            : e.acertou
-              ? corJornada.feitoFundo
-              : AMBAR.fundo,
-        }}
-      >
-        {e.verificada ? (
-          <View style={{ gap: 4 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
-              {e.acertou ? (
-                <Check size={24} color={corJornada.feito} strokeWidth={3} />
-              ) : (
-                <Text style={{ fontSize: 20 }}>💡</Text>
-              )}
-              <T tipo="subtitulo" cor={e.acertou ? cor.sementinha : AMBAR.texto}>
-                {revisando
-                  ? "A resposta certa"
-                  : e.acertou
-                    ? "Isso mesmo!"
-                    : multi
-                      ? "Quase! Olhe as marcadas em verde"
-                      : "A certa está em verde"}
+      {/* O pé: antes de responder, só o botão; depois, a resposta comentada
+          numa folha que sobe, solta das bordas, na cor do veredito. */}
+      <Entrada key={`${e.indice}-${e.verificada ? "v" : "p"}`} deslocamento={e.verificada ? 28 : 0}>
+        <View
+          style={
+            e.verificada
+              ? {
+                  marginHorizontal: 10,
+                  marginBottom: 6,
+                  padding: espaco.lg,
+                  gap: espaco.md,
+                  borderRadius: 30,
+                  ...curva,
+                  borderWidth: StyleSheet.hairlineWidth,
+                  borderColor: "rgba(255,255,255,0.95)",
+                  backgroundColor: e.acertou ? corJornada.feitoFundo : AMBAR.fundo,
+                  ...sombraFlutuante,
+                }
+              : { paddingHorizontal: espaco.lg, paddingBottom: espaco.md, gap: espaco.md }
+          }
+        >
+          {e.verificada ? (
+            <View style={{ gap: 4 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
+                {e.acertou ? (
+                  <Check size={24} color={corJornada.feito} strokeWidth={3} />
+                ) : (
+                  <Text style={{ fontSize: 20 }}>💡</Text>
+                )}
+                <T tipo="subtitulo" cor={e.acertou ? cor.sementinha : AMBAR.texto}>
+                  {revisando
+                    ? "A resposta certa"
+                    : e.acertou
+                      ? "Isso mesmo!"
+                      : multi
+                        ? "Quase! Olhe as marcadas em verde"
+                        : "A certa está em verde"}
+                </T>
+              </View>
+              <T tipo="corpo" cor={cor.texto}>
+                {q.why}
               </T>
             </View>
-            <T tipo="corpo" cor={cor.texto}>
-              {q.why}
-            </T>
-          </View>
-        ) : null}
-        {e.verificada ? (
-          <BotaoDaAtividade
-            rotulo={
-              e.indice + 1 >= total ? (revisando ? "Terminar a revisão" : "Terminar") : "Continuar"
-            }
-            cor={e.acertou ? corJornada.feito : corJornada.roxo}
-            aoTocar={() => {
-              if (!revisando) return setE(continuar(e, total));
-              /* Na revisão não há fim nem pagamento: volta para a aula feita. */
-              if (e.indice + 1 >= total) {
-                setRevisando(false);
-                setE(INICIO_DA_AULA);
-                return;
+          ) : null}
+          {e.verificada ? (
+            <BotaoDaAtividade
+              rotulo={
+                e.indice + 1 >= total
+                  ? revisando
+                    ? "Terminar a revisão"
+                    : "Terminar"
+                  : "Continuar"
               }
-              setE(revisao(quiz.questions[e.indice + 1], e.indice + 1));
-            }}
-          />
-        ) : (
-          <BotaoDaAtividade
-            rotulo="Verificar"
-            cor={corJornada.roxo}
-            vibrar={false}
-            desabilitado={!podeVerificar(e)}
-            aoTocar={() => {
-              const x = verificar(e, q);
-              /* Acerto: um toque firme. Erro: um toque curto e leve — o corpo
+              cor={e.acertou ? corJornada.feito : corJornada.roxo}
+              aoTocar={() => {
+                if (!revisando) return setE(continuar(e, total));
+                /* Na revisão não há fim nem pagamento: volta para a aula feita. */
+                if (e.indice + 1 >= total) {
+                  setRevisando(false);
+                  setE(INICIO_DA_AULA);
+                  return;
+                }
+                setE(revisao(quiz.questions[e.indice + 1], e.indice + 1));
+              }}
+            />
+          ) : (
+            <BotaoDaAtividade
+              rotulo="Verificar"
+              cor={corJornada.roxo}
+              vibrar={false}
+              desabilitado={!podeVerificar(e)}
+              aoTocar={() => {
+                const x = verificar(e, q);
+                /* Acerto: um toque firme. Erro: um toque curto e leve — o corpo
                  diz "não" sem repreender (no site, 18 ms contra 10 ms). */
-              if (Platform.OS !== "web") {
-                void Haptics.impactAsync(
-                  x.acertou
-                    ? Haptics.ImpactFeedbackStyle.Medium
-                    : Haptics.ImpactFeedbackStyle.Light,
-                ).catch(() => {});
-              }
-              setE(x);
-            }}
-          />
-        )}
-      </View>
+                if (Platform.OS !== "web") {
+                  void Haptics.impactAsync(
+                    x.acertou
+                      ? Haptics.ImpactFeedbackStyle.Medium
+                      : Haptics.ImpactFeedbackStyle.Light,
+                  ).catch(() => {});
+                }
+                setE(x);
+              }}
+            />
+          )}
+        </View>
+      </Entrada>
     </SafeAreaView>
   );
 }
@@ -431,7 +477,7 @@ function Licao({ quiz }: { quiz: DailyQuiz }) {
       <Cartao>
         <Text
           style={{
-            fontFamily: fonte.forte,
+            ...fonte.forte,
             fontSize: 13,
             color: corJornada.roxo,
             letterSpacing: 0.4,
@@ -470,7 +516,7 @@ function Opcao({
   aoTocar: () => void;
 }) {
   const visual = {
-    neutra: { borda: cor.borda, fundo: cor.cartao, selo: cor.apagado, letra: cor.textoApagado },
+    neutra: { borda: cor.borda, fundo: luz.cartao, selo: cor.apagado, letra: cor.textoApagado },
     escolhida: {
       borda: corJornada.roxo,
       fundo: corJornada.roxoFundo,
@@ -522,35 +568,36 @@ function Opcao({
           toque();
           aoTocar();
         }}
-        /* O relevo da opção é a borda de baixo mais grossa, na cor da borda —
-           afunda quando o dedo aperta. A que faltou fica tracejada e plana:
-           ela não foi tocada, e o relevo diria que foi. */
+        /* A opção é um cartão do app: material branco com o canto do iPhone e
+           a sombra em camadas, que afunda de leve quando o dedo aperta. A
+           escolhida e o veredito ganham o aro da cor; a que faltou fica
+           tracejada e sem sombra — ela não foi tocada. */
         style={({ pressed }) => {
-          const plana = estado === "faltou" || travada;
-          const funda = pressed && !plana;
+          const neutra = estado === "neutra";
           return {
             flexDirection: "row",
             alignItems: "center",
             gap: espaco.md,
-            minHeight: ALVO_MINIMO + 12,
+            minHeight: ALVO_MINIMO + 18,
             paddingVertical: espaco.md,
-            paddingHorizontal: espaco.md,
-            borderRadius: 18,
-            borderWidth: 2,
-            borderBottomWidth: plana || funda ? 2 : 5,
-            marginTop: funda ? 3 : 0,
-            marginBottom: plana ? 3 : 0,
+            paddingHorizontal: 14,
+            borderRadius: 22,
+            ...curva,
+            borderWidth: neutra ? StyleSheet.hairlineWidth : 2,
             borderStyle: estado === "faltou" ? "dashed" : "solid",
-            borderColor: visual.borda,
+            borderColor: neutra ? "rgba(255,255,255,0.95)" : visual.borda,
             backgroundColor: visual.fundo,
+            ...(estado === "faltou" ? null : sombra),
+            transform: [{ scale: pressed && !travada ? 0.975 : 1 }],
           };
         }}
       >
         <View
           style={{
-            width: 32,
-            height: 32,
-            borderRadius: multi ? 8 : 16,
+            width: 34,
+            height: 34,
+            borderRadius: multi ? 11 : 17,
+            ...curva,
             backgroundColor: visual.selo,
             alignItems: "center",
             justifyContent: "center",
@@ -561,17 +608,15 @@ function Opcao({
           ) : estado === "errada" ? (
             <X size={18} color={visual.letra} strokeWidth={3} />
           ) : (
-            <Text style={{ fontFamily: fonte.titulo, fontSize: 15, color: visual.letra }}>
-              {letra}
-            </Text>
+            <Text style={{ ...fonte.titulo, fontSize: 15, color: visual.letra }}>{letra}</Text>
           )}
         </View>
         <Text
           style={{
             flex: 1,
-            fontFamily: fonte.media,
-            fontSize: 16,
-            lineHeight: 22,
+            ...fonte.media,
+            fontSize: 17,
+            lineHeight: 23,
             color: cor.texto,
           }}
         >

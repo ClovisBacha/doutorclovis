@@ -79,7 +79,7 @@ function BloqueadosNoApp() {
               <Avatar id={item.id} nome={item.nome} url={item.avatarUrl} tamanho={44} />
               <Text
                 numberOfLines={1}
-                style={{ flex: 1, fontFamily: fonte.forte, fontSize: 16, color: cor.texto }}
+                style={{ flex: 1, ...fonte.forte, fontSize: 16, color: cor.texto }}
               >
                 {item.nome}
               </Text>

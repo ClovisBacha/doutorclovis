@@ -228,7 +228,7 @@ export default function Dormir() {
           <Text
             accessibilityRole="header"
             style={{
-              fontFamily: fonte.media,
+              ...fonte.media,
               fontSize: 26,
               lineHeight: 32,
               color: corNoite.branco,
@@ -239,7 +239,7 @@ export default function Dormir() {
           <Text
             style={{
               marginTop: 4,
-              fontFamily: fonte.normal,
+              ...fonte.normal,
               fontSize: 13,
               lineHeight: 21,
               color: corNoite.branco60,
@@ -278,7 +278,7 @@ export default function Dormir() {
                 <View style={{ flex: 1 }}>
                   <Text
                     style={{
-                      fontFamily: fonte.titulo,
+                      ...fonte.titulo,
                       fontSize: 14,
                       lineHeight: 19,
                       color: corNoite.branco,
@@ -288,7 +288,7 @@ export default function Dormir() {
                   </Text>
                   <Text
                     style={{
-                      fontFamily: fonte.normal,
+                      ...fonte.normal,
                       fontSize: 13,
                       lineHeight: 17,
                       color: corNoite.branco50,
@@ -304,7 +304,7 @@ export default function Dormir() {
           <Text
             style={{
               marginTop: espaco.sm,
-              fontFamily: fonte.normal,
+              ...fonte.normal,
               fontSize: 13,
               lineHeight: 20,
               color: corNoite.branco35,
@@ -357,7 +357,7 @@ export default function Dormir() {
                       <Text
                         style={{
                           marginTop: espaco.sm,
-                          fontFamily: fonte.titulo,
+                          ...fonte.titulo,
                           fontSize: 14,
                           lineHeight: 19,
                           color: corNoite.branco,
@@ -368,7 +368,7 @@ export default function Dormir() {
                       <Text
                         style={{
                           marginTop: 2,
-                          fontFamily: fonte.normal,
+                          ...fonte.normal,
                           fontSize: 13,
                           lineHeight: 17,
                           color: corNoite.branco50,
@@ -411,7 +411,7 @@ export default function Dormir() {
                 >
                   <Text
                     style={{
-                      fontFamily: fonte.forte,
+                      ...fonte.forte,
                       fontSize: 13,
                       color: ativo ? corNoite.tempoTexto : corNoite.branco70,
                     }}
@@ -428,7 +428,7 @@ export default function Dormir() {
             style={{
               marginTop: espaco.xl,
               minHeight: 20,
-              fontFamily: fonte.normal,
+              ...fonte.normal,
               fontSize: 13,
               color: corNoite.branco60,
             }}
@@ -454,7 +454,7 @@ export default function Dormir() {
                 opacity: pressed ? 0.8 : 1,
               })}
             >
-              <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: corNoite.branco80 }}>
+              <Text style={{ ...fonte.titulo, fontSize: 14, color: corNoite.branco80 }}>
                 Parar agora
               </Text>
             </Pressable>
@@ -463,7 +463,7 @@ export default function Dormir() {
           <Text
             style={{
               marginTop: espaco.xxl,
-              fontFamily: fonte.normal,
+              ...fonte.normal,
               fontSize: 13,
               lineHeight: 20,
               color: corNoite.branco35,
@@ -485,7 +485,7 @@ function Secao({ children }: { children: string }) {
       style={{
         marginTop: 28,
         marginBottom: espaco.sm,
-        fontFamily: fonte.forte,
+        ...fonte.forte,
         fontSize: 13,
         letterSpacing: 0.65,
         textTransform: "uppercase",
@@ -735,7 +735,7 @@ function HistoriaDaNoite({
               style={{
                 marginTop: 20,
                 textAlign: "center",
-                fontFamily: fonte.media,
+                ...fonte.media,
                 fontSize: 24,
                 lineHeight: 30,
                 color: corNoite.branco,
@@ -766,7 +766,7 @@ function HistoriaDaNoite({
             <Text
               style={{
                 marginTop: espaco.lg,
-                fontFamily: fonte.normal,
+                ...fonte.normal,
                 fontSize: 13,
                 color: corNoite.branco30,
               }}

@@ -297,7 +297,7 @@ export default function GratidaoTela() {
                   <Text
                     accessibilityLabel={`${marco} coisas boas`}
                     style={{
-                      fontFamily: fonte.titulo,
+                      ...fonte.titulo,
                       fontSize: 60,
                       lineHeight: 66,
                       color: corGratidao.marco,
@@ -310,7 +310,7 @@ export default function GratidaoTela() {
                   <View style={CARTAO_DA_GRATIDAO}>
                     <Text
                       style={{
-                        fontFamily: fonte.normal,
+                        ...fonte.normal,
                         fontSize: 15,
                         lineHeight: 21,
                         color: corGratidao.titulo,
@@ -339,7 +339,7 @@ export default function GratidaoTela() {
                     <Text
                       style={{
                         textAlign: "center",
-                        fontFamily: fonte.normal,
+                        ...fonte.normal,
                         fontSize: 14,
                         lineHeight: 19,
                         color: corGratidao.cartaTexto,
@@ -386,7 +386,7 @@ export default function GratidaoTela() {
             accessibilityRole="header"
             style={{
               textAlign: "center",
-              fontFamily: fonte.media,
+              ...fonte.media,
               fontSize: 24,
               lineHeight: 30,
               color: corGratidao.titulo,
@@ -398,7 +398,7 @@ export default function GratidaoTela() {
             style={{
               marginTop: 4,
               textAlign: "center",
-              fontFamily: fonte.normal,
+              ...fonte.normal,
               fontSize: 13,
               color: corGratidao.texto,
             }}
@@ -410,7 +410,7 @@ export default function GratidaoTela() {
               <View key={`${g.quando}-${g.texto.slice(0, 12)}`} style={CARTAO_DA_GRATIDAO}>
                 <Text
                   style={{
-                    fontFamily: fonte.normal,
+                    ...fonte.normal,
                     fontSize: 14,
                     lineHeight: 19,
                     color: corGratidao.titulo,
@@ -458,7 +458,7 @@ export default function GratidaoTela() {
             style={{
               marginTop: espaco.lg,
               textAlign: "center",
-              fontFamily: fonte.titulo,
+              ...fonte.titulo,
               fontSize: 24,
               lineHeight: 30,
               color: corGratidao.titulo,
@@ -471,7 +471,7 @@ export default function GratidaoTela() {
               marginTop: espaco.sm,
               maxWidth: 320,
               textAlign: "center",
-              fontFamily: fonte.normal,
+              ...fonte.normal,
               fontSize: 14,
               lineHeight: 20,
               color: corGratidao.texto,
@@ -506,7 +506,7 @@ export default function GratidaoTela() {
                 >
                   <Text
                     style={{
-                      fontFamily: fonte.normal,
+                      ...fonte.normal,
                       fontSize: 14,
                       lineHeight: 19,
                       color: corGratidao.titulo,
@@ -522,7 +522,7 @@ export default function GratidaoTela() {
             <Text
               style={{
                 marginTop: espaco.md,
-                fontFamily: fonte.titulo,
+                ...fonte.titulo,
                 fontSize: 13,
                 color: corGratidao.forte,
               }}
@@ -570,7 +570,7 @@ export default function GratidaoTela() {
             style={{
               marginTop: espaco.lg,
               textAlign: "center",
-              fontFamily: fonte.titulo,
+              ...fonte.titulo,
               fontSize: 26,
               lineHeight: 32,
               letterSpacing: -0.3,
@@ -584,7 +584,7 @@ export default function GratidaoTela() {
               marginTop: espaco.sm,
               maxWidth: 320,
               textAlign: "center",
-              fontFamily: fonte.normal,
+              ...fonte.normal,
               fontSize: 14,
               lineHeight: 20,
               color: corGratidao.texto,
@@ -624,9 +624,7 @@ export default function GratidaoTela() {
                   justifyContent: "center",
                 })}
               >
-                <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: corGratidao.forte }}>
-                  {f}
-                </Text>
+                <Text style={{ ...fonte.forte, fontSize: 14, color: corGratidao.forte }}>{f}</Text>
               </Pressable>
             ))}
           </View>
@@ -650,7 +648,7 @@ export default function GratidaoTela() {
               backgroundColor: cor.branco,
               padding: espaco.lg,
               ...sombraDe(corGratidao.forte, 0.8),
-              fontFamily: fonte.normal,
+              ...fonte.normal,
               fontSize: 15,
               lineHeight: 21,
               color: cor.texto,
@@ -687,7 +685,7 @@ export default function GratidaoTela() {
 
 const estiloDoQuando = {
   marginTop: 4,
-  fontFamily: fonte.forte,
+  ...fonte.forte,
   fontSize: 13,
   letterSpacing: 0.4,
   textTransform: "uppercase" as const,
@@ -721,7 +719,7 @@ function Link({
     >
       <Text
         style={{
-          fontFamily: fonte.forte,
+          ...fonte.forte,
           fontSize: 13,
           color: tinta,
           textDecorationLine: "underline",

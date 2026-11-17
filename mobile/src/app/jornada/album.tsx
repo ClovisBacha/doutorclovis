@@ -76,7 +76,7 @@ export default function AlbumDeVoces() {
           contentFit="contain"
         />
         <View style={{ flex: 1 }}>
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 22, color: cor.texto }}>
+          <Text style={{ ...fonte.titulo, fontSize: 22, color: cor.texto }}>
             {total} {total === 1 ? "figurinha" : "figurinhas"}
           </Text>
           <T tipo="apagado">
@@ -121,7 +121,7 @@ export default function AlbumDeVoces() {
                   })}
                 >
                   <Text style={{ fontSize: 30, opacity: tem ? 1 : 0.35 }}>{figurinhaDoPos(s)}</Text>
-                  <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: cor.textoApagado }}>
+                  <Text style={{ ...fonte.forte, fontSize: 13, color: cor.textoApagado }}>
                     S{s}
                   </Text>
                 </Pressable>
@@ -160,9 +160,7 @@ export default function AlbumDeVoces() {
                 })}
               >
                 <Text style={{ fontSize: 22, opacity: tem ? 1 : 0.3 }}>{fruitEmojiForWeek(s)}</Text>
-                <Text style={{ fontFamily: fonte.media, fontSize: 11, color: cor.textoApagado }}>
-                  {s}
-                </Text>
+                <Text style={{ ...fonte.media, fontSize: 11, color: cor.textoApagado }}>{s}</Text>
               </Pressable>
             );
           })}
@@ -218,7 +216,7 @@ function FolhaDaSemanaDeVida({
           <View style={{ flex: 1 }}>
             <Text
               style={{
-                fontFamily: fonte.titulo,
+                ...fonte.titulo,
                 fontSize: 12,
                 letterSpacing: 1.2,
                 textTransform: "uppercase",
@@ -227,7 +225,7 @@ function FolhaDaSemanaDeVida({
             >
               Semana {semana} de vida
             </Text>
-            <Text style={{ fontFamily: fonte.titulo, fontSize: 20, color: cor.texto }}>
+            <Text style={{ ...fonte.titulo, fontSize: 20, color: cor.texto }}>
               {tem ? "Figurinha conquistada" : "Sem figurinha nessa semana"}
             </Text>
             <T tipo="apagado">
@@ -236,10 +234,8 @@ function FolhaDaSemanaDeVida({
           </View>
         </View>
         <View style={{ borderRadius: 18, backgroundColor: "#effaff", padding: espaco.lg, gap: 4 }}>
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 13, color: "#0369a1" }}>
-            Nessa semana
-          </Text>
-          <Text style={{ fontFamily: fonte.media, fontSize: 15, lineHeight: 22, color: "#0c3a5a" }}>
+          <Text style={{ ...fonte.titulo, fontSize: 13, color: "#0369a1" }}>Nessa semana</Text>
+          <Text style={{ ...fonte.media, fontSize: 15, lineHeight: 22, color: "#0c3a5a" }}>
             {nestaSemanaDoPos(semana)}
           </Text>
         </View>

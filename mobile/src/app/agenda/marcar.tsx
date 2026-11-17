@@ -200,7 +200,7 @@ export default function MarcarConsulta() {
             aoMenos={() => setHora((h) => (h + 23) % 24)}
             aoMais={() => setHora((h) => (h + 1) % 24)}
           />
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 30, color: cor.texto }}>:</Text>
+          <Text style={{ ...fonte.titulo, fontSize: 30, color: cor.texto }}>:</Text>
           <Passo
             valor={String(minuto).padStart(2, "0")}
             rotulo="minutos"
@@ -208,9 +208,7 @@ export default function MarcarConsulta() {
             aoMais={() => setMinuto((m) => (m + 5) % 60)}
           />
         </View>
-        <Text
-          style={{ textAlign: "center", fontFamily: fonte.forte, fontSize: 15, color: cor.agenda }}
-        >
+        <Text style={{ textAlign: "center", ...fonte.forte, fontSize: 15, color: cor.agenda }}>
           {quandoPorExtenso(quando, agora)}
         </Text>
       </Secao>
@@ -268,7 +266,7 @@ export default function MarcarConsulta() {
           }}
         >
           <Trash2 size={18} color={cor.urgente} />
-          <Text style={{ fontFamily: fonte.forte, fontSize: 15, color: cor.urgente }}>
+          <Text style={{ ...fonte.forte, fontSize: 15, color: cor.urgente }}>
             {confirmarApagar ? "Toque de novo para apagar" : "Apagar da agenda"}
           </Text>
         </Pressable>
@@ -322,9 +320,7 @@ function Escolha({
         borderColor: ativa ? cor.agenda : cor.borda,
       }}
     >
-      <Text
-        style={{ fontFamily: fonte.forte, fontSize: 15, color: ativa ? cor.branco : cor.texto }}
-      >
+      <Text style={{ ...fonte.forte, fontSize: 15, color: ativa ? cor.branco : cor.texto }}>
         {rotulo}
       </Text>
     </Pressable>

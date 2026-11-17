@@ -70,12 +70,12 @@ export function GanheMais({
           paddingHorizontal: espaco.lg,
         }}
       >
-        <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: corRecompensas.esmeralda800 }}>
+        <Text style={{ ...fonte.forte, fontSize: 14, color: corRecompensas.esmeralda800 }}>
           🌱 Ganhe mais Sementinhas
         </Text>
         <Text
           style={{
-            fontFamily: fonte.forte,
+            ...fonte.forte,
             fontSize: 16,
             color: corRecompensas.esmeralda600,
             transform: [{ rotate: aberta ? "90deg" : "0deg" }],
@@ -94,7 +94,7 @@ export function GanheMais({
             style={{
               marginTop: espaco.xs,
               paddingHorizontal: espaco.sm,
-              fontFamily: fonte.normal,
+              ...fonte.normal,
               fontSize: 13,
               lineHeight: 19,
               textAlign: "center",
@@ -147,9 +147,7 @@ function CartaoDaIndicacao({ avisar }: { avisar: (t: string) => void }) {
     >
       <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
         <Text style={{ fontSize: 24 }}>👭</Text>
-        <Text
-          style={{ flex: 1, fontFamily: fonte.titulo, fontSize: 14, color: corRecompensas.rosa700 }}
-        >
+        <Text style={{ flex: 1, ...fonte.titulo, fontSize: 14, color: corRecompensas.rosa700 }}>
           Indique uma amiga → {RECOMPENSA_DA_INDICACAO} 🌱
         </Text>
         {ind.amigas > 0 ? (
@@ -161,7 +159,7 @@ function CartaoDaIndicacao({ avisar }: { avisar: (t: string) => void }) {
               paddingVertical: 4,
             }}
           >
-            <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: corRecompensas.rosa700 }}>
+            <Text style={{ ...fonte.forte, fontSize: 13, color: corRecompensas.rosa700 }}>
               {ind.amigas} {ind.amigas === 1 ? "amiga" : "amigas"} 💞
             </Text>
           </View>
@@ -169,8 +167,8 @@ function CartaoDaIndicacao({ avisar }: { avisar: (t: string) => void }) {
       </View>
       <Text style={estilo.corpo}>
         Cada amiga que criar a conta pelo seu link te dá{" "}
-        <Text style={{ fontFamily: fonte.forte }}>{RECOMPENSA_DA_INDICACAO} Sementinhas</Text>. Sem
-        limite de amigas 💜
+        <Text style={{ ...fonte.forte }}>{RECOMPENSA_DA_INDICACAO} Sementinhas</Text>. Sem limite de
+        amigas 💜
       </Text>
       <View
         style={{
@@ -187,7 +185,7 @@ function CartaoDaIndicacao({ avisar }: { avisar: (t: string) => void }) {
       >
         <Text
           numberOfLines={1}
-          style={{ flex: 1, fontFamily: fonte.normal, fontSize: 13, color: cor.textoApagado }}
+          style={{ flex: 1, ...fonte.normal, fontSize: 13, color: cor.textoApagado }}
         >
           {link}
         </Text>
@@ -197,7 +195,7 @@ function CartaoDaIndicacao({ avisar }: { avisar: (t: string) => void }) {
           onPress={() => void compartilhar()}
           style={{ minHeight: ALVO_MINIMO, justifyContent: "center", paddingHorizontal: espaco.md }}
         >
-          <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: corRecompensas.rosa600 }}>
+          <Text style={{ ...fonte.forte, fontSize: 13, color: corRecompensas.rosa600 }}>
             Compartilhar
           </Text>
         </Pressable>
@@ -224,7 +222,7 @@ function CartaoDaIndicacao({ avisar }: { avisar: (t: string) => void }) {
             justifyContent: "center",
           }}
         >
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: cor.branco }}>
+          <Text style={{ ...fonte.titulo, fontSize: 14, color: cor.branco }}>
             Convidar pelo WhatsApp
           </Text>
         </LinearGradient>
@@ -315,7 +313,7 @@ function CartaoDoDepoimento({ avisar }: { avisar: (t: string) => void }) {
         <Text
           style={{
             flex: 1,
-            fontFamily: fonte.titulo,
+            ...fonte.titulo,
             fontSize: 14,
             color: corRecompensas.violeta700,
           }}
@@ -331,9 +329,7 @@ function CartaoDoDepoimento({ avisar }: { avisar: (t: string) => void }) {
               paddingVertical: 4,
             }}
           >
-            <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: selo.tinta }}>
-              {selo.texto}
-            </Text>
+            <Text style={{ ...fonte.forte, fontSize: 13, color: selo.tinta }}>{selo.texto}</Text>
           </View>
         ) : null}
       </View>
@@ -341,8 +337,8 @@ function CartaoDoDepoimento({ avisar }: { avisar: (t: string) => void }) {
         <>
           <Text style={estilo.corpo}>
             Conte como está sendo sua experiência 💜 Se o Dr. Clóvis aprovar, você ganha{" "}
-            <Text style={{ fontFamily: fonte.forte }}>{RECOMPENSA_DO_DEPOIMENTO} Sementinhas</Text>{" "}
-            e seu depoimento pode aparecer no site.
+            <Text style={{ ...fonte.forte }}>{RECOMPENSA_DO_DEPOIMENTO} Sementinhas</Text> e seu
+            depoimento pode aparecer no site.
           </Text>
           <TextInput
             value={texto}
@@ -376,7 +372,7 @@ function CartaoDoDepoimento({ avisar }: { avisar: (t: string) => void }) {
               opacity: enviando || curto ? 0.4 : pressed ? 0.85 : 1,
             })}
           >
-            <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: cor.branco }}>
+            <Text style={{ ...fonte.titulo, fontSize: 14, color: cor.branco }}>
               {enviando ? "Enviando…" : status ? "Reenviar para análise" : "Enviar depoimento"}
             </Text>
           </Pressable>
@@ -393,7 +389,7 @@ function CartaoDoDepoimento({ avisar }: { avisar: (t: string) => void }) {
           >
             <Text
               style={{
-                fontFamily: fonte.normal,
+                ...fonte.normal,
                 fontStyle: "italic",
                 fontSize: 14,
                 lineHeight: 21,
@@ -411,9 +407,7 @@ function CartaoDoDepoimento({ avisar }: { avisar: (t: string) => void }) {
             }}
             style={{ alignSelf: "flex-start", minHeight: ALVO_MINIMO, justifyContent: "center" }}
           >
-            <Text
-              style={{ fontFamily: fonte.forte, fontSize: 13, color: corRecompensas.violeta600 }}
-            >
+            <Text style={{ ...fonte.forte, fontSize: 13, color: corRecompensas.violeta600 }}>
               Editar depoimento
             </Text>
           </Pressable>
@@ -468,12 +462,12 @@ function CodigoDeQuemIndicou({
 
   return (
     <CartaoMaterial estilo={{ borderRadius: 24, padding: espaco.lg }}>
-      <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: cor.texto }}>
+      <Text style={{ ...fonte.forte, fontSize: 14, color: cor.texto }}>
         Veio pela indicação de alguém?
       </Text>
       <Text style={estilo.miudo}>
         Coloque o código da sua médica ou da embaixadora que te trouxe e ganhe{" "}
-        <Text style={{ fontFamily: fonte.media, color: cor.texto }}>
+        <Text style={{ ...fonte.media, color: cor.texto }}>
           {BONUS_INFLUENCIADORA} Sementinhas 🌱
         </Text>
         .
@@ -515,7 +509,7 @@ function CodigoDeQuemIndicou({
             opacity: enviando || codigo.trim().length < 3 ? 0.4 : pressed ? 0.85 : 1,
           })}
         >
-          <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: cor.branco }}>
+          <Text style={{ ...fonte.forte, fontSize: 14, color: cor.branco }}>
             {enviando ? "…" : "Aplicar"}
           </Text>
         </Pressable>
@@ -568,7 +562,7 @@ function Extrato() {
           opacity: pressed ? 0.85 : 1,
         })}
       >
-        <Text style={{ fontFamily: fonte.media, fontSize: 13, color: corRecompensas.ardosia600 }}>
+        <Text style={{ ...fonte.media, fontSize: 13, color: corRecompensas.ardosia600 }}>
           {aberto ? "Esconder" : "Ver"} minhas últimas movimentações
         </Text>
       </Pressable>
@@ -610,13 +604,13 @@ function Extrato() {
               >
                 <Text
                   numberOfLines={1}
-                  style={{ flex: 1, fontFamily: fonte.normal, fontSize: 13, color: cor.texto }}
+                  style={{ flex: 1, ...fonte.normal, fontSize: 13, color: cor.texto }}
                 >
                   {l.motivo ?? "Movimentação"}
                 </Text>
                 <Text
                   style={{
-                    fontFamily: fonte.normal,
+                    ...fonte.normal,
                     fontSize: 13,
                     color: cor.textoApagado,
                     fontVariant: ["tabular-nums"],
@@ -628,7 +622,7 @@ function Extrato() {
                   style={{
                     minWidth: 36,
                     textAlign: "right",
-                    fontFamily: fonte.forte,
+                    ...fonte.forte,
                     fontSize: 13,
                     fontVariant: ["tabular-nums"],
                     color: l.quantidade >= 0 ? corRecompensas.esmeralda600 : cor.textoApagado,
@@ -649,14 +643,14 @@ function Extrato() {
 const estilo = {
   corpo: {
     marginTop: espaco.sm,
-    fontFamily: fonte.normal,
+    ...fonte.normal,
     fontSize: 14,
     lineHeight: 22,
     color: cor.texto,
   },
   miudo: {
     marginTop: espaco.xs,
-    fontFamily: fonte.normal,
+    ...fonte.normal,
     fontSize: 13,
     lineHeight: 18,
     color: cor.textoApagado,
@@ -669,14 +663,14 @@ const estilo = {
     backgroundColor: cor.branco,
     paddingHorizontal: espaco.lg,
     paddingVertical: espaco.sm,
-    fontFamily: fonte.normal,
+    ...fonte.normal,
     fontSize: 14,
     color: cor.texto,
   },
   linhaDoExtrato: {
     paddingHorizontal: espaco.md,
     paddingVertical: espaco.md,
-    fontFamily: fonte.normal,
+    ...fonte.normal,
     fontSize: 13,
   },
 } as const;

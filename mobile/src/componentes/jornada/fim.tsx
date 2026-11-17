@@ -251,7 +251,7 @@ function TrofeuConquistado({ aoFechar }: { aoFechar: () => void }) {
         <Text
           style={{
             textAlign: "center",
-            fontFamily: fonte.titulo,
+            ...fonte.titulo,
             fontSize: 26,
             lineHeight: 32,
             color: cor.branco,
@@ -262,7 +262,7 @@ function TrofeuConquistado({ aoFechar }: { aoFechar: () => void }) {
         <Text
           style={{
             textAlign: "center",
-            fontFamily: fonte.media,
+            ...fonte.media,
             fontSize: 15,
             color: "rgba(255,255,255,0.85)",
           }}

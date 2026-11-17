@@ -36,7 +36,13 @@ const servidor = createServer((req, res) => {
 await new Promise((r) => servidor.listen(0, "127.0.0.1", r));
 const porta = servidor.address().port;
 
-const exe = existsSync("/opt/pw-browsers/chromium") ? "/opt/pw-browsers/chromium" : undefined;
+// O Chromium da CI; no Mac, o Chrome instalado (sem `npx playwright install`).
+const CHROME_DO_MAC = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const exe = existsSync("/opt/pw-browsers/chromium")
+  ? "/opt/pw-browsers/chromium"
+  : existsSync(CHROME_DO_MAC)
+    ? CHROME_DO_MAC
+    : undefined;
 const navegador = await chromium.launch({ executablePath: exe });
 let falhas = 0;
 for (const rota of rotas) {

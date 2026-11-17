@@ -17,7 +17,7 @@ import { ShieldCheck } from "lucide-react-native";
 import Svg, { Circle, Defs, RadialGradient, Stop } from "react-native-svg";
 import { estadoDoNo as estadoDaPele, type TrilhaSkin } from "@/lib/trilha-skins";
 import { useAviso } from "~/componentes/aviso";
-import { toque } from "~/componentes/base";
+import { toque, useFolgaDaBarra } from "~/componentes/base";
 import { corCaminho } from "~/componentes/caminho/cores";
 import { corJornada } from "~/componentes/jornada/cores";
 import {
@@ -41,6 +41,7 @@ import {
   type ArrumarEnfeite,
 } from "~/componentes/caminho/enfeites";
 import { useMovimentoReduzido } from "~/componentes/movimento";
+import { Vidro } from "~/componentes/vidro";
 import { parametroDaBancada } from "~/lib/bancada";
 import {
   comBranco,
@@ -181,19 +182,40 @@ export function Caminho(p: PropsDoCaminho) {
   const lista = useRef<FlatList<Bloco>>(null);
   const [alturaDoTopo, setAlturaDoTopo] = useState<number | null>(null);
   const [alturaDaLista, setAlturaDaLista] = useState<number | null>(null);
+  /* O placar FLUTUA sobre a trilha (o vidro de 16/11/2026): a lista começa
+     embaixo dele, e a trilha passa por trás do vidro ao rolar. */
+  const [alturaDaFaixa, setAlturaDaFaixa] = useState(0);
+  const folga = useFolgaDaBarra();
   /* Na bancada, `&topo=1` deixa a lista no alto (para fotografar o humor e a
      primeira fase); fora dela, sempre abre em hoje. */
   const rolou = useRef(parametroDaBancada("topo") === "1");
-  useEffect(() => {
+  /* O placar e a barra de abas flutuam por cima da lista: "o meio" é o meio
+     do que se vê ENTRE os dois — e só depois de o placar se medir, porque a
+     altura dele entra no topo da lista.
+     ⚠️ No iPhone a lista faz a rolagem inicial DELA (`initialScrollIndex`)
+     quando termina de se medir, depois desta — e a desfazia: o dia de hoje
+     abria embaixo, atrás da barra. Por isso a centralização vale de novo a
+     cada medida (`onContentSizeChange`), até ela tocar na tela ou passarem
+     dois segundos. */
+  const centrar = useCallback(() => {
     if (rolou.current || alturaDoTopo == null || alturaDaLista == null || indiceDeHoje < 0) return;
-    rolou.current = true;
-    const alvo = Math.max(0, alturaDoTopo + yDeHoje - alturaDaLista / 2);
-    const t = setTimeout(
-      () => lista.current?.scrollToOffset({ offset: alvo, animated: false }),
-      60,
-    );
+    if (alturaDaFaixa === 0) return;
+    const meio = (alturaDaFaixa + alturaDaLista - folga) / 2;
+    lista.current?.scrollToOffset({
+      offset: Math.max(0, alturaDoTopo + yDeHoje - meio),
+      animated: false,
+    });
+  }, [alturaDoTopo, alturaDaLista, alturaDaFaixa, folga, indiceDeHoje, yDeHoje]);
+  useEffect(() => {
+    const t = setTimeout(centrar, 60);
     return () => clearTimeout(t);
-  }, [alturaDoTopo, alturaDaLista, indiceDeHoje, yDeHoje]);
+  }, [centrar]);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      rolou.current = true;
+    }, 2000);
+    return () => clearTimeout(t);
+  }, []);
 
   /* ── O aviso do dia que ainda não abriu ── */
   const { avisar, aviso } = useAviso({ direita: 72 });
@@ -346,17 +368,7 @@ export function Caminho(p: PropsDoCaminho) {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: cor.fundo }}>
-      <FaixaDoTopo
-        chama={p.chama}
-        perdoes={p.perdoes ?? 0}
-        amigas={p.amigas}
-        trofeus={p.trofeus}
-        saldo={p.saldo}
-        carregando={p.carregandoCarteira}
-        aoAbrirFolha={p.aoAbrirFolha}
-        aoAbrirAmigas={p.aoAbrirAmigas}
-      />
+    <View style={{ flex: 1 }}>
       <View style={{ flex: 1 }}>
         <FundoEAr
           paradas={paradas}
@@ -384,8 +396,20 @@ export function Caminho(p: PropsDoCaminho) {
           initialScrollIndex={indiceDeHoje > 0 && !rolou.current ? indiceDeHoje : undefined}
           initialNumToRender={3}
           windowSize={7}
-          extraData={[alturaDoTopo, porBloco, arrumando, selecionado, p.pele, parado]}
+          extraData={[
+            alturaDoTopo,
+            alturaDaFaixa,
+            porBloco,
+            arrumando,
+            selecionado,
+            p.pele,
+            parado,
+          ]}
           onLayout={(e: LayoutChangeEvent) => setAlturaDaLista(e.nativeEvent.layout.height)}
+          onContentSizeChange={centrar}
+          onScrollBeginDrag={() => {
+            rolou.current = true;
+          }}
           onScrollToIndexFailed={() => {}}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
@@ -393,7 +417,7 @@ export function Caminho(p: PropsDoCaminho) {
               onLayout={(e) => setAlturaDoTopo(e.nativeEvent.layout.height)}
               style={{
                 paddingHorizontal: 20,
-                paddingTop: espaco.lg,
+                paddingTop: espaco.lg + alturaDaFaixa,
                 gap: espaco.lg,
                 paddingBottom: espaco.lg,
               }}
@@ -405,8 +429,31 @@ export function Caminho(p: PropsDoCaminho) {
               {p.humorFeito ? null : <CartaoDoHumor aoMarcar={p.aoMarcarHumor} />}
             </View>
           }
-          ListFooterComponent={<View style={{ height: 40 + 64 + (arrumando ? 120 : 0) }} />}
+          ListFooterComponent={<View style={{ height: 40 + 64 + (arrumando ? 120 : 0) + folga }} />}
         />
+        <View
+          pointerEvents="box-none"
+          onLayout={(e) => setAlturaDaFaixa(Math.round(e.nativeEvent.layout.height))}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            paddingHorizontal: 12,
+            paddingTop: 4,
+          }}
+        >
+          <FaixaDoTopo
+            chama={p.chama}
+            perdoes={p.perdoes ?? 0}
+            amigas={p.amigas}
+            trofeus={p.trofeus}
+            saldo={p.saldo}
+            carregando={p.carregandoCarteira}
+            aoAbrirFolha={p.aoAbrirFolha}
+            aoAbrirAmigas={p.aoAbrirAmigas}
+          />
+        </View>
       </View>
       {arrumando ? (
         <BarraDeArrumar
@@ -507,17 +554,17 @@ function FaixaDoTopo({
   /* Desconhecido é "—", nunca 0: zero afirma; o traço admite que não sabemos. */
   const fmt = (n: number | null) => (carregando ? "…" : n == null ? "—" : String(n));
   const amigasTexto = amigas == null ? "—" : amigas > 99 ? "99+" : String(amigas);
+  /* O placar é uma cápsula de VIDRO solta sobre a trilha (16/11/2026), com um
+     tom de branco: sobre o céu da noite, os números coloridos precisam dele. */
   return (
-    <View
-      style={{
+    <Vidro
+      tinta="rgba(255,255,255,0.72)"
+      estilo={{
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-around",
-        paddingHorizontal: espaco.xl,
-        paddingVertical: espaco.md,
-        borderBottomWidth: 1,
-        borderBottomColor: cor.borda,
-        backgroundColor: corCaminho.faixaFundo,
+        paddingHorizontal: espaco.md,
+        paddingVertical: 4,
       }}
     >
       <ItemDaFaixa
@@ -584,7 +631,7 @@ function FaixaDoTopo({
           </ItemDaFaixa>
         </>
       ) : null}
-    </View>
+    </Vidro>
   );
 }
 
@@ -641,10 +688,8 @@ function CartaoDoHumor({ aoMarcar }: { aoMarcar: (humor: string) => void }) {
         shadowOffset: { width: 0, height: 2 },
       }}
     >
-      <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: cor.texto }}>
-        Como você está hoje?
-      </Text>
-      <Text style={{ fontFamily: fonte.normal, fontSize: 13, color: cor.textoApagado }}>
+      <Text style={{ ...fonte.forte, fontSize: 14, color: cor.texto }}>Como você está hoje?</Text>
+      <Text style={{ ...fonte.normal, fontSize: 13, color: cor.textoApagado }}>
         1ª tarefa do desafio de hoje 🔥
       </Text>
       <View style={{ flexDirection: "row", gap: 4, marginTop: 10 }}>
@@ -668,7 +713,7 @@ function CartaoDoHumor({ aoMarcar }: { aoMarcar: (humor: string) => void }) {
             })}
           >
             <Emoji tamanho={24}>{h.emoji}</Emoji>
-            <Text style={{ fontFamily: fonte.normal, fontSize: 13, color: cor.textoApagado }}>
+            <Text style={{ ...fonte.normal, fontSize: 13, color: cor.textoApagado }}>
               {h.label}
             </Text>
           </Pressable>
@@ -710,7 +755,7 @@ function CartaoDoNascimento({ nome, aoTocar }: { nome: string | null; aoTocar: (
           end={{ x: 1, y: 0.5 }}
           style={{ paddingVertical: espaco.md, alignItems: "center" }}
         >
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: cor.branco }}>
+          <Text style={{ ...fonte.titulo, fontSize: 14, color: cor.branco }}>
             🎉 {nome || "O bebê"} nasceu!
           </Text>
         </LinearGradient>
@@ -777,7 +822,7 @@ function FaixaDaFase({
             <View style={{ flex: 1 }}>
               <Text
                 style={{
-                  fontFamily: fonte.forte,
+                  ...fonte.forte,
                   fontSize: 13,
                   letterSpacing: 0.8,
                   textTransform: "uppercase",
@@ -786,9 +831,7 @@ function FaixaDaFase({
               >
                 Fase {fase.n} · Semanas {fase.from}–{fase.to}
               </Text>
-              <Text
-                style={{ marginTop: 2, fontFamily: fonte.titulo, fontSize: 20, color: cor.branco }}
-              >
+              <Text style={{ marginTop: 2, ...fonte.titulo, fontSize: 20, color: cor.branco }}>
                 {fase.name}
               </Text>
             </View>
@@ -971,9 +1014,7 @@ function BarraDaSemana({
                   shadowOffset: { width: 0, height: 1 },
                 }}
               >
-                <Text
-                  style={{ fontFamily: fonte.titulo, fontSize: 9, color: corCaminho.sementinhas }}
-                >
+                <Text style={{ ...fonte.titulo, fontSize: 9, color: corCaminho.sementinhas }}>
                   ✓
                 </Text>
               </View>
@@ -983,7 +1024,7 @@ function BarraDaSemana({
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
               <Text
                 numberOfLines={1}
-                style={{ fontFamily: fonte.titulo, fontSize: 15, color: corCaminho.textoForte }}
+                style={{ ...fonte.titulo, fontSize: 15, color: corCaminho.textoForte }}
               >
                 {titulo}
               </Text>
@@ -998,7 +1039,7 @@ function BarraDaSemana({
                 >
                   <Text
                     style={{
-                      fontFamily: fonte.titulo,
+                      ...fonte.titulo,
                       fontSize: 9,
                       letterSpacing: 0.6,
                       textTransform: "uppercase",
@@ -1012,7 +1053,7 @@ function BarraDaSemana({
             </View>
             <Text
               numberOfLines={1}
-              style={{ fontFamily: fonte.media, fontSize: 13, color: corCaminho.textoMedio }}
+              style={{ ...fonte.media, fontSize: 13, color: corCaminho.textoMedio }}
             >
               {sub}
             </Text>
@@ -1161,7 +1202,7 @@ function NoDoDia({
                 <Text
                   numberOfLines={1}
                   style={{
-                    fontFamily: fonte.titulo,
+                    ...fonte.titulo,
                     fontSize: 13,
                     letterSpacing: 0.4,
                     textTransform: "uppercase",
@@ -1218,7 +1259,7 @@ function NoDoDia({
                 ) : fechado ? (
                   <Text
                     style={{
-                      fontFamily: fonte.titulo,
+                      ...fonte.titulo,
                       fontSize: hoje ? 30 : 24,
                       color: cor.branco,
                     }}
@@ -1288,6 +1329,7 @@ function BotaoDaLoja({
   aoTocar: () => void;
 }) {
   const reduzido = useMovimentoReduzido();
+  const folga = useFolgaDaBarra();
   const v = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (reduzido) return;
@@ -1311,7 +1353,7 @@ function BotaoDaLoja({
     return () => laco.stop();
   }, [reduzido, v]);
   return (
-    <View style={{ position: "absolute", right: espaco.lg, bottom: espaco.lg }}>
+    <View style={{ position: "absolute", right: espaco.lg, bottom: espaco.lg + folga }}>
       {/* O brilho que respira (`dc-shop-glow`): um aro verde-água por trás. */}
       <Animated.View
         pointerEvents="none"
@@ -1373,9 +1415,7 @@ function BotaoDaLoja({
               borderColor: cor.branco,
             }}
           >
-            <Text
-              style={{ fontFamily: fonte.titulo, fontSize: 12, lineHeight: 15, color: cor.branco }}
-            >
+            <Text style={{ ...fonte.titulo, fontSize: 12, lineHeight: 15, color: cor.branco }}>
               {aResgatar}
             </Text>
           </View>
@@ -1396,7 +1436,7 @@ function BotaoDaLoja({
           >
             <Text
               style={{
-                fontFamily: fonte.titulo,
+                ...fonte.titulo,
                 fontSize: 13,
                 lineHeight: 15,
                 color: corCaminho.lojaSaldo,
@@ -1412,6 +1452,6 @@ function BotaoDaLoja({
 }
 
 const estilo = {
-  numero: { fontFamily: fonte.titulo, fontSize: 18, lineHeight: 24 },
-  rotuloDaFaixa: { fontFamily: fonte.normal, fontSize: 13, color: cor.textoApagado },
+  numero: { ...fonte.titulo, fontSize: 18, lineHeight: 24 },
+  rotuloDaFaixa: { ...fonte.normal, fontSize: 13, color: cor.textoApagado },
 } as const;

@@ -48,7 +48,12 @@ export function Carrossel({
       Animated.spring(escala, { toValue: 1.15, friction: 4, tension: 160, useNativeDriver: true }),
       Animated.parallel([
         Animated.timing(escala, { toValue: 1.4, duration: 260, delay: 200, useNativeDriver: true }),
-        Animated.timing(opacidade, { toValue: 0, duration: 260, delay: 200, useNativeDriver: true }),
+        Animated.timing(opacidade, {
+          toValue: 0,
+          duration: 260,
+          delay: 200,
+          useNativeDriver: true,
+        }),
       ]),
     ]).start();
   };
@@ -75,7 +80,14 @@ export function Carrossel({
 
   return (
     <View onLayout={(e: LayoutChangeEvent) => setLargura(e.nativeEvent.layout.width)}>
-      <View style={{ width: "100%", height: altura || undefined, aspectRatio: altura ? undefined : 4 / 5, backgroundColor: cor.apagado }}>
+      <View
+        style={{
+          width: "100%",
+          height: altura || undefined,
+          aspectRatio: altura ? undefined : 4 / 5,
+          backgroundColor: cor.apagado,
+        }}
+      >
         {largura > 0 ? (
           <FlatList
             data={urls}
@@ -137,7 +149,7 @@ export function Carrossel({
               paddingVertical: 3,
             }}
           >
-            <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: cor.branco }}>
+            <Text style={{ ...fonte.forte, fontSize: 13, color: cor.branco }}>
               {indice + 1}/{urls.length}
             </Text>
           </View>

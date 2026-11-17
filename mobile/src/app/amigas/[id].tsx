@@ -80,9 +80,7 @@ export default function PerfilDaAmigaTela() {
             padding: espaco.xl,
           }}
         >
-          <Text
-            style={{ textAlign: "center", fontFamily: fonte.media, fontSize: 14, color: tinta.sub }}
-          >
+          <Text style={{ textAlign: "center", ...fonte.media, fontSize: 14, color: tinta.sub }}>
             {leitura.indisponivel
               ? "O Cantinho dela não está aberto para visitas agora."
               : "Não foi possível abrir este perfil."}
@@ -131,7 +129,7 @@ export default function PerfilDaAmigaTela() {
           <Text
             style={{
               textAlign: "center",
-              fontFamily: fonte.titulo,
+              ...fonte.titulo,
               fontSize: 24,
               color: tinta.titulo,
             }}
@@ -139,11 +137,9 @@ export default function PerfilDaAmigaTela() {
             {a.nome}
           </Text>
           {a.bebe ? (
-            <Text style={{ fontFamily: fonte.media, fontSize: 14, color: tinta.sub }}>
-              💜 {a.bebe}
-            </Text>
+            <Text style={{ ...fonte.media, fontSize: 14, color: tinta.sub }}>💜 {a.bebe}</Text>
           ) : null}
-          <Text style={{ fontFamily: fonte.media, fontSize: 13, color: tinta.sub }}>
+          <Text style={{ ...fonte.media, fontSize: 13, color: tinta.sub }}>
             {tempoNoApp(a.diasNoApp)}
           </Text>
 
@@ -187,7 +183,7 @@ export default function PerfilDaAmigaTela() {
             opacity: pressed ? 0.8 : 1,
           })}
         >
-          <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: tinta.sub }}>
+          <Text style={{ ...fonte.forte, fontSize: 13, color: tinta.sub }}>
             Sair da amizade com {a.nome}
           </Text>
         </Pressable>
@@ -285,7 +281,7 @@ function CenaDoCantinho({ cantinho }: { cantinho: CantinhoDaAmiga }) {
               backgroundColor: "rgba(255,255,255,0.75)",
               paddingHorizontal: 14,
               paddingVertical: 6,
-              fontFamily: fonte.media,
+              ...fonte.media,
               fontSize: 13,
               color: tinta.sub,
             }}
@@ -340,8 +336,8 @@ function Numero({
       style={{ flex: 1, alignItems: "center", gap: 2 }}
     >
       <View style={{ height: 44, alignItems: "center", justifyContent: "center" }}>{icone}</View>
-      <Text style={{ fontFamily: fonte.titulo, fontSize: 20, color: c }}>{valor}</Text>
-      <Text style={{ fontFamily: fonte.media, fontSize: 13, color: tinta.sub }}>{rotulo}</Text>
+      <Text style={{ ...fonte.titulo, fontSize: 20, color: c }}>{valor}</Text>
+      <Text style={{ ...fonte.media, fontSize: 13, color: tinta.sub }}>{rotulo}</Text>
     </View>
   );
 }

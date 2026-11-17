@@ -8,12 +8,24 @@ import {
   FolhaDaEntrada,
   FrasesQueGiram,
   FundoDaEntrada,
+  useCeuDaEntrada,
 } from "~/componentes/entrada";
+import { sombraDoTexto } from "~/componentes/ceu-vivo";
 import { CabecalhoDaMarca } from "~/componentes/marca";
 import { Entrada } from "~/componentes/movimento";
 import { appleDisponivel, entrarComApple } from "~/lib/apple";
 import { supabase } from "~/servidor/supabase";
 import { cor, espaco, raio } from "~/tema";
+
+/** Escrito direto sobre o céu da entrada: usa a tinta que se lê nele. */
+function PrimeiraVez() {
+  const ceu = useCeuDaEntrada();
+  return (
+    <T tipo="apagado" centro cor={ceu.tinta} estilo={{ fontSize: 15, ...sombraDoTexto(ceu) }}>
+      Primeira vez por aqui?
+    </T>
+  );
+}
 
 export default function Entrar() {
   const [email, setEmail] = useState("");
@@ -62,7 +74,10 @@ export default function Entrar() {
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <Tela bordas={["top", "bottom"]} fundo="transparent" estilo={{ gap: espaco.lg }}>
+        {/* Sem a borda de baixo: a rolagem vai até o fim da tela. Com ela, a
+            folha branca era cortada numa linha reta sobre o céu, acima do
+            traço do iPhone (a `Tela` já deixa a folga no fim do conteúdo). */}
+        <Tela bordas={["top"]} fundo="transparent" estilo={{ gap: espaco.lg }}>
           <Entrada>
             <CabecalhoDaMarca subtitulo="Sua gestação, um dia de cada vez — com aulas, cuidado e amigas do seu lado." />
           </Entrada>
@@ -124,9 +139,7 @@ export default function Entrar() {
           </Entrada>
           <Entrada atraso={320}>
             <View style={{ gap: espaco.sm }}>
-              <T tipo="apagado" centro>
-                Primeira vez por aqui?
-              </T>
+              <PrimeiraVez />
               <Botao
                 rotulo="Criar minha conta"
                 tipo="secundario"

@@ -87,7 +87,7 @@ export default function Aceite() {
       <Cartao fundo={cor.destaque} estilo={{ gap: espaco.sm }}>
         {PONTOS_DO_ACEITE.map((p) => (
           <View key={p} style={{ flexDirection: "row", gap: espaco.sm }}>
-            <Text style={{ fontFamily: fonte.forte, fontSize: 16, color: cor.primaria }}>•</Text>
+            <Text style={{ ...fonte.forte, fontSize: 16, color: cor.primaria }}>•</Text>
             <T estilo={{ flex: 1, fontSize: 15, lineHeight: 22 }}>{p}</T>
           </View>
         ))}

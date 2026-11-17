@@ -65,14 +65,14 @@ export function MarcosDaRede() {
     <View>
       <Text
         accessibilityRole="header"
-        style={{ marginBottom: 4, fontFamily: fonte.media, fontSize: 16, color: cor.texto }}
+        style={{ marginBottom: 4, ...fonte.media, fontSize: 16, color: cor.texto }}
       >
         👭 Marcos da sua rede · {ganhos} de {marcos.length}
       </Text>
       <Text
         style={{
           marginBottom: espaco.md,
-          fontFamily: fonte.normal,
+          ...fonte.normal,
           fontSize: 13,
           lineHeight: 18,
           color: cor.textoApagado,
@@ -111,15 +111,13 @@ function CartaoDoMarco({ m }: { m: MarcoNaTela }) {
       }}
     >
       <Text style={{ fontSize: 30, lineHeight: 36, marginBottom: espaco.sm }}>{m.emoji}</Text>
-      <Text
-        style={{ fontFamily: fonte.media, fontSize: 13, textAlign: "center", color: cor.texto }}
-      >
+      <Text style={{ ...fonte.media, fontSize: 13, textAlign: "center", color: cor.texto }}>
         {m.titulo}
       </Text>
       <Text
         style={{
           marginTop: 2,
-          fontFamily: fonte.normal,
+          ...fonte.normal,
           fontSize: 13,
           lineHeight: 16,
           textAlign: "center",
@@ -131,7 +129,7 @@ function CartaoDoMarco({ m }: { m: MarcoNaTela }) {
       <Text
         style={{
           marginTop: 6,
-          fontFamily: fonte.forte,
+          ...fonte.forte,
           fontSize: 13,
           letterSpacing: 0.4,
           textTransform: "uppercase",

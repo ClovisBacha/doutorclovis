@@ -13,7 +13,9 @@ import {
 import Svg, { Circle, Defs, RadialGradient, Stop } from "react-native-svg";
 import { CANTINHO_BY_ID, escalaDaArvore, faseDoDiaNoite, type CantinhoType } from "@/lib/cantinho";
 import { climasAtivos, particulasDe, type Particula } from "@/lib/clima-do-cantinho";
-import { toque } from "~/componentes/base";
+import { Pencil } from "lucide-react-native";
+import { toque, useFolgaDaBarra } from "~/componentes/base";
+import { Vidro } from "~/componentes/vidro";
 import { corCaminho } from "~/componentes/caminho/cores";
 import {
   DECOR_MAX,
@@ -616,8 +618,9 @@ function ParticulaNoAr({
    O modo Arrumar: o lápis e a barra de baixo
    ══════════════════════════════════════════════════════════════════════════ */
 
-/** O ✏️ — do lado oposto ao da loja, como no site. */
+/** O lápis — do lado oposto ao da loja, como no site. Um botão de vidro solto sobre a trilha. */
 export function BotaoDeArrumar({ aoTocar }: { aoTocar: () => void }) {
+  const folga = useFolgaDaBarra();
   return (
     <Pressable
       accessibilityRole="button"
@@ -629,23 +632,17 @@ export function BotaoDeArrumar({ aoTocar }: { aoTocar: () => void }) {
       style={({ pressed }) => ({
         position: "absolute",
         left: espaco.lg,
-        bottom: espaco.lg,
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: corCaminho.lapisFundo,
-        borderWidth: 1,
-        borderColor: corCaminho.lapisAro,
-        shadowColor: corCaminho.sombra,
-        shadowOpacity: 0.14,
-        shadowRadius: 9,
-        shadowOffset: { width: 0, height: 6 },
+        bottom: espaco.lg + folga,
         transform: [{ scale: pressed ? 0.96 : 1 }],
       })}
     >
-      <Text style={{ fontSize: 20 }}>✏️</Text>
+      <Vidro
+        interativo
+        tinta="rgba(255,255,255,0.72)"
+        estilo={{ width: 48, height: 48, alignItems: "center", justifyContent: "center" }}
+      >
+        <Pencil size={20} color={cor.primariaEscura} strokeWidth={2.2} />
+      </Vidro>
     </Pressable>
   );
 }
@@ -670,14 +667,18 @@ export function BarraDeArrumar({
   bandeja: readonly string[];
   aoPor: (id: string) => void;
 }) {
+  /* Com a barra de abas flutuando embaixo, a de arrumar flutua acima dela. */
+  const folga = useFolgaDaBarra();
   return (
     <View
       style={{
         position: "absolute",
-        left: 0,
-        right: 0,
-        bottom: 0,
-        borderTopWidth: 1,
+        left: folga ? 12 : 0,
+        right: folga ? 12 : 0,
+        bottom: folga ? folga + espaco.sm : 0,
+        ...(folga
+          ? { borderRadius: 22, borderWidth: 1, borderColor: corCaminho.barraBorda }
+          : { borderTopWidth: 1 }),
         borderTopColor: corCaminho.barraBorda,
         backgroundColor: corCaminho.barraFundo,
         paddingHorizontal: espaco.md,
@@ -693,16 +694,16 @@ export function BarraDeArrumar({
         <Text
           style={{
             flex: 1,
-            fontFamily: fonte.normal,
+            ...fonte.normal,
             fontSize: 13,
             lineHeight: 17,
             color: cor.textoApagado,
           }}
         >
           Arraste pra mover ·{" "}
-          <Text style={{ fontFamily: fonte.forte, color: corCaminho.barraTamanho }}>⤢</Text> pra
-          mudar o tamanho ·{" "}
-          <Text style={{ fontFamily: fonte.forte, color: corCaminho.barraTirar }}>✕</Text> pra tirar{" "}
+          <Text style={{ ...fonte.forte, color: corCaminho.barraTamanho }}>⤢</Text> pra mudar o
+          tamanho · <Text style={{ ...fonte.forte, color: corCaminho.barraTirar }}>✕</Text> pra
+          tirar{" "}
           <Text style={{ fontVariant: ["tabular-nums"] }}>
             ({quantos}/{DECOR_MAX})
           </Text>
@@ -728,7 +729,7 @@ export function BarraDeArrumar({
           })}
           hitSlop={2}
         >
-          <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: corCaminho.desfazerTexto }}>
+          <Text style={{ ...fonte.forte, fontSize: 13, color: corCaminho.desfazerTexto }}>
             ↩︎ Desfazer
           </Text>
         </Pressable>
@@ -748,9 +749,7 @@ export function BarraDeArrumar({
           })}
           hitSlop={2}
         >
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: cor.branco }}>
-            Pronto ✓
-          </Text>
+          <Text style={{ ...fonte.titulo, fontSize: 14, color: cor.branco }}>Pronto ✓</Text>
         </Pressable>
       </View>
       <ScrollView
@@ -805,5 +804,5 @@ const estilo = {
     shadowOffset: { width: 0, height: 2 },
     zIndex: 6,
   },
-  controleTexto: { fontFamily: fonte.forte, fontSize: 14, color: cor.branco },
+  controleTexto: { ...fonte.forte, fontSize: 14, color: cor.branco },
 };

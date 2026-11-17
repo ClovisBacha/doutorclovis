@@ -54,9 +54,7 @@ export function CaixaDeMarcar({
         }}
       >
         {marcada ? (
-          <T estilo={{ color: cor.branco, fontFamily: fonte.titulo, fontSize: 15, lineHeight: 18 }}>
-            ✓
-          </T>
+          <T estilo={{ color: cor.branco, ...fonte.titulo, fontSize: 15, lineHeight: 18 }}>✓</T>
         ) : null}
       </View>
       <T estilo={{ flex: 1, fontSize: 15, lineHeight: 22 }}>{rotulo}</T>

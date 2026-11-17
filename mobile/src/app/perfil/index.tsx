@@ -393,7 +393,7 @@ function Contagem({ valor, rotulo }: { valor: number | null; rotulo: string }) {
   if (valor == null) return null;
   return (
     <T tipo="apagado">
-      <Text style={{ fontFamily: fonte.forte, color: cor.texto }}>{valor}</Text> {rotulo}
+      <Text style={{ ...fonte.forte, color: cor.texto }}>{valor}</Text> {rotulo}
     </T>
   );
 }

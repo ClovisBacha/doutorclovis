@@ -383,7 +383,7 @@ export default function Meditar() {
             style={{
               marginTop: espaco.lg,
               textAlign: "center",
-              fontFamily: fonte.media,
+              ...fonte.media,
               fontSize: 26,
               lineHeight: 32,
               color: corMeditacao.titulo,
@@ -395,7 +395,7 @@ export default function Meditar() {
             style={{
               marginTop: 6,
               textAlign: "center",
-              fontFamily: fonte.normal,
+              ...fonte.normal,
               fontSize: 13,
               lineHeight: 18,
               color: corMeditacao.texto,
@@ -422,9 +422,7 @@ export default function Meditar() {
             hitSlop={8}
             style={{ marginTop: espaco.lg, minHeight: ALVO_MINIMO, justifyContent: "center" }}
           >
-            <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: corMeditacao.secao }}>
-              Pular
-            </Text>
+            <Text style={{ ...fonte.forte, fontSize: 13, color: corMeditacao.secao }}>Pular</Text>
           </Pressable>
         </ScrollView>
       </FundoDaAtividade>
@@ -468,7 +466,7 @@ export default function Meditar() {
                 <Text
                   style={{
                     textAlign: "center",
-                    fontFamily: fonte.forte,
+                    ...fonte.forte,
                     fontSize: 13,
                     color: corMeditacao.icone,
                   }}
@@ -552,7 +550,7 @@ export default function Meditar() {
                         >
                           <Text
                             style={{
-                              fontFamily: fonte.forte,
+                              ...fonte.forte,
                               fontSize: 13,
                               color: ativa ? cor.branco : corMeditacao.forte,
                             }}
@@ -577,7 +575,7 @@ export default function Meditar() {
             <Text
               style={{
                 marginTop: 6,
-                fontFamily: fonte.normal,
+                ...fonte.normal,
                 fontSize: 13,
                 color: corMeditacao.dica,
               }}
@@ -712,12 +710,12 @@ function LembreteDiario({ uid, dias }: { uid: string; dias: readonly string[] })
           <Bell size={18} color={corMeditacao.forte} strokeWidth={2.3} />
         </Ficha>
         <View style={{ flex: 1 }}>
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: corMeditacao.titulo }}>
+          <Text style={{ ...fonte.titulo, fontSize: 14, color: corMeditacao.titulo }}>
             Lembrar todo dia
           </Text>
           <Text
             style={{
-              fontFamily: fonte.normal,
+              ...fonte.normal,
               fontSize: 13,
               lineHeight: 17,
               color: corMeditacao.discreto,
@@ -751,7 +749,7 @@ function LembreteDiario({ uid, dias }: { uid: string; dias: readonly string[] })
             >
               <Text
                 style={{
-                  fontFamily: fonte.titulo,
+                  ...fonte.titulo,
                   fontSize: 14,
                   color: corMeditacao.forte,
                   fontVariant: ["tabular-nums"],
@@ -798,9 +796,7 @@ function LembreteDiario({ uid, dias }: { uid: string; dias: readonly string[] })
             })}
             hitSlop={5}
           >
-            <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: cor.branco }}>
-              Ativar
-            </Text>
+            <Text style={{ ...fonte.titulo, fontSize: 14, color: cor.branco }}>Ativar</Text>
           </Pressable>
         )}
       </View>
@@ -808,7 +804,7 @@ function LembreteDiario({ uid, dias }: { uid: string; dias: readonly string[] })
         <Text
           style={{
             marginTop: 6,
-            fontFamily: fonte.normal,
+            ...fonte.normal,
             fontSize: 13,
             lineHeight: 18,
             color: corMeditacao.discreto,
@@ -850,7 +846,7 @@ function LembreteDiario({ uid, dias }: { uid: string; dias: readonly string[] })
             <Text
               style={{
                 textAlign: "center",
-                fontFamily: fonte.forte,
+                ...fonte.forte,
                 fontSize: 13,
                 letterSpacing: 0.65,
                 textTransform: "uppercase",
@@ -933,7 +929,7 @@ function CartaoDoPrograma({
         </View>
         <Text
           style={{
-            fontFamily: fonte.titulo,
+            ...fonte.titulo,
             fontSize: 13,
             letterSpacing: 1.5,
             textTransform: "uppercase",
@@ -946,7 +942,7 @@ function CartaoDoPrograma({
           style={{
             marginTop: 6,
             maxWidth: "68%",
-            fontFamily: fonte.titulo,
+            ...fonte.titulo,
             fontSize: 24,
             lineHeight: 29,
             letterSpacing: -0.3,
@@ -959,7 +955,7 @@ function CartaoDoPrograma({
           style={{
             marginTop: 4,
             maxWidth: "68%",
-            fontFamily: fonte.media,
+            ...fonte.media,
             fontSize: 14,
             lineHeight: 19,
             color: corMeditacao.branco85,
@@ -1010,7 +1006,7 @@ function CartaoDoPrograma({
             }}
           >
             <Play size={16} color={corMeditacao.icone} fill={corMeditacao.icone} />
-            <Text style={{ fontFamily: fonte.titulo, fontSize: 16, color: corMeditacao.icone }}>
+            <Text style={{ ...fonte.titulo, fontSize: 16, color: corMeditacao.icone }}>
               Começar
             </Text>
           </View>
@@ -1031,7 +1027,7 @@ function CartaoDoPrograma({
           opacity: pressed ? 0.6 : 1,
         })}
       >
-        <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: corMeditacao.discreto }}>
+        <Text style={{ ...fonte.forte, fontSize: 14, color: corMeditacao.discreto }}>
           Ou escolha você mesma
         </Text>
         <ChevronDown size={18} color={corMeditacao.discreto} />
@@ -1081,7 +1077,7 @@ function SonsDeFundo({
             <Text
               style={{
                 marginBottom: 6,
-                fontFamily: fonte.forte,
+                ...fonte.forte,
                 fontSize: 13,
                 letterSpacing: 0.65,
                 textTransform: "uppercase",
@@ -1121,7 +1117,7 @@ function SonsDeFundo({
                   <IconeDoSom som={k} />
                   <Text
                     style={{
-                      fontFamily: fonte.forte,
+                      ...fonte.forte,
                       fontSize: 13,
                       color: ativo ? cor.branco : corMeditacao.forte,
                     }}
@@ -1376,7 +1372,7 @@ function Sessao({
           style={{
             marginRight: espaco.sm,
             minWidth: 28,
-            fontFamily: fonte.forte,
+            ...fonte.forte,
             fontSize: 13,
             color: corMeditacao.restante,
             fontVariant: ["tabular-nums"],
@@ -1457,7 +1453,7 @@ function Sessao({
             minHeight: 84,
             maxWidth: 384,
             textAlign: "center",
-            fontFamily: fonte.titulo,
+            ...fonte.titulo,
             fontSize: 22,
             lineHeight: 36,
             letterSpacing: -0.22,
@@ -1547,7 +1543,7 @@ function Circulo({
             /* Pausada, a palavra da fase some: no site o véu a desfocava, e
                aqui ela vazaria por trás do "Pausado". */
             opacity: oculto ? 0 : 1,
-            fontFamily: fonte.forte,
+            ...fonte.forte,
             fontSize: 15,
             letterSpacing: 2.7,
             textTransform: "uppercase",
@@ -1598,7 +1594,7 @@ function VeuDaPausa({ motivo, aoContinuar }: { motivo: Pausa; aoContinuar: () =>
         accessibilityLiveRegion="assertive"
         style={{
           marginTop: espaco.lg,
-          fontFamily: fonte.media,
+          ...fonte.media,
           fontSize: 24,
           lineHeight: 30,
           color: corMeditacao.titulo,
@@ -1611,7 +1607,7 @@ function VeuDaPausa({ motivo, aoContinuar }: { motivo: Pausa; aoContinuar: () =>
           marginTop: 6,
           maxWidth: 320,
           textAlign: "center",
-          fontFamily: fonte.normal,
+          ...fonte.normal,
           fontSize: 13,
           lineHeight: 21,
           color: corMeditacao.texto,

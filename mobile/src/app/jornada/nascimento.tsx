@@ -176,7 +176,7 @@ export default function ContarONascimento() {
             accessibilityRole="header"
             style={{
               textAlign: "center",
-              fontFamily: fonte.titulo,
+              ...fonte.titulo,
               fontSize: 24,
               lineHeight: 30,
               color: cor.texto,
@@ -247,9 +247,7 @@ export default function ContarONascimento() {
           <View
             style={{ backgroundColor: cor.atencaoFundo, borderRadius: raio.md, padding: espaco.md }}
           >
-            <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: cor.atencaoForte }}>
-              {erro}
-            </Text>
+            <Text style={{ ...fonte.forte, fontSize: 14, color: cor.atencaoForte }}>{erro}</Text>
           </View>
         ) : null}
 
@@ -262,7 +260,7 @@ export default function ContarONascimento() {
               padding: espaco.lg,
             }}
           >
-            <Text style={{ fontFamily: fonte.titulo, fontSize: 16, color: "#7d1d45" }}>
+            <Text style={{ ...fonte.titulo, fontSize: 16, color: "#7d1d45" }}>
               Confirmar o nascimento em {nascimentoPorExtenso(previa.dados)}?
             </Text>
             <T tipo="apagado">
@@ -280,9 +278,7 @@ export default function ContarONascimento() {
               onPress={() => setConfirmando(false)}
               style={{ minHeight: 44, alignItems: "center", justifyContent: "center" }}
             >
-              <Text style={{ fontFamily: fonte.forte, fontSize: 15, color: "#9a7486" }}>
-                Ainda não
-              </Text>
+              <Text style={{ ...fonte.forte, fontSize: 15, color: "#9a7486" }}>Ainda não</Text>
             </Pressable>
           </View>
         ) : (

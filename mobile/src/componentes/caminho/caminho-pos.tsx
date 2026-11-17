@@ -2,7 +2,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Modal, Pressable, Text, View, type LayoutChangeEvent } from "react-native";
 import { useAviso } from "~/componentes/aviso";
-import { toque } from "~/componentes/base";
+import { toque, useFolgaDaBarra } from "~/componentes/base";
 import { corCaminho } from "~/componentes/caminho/cores";
 import {
   AnelDeTarefas,
@@ -95,17 +95,29 @@ export function TrilhaDoPosParto({
   const lista = useRef<FlatList<Bloco>>(null);
   const [alturaDaLista, setAlturaDaLista] = useState<number | null>(null);
   const [alturaDoTopo, setAlturaDoTopo] = useState<number | null>(null);
+  /* A barra de abas flutua por cima da lista: o fim e "o meio" contam com ela. */
+  const folga = useFolgaDaBarra();
   const rolou = useRef(parametroDaBancada("topo") === "1");
-  useEffect(() => {
+  /* Como na trilha da gestação: no iPhone a lista refaz a rolagem inicial
+     depois desta, então a centralização vale de novo a cada medida, até ela
+     tocar na tela ou passarem dois segundos. */
+  const centrar = useCallback(() => {
     if (rolou.current || alturaDoTopo == null || alturaDaLista == null || indiceDeHoje < 0) return;
-    rolou.current = true;
-    const alvo = Math.max(0, alturaDoTopo + yDeHoje - alturaDaLista / 2);
-    const t = setTimeout(
-      () => lista.current?.scrollToOffset({ offset: alvo, animated: false }),
-      60,
-    );
+    lista.current?.scrollToOffset({
+      offset: Math.max(0, alturaDoTopo + yDeHoje - (alturaDaLista - folga) / 2),
+      animated: false,
+    });
+  }, [alturaDoTopo, alturaDaLista, folga, indiceDeHoje, yDeHoje]);
+  useEffect(() => {
+    const t = setTimeout(centrar, 60);
     return () => clearTimeout(t);
-  }, [alturaDoTopo, alturaDaLista, indiceDeHoje, yDeHoje]);
+  }, [centrar]);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      rolou.current = true;
+    }, 2000);
+    return () => clearTimeout(t);
+  }, []);
 
   const renderItem = useCallback(
     ({ item }: { item: Bloco }) =>
@@ -126,10 +138,14 @@ export function TrilhaDoPosParto({
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: cor.fundo }}>
+    <View style={{ flex: 1 }}>
       <FaixaDoTopoDoPos chama={chama} semana={semanaDeHoje} figurinhas={figurinhas} />
       <FlatList
         ref={lista}
+        onContentSizeChange={centrar}
+        onScrollBeginDrag={() => {
+          rolou.current = true;
+        }}
         data={blocos}
         keyExtractor={(b) => (b.tipo === "fase" ? `f${b.fase.n}` : `s${b.semana}`)}
         renderItem={renderItem}
@@ -149,14 +165,14 @@ export function TrilhaDoPosParto({
             onLayout={(e) => setAlturaDoTopo(e.nativeEvent.layout.height)}
             style={{ paddingHorizontal: 20, paddingTop: espaco.lg, paddingBottom: espaco.sm }}
           >
-            <Text style={{ fontFamily: fonte.media, fontSize: 14, color: cor.textoApagado }}>
+            <Text style={{ ...fonte.media, fontSize: 14, color: cor.textoApagado }}>
               {formou
                 ? "As 12 semanas estão completas. O caminho fica guardado aqui para sempre 💝"
                 : "Cada dia com as três tarefas ganha o ✓, e cada semana, a sua figurinha."}
             </Text>
           </View>
         }
-        ListFooterComponent={<View style={{ height: 60 }} />}
+        ListFooterComponent={<View style={{ height: 60 + folga }} />}
       />
       {aviso}
       <FolhaDoDiaDoPos D={diaAberto} blob={blob} aoFechar={() => setDiaAberto(null)} />
@@ -266,7 +282,7 @@ function FaixaDaFaseDoPos({
           <View style={{ flex: 1 }}>
             <Text
               style={{
-                fontFamily: fonte.forte,
+                ...fonte.forte,
                 fontSize: 13,
                 letterSpacing: 0.8,
                 textTransform: "uppercase",
@@ -275,9 +291,7 @@ function FaixaDaFaseDoPos({
             >
               Fase {fase.n} · Semanas {fase.from}–{fase.to} de vida
             </Text>
-            <Text
-              style={{ marginTop: 2, fontFamily: fonte.titulo, fontSize: 20, color: cor.branco }}
-            >
+            <Text style={{ marginTop: 2, ...fonte.titulo, fontSize: 20, color: cor.branco }}>
               {fase.name}
             </Text>
           </View>
@@ -376,7 +390,7 @@ function SemanaDoPos({
               <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                 <Text
                   numberOfLines={1}
-                  style={{ fontFamily: fonte.titulo, fontSize: 15, color: corCaminho.textoForte }}
+                  style={{ ...fonte.titulo, fontSize: 15, color: corCaminho.textoForte }}
                 >
                   Semana {bloco.semana} de vida
                 </Text>
@@ -391,7 +405,7 @@ function SemanaDoPos({
                   >
                     <Text
                       style={{
-                        fontFamily: fonte.titulo,
+                        ...fonte.titulo,
                         fontSize: 9,
                         letterSpacing: 0.6,
                         textTransform: "uppercase",
@@ -405,7 +419,7 @@ function SemanaDoPos({
               </View>
               <Text
                 numberOfLines={1}
-                style={{ fontFamily: fonte.media, fontSize: 13, color: corCaminho.textoMedio }}
+                style={{ ...fonte.media, fontSize: 13, color: corCaminho.textoMedio }}
               >
                 {nFeitos} de 7 dias
               </Text>
@@ -556,7 +570,7 @@ function NoDoDiaDoPos({
                 <Text
                   numberOfLines={1}
                   style={{
-                    fontFamily: fonte.titulo,
+                    ...fonte.titulo,
                     fontSize: 13,
                     letterSpacing: 0.4,
                     textTransform: "uppercase",
@@ -583,9 +597,7 @@ function NoDoDiaDoPos({
               {hoje && !fechado ? (
                 <Emoji tamanho={30}>🎁</Emoji>
               ) : fechado ? (
-                <Text
-                  style={{ fontFamily: fonte.titulo, fontSize: hoje ? 30 : 24, color: cor.branco }}
-                >
+                <Text style={{ ...fonte.titulo, fontSize: hoje ? 30 : 24, color: cor.branco }}>
                   ✓
                 </Text>
               ) : null}
@@ -644,7 +656,7 @@ function FolhaDoDiaDoPos({
         />
         <Text
           style={{
-            fontFamily: fonte.titulo,
+            ...fonte.titulo,
             fontSize: 12,
             letterSpacing: 1.2,
             textTransform: "uppercase",
@@ -655,7 +667,7 @@ function FolhaDoDiaDoPos({
         </Text>
         <Text
           accessibilityRole="header"
-          style={{ fontFamily: fonte.titulo, fontSize: 22, color: cor.texto }}
+          style={{ ...fonte.titulo, fontSize: 22, color: cor.texto }}
         >
           {fechado ? `Dia completo ${figurinhaDoPos(semana)}` : "Esse dia ficou pela metade"}
         </Text>
@@ -664,7 +676,7 @@ function FolhaDoDiaDoPos({
             <Text
               key={l.chave}
               style={{
-                fontFamily: fonte.media,
+                ...fonte.media,
                 fontSize: 15,
                 color: flags[l.chave] || fechado ? "#047857" : cor.textoApagado,
               }}
@@ -674,10 +686,8 @@ function FolhaDoDiaDoPos({
           ))}
         </View>
         <View style={{ borderRadius: 18, backgroundColor: "#effaff", padding: espaco.lg, gap: 4 }}>
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 13, color: "#0369a1" }}>
-            Nessa semana
-          </Text>
-          <Text style={{ fontFamily: fonte.media, fontSize: 15, lineHeight: 22, color: "#0c3a5a" }}>
+          <Text style={{ ...fonte.titulo, fontSize: 13, color: "#0369a1" }}>Nessa semana</Text>
+          <Text style={{ ...fonte.media, fontSize: 15, lineHeight: 22, color: "#0c3a5a" }}>
             {nestaSemanaDoPos(semana)}
           </Text>
         </View>
@@ -688,6 +698,6 @@ function FolhaDoDiaDoPos({
 }
 
 const estilo = {
-  numero: { fontFamily: fonte.titulo, fontSize: 18, lineHeight: 24 },
-  rotulo: { fontFamily: fonte.normal, fontSize: 13, color: cor.textoApagado },
+  numero: { ...fonte.titulo, fontSize: 18, lineHeight: 24 },
+  rotulo: { ...fonte.normal, fontSize: 13, color: cor.textoApagado },
 } as const;

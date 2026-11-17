@@ -170,7 +170,7 @@ export function ConviteDosLembretes({
         }}
       >
         <Bell size={18} color="#0369a1" />
-        <Text style={{ flex: 1, fontFamily: fonte.media, fontSize: 14, color: "#0c3a5a" }}>
+        <Text style={{ flex: 1, ...fonte.media, fontSize: 14, color: "#0c3a5a" }}>
           Combinado: eu te lembro às {ligado.replace(":00", "h")}. Dá para mudar no Perfil, em
           Lembretes.
         </Text>
@@ -213,11 +213,11 @@ export function ConviteDosLembretes({
         >
           <Bell size={20} color="#0369a1" />
         </View>
-        <Text style={{ flex: 1, fontFamily: fonte.titulo, fontSize: 16, color: "#3a2230" }}>
+        <Text style={{ flex: 1, ...fonte.titulo, fontSize: 16, color: "#3a2230" }}>
           Quer que eu te lembre do cuidado de hoje?
         </Text>
       </View>
-      <Text style={{ fontFamily: fonte.media, fontSize: 14, lineHeight: 20, color: "#7d5a72" }}>
+      <Text style={{ ...fonte.media, fontSize: 14, lineHeight: 20, color: "#7d5a72" }}>
         Um aviso por dia, na hora que você escolher — e silêncio no dia em que você já cuidou.
       </Text>
       <View style={{ flexDirection: "row", gap: espaco.sm, marginTop: 2 }}>
@@ -238,7 +238,7 @@ export function ConviteDosLembretes({
         }}
         style={{ minHeight: ALVO_MINIMO, justifyContent: "center", alignSelf: "flex-start" }}
       >
-        <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: "#9a7486" }}>Agora não</Text>
+        <Text style={{ ...fonte.forte, fontSize: 14, color: "#9a7486" }}>Agora não</Text>
       </Pressable>
       <FolhaDoHorario
         aberta={escolhendo}
@@ -257,9 +257,7 @@ export function ConviteDosLembretes({
 export function AvisoSemPermissao() {
   return (
     <View style={{ gap: 6 }}>
-      <Text
-        style={{ fontFamily: fonte.normal, fontSize: 13, lineHeight: 18, color: cor.atencaoForte }}
-      >
+      <Text style={{ ...fonte.normal, fontSize: 13, lineHeight: 18, color: cor.atencaoForte }}>
         As notificações do app estão desligadas no iPhone. Ative nos Ajustes para o lembrete chegar.
       </Text>
       {Platform.OS !== "web" ? (
@@ -268,7 +266,7 @@ export function AvisoSemPermissao() {
           onPress={() => void Linking.openSettings().catch(() => {})}
           style={{ minHeight: ALVO_MINIMO, justifyContent: "center", alignSelf: "flex-start" }}
         >
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: "#0369a1" }}>
+          <Text style={{ ...fonte.titulo, fontSize: 14, color: "#0369a1" }}>
             Abrir os Ajustes ›
           </Text>
         </Pressable>
@@ -304,9 +302,7 @@ function BotaoPilula({
         opacity: pressed ? 0.85 : 1,
       })}
     >
-      <Text
-        style={{ fontFamily: fonte.titulo, fontSize: 15, color: cheio ? cor.branco : "#0369a1" }}
-      >
+      <Text style={{ ...fonte.titulo, fontSize: 15, color: cheio ? cor.branco : "#0369a1" }}>
         {rotulo}
       </Text>
     </Pressable>
@@ -356,7 +352,7 @@ export function FolhaDoHorario({
           <Text
             style={{
               textAlign: "center",
-              fontFamily: fonte.forte,
+              ...fonte.forte,
               fontSize: 13,
               letterSpacing: 0.65,
               textTransform: "uppercase",
@@ -397,7 +393,7 @@ export function FolhaDoHorario({
                 >
                   <Text
                     style={{
-                      fontFamily: fonte.titulo,
+                      ...fonte.titulo,
                       fontSize: 15,
                       color: ativa ? cor.branco : "#0c3a5a",
                       fontVariant: ["tabular-nums"],

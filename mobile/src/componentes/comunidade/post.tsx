@@ -8,7 +8,16 @@ import {
   totalDeReacoes,
   type TipoDeReacao,
 } from "@/lib/rede-social";
-import { Bookmark, EyeOff, Globe, Heart, Lock, MessageCircle, MoreHorizontal, Users } from "lucide-react-native";
+import {
+  Bookmark,
+  EyeOff,
+  Globe,
+  Heart,
+  Lock,
+  MessageCircle,
+  MoreHorizontal,
+  Users,
+} from "lucide-react-native";
 import { memo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { toque } from "~/componentes/base";
@@ -71,34 +80,54 @@ export const CartaoDoPost = memo(function CartaoDoPost({
   return (
     <View
       style={[
-        { backgroundColor: cor.cartao, borderRadius: raio.lg, marginHorizontal: espaco.lg, overflow: "hidden" },
+        {
+          backgroundColor: cor.cartao,
+          borderRadius: raio.lg,
+          marginHorizontal: espaco.lg,
+          overflow: "hidden",
+        },
         sombra,
       ]}
     >
       {sugerido ? (
         <View style={{ paddingHorizontal: espaco.lg, paddingTop: espaco.md }}>
-          <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: cor.primaria }}>
+          <Text style={{ ...fonte.forte, fontSize: 13, color: cor.primaria }}>
             Sugerido para você
           </Text>
         </View>
       ) : null}
 
       {/* Autor */}
-      <View style={{ flexDirection: "row", alignItems: "center", paddingLeft: espaco.md, paddingRight: espaco.xs, paddingVertical: espaco.sm, gap: espaco.sm }}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          paddingLeft: espaco.md,
+          paddingRight: espaco.xs,
+          paddingVertical: espaco.sm,
+          gap: espaco.sm,
+        }}
+      >
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Abrir o perfil de ${post.autorNome}`}
           onPress={() => acoes.aoPerfil(post.autorId)}
-          style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: espaco.sm, minHeight: ALVO_MINIMO }}
+          style={{
+            flex: 1,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: espaco.sm,
+            minHeight: ALVO_MINIMO,
+          }}
         >
           <Avatar id={post.autorId} nome={post.autorNome} url={post.autorAvatar} tamanho={38} />
           <View style={{ flex: 1 }}>
-            <Text numberOfLines={1} style={{ fontFamily: fonte.forte, fontSize: 15, color: cor.texto }}>
+            <Text numberOfLines={1} style={{ ...fonte.forte, fontSize: 15, color: cor.texto }}>
               {post.autorNome}
               {post.autorOficial ? <Text style={{ color: cor.primaria }}> ✓</Text> : null}
             </Text>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-              <Text style={{ fontFamily: fonte.normal, fontSize: 13, color: cor.textoApagado }}>
+              <Text style={{ ...fonte.normal, fontSize: 13, color: cor.textoApagado }}>
                 {haQuantoPublicou(post.criadoEm, agora)}
               </Text>
               <Text style={{ fontSize: 13, color: cor.textoApagado }}>·</Text>
@@ -115,7 +144,12 @@ export const CartaoDoPost = memo(function CartaoDoPost({
             toque();
             acoes.aoMenu(post);
           }}
-          style={{ width: ALVO_MINIMO, height: ALVO_MINIMO, alignItems: "center", justifyContent: "center" }}
+          style={{
+            width: ALVO_MINIMO,
+            height: ALVO_MINIMO,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
         >
           <MoreHorizontal size={22} color={cor.textoApagado} />
         </Pressable>
@@ -143,12 +177,14 @@ export const CartaoDoPost = memo(function CartaoDoPost({
             >
               <Text
                 numberOfLines={longo && !aberto ? 5 : undefined}
-                style={{ fontFamily: fonte.normal, fontSize: 16, lineHeight: 23, color: cor.texto }}
+                style={{ ...fonte.normal, fontSize: 16, lineHeight: 23, color: cor.texto }}
               >
                 {texto}
               </Text>
               {longo && !aberto ? (
-                <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: cor.textoApagado, marginTop: 2 }}>
+                <Text
+                  style={{ ...fonte.forte, fontSize: 14, color: cor.textoApagado, marginTop: 2 }}
+                >
                   ver mais
                 </Text>
               ) : null}
@@ -170,7 +206,14 @@ export const CartaoDoPost = memo(function CartaoDoPost({
       )}
 
       {/* Ações */}
-      <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: espaco.xs, paddingTop: espaco.xs }}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          paddingHorizontal: espaco.xs,
+          paddingTop: espaco.xs,
+        }}
+      >
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={post.minhaReacao ? "Trocar a reação" : "Reagir"}
@@ -183,7 +226,12 @@ export const CartaoDoPost = memo(function CartaoDoPost({
             toque(false);
             setEscolhendo(true);
           }}
-          style={{ width: ALVO_MINIMO + 4, height: ALVO_MINIMO + 4, alignItems: "center", justifyContent: "center" }}
+          style={{
+            width: ALVO_MINIMO + 4,
+            height: ALVO_MINIMO + 4,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
         >
           {post.minhaReacao ? (
             <Text style={{ fontSize: 25 }}>{emojiDaReacao(post.minhaReacao)}</Text>
@@ -199,7 +247,12 @@ export const CartaoDoPost = memo(function CartaoDoPost({
               toque();
               acoes.aoComentarios?.(post);
             }}
-            style={{ width: ALVO_MINIMO + 4, height: ALVO_MINIMO + 4, alignItems: "center", justifyContent: "center" }}
+            style={{
+              width: ALVO_MINIMO + 4,
+              height: ALVO_MINIMO + 4,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
           >
             <MessageCircle size={25} color={cor.texto} strokeWidth={1.9} />
           </Pressable>
@@ -230,7 +283,14 @@ export const CartaoDoPost = memo(function CartaoDoPost({
                 </View>
               ))}
             </View>
-            <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: cor.texto, fontVariant: ["tabular-nums"] }}>
+            <Text
+              style={{
+                ...fonte.forte,
+                fontSize: 14,
+                color: cor.texto,
+                fontVariant: ["tabular-nums"],
+              }}
+            >
               {total}
             </Text>
           </View>
@@ -244,7 +304,12 @@ export const CartaoDoPost = memo(function CartaoDoPost({
             toque();
             acoes.aoSalvar(post);
           }}
-          style={{ width: ALVO_MINIMO + 4, height: ALVO_MINIMO + 4, alignItems: "center", justifyContent: "center" }}
+          style={{
+            width: ALVO_MINIMO + 4,
+            height: ALVO_MINIMO + 4,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
         >
           <Bookmark
             size={24}
@@ -269,9 +334,14 @@ export const CartaoDoPost = memo(function CartaoDoPost({
         <Pressable
           accessibilityRole="button"
           onPress={() => acoes.aoComentarios?.(post)}
-          style={{ paddingHorizontal: espaco.lg, minHeight: ALVO_MINIMO, justifyContent: "center", marginBottom: espaco.xs }}
+          style={{
+            paddingHorizontal: espaco.lg,
+            minHeight: ALVO_MINIMO,
+            justifyContent: "center",
+            marginBottom: espaco.xs,
+          }}
         >
-          <Text style={{ fontFamily: fonte.media, fontSize: 14, color: cor.textoApagado }}>
+          <Text style={{ ...fonte.media, fontSize: 14, color: cor.textoApagado }}>
             Ver comentários
           </Text>
         </Pressable>
@@ -351,7 +421,8 @@ function Veu({
   temFoto: boolean;
   aoRevelar: () => void;
 }) {
-  const rotulo = razao === "sensivel" ? rotuloDoMotivo(motivo) : "Tem uma palavra que você escondeu";
+  const rotulo =
+    razao === "sensivel" ? rotuloDoMotivo(motivo) : "Tem uma palavra que você escondeu";
   return (
     <Pressable
       accessibilityRole="button"
@@ -369,10 +440,10 @@ function Veu({
       }}
     >
       <EyeOff size={30} color={cor.textoApagado} />
-      <Text style={{ fontFamily: fonte.forte, fontSize: 16, color: cor.texto, textAlign: "center" }}>
+      <Text style={{ ...fonte.forte, fontSize: 16, color: cor.texto, textAlign: "center" }}>
         {rotulo}
       </Text>
-      <Text style={{ fontFamily: fonte.normal, fontSize: 14, color: cor.textoApagado, textAlign: "center" }}>
+      <Text style={{ ...fonte.normal, fontSize: 14, color: cor.textoApagado, textAlign: "center" }}>
         {razao === "sensivel"
           ? "Quem publicou avisou que este conteúdo pode ser difícil."
           : "Esta publicação contém uma palavra da sua lista."}
@@ -389,7 +460,9 @@ function Veu({
           justifyContent: "center",
         }}
       >
-        <Text style={{ fontFamily: fonte.forte, fontSize: 15, color: cor.primariaEscura }}>Ver mesmo assim</Text>
+        <Text style={{ ...fonte.forte, fontSize: 15, color: cor.primariaEscura }}>
+          Ver mesmo assim
+        </Text>
       </View>
     </Pressable>
   );

@@ -8,12 +8,19 @@ import type { Perfil } from "~/lib/sessao";
  * Só existe na WEB e só com `?bancada=1` na URL. No iPhone `window.location`
  * não existe, então isto é sempre falso no app instalado.
  *
+ * A exceção (16/11/2026) é o SIMULADOR em desenvolvimento, para ver o vidro e
+ * o movimento de verdade sem uma conta: só num pacote de DEV (`__DEV__`, que
+ * um build de loja nunca tem) servido por um Metro aberto com
+ * `EXPO_PUBLIC_BANCADA=1`. As duas travas juntas: `vidro-e-luz.test.ts` cobra
+ * que nenhum `.env` nem o `testflight.sh` ligam a variável.
+ *
  * Regra herdada do site: a bancada injeta o DADO nos mesmos estados da tela
  * de produção, nunca um desenho à parte. Uma bancada que mostra o que o
  * servidor nunca produziria aprova qualquer coisa.
  */
 export function ehBancada(): boolean {
-  if (Platform.OS !== "web" || typeof window === "undefined") return false;
+  if (Platform.OS !== "web") return __DEV__ && process.env.EXPO_PUBLIC_BANCADA === "1";
+  if (typeof window === "undefined") return false;
   try {
     return new URLSearchParams(window.location.search).get("bancada") === "1";
   } catch {
@@ -21,11 +28,20 @@ export function ehBancada(): boolean {
   }
 }
 
-/** Lê um parâmetro da URL da bancada (só na web). */
+/**
+ * Lê um parâmetro da bancada: na web, da URL; no simulador em desenvolvimento,
+ * de `EXPO_PUBLIC_BANCADA_PARAMS` (ex.: `hora=8&semana=30`), posta junto com
+ * `EXPO_PUBLIC_BANCADA=1` ao abrir o Metro.
+ */
 export function parametroDaBancada(nome: string): string | null {
   if (!ehBancada()) return null;
   try {
-    return new URLSearchParams(window.location.search).get(nome);
+    if (Platform.OS === "web") return new URLSearchParams(window.location.search).get(nome);
+    for (const par of (process.env.EXPO_PUBLIC_BANCADA_PARAMS ?? "").split("&")) {
+      const [chave, valor = ""] = par.split("=");
+      if (chave === nome) return decodeURIComponent(valor);
+    }
+    return null;
   } catch {
     return null;
   }
@@ -38,7 +54,7 @@ export function parametroDaBancada(nome: string): string | null {
  * relido do servidor — isto só existe para simular o mesmo na bancada.
  */
 export function recarregarNaBancada(caminho: string) {
-  if (!ehBancada()) return;
+  if (!ehBancada() || Platform.OS !== "web") return;
   try {
     window.location.assign(caminho);
   } catch {

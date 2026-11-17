@@ -66,7 +66,7 @@ export function FolhaDeSons({
           <Text
             style={{
               textAlign: "center",
-              fontFamily: fonte.forte,
+              ...fonte.forte,
               fontSize: 13,
               letterSpacing: 0.65,
               textTransform: "uppercase",
@@ -112,9 +112,7 @@ export function FolhaDeSons({
                 opacity: pressed ? 0.75 : 1,
               })}
             >
-              <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: tinta }}>
-                🔇 Desligar som
-              </Text>
+              <Text style={{ ...fonte.forte, fontSize: 14, color: tinta }}>🔇 Desligar som</Text>
             </Pressable>
           </ScrollView>
         </View>

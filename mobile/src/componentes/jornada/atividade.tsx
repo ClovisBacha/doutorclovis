@@ -6,7 +6,7 @@ import Svg, { Circle, Defs, Ellipse, Path, RadialGradient, Rect, Stop } from "re
 import { toque } from "~/componentes/base";
 import { BolhaViva, type HumorDaBolha } from "~/componentes/movimento";
 import { clarear, comAlfa, escurecer, misturar } from "~/lib/cor";
-import { ALVO_MINIMO, cor, espaco, fonte } from "~/tema";
+import { ALVO_MINIMO, cor, espaco, fonte, curva } from "~/tema";
 
 /**
  * AS PEÇAS DAS ATIVIDADES DO APP ANTIGO — o Movimento (verde) e a Meditação
@@ -171,7 +171,7 @@ export function BolhaComBalao({
           <Text
             style={{
               textAlign: "center",
-              fontFamily: fonte.media,
+              ...fonte.media,
               fontSize: 14,
               lineHeight: 20,
               color: paleta?.titulo ?? BALAO.texto,
@@ -212,7 +212,7 @@ export function TituloDaAtividade({
       style={{
         marginTop: espaco.lg,
         textAlign: "center",
-        fontFamily: fonte.titulo,
+        ...fonte.titulo,
         fontSize: 30,
         lineHeight: 36,
         letterSpacing: -0.3,
@@ -246,7 +246,7 @@ export function Secao({
       style={{
         marginTop: topo,
         marginBottom: espaco.md,
-        fontFamily: fonte.titulo,
+        ...fonte.titulo,
         fontSize: 17,
         lineHeight: 22,
         color: tinta ?? paleta.titulo,
@@ -339,7 +339,11 @@ export function BotaoDaAtividade({
   /** `false` quando a própria ação vibra do seu jeito (o acerto e o erro da aula). */
   vibrar?: boolean;
 }) {
-  const labio = claro ? clarear(tinta, 0.72) : escurecer(tinta, 0.28);
+  /* Desabilitado, o botão fica bem claro, com a letra na própria cor — e não
+     a cor cheia com transparência, que virava um tom de barro sobre o degradê. */
+  const apagado = !!desabilitado && !claro;
+  const face = apagado ? clarear(tinta, 0.84) : tinta;
+  const labio = claro || apagado ? clarear(tinta, 0.72) : escurecer(tinta, 0.28);
   const off = desabilitado || carregando;
   return (
     <Pressable
@@ -352,18 +356,23 @@ export function BotaoDaAtividade({
         aoTocar();
       }}
       style={({ pressed }) => ({
-        borderRadius: 20,
+        borderRadius: 22,
+        ...curva,
         backgroundColor: labio,
         paddingBottom: pressed ? 1 : LABIO + 1,
         marginTop: pressed ? LABIO : 0,
-        opacity: desabilitado ? 0.45 : 1,
+        opacity: desabilitado && claro ? 0.5 : 1,
+        /* A luz do botão cheio: um brilho da própria cor embaixo. */
+        boxShadow: claro || off ? undefined : `0px 12px 22px -12px ${comAlfa(tinta, 0.75)}`,
       })}
     >
       <View
         style={{
           minHeight: claro ? 48 : 54,
-          borderRadius: 20,
-          backgroundColor: claro ? cor.branco : tinta,
+          borderRadius: 22,
+          ...curva,
+          overflow: "hidden",
+          backgroundColor: claro ? cor.branco : face,
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "center",
@@ -371,14 +380,22 @@ export function BotaoDaAtividade({
           paddingHorizontal: espaco.xl,
         }}
       >
+        {/* A face recebe a luz de cima, como os botões das abas. */}
+        {claro || apagado ? null : (
+          <LinearGradient
+            pointerEvents="none"
+            colors={[clarear(face, 0.18), face]}
+            style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }}
+          />
+        )}
         {carregando ? <ActivityIndicator color={claro ? tinta : cor.branco} /> : icone}
         <Text
           style={{
-            fontFamily: fonte.titulo,
+            ...fonte.titulo,
             fontSize: claro ? 15 : 17,
             lineHeight: 22,
             letterSpacing: 0.2,
-            color: claro ? tinta : cor.branco,
+            color: claro ? tinta : apagado ? clarear(tinta, 0.4) : cor.branco,
           }}
         >
           {rotulo}
@@ -447,7 +464,7 @@ export function Escolha({
         <Text
           style={{
             flexShrink: 1,
-            fontFamily: centro ? fonte.titulo : fonte.forte,
+            ...(centro ? fonte.titulo : fonte.forte),
             fontSize: centro ? 16 : 14,
             lineHeight: centro ? 20 : 18,
             color: ativa ? cor.branco : centro ? paleta.forte : paleta.titulo,
@@ -514,7 +531,7 @@ export function EscolhaComLegenda({
         <View style={{ flex: 1 }}>
           <Text
             style={{
-              fontFamily: fonte.titulo,
+              ...fonte.titulo,
               fontSize: 14,
               lineHeight: 19,
               color: ativa ? cor.branco : paleta.titulo,
@@ -524,7 +541,7 @@ export function EscolhaComLegenda({
           </Text>
           <Text
             style={{
-              fontFamily: fonte.normal,
+              ...fonte.normal,
               fontSize: 13,
               lineHeight: 17,
               color: ativa ? paleta.brancoSuave : paleta.discreto,

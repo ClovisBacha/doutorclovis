@@ -99,12 +99,10 @@ export default function Lembretes() {
               opacity: pressed ? 0.85 : 1,
             })}
           >
-            <Text style={{ fontFamily: fonte.forte, fontSize: 15, color: "#0c3a5a" }}>
-              Todos os dias às
-            </Text>
+            <Text style={{ ...fonte.forte, fontSize: 15, color: "#0c3a5a" }}>Todos os dias às</Text>
             <Text
               style={{
-                fontFamily: fonte.titulo,
+                ...fonte.titulo,
                 fontSize: 17,
                 color: "#0369a1",
                 fontVariant: ["tabular-nums"],
@@ -205,10 +203,10 @@ function Bloco({
           {icone}
         </View>
         <View style={{ flex: 1, gap: 2 }}>
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 16, color: cor.texto }}>{titulo}</Text>
+          <Text style={{ ...fonte.titulo, fontSize: 16, color: cor.texto }}>{titulo}</Text>
           <Text
             style={{
-              fontFamily: fonte.normal,
+              ...fonte.normal,
               fontSize: 13,
               lineHeight: 18,
               color: cor.textoApagado,
@@ -269,10 +267,10 @@ function Atalho({
         {icone}
       </View>
       <View style={{ flex: 1, gap: 2 }}>
-        <Text style={{ fontFamily: fonte.titulo, fontSize: 16, color: cor.texto }}>{titulo}</Text>
+        <Text style={{ ...fonte.titulo, fontSize: 16, color: cor.texto }}>{titulo}</Text>
         <Text
           style={{
-            fontFamily: fonte.normal,
+            ...fonte.normal,
             fontSize: 13,
             lineHeight: 18,
             color: cor.textoApagado,
@@ -281,7 +279,7 @@ function Atalho({
           {sub}
         </Text>
       </View>
-      <Text style={{ fontFamily: fonte.titulo, fontSize: 20, color: cor.textoApagado }}>›</Text>
+      <Text style={{ ...fonte.titulo, fontSize: 20, color: cor.textoApagado }}>›</Text>
     </Pressable>
   );
 }

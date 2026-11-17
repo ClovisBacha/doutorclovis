@@ -184,7 +184,7 @@ function Destaque({ c, agora }: { c: Compromisso; agora: Date }) {
         >
           <Text
             style={{
-              fontFamily: fonte.titulo,
+              ...fonte.titulo,
               fontSize: 12,
               letterSpacing: 1.4,
               textTransform: "uppercase",
@@ -201,15 +201,15 @@ function Destaque({ c, agora }: { c: Compromisso; agora: Date }) {
               paddingVertical: 3,
             }}
           >
-            <Text style={{ fontFamily: fonte.titulo, fontSize: 13, color: cor.branco }}>
+            <Text style={{ ...fonte.titulo, fontSize: 13, color: cor.branco }}>
               {faltaQuanto(c.quando, agora)}
             </Text>
           </View>
         </View>
-        <Text style={{ fontFamily: fonte.titulo, fontSize: 24, lineHeight: 30, color: cor.branco }}>
+        <Text style={{ ...fonte.titulo, fontSize: 24, lineHeight: 30, color: cor.branco }}>
           {emojiDo(c.tipo)} {nomeDo(c)}
         </Text>
-        <Text style={{ fontFamily: fonte.forte, fontSize: 16, color: cor.branco }}>
+        <Text style={{ ...fonte.forte, fontSize: 16, color: cor.branco }}>
           {quandoPorExtenso(c.quando, agora)}
         </Text>
         {c.onde ? (
@@ -218,7 +218,7 @@ function Destaque({ c, agora }: { c: Compromisso; agora: Date }) {
             <Text
               style={{
                 flex: 1,
-                fontFamily: fonte.media,
+                ...fonte.media,
                 fontSize: 14,
                 color: "rgba(255,255,255,0.9)",
               }}
@@ -232,7 +232,7 @@ function Destaque({ c, agora }: { c: Compromisso; agora: Date }) {
             numberOfLines={3}
             style={{
               marginTop: 4,
-              fontFamily: fonte.normal,
+              ...fonte.normal,
               fontSize: 14,
               lineHeight: 20,
               color: "rgba(255,255,255,0.9)",
@@ -260,14 +260,12 @@ function SemNada() {
       ]}
     >
       <Text style={{ fontSize: 40 }}>🗓️</Text>
-      <Text
-        style={{ fontFamily: fonte.titulo, fontSize: 19, color: cor.agenda, textAlign: "center" }}
-      >
+      <Text style={{ ...fonte.titulo, fontSize: 19, color: cor.agenda, textAlign: "center" }}>
         Nenhuma consulta marcada
       </Text>
       <Text
         style={{
-          fontFamily: fonte.media,
+          ...fonte.media,
           fontSize: 14,
           lineHeight: 20,
           color: cor.texto,
@@ -286,7 +284,7 @@ function AvisoDosLembretes({ temFuturo, ligados }: { temFuturo: boolean; ligados
     return (
       <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
         <Bell size={16} color={cor.agenda} />
-        <Text style={{ flex: 1, fontFamily: fonte.media, fontSize: 13, color: cor.textoApagado }}>
+        <Text style={{ flex: 1, ...fonte.media, fontSize: 13, color: cor.textoApagado }}>
           Eu te lembro na véspera, às 19h, e duas horas antes.
         </Text>
       </View>
@@ -303,11 +301,11 @@ function AvisoDosLembretes({ temFuturo, ligados }: { temFuturo: boolean; ligados
     >
       <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
         <BellOff size={18} color={cor.atencao} />
-        <Text style={{ flex: 1, fontFamily: fonte.forte, fontSize: 14, color: cor.atencaoForte }}>
+        <Text style={{ flex: 1, ...fonte.forte, fontSize: 14, color: cor.atencaoForte }}>
           Os lembretes estão desligados
         </Text>
       </View>
-      <Text style={{ fontFamily: fonte.normal, fontSize: 14, lineHeight: 20, color: cor.texto }}>
+      <Text style={{ ...fonte.normal, fontSize: 14, lineHeight: 20, color: cor.texto }}>
         O iPhone não deixa o app avisar. Ligue as notificações nos Ajustes para receber o lembrete
         das consultas.
       </Text>

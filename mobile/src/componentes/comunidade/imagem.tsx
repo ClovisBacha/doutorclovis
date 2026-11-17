@@ -63,7 +63,7 @@ export function Avatar({
     <View style={base} accessible={false}>
       <Text
         style={{
-          fontFamily: fonte.titulo,
+          ...fonte.titulo,
           fontSize: Math.max(13, Math.round(tamanho * 0.42)),
           color: cor.branco,
         }}

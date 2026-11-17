@@ -1,25 +1,46 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Animated, Easing, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  Animated,
+  Easing,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type ScrollView,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Check, ChevronRight, Flame, Play, Sprout } from "lucide-react-native";
 import Svg, { Circle, Text as SvgText } from "react-native-svg";
-import { bebeDaSemana } from "~/lib/bebe-da-semana";
-import { toque } from "~/componentes/base";
-import { BotaoDaAtividade, Brilho, sombraDe } from "~/componentes/jornada/atividade";
+import { toque, useFimDaRolagem } from "~/componentes/base";
+import { Vidro } from "~/componentes/vidro";
+import { Brilho } from "~/componentes/jornada/atividade";
+import { CEUS, ceuDaHora, CeuVivo, useCeuDasAbas, type Ceu } from "~/componentes/ceu-vivo";
+import { Painel } from "~/componentes/painel";
+import { ALTURA_DO_CEU, CeuDoBebe } from "~/componentes/jornada/ceu-do-bebe";
 import {
   ArteDaBolha,
   Flutuar,
+  Inclinacao3D,
   useMovimentoReduzido,
+  useParalaxe,
   type HumorDaArte,
 } from "~/componentes/movimento";
 import { CompartilharASemana, type DadosDoCartao } from "~/componentes/jornada/cartao-da-semana";
 import { Confete } from "~/componentes/jornada/pecas";
 import { parametroDaBancada } from "~/lib/bancada";
 import { arteDoBebe } from "~/componentes/jornada/arte-do-bebe";
+import { clarear, comAlfa } from "~/lib/cor";
 import type { ChaveDoCuidado, Cuidado } from "~/lib/jornada/hoje";
-import { cor, espaco, fonte } from "~/tema";
+import { aperto, cor, curva, espaco, fonte, luz, sombra } from "~/tema";
+
+export { Selo } from "~/componentes/jornada/ceu-do-bebe";
+/* O céu da hora mora em `ceu-vivo.tsx` (é também o fundo da entrada); o
+   pós-parto ainda o importa daqui. */
+export { CEUS, ceuDaHora } from "~/componentes/ceu-vivo";
 
 /**
  * HOJE — "o cuidado de hoje": a primeira tela do app (out/2026, aprovada pelo
@@ -48,9 +69,9 @@ export const ARTE: Record<ChaveDoCuidado, number> = {
 export const FICHA: Record<ChaveDoCuidado, string> = {
   aula: "#fff1df",
   movement: "#e3f7ee",
-  meditation: "#ffe9ef",
-  bonding: "#fff1e3",
-  gratitude: "#efe9ff",
+  meditation: "#f1eaff",
+  bonding: "#ffe9ef",
+  gratitude: "#fff6d6",
 };
 
 /* O destaque do "próximo cuidado", na cor da atividade. */
@@ -77,34 +98,27 @@ const DESTAQUE: Record<
   },
 };
 
-/** O céu pintado da hora do dia, e a tinta que se lê em cima dele. */
-export const CEUS = {
-  amanhecer: {
-    arte: require("../../../../src/assets/ceu/amanhecer.webp"),
-    tinta: "#2e2348",
-    sec: "#5d4d84",
-  },
-  dia: { arte: require("../../../../src/assets/ceu/dia.webp"), tinta: "#ffffff", sec: "#eaf4ff" },
-  tarde: {
-    arte: require("../../../../src/assets/ceu/por-do-sol.webp"),
-    tinta: "#ffffff",
-    sec: "#ffe9de",
-  },
-  noite: {
-    arte: require("../../../../src/assets/ceu/anoitecer.webp"),
-    tinta: "#ffffff",
-    sec: "#dcd6ff",
-  },
+/** A névoa da paleta: o fundo do pós-parto, que ainda tem a folha sobre o céu. */
+export const FUNDO = cor.fundo;
+
+/* As tintas da folha: a ameixa da paleta, e um degrau mais suave para o texto corrido. */
+const TINTA = {
+  titulo: cor.texto,
+  corpo: "#463d63",
+  apagado: cor.textoApagado,
+  link: cor.primariaEscura,
 } as const;
 
-export function ceuDaHora(hora: number): keyof typeof CEUS {
-  if (hora >= 5 && hora < 11) return "amanhecer";
-  if (hora >= 11 && hora < 16) return "dia";
-  if (hora >= 16 && hora < 19) return "tarde";
-  return "noite";
-}
+const FIO = StyleSheet.hairlineWidth;
 
-export const FUNDO = "#fff8f5";
+/** O material dos cartões da folha: branco, com o fio de luz e a sombra em camadas. */
+const MATERIAL = {
+  backgroundColor: luz.cartao,
+  borderWidth: FIO,
+  borderColor: "rgba(255,255,255,0.9)",
+  ...curva,
+  ...sombra,
+} as const;
 
 /** Quantos cuidados a tela já mostrou feitos, por dia — neste processo. */
 const vistosPorDia = new Map<string, number>();
@@ -257,198 +271,148 @@ export function TelaDeHoje({
   direita?: ReactNode;
 }) {
   const topo = useSafeAreaInsets().top;
-  const ceu = CEUS[ceuDaHora(hora)];
-  const bebe = bebeDaSemana(semana);
+  /* Dentro das abas o céu é o delas (um só, atrás de todas): a tela fica
+     transparente e lê dele a fase e a inclinação do celular. Fora, o seu. */
+  const dasAbas = useCeuDasAbas();
+  const fase = dasAbas?.fase ?? ceuDaHora(hora);
+  const ceu = CEUS[fase];
   const quem = nomeDoBebe ?? "o bebê";
   const feitos = cuidados.filter((c) => c.feito).length;
   const proximo = cuidados.find((c) => !c.feito) ?? null;
   const resto = cuidados.filter((c) => c !== proximo);
   const { pulso, brilho, festa } = useMomentoDoDia(D, feitos, 5, "gestacao", pronto);
+  const fim = useFimDaRolagem(espaco.xxl);
+  /* A rolagem e a inclinação do celular movem as camadas (o céu, o número, o
+     bebê) e fazem nascer a barra de vidro do topo: tudo no fio nativo, sem
+     passar pelo JavaScript a cada quadro. */
+  const rolagem = useRef(new Animated.Value(0)).current;
+  const propria = useParalaxe();
+  const { x, y } = dasAbas ?? propria;
+  const lista = useRef<ScrollView>(null);
+  const aoRolar = useMemo(
+    () =>
+      Animated.event([{ nativeEvent: { contentOffset: { y: rolagem } } }], {
+        useNativeDriver: true,
+      }),
+    [rolagem],
+  );
 
   return (
-    <View style={{ flex: 1, backgroundColor: FUNDO }}>
-      <ScrollView
-        style={{ flex: 1, backgroundColor: FUNDO }}
-        contentContainerStyle={{ paddingBottom: espaco.xxl }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* O céu da hora, com o bebê da semana — o herói da tela. */}
-        <View style={{ height: 430 + topo, overflow: "hidden" }}>
-          <Image
-            source={ceu.arte}
-            style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }}
-            contentFit="cover"
-            accessibilityIgnoresInvertColors
-          />
-          <LinearGradient
-            colors={["rgba(255,248,245,0)", FUNDO]}
-            style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 120 }}
-          />
-          {/* O céu se ilumina quando o quinto cuidado se acende. */}
-          <Animated.View
-            pointerEvents="none"
-            style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              top: 0,
-              bottom: 0,
-              backgroundColor: "#fff7e0",
-              opacity: brilho,
-            }}
-          />
-          <View
-            style={{
-              paddingTop: topo + espaco.lg,
-              paddingHorizontal: 20,
-              flexDirection: "row",
-              alignItems: "flex-start",
-              justifyContent: "space-between",
-            }}
-          >
-            <View style={{ flex: 1 }}>
-              <Text
-                style={{
-                  fontFamily: fonte.titulo,
-                  fontSize: 12,
-                  letterSpacing: 1.4,
-                  textTransform: "uppercase",
-                  color: ceu.sec,
-                }}
-              >
-                {data}
-              </Text>
-              <Text
-                accessibilityRole="header"
-                style={{
-                  marginTop: 2,
-                  fontFamily: fonte.titulo,
-                  fontSize: 31,
-                  lineHeight: 37,
-                  letterSpacing: -0.5,
-                  color: ceu.tinta,
-                }}
-              >
-                {saudacao}
-              </Text>
-            </View>
-            {direita}
-          </View>
-          <View style={{ alignItems: "center", marginTop: 2 }}>
-            <View style={{ alignItems: "center", justifyContent: "center" }}>
-              <Brilho tamanho={240} />
-              <Flutuar>
-                <Image
-                  source={arteDoBebe(semana)}
-                  style={{ width: 186, height: 186 }}
-                  contentFit="contain"
-                  accessibilityLabel={`${quem} com ${semana} semanas`}
-                />
-              </Flutuar>
-            </View>
-            {nomeDoBebe ? (
-              <Text style={{ fontFamily: fonte.titulo, fontSize: 22, color: "#2e2348" }}>
-                {nomeDoBebe}
-              </Text>
-            ) : null}
-            <Text
-              style={{
-                marginTop: 2,
-                paddingHorizontal: espaco.lg,
-                textAlign: "center",
-                fontFamily: fonte.forte,
-                fontSize: 14,
-                color: "#5d4d84",
-              }}
-            >
-              {semana} semanas{dias > 0 ? ` e ${dias} ${dias === 1 ? "dia" : "dias"}` : ""} ·
-              tamanho de {bebe.fruit.toLowerCase()}
-            </Text>
-            <View style={{ flexDirection: "row", gap: espaco.sm, marginTop: 10 }}>
-              {faltam != null && faltam > 0 ? (
-                <Selo>
-                  ⏳ faltam {faltam} {faltam === 1 ? "dia" : "dias"}
-                </Selo>
-              ) : null}
-              <Selo>📏 {bebe.size}</Selo>
-            </View>
-          </View>
-        </View>
+    <View style={{ flex: 1, backgroundColor: dasAbas ? "transparent" : ceu.chao }}>
+      {/* O CÉU DA HORA É A TELA INTEIRA: fica parado atrás da rolagem, vivo, e
+          tudo o mais flutua sobre ele (16/11/2026). */}
+      {dasAbas ? null : <CeuVivo fase={fase} rolagem={rolagem} x={x} y={y} />}
+      {/* O céu se ilumina quando o quinto cuidado se acende. */}
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, { backgroundColor: "#fff7e0", opacity: brilho }]}
+      />
 
-        {/* A folha que sobe sobre o céu. */}
-        <View
-          style={{
-            marginTop: -34,
-            borderTopLeftRadius: 32,
-            borderTopRightRadius: 32,
-            backgroundColor: FUNDO,
-            paddingHorizontal: 18,
-            paddingTop: 22,
-            gap: espaco.md,
-          }}
-        >
+      <Animated.ScrollView
+        ref={lista}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: fim }}
+        showsVerticalScrollIndicator={false}
+        onScroll={aoRolar}
+        scrollEventThrottle={16}
+      >
+        {/* O bebê da semana no céu — o herói da tela. */}
+        <CeuDoBebe
+          topo={topo}
+          ceu={ceu}
+          data={data}
+          saudacao={saudacao}
+          direita={direita}
+          semana={semana}
+          dias={dias}
+          nomeDoBebe={nomeDoBebe}
+          faltam={faltam}
+          rolagem={rolagem}
+          x={x}
+          y={y}
+        />
+
+        {/* Os painéis, soltos sobre o céu. */}
+        <View style={{ paddingHorizontal: 12, paddingTop: 6, gap: 14 }}>
           {avisos}
           {nascimento}
-          {acompanhamento}
-          <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.md }}>
-            <View style={{ flex: 1 }}>
-              <Text
-                accessibilityRole="header"
-                style={{
-                  fontFamily: fonte.titulo,
-                  fontSize: 24,
-                  letterSpacing: -0.3,
-                  color: "#3a2230",
-                }}
-              >
-                O cuidado de hoje
-              </Text>
-              <Text
-                style={{ marginTop: 2, fontFamily: fonte.media, fontSize: 14, color: "#9a7486" }}
-              >
-                5 minutinhos para você e {quem}
-              </Text>
-            </View>
-            <Animated.View style={{ transform: [{ scale: pulso }] }}>
-              <AnelDoDia feitos={feitos} />
-            </Animated.View>
-          </View>
+          {acompanhamento ? (
+            <Entrar atraso={80}>
+              <Painel>{acompanhamento}</Painel>
+            </Entrar>
+          ) : null}
 
-          {/* A bolha, pequena: a personagem que acompanha, e não a dona da tela. */}
-          <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
-            <ArteDaBolha humor={humor} tamanho={58} />
-            <View
-              style={{
-                flex: 1,
-                borderRadius: 18,
-                borderTopLeftRadius: 6,
-                backgroundColor: cor.branco,
-                paddingHorizontal: 14,
-                paddingVertical: 10,
-                ...sombraDe("#b0708d", 0.6),
-              }}
-            >
-              <Text
-                style={{ fontFamily: fonte.media, fontSize: 14, lineHeight: 20, color: "#5b3a4a" }}
-              >
-                {recado}
-              </Text>
-            </View>
-          </View>
+          <Entrar atraso={160}>
+            <Painel>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.md }}>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    accessibilityRole="header"
+                    style={{
+                      ...fonte.titulo,
+                      fontSize: 26,
+                      lineHeight: 31,
+                      letterSpacing: aperto.titulo,
+                      color: TINTA.titulo,
+                    }}
+                  >
+                    O cuidado de hoje
+                  </Text>
+                  <Text
+                    style={{ marginTop: 2, ...fonte.media, fontSize: 15, color: TINTA.apagado }}
+                  >
+                    5 minutinhos para você e {quem}
+                  </Text>
+                </View>
+                <Animated.View style={{ transform: [{ scale: pulso }] }}>
+                  <AnelDoDia feitos={feitos} />
+                </Animated.View>
+              </View>
 
-          <Entrar key={proximo?.chave ?? "cheio"}>
-            {proximo ? (
-              <ProximoCuidado c={proximo} aoAbrir={() => aoAbrir(proximo.chave)} />
-            ) : (
-              <DiaCheio quem={quem} />
-            )}
+              {/* A bolha, pequena: a personagem que acompanha, e não a dona da tela. */}
+              <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
+                <ArteDaBolha humor={humor} tamanho={58} />
+                <View
+                  style={{
+                    flex: 1,
+                    borderRadius: 20,
+                    borderTopLeftRadius: 6,
+                    paddingHorizontal: 14,
+                    paddingVertical: 11,
+                    ...MATERIAL,
+                  }}
+                >
+                  <Text
+                    style={{ ...fonte.media, fontSize: 15, lineHeight: 21, color: TINTA.corpo }}
+                  >
+                    {recado}
+                  </Text>
+                </View>
+              </View>
+
+              <Entrar key={proximo?.chave ?? "cheio"}>
+                {proximo ? (
+                  <ProximoCuidado c={proximo} aoAbrir={() => aoAbrir(proximo.chave)} />
+                ) : (
+                  <DiaCheio quem={quem} />
+                )}
+              </Entrar>
+
+              {/* Os outros cuidados, numa lista só (e não quatro cartões soltos). */}
+              {resto.length ? (
+                <View style={{ borderRadius: 26, paddingVertical: 4, ...MATERIAL }}>
+                  {resto.map((c, i) => (
+                    <View key={c.chave}>
+                      {i > 0 ? (
+                        <View style={{ height: FIO, marginLeft: 82, backgroundColor: cor.borda }} />
+                      ) : null}
+                      <LinhaDoCuidado c={c} aoAbrir={() => aoAbrir(c.chave)} />
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </Painel>
           </Entrar>
-
-          <View style={{ gap: 10 }}>
-            {resto.map((c) => (
-              <LinhaDoCuidado key={c.chave} c={c} aoAbrir={() => aoAbrir(c.chave)} />
-            ))}
-          </View>
 
           {amigas}
 
@@ -463,54 +427,164 @@ export function TelaDeHoje({
               toque();
               aoVerJornada();
             }}
-            style={({ pressed }) => ({
-              marginTop: espaco.xs,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              borderRadius: 18,
-              backgroundColor: "#fff1e6",
-              paddingHorizontal: 14,
-              paddingVertical: 13,
-              opacity: pressed ? 0.8 : 1,
-            })}
+            style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
           >
-            <Text style={{ fontFamily: fonte.forte, fontSize: 14, color: "#8a4d2a" }}>
+            <LinearGradient
+              colors={["#fff0e3", "#ffe6ef"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: espaco.sm,
+                borderRadius: 22,
+                ...curva,
+                paddingHorizontal: 16,
+                paddingVertical: 15,
+              }}
+            >
               {chama > 0 ? (
-                <>
-                  <Text style={{ fontFamily: fonte.titulo, color: "#c2571a" }}>
-                    🔥 {chama} {chama === 1 ? "dia" : "dias"}
-                  </Text>{" "}
-                  cuidando de vocês
-                </>
+                <Flame size={20} color="#e2560f" fill="#ff9d4d" strokeWidth={2} />
               ) : (
-                "🌱 Sua jornada começa hoje"
+                <Sprout size={20} color="#15803d" strokeWidth={2.2} />
               )}
-            </Text>
-            <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: "#7a3fd1" }}>
-              Ver a trilha ›
-            </Text>
+              <Text style={{ flex: 1, ...fonte.media, fontSize: 15, color: "#7a4324" }}>
+                {chama > 0 ? (
+                  <>
+                    <Text style={{ ...fonte.titulo, color: "#c2571a" }}>
+                      {chama} {chama === 1 ? "dia" : "dias"}
+                    </Text>{" "}
+                    cuidando de vocês
+                  </>
+                ) : (
+                  "Sua jornada começa hoje"
+                )}
+              </Text>
+              <Text style={{ ...fonte.forte, fontSize: 15, color: TINTA.link }}>Ver a trilha</Text>
+              <ChevronRight size={18} color={TINTA.link} strokeWidth={2.4} />
+            </LinearGradient>
           </Pressable>
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
+
+      <BarraQueNasce
+        topo={topo}
+        ceu={ceu}
+        rolagem={rolagem}
+        semana={semana}
+        nomeDoBebe={nomeDoBebe}
+        feitos={feitos}
+        aoTocar={() => lista.current?.scrollTo({ y: 0, animated: true })}
+      />
       {festa ? <Confete pecas={60} /> : null}
     </View>
   );
 }
 
-export function Selo({ children }: { children: ReactNode }) {
+/**
+ * A BARRA QUE NASCE: quando o céu sai da tela, desce do topo uma cápsula de
+ * vidro com o bebê, o nome, a semana e os cuidados do dia — o que o céu dizia
+ * continua à vista, e um toque nela volta ao topo. Ela desliza (e não aparece
+ * esmaecendo): vidro com transparência animada perde o efeito no meio do caminho.
+ */
+function BarraQueNasce({
+  topo,
+  ceu,
+  rolagem,
+  semana,
+  nomeDoBebe,
+  feitos,
+  aoTocar,
+}: {
+  topo: number;
+  ceu: Ceu;
+  rolagem: Animated.Value;
+  semana: number;
+  nomeDoBebe: string | null;
+  feitos: number;
+  aoTocar: () => void;
+}) {
+  const some = ALTURA_DO_CEU + topo - 190;
   return (
-    <View
-      style={{
-        borderRadius: 999,
-        backgroundColor: "rgba(255,255,255,0.84)",
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        ...sombraDe("#504078", 0.5),
-      }}
-    >
-      <Text style={{ fontFamily: fonte.titulo, fontSize: 13, color: "#4a3a6e" }}>{children}</Text>
-    </View>
+    <>
+      {/* Com o bebê fora da tela, o topo se desfaz na cor do alto do céu: o que
+          rola não passa por baixo do relógio do iPhone. */}
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: topo + 64,
+          opacity: rolagem.interpolate({
+            inputRange: [some, some + 90],
+            outputRange: [0, 1],
+            extrapolate: "clamp",
+          }),
+        }}
+      >
+        <LinearGradient
+          colors={[ceu.topo, comAlfa(ceu.topo, 0.85), comAlfa(ceu.topo, 0)]}
+          locations={[0, 0.5, 1]}
+          style={{ flex: 1 }}
+        />
+      </Animated.View>
+      <Animated.View
+        pointerEvents="box-none"
+        style={{
+          position: "absolute",
+          top: topo + 4,
+          left: 0,
+          right: 0,
+          alignItems: "center",
+          transform: [
+            {
+              translateY: rolagem.interpolate({
+                inputRange: [some, some + 90],
+                outputRange: [-(topo + 80), 0],
+                extrapolate: "clamp",
+              }),
+            },
+          ],
+        }}
+      >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${nomeDoBebe ?? "O bebê"}, ${semana} semanas. ${feitos} de 5 cuidados feitos hoje. Voltar ao topo`}
+          onPress={() => {
+            toque();
+            aoTocar();
+          }}
+        >
+          <Vidro
+            interativo
+            estilo={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8,
+              paddingLeft: 6,
+              paddingRight: 14,
+              paddingVertical: 5,
+            }}
+          >
+            <Image
+              source={arteDoBebe(semana)}
+              style={{ width: 34, height: 34 }}
+              contentFit="contain"
+            />
+            <Text style={{ ...fonte.titulo, fontSize: 15, color: TINTA.titulo }}>
+              {nomeDoBebe ?? "O bebê"}
+            </Text>
+            <Text style={{ ...fonte.media, fontSize: 14, color: TINTA.apagado }}>
+              {semana} semanas
+            </Text>
+            <View style={{ width: 1, height: 16, backgroundColor: cor.borda }} />
+            <Text style={{ ...fonte.titulo, fontSize: 14, color: TINTA.link }}>{feitos}/5</Text>
+          </Vidro>
+        </Pressable>
+      </Animated.View>
+    </>
   );
 }
 
@@ -518,8 +592,8 @@ export function Selo({ children }: { children: ReactNode }) {
 export function AnelDoDia({
   feitos,
   total = 5,
-  cor: tinta = "#e8578f",
-  vazio = "#f6dbe6",
+  cor: tinta = cor.primaria,
+  vazio = cor.destaque,
 }: {
   feitos: number;
   total?: number;
@@ -552,9 +626,10 @@ export function AnelDoDia({
           x={40}
           y={39}
           textAnchor="middle"
-          fontFamily={fonte.titulo}
+          fontFamily={fonte.titulo.fontFamily}
+          fontWeight={fonte.titulo.fontWeight}
           fontSize={19}
-          fill="#4a1f33"
+          fill={TINTA.titulo}
         >
           {`${feitos}/${total}`}
         </SvgText>
@@ -562,9 +637,10 @@ export function AnelDoDia({
           x={40}
           y={54}
           textAnchor="middle"
-          fontFamily={fonte.forte}
+          fontFamily={fonte.forte.fontFamily}
+          fontWeight={fonte.forte.fontWeight}
           fontSize={9.5}
-          fill="#b0708d"
+          fill={TINTA.apagado}
         >
           cuidados
         </SvgText>
@@ -573,79 +649,163 @@ export function AnelDoDia({
   );
 }
 
+/**
+ * O PRÓXIMO CUIDADO, em destaque: o objeto da atividade SALTA para fora do
+ * cartão (passa da borda de cima, com o brilho por trás), e o cartão inteiro
+ * inclina com o celular e com o dedo (`Inclinacao3D`). O cartão é o botão: o
+ * "Começar" é só o desenho dele, para o leitor de tela não ler dois botões.
+ */
 function ProximoCuidado({ c, aoAbrir }: { c: Cuidado; aoAbrir: () => void }) {
   const d = DESTAQUE[c.chave];
   return (
-    <LinearGradient
-      colors={[d.de, d.ate]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 14,
-        borderRadius: 26,
-        padding: 16,
-        borderBottomWidth: 5,
-        borderBottomColor: d.labio,
-        ...sombraDe(d.forte, 1),
+    <Inclinacao3D
+      raio={30}
+      aoTocar={aoAbrir}
+      rotuloAcessivel={`Próximo cuidado: ${c.titulo}. ${c.sub}. Começar`}
+      estiloDeFora={{ marginTop: 30 }}
+      estilo={{
+        boxShadow: `0px 2px 4px ${comAlfa(d.forte, 0.06)}, 0px 22px 40px -18px ${comAlfa(d.forte, 0.5)}`,
       }}
     >
-      <Image source={ARTE[c.chave]} style={{ width: 84, height: 84 }} contentFit="contain" />
-      <View style={{ flex: 1, gap: 2 }}>
+      {/* O degradê é o FUNDO, e não o pai: no iPhone ele corta o que passa da
+          borda, e o objeto precisa passar. */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={[clarear(d.de, 0.35), d.ate]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            borderRadius: 30,
+            ...curva,
+            borderWidth: FIO,
+            borderColor: "rgba(255,255,255,0.95)",
+          },
+        ]}
+      />
+      <View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          left: -4,
+          top: -38,
+          width: 132,
+          height: 138,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Brilho tamanho={170} />
+        <Flutuar amplitude={4} periodo={3800}>
+          <Image source={ARTE[c.chave]} style={{ width: 134, height: 134 }} contentFit="contain" />
+        </Flutuar>
+      </View>
+      <View
+        style={{
+          minHeight: 150,
+          justifyContent: "center",
+          paddingVertical: 18,
+          paddingRight: 14,
+          paddingLeft: 124,
+        }}
+      >
         <Text
           style={{
-            fontFamily: fonte.titulo,
+            ...fonte.titulo,
             fontSize: 11,
-            letterSpacing: 1.2,
+            letterSpacing: 1.3,
             textTransform: "uppercase",
             color: d.forte,
           }}
         >
           Próximo cuidado
         </Text>
-        <Text style={{ fontFamily: fonte.titulo, fontSize: 19, lineHeight: 24, color: d.tinta }}>
+        <Text
+          style={{
+            marginTop: 2,
+            ...fonte.titulo,
+            fontSize: 22,
+            lineHeight: 26,
+            letterSpacing: aperto.subtitulo,
+            color: d.tinta,
+          }}
+        >
           {c.titulo}
         </Text>
         <Text
           style={{
-            fontFamily: fonte.media,
-            fontSize: 13,
-            lineHeight: 18,
+            marginTop: 2,
+            ...fonte.media,
+            fontSize: 14,
+            lineHeight: 19,
             color: d.tinta,
             opacity: 0.8,
           }}
         >
           {c.sub}
         </Text>
-        <View style={{ marginTop: espaco.sm, alignSelf: "flex-start" }}>
-          <BotaoDaAtividade cor={d.forte} rotulo="▶  Começar" aoTocar={aoAbrir} />
+        <View
+          style={{
+            marginTop: espaco.md,
+            alignSelf: "flex-start",
+            borderRadius: 999,
+            boxShadow: `0px 10px 20px -8px ${comAlfa(d.forte, 0.7)}`,
+          }}
+        >
+          <LinearGradient
+            colors={[clarear(d.forte, 0.14), d.forte]}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 7,
+              minHeight: 44,
+              borderRadius: 999,
+              ...curva,
+              paddingLeft: 16,
+              paddingRight: 20,
+            }}
+          >
+            <Play size={15} color={cor.branco} fill={cor.branco} />
+            <Text style={{ ...fonte.titulo, fontSize: 16, color: cor.branco }}>Começar</Text>
+          </LinearGradient>
         </View>
       </View>
-    </LinearGradient>
+    </Inclinacao3D>
   );
 }
 
 function DiaCheio({ quem }: { quem: string }) {
   return (
     <LinearGradient
-      colors={["#fff0f6", "#ffe3ee"]}
+      colors={["#fff3f8", "#ffe1ec"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
       style={{
         flexDirection: "row",
         alignItems: "center",
         gap: 14,
-        borderRadius: 26,
-        padding: 16,
-        borderBottomWidth: 5,
-        borderBottomColor: "#f9c6da",
+        borderRadius: 30,
+        ...curva,
+        padding: 18,
+        borderWidth: FIO,
+        borderColor: "rgba(255,255,255,0.95)",
+        boxShadow: `0px 22px 40px -18px ${comAlfa(cor.primaria, 0.45)}`,
       }}
     >
-      <ArteDaBolha humor="comemorando" tamanho={84} />
+      <ArteDaBolha humor="comemorando" tamanho={88} />
       <View style={{ flex: 1, gap: 2 }}>
-        <Text style={{ fontFamily: fonte.titulo, fontSize: 20, color: "#7d1d45" }}>
+        <Text
+          style={{
+            ...fonte.titulo,
+            fontSize: 22,
+            letterSpacing: aperto.subtitulo,
+            color: cor.textoDestaque,
+          }}
+        >
           Dia cheio 💛
         </Text>
-        <Text style={{ fontFamily: fonte.media, fontSize: 14, lineHeight: 20, color: "#8a3a5c" }}>
+        <Text style={{ ...fonte.media, fontSize: 15, lineHeight: 21, color: "#8a3a5c" }}>
           Os cinco cuidados de hoje estão feitos. {primeiraMaiuscula(quem)} sentiu cada minuto.
         </Text>
       </View>
@@ -665,54 +825,33 @@ function LinhaDoCuidado({ c, aoAbrir }: { c: Cuidado; aoAbrir: () => void }) {
       style={({ pressed }) => ({
         flexDirection: "row",
         alignItems: "center",
-        gap: 13,
-        borderRadius: 20,
-        backgroundColor: cor.branco,
-        paddingVertical: 11,
-        paddingLeft: 11,
+        gap: 14,
+        paddingVertical: 10,
+        paddingLeft: 12,
         paddingRight: 14,
-        opacity: pressed ? 0.85 : 1,
-        ...sombraDe("#b0708d", 0.6),
+        opacity: pressed ? 0.6 : 1,
       })}
     >
       <View
         style={{
           width: 56,
           height: 56,
-          borderRadius: 17,
+          borderRadius: 18,
+          ...curva,
           alignItems: "center",
           justifyContent: "center",
           backgroundColor: FICHA[c.chave],
         }}
       >
-        <Image source={ARTE[c.chave]} style={{ width: 44, height: 44 }} contentFit="contain" />
-        {c.feito ? (
-          <View
-            style={{
-              position: "absolute",
-              right: -5,
-              bottom: -5,
-              width: 22,
-              height: 22,
-              borderRadius: 11,
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: "#16a36f",
-              borderWidth: 2,
-              borderColor: cor.branco,
-            }}
-          >
-            <Text style={{ fontFamily: fonte.titulo, fontSize: 12, color: cor.branco }}>✓</Text>
-          </View>
-        ) : null}
+        <Image source={ARTE[c.chave]} style={{ width: 46, height: 46 }} contentFit="contain" />
       </View>
       <View style={{ flex: 1 }}>
         <Text
           style={{
-            fontFamily: fonte.titulo,
-            fontSize: 15.5,
-            lineHeight: 20,
-            color: c.feito ? "#8a7280" : "#3a2230",
+            ...fonte.forte,
+            fontSize: 16,
+            lineHeight: 21,
+            color: c.feito ? TINTA.apagado : TINTA.titulo,
           }}
         >
           {c.titulo}
@@ -720,17 +859,30 @@ function LinhaDoCuidado({ c, aoAbrir }: { c: Cuidado; aoAbrir: () => void }) {
         <Text
           style={{
             marginTop: 1,
-            fontFamily: fonte.media,
-            fontSize: 13,
+            ...fonte.media,
+            fontSize: 13.5,
             lineHeight: 18,
-            color: "#9a7486",
+            color: TINTA.apagado,
           }}
         >
           {c.feito ? "Feito hoje 💛" : c.sub}
         </Text>
       </View>
-      {c.feito ? null : (
-        <Text style={{ fontFamily: fonte.titulo, fontSize: 24, color: "#d3b5c4" }}>›</Text>
+      {c.feito ? (
+        <View
+          style={{
+            width: 26,
+            height: 26,
+            borderRadius: 13,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "#12a06c",
+          }}
+        >
+          <Check size={15} color={cor.branco} strokeWidth={3.2} />
+        </View>
+      ) : (
+        <ChevronRight size={20} color="#c3bad6" strokeWidth={2.4} />
       )}
     </Pressable>
   );

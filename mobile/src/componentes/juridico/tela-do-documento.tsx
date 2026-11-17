@@ -33,9 +33,7 @@ export function TelaDoDocumento({ doc }: { doc: DocumentoJuridico }) {
               <View key={i} style={{ gap: 6 }}>
                 {b.lista.map((item) => (
                   <View key={item} style={{ flexDirection: "row", gap: espaco.sm }}>
-                    <Text style={{ fontFamily: fonte.forte, fontSize: 16, color: cor.primaria }}>
-                      •
-                    </Text>
+                    <Text style={{ ...fonte.forte, fontSize: 16, color: cor.primaria }}>•</Text>
                     <T estilo={{ flex: 1, lineHeight: 23 }}>{item}</T>
                   </View>
                 ))}

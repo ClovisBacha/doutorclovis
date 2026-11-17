@@ -401,7 +401,7 @@ export default function Bebe() {
           <Text
             style={{
               marginTop: espaco.xxl,
-              fontFamily: fonte.media,
+              ...fonte.media,
               fontSize: 13,
               letterSpacing: 0.65,
               textTransform: "uppercase",
@@ -452,9 +452,7 @@ export default function Bebe() {
             onPress={() => setEtapa("intro")}
             style={{ alignSelf: "flex-start", minHeight: ALVO_MINIMO, justifyContent: "center" }}
           >
-            <Text style={{ fontFamily: fonte.forte, fontSize: 13, color: corBebe.link }}>
-              ‹ Voltar
-            </Text>
+            <Text style={{ ...fonte.forte, fontSize: 13, color: corBebe.link }}>‹ Voltar</Text>
           </Pressable>
           <View style={{ alignItems: "center" }}>
             <Text style={estilos.rotulo}>Suas cartas</Text>
@@ -462,7 +460,7 @@ export default function Bebe() {
               accessibilityRole="header"
               style={{
                 marginTop: 4,
-                fontFamily: fonte.titulo,
+                ...fonte.titulo,
                 fontSize: 24,
                 lineHeight: 30,
                 letterSpacing: -0.24,
@@ -476,7 +474,7 @@ export default function Bebe() {
                 marginTop: 4,
                 maxWidth: 320,
                 textAlign: "center",
-                fontFamily: fonte.normal,
+                ...fonte.normal,
                 fontSize: 13,
                 lineHeight: 18,
                 color: corBebe.discreto,
@@ -513,7 +511,7 @@ export default function Bebe() {
                   <View style={{ flex: 1 }}>
                     <Text
                       style={{
-                        fontFamily: fonte.forte,
+                        ...fonte.forte,
                         fontSize: 14,
                         lineHeight: 19,
                         color: corBebe.titulo,
@@ -521,7 +519,7 @@ export default function Bebe() {
                     >
                       {c.title}
                     </Text>
-                    <Text style={{ fontFamily: fonte.normal, fontSize: 13, color: corBebe.lida }}>
+                    <Text style={{ ...fonte.normal, fontSize: 13, color: corBebe.lida }}>
                       {quando ? `Lida ${haQuantoTempo(quando, new Date())}` : "Ainda não lida"}
                     </Text>
                   </View>
@@ -593,7 +591,7 @@ export default function Bebe() {
             style={{
               marginTop: 4,
               textAlign: "center",
-              fontFamily: fonte.titulo,
+              ...fonte.titulo,
               fontSize: 28,
               lineHeight: 34,
               letterSpacing: -0.3,
@@ -606,7 +604,7 @@ export default function Bebe() {
             style={{
               marginTop: espaco.md,
               textAlign: "center",
-              fontFamily: fonte.normal,
+              ...fonte.normal,
               fontSize: 15,
               lineHeight: 23,
               color: corBebe.texto,
@@ -615,14 +613,14 @@ export default function Bebe() {
             {lendoAsDelas ? (
               <>
                 Esta carta é feita das coisas boas que{" "}
-                <Text style={{ fontFamily: fonte.titulo }}>você mesma anotou</Text> na Gratidão, na
-                ordem em que aconteceram. Leia em voz alta, devagar. 💛
+                <Text style={{ ...fonte.titulo }}>você mesma anotou</Text> na Gratidão, na ordem em
+                que aconteceram. Leia em voz alta, devagar. 💛
               </>
             ) : (
               <>
                 Encontre um lugar calmo, mão na barriga… e leia{" "}
-                <Text style={{ fontFamily: fonte.titulo }}>em voz alta</Text>, devagar. A sua voz é
-                o som preferido do bebê. 💛
+                <Text style={{ ...fonte.titulo }}>em voz alta</Text>, devagar. A sua voz é o som
+                preferido do bebê. 💛
               </>
             )}
           </Text>
@@ -671,7 +669,7 @@ function Link({ texto, aoTocar }: { texto: string; aoTocar: () => void }) {
     >
       <Text
         style={{
-          fontFamily: fonte.forte,
+          ...fonte.forte,
           fontSize: 13,
           color: corBebe.link,
           textDecorationLine: "underline",
@@ -703,7 +701,7 @@ function LinhaQueEntra({ texto }: { texto: string }) {
       style={{
         maxWidth: 384,
         textAlign: "center",
-        fontFamily: fonte.media,
+        ...fonte.media,
         fontSize: 26,
         lineHeight: 42,
         color: corBebe.titulo,
@@ -796,7 +794,7 @@ function Coracao({
 
 const estilos = StyleSheet.create({
   rotulo: {
-    fontFamily: fonte.forte,
+    ...fonte.forte,
     fontSize: 13,
     letterSpacing: 2.3,
     textTransform: "uppercase",

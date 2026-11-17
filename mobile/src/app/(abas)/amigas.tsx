@@ -1,4 +1,3 @@
-import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
@@ -7,8 +6,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { linkDeIndicacao } from "@/lib/indicacao";
 import { tempoNoApp } from "@/lib/amigas";
 import { useAviso } from "~/componentes/aviso";
-import { Carregando, NaoConsegueLer, toque } from "~/componentes/base";
+import { Carregando, NaoConsegueLer, toque, useFimDaRolagem } from "~/componentes/base";
 import { BotaoDoPerfil } from "~/componentes/botao-do-perfil";
+import { CEUS, sombraDoTexto, useCeuDasAbas, type Ceu } from "~/componentes/ceu-vivo";
+import { BolhaViva } from "~/componentes/movimento";
+import { Painel } from "~/componentes/painel";
 import {
   cobrarOBonus,
   lerAmigas,
@@ -30,7 +32,7 @@ import { useJornada } from "~/componentes/jornada/usarJornada";
 import { lerAIndicacao } from "~/componentes/recompensas/economia-do-cantinho";
 import { fraseDoPedido, mensagemDeConviteDoApp } from "~/lib/jornada/amigas";
 import { mudarSelos, seloDasAmigas } from "~/lib/selos";
-import { ALVO_MINIMO, cor, espaco, fonte } from "~/tema";
+import { ALVO_MINIMO, amanhecer, aperto, cor, curva, espaco, fonte, luz, sombra } from "~/tema";
 
 /**
  * AS AMIGAS — a aba do site (`src/components/amigas.tsx`), e uma das quatro da
@@ -45,22 +47,28 @@ import { ALVO_MINIMO, cor, espaco, fonte } from "~/tema";
  * servidor paga, e ele só paga atividade na gestação — uma chama que nunca
  * acende é pior que nenhuma (decisão do dono).
  *
+ * O desenho (16/11/2026): a aba flutua sobre o céu das três abas, como a do
+ * bebê — a bolha apaixonada solta no céu no lugar da faixa cor-de-rosa, e cada
+ * seção num painel de vidro ("vamos tirar esse fundo rosa", o dono).
+ *
  * Bancada: /amigas?bancada=1 [&amigas=0] [&dupla=sem|enviado|recebido|ativa|pausa]
  * [&pedidos=0] [&pos=1] [&luto=1]
  */
-
-const HEROI = require("../../../../src/assets/amigas/heroi.webp");
 
 export default function Amigas() {
   const { dia } = useJornada();
   const pos = dia.modo === "pos";
   const [leitura, setLeitura] = useState<LeituraDasAmigas | null | "carregando">("carregando");
+  const fim = useFimDaRolagem(60);
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [codigo, setCodigo] = useState<string | null>(null);
   const [termo, setTermo] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [resposta, setResposta] = useState<{ texto: string; ok: boolean } | null>(null);
   const { avisar, aviso } = useAviso();
+  /* O céu das abas, atrás de tudo (fora das abas, o fundo antigo). */
+  const dasAbas = useCeuDasAbas();
+  const ceu = dasAbas ? CEUS[dasAbas.fase] : null;
 
   const carregar = useCallback(async () => {
     const [l, p] = await Promise.all([lerAmigas(), lerPedidos()]);
@@ -132,7 +140,12 @@ export default function Amigas() {
   }
 
   const corpo = (() => {
-    if (leitura === "carregando") return <Carregando texto="Chamando as suas amigas…" />;
+    if (leitura === "carregando")
+      return (
+        <Painel>
+          <Carregando texto="Chamando as suas amigas…" />
+        </Painel>
+      );
     if (!leitura)
       return (
         <NaoConsegueLer
@@ -142,32 +155,24 @@ export default function Amigas() {
       );
     if (leitura.careMode || ("cuidado" in dia && dia.cuidado))
       return (
-        <View
-          style={{
-            borderRadius: 24,
-            borderWidth: 1,
-            borderStyle: "dashed",
-            borderColor: cor.borda,
-            padding: espaco.xl,
-          }}
-        >
+        <Painel estilo={{ padding: espaco.xl }}>
           <Text
             style={{
               textAlign: "center",
-              fontFamily: fonte.media,
+              ...fonte.media,
               fontSize: 15,
               color: cor.textoApagado,
             }}
           >
             As Amigas voltam quando você quiser. Está tudo guardado.
           </Text>
-        </View>
+        </Painel>
       );
     const { amigas, dupla } = leitura;
     return (
-      <View style={{ gap: 20 }}>
+      <View style={{ gap: 14 }}>
         {pedidos.length > 0 ? (
-          <View>
+          <Painel>
             <CabecalhoDaSecao
               titulo={
                 pedidos.length === 1
@@ -180,10 +185,12 @@ export default function Amigas() {
                 <View
                   key={p.id}
                   style={{
-                    borderRadius: 20,
-                    backgroundColor: cor.branco,
+                    borderRadius: 22,
+                    ...curva,
+                    backgroundColor: luz.cartao,
                     padding: 12,
                     gap: 10,
+                    ...sombra,
                   }}
                 >
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
@@ -191,11 +198,11 @@ export default function Amigas() {
                     <View style={{ flex: 1 }}>
                       <Text
                         numberOfLines={1}
-                        style={{ fontFamily: fonte.titulo, fontSize: 15, color: tinta.titulo }}
+                        style={{ ...fonte.titulo, fontSize: 16, color: tinta.titulo }}
                       >
                         {p.nome}
                       </Text>
-                      <Text style={{ fontFamily: fonte.media, fontSize: 13, color: tinta.sub }}>
+                      <Text style={{ ...fonte.media, fontSize: 13, color: tinta.sub }}>
                         {tempoNoApp(p.diasNoApp)}
                       </Text>
                     </View>
@@ -207,11 +214,11 @@ export default function Amigas() {
                 </View>
               ))}
             </View>
-          </View>
+          </Painel>
         ) : null}
 
         {pos ? null : (
-          <View>
+          <Painel>
             <CabecalhoDaSecao titulo="Dupla de sequência" />
             <CartaoDaDupla
               dupla={dupla}
@@ -219,34 +226,35 @@ export default function Amigas() {
               aoMudar={() => void carregar()}
               avisar={avisar}
             />
-          </View>
+          </Painel>
         )}
 
-        <View>
+        <Painel>
           <CabecalhoDaSecao titulo="Suas amigas" />
           {amigas.length === 0 ? (
             <View
               style={{
                 alignItems: "center",
                 gap: 6,
-                borderRadius: 20,
+                borderRadius: 22,
+                ...curva,
                 borderWidth: 1,
                 borderStyle: "dashed",
-                borderColor: "#e9d5ff",
+                borderColor: "#d9c8f5",
                 backgroundColor: "rgba(255,255,255,0.6)",
                 padding: espaco.xl,
               }}
             >
               <Text style={{ fontSize: 30 }}>👭</Text>
-              <Text style={{ fontFamily: fonte.titulo, fontSize: 15, color: tinta.titulo }}>
+              <Text style={{ ...fonte.titulo, fontSize: 16, color: tinta.titulo }}>
                 Ainda não tem ninguém por aqui
               </Text>
               <Text
                 style={{
                   textAlign: "center",
-                  fontFamily: fonte.media,
-                  fontSize: 13,
-                  lineHeight: 19,
+                  ...fonte.media,
+                  fontSize: 14,
+                  lineHeight: 20,
                   color: tinta.sub,
                 }}
               >
@@ -264,20 +272,16 @@ export default function Amigas() {
               ))}
             </View>
           )}
-        </View>
+        </Painel>
 
-        <View
-          style={{
-            borderRadius: 24,
-            backgroundColor: cor.branco,
-            padding: espaco.lg,
-            gap: espaco.sm,
-          }}
-        >
-          <Text style={{ fontFamily: fonte.titulo, fontSize: 17, color: tinta.titulo }}>
+        <Painel estilo={{ gap: espaco.sm, padding: espaco.lg }}>
+          <Text
+            accessibilityRole="header"
+            style={{ ...fonte.titulo, fontSize: 18, color: tinta.titulo }}
+          >
             Já tem uma amiga no app?
           </Text>
-          <Text style={{ fontFamily: fonte.media, fontSize: 13, lineHeight: 19, color: tinta.sub }}>
+          <Text style={{ ...fonte.media, fontSize: 14, lineHeight: 20, color: tinta.sub }}>
             Peça o código dela (está no cartão de indicação, nas Recompensas) ou use o e-mail que
             ela cadastrou. Ela recebe um pedido e escolhe se aceita.
           </Text>
@@ -297,9 +301,9 @@ export default function Amigas() {
                 borderRadius: 999,
                 borderWidth: 1,
                 borderColor: cor.borda,
-                backgroundColor: cor.fundo,
+                backgroundColor: cor.cartao,
                 paddingHorizontal: espaco.lg,
-                fontFamily: fonte.normal,
+                ...fonte.normal,
                 fontSize: 16,
                 color: cor.texto,
               }}
@@ -318,11 +322,11 @@ export default function Amigas() {
                 borderRadius: 999,
                 alignItems: "center",
                 justifyContent: "center",
-                backgroundColor: tinta.rosa,
+                backgroundColor: cor.primaria,
                 opacity: enviando || termo.trim().length < 3 ? 0.45 : pressed ? 0.85 : 1,
               })}
             >
-              <Text style={{ fontFamily: fonte.titulo, fontSize: 14, color: cor.branco }}>
+              <Text style={{ ...fonte.titulo, fontSize: 15, color: cor.branco }}>
                 {enviando ? "…" : "Enviar"}
               </Text>
             </Pressable>
@@ -330,7 +334,7 @@ export default function Amigas() {
           {resposta ? (
             <Text
               style={{
-                fontFamily: fonte.media,
+                ...fonte.media,
                 fontSize: 13,
                 lineHeight: 19,
                 color: resposta.ok ? "#15803d" : cor.atencaoForte,
@@ -340,15 +344,15 @@ export default function Amigas() {
             </Text>
           ) : null}
           {codigo ? (
-            <Text style={{ fontFamily: fonte.normal, fontSize: 13, color: tinta.sub }}>
+            <Text style={{ ...fonte.normal, fontSize: 13, color: tinta.sub }}>
               O seu código é{" "}
-              <Text style={{ fontFamily: fonte.titulo, letterSpacing: 1.2, color: tinta.titulo }}>
+              <Text style={{ ...fonte.titulo, letterSpacing: 1.2, color: tinta.titulo }}>
                 {codigo}
               </Text>{" "}
               — mande para ela te achar também.
             </Text>
           ) : null}
-        </View>
+        </Painel>
 
         <Pressable
           accessibilityRole="button"
@@ -357,23 +361,24 @@ export default function Amigas() {
           style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1 })}
         >
           <LinearGradient
-            colors={["#fdf3e0", "#fbeef4", "#f6ecfb"]}
+            colors={["#fff4e2", "#ffeaf3", "#f1eaff"]}
             start={{ x: 0, y: 0.3 }}
             end={{ x: 1, y: 0.7 }}
             style={{
               flexDirection: "row",
               alignItems: "center",
               gap: 10,
-              borderRadius: 20,
-              padding: 12,
+              borderRadius: 26,
+              ...curva,
+              padding: 14,
             }}
           >
             <LinearGradient
-              colors={["#a855f7", "#7c3aed"]}
+              colors={[amanhecer[1], amanhecer[2]]}
               style={{
-                width: 44,
-                height: 44,
-                borderRadius: 22,
+                width: 46,
+                height: 46,
+                borderRadius: 23,
                 alignItems: "center",
                 justifyContent: "center",
               }}
@@ -383,31 +388,27 @@ export default function Amigas() {
             <View style={{ flex: 1 }}>
               <Text
                 style={{
-                  fontFamily: fonte.titulo,
-                  fontSize: 15,
-                  lineHeight: 19,
+                  ...fonte.titulo,
+                  fontSize: 16,
+                  lineHeight: 20,
                   color: tinta.titulo,
                 }}
               >
                 Convide uma amiga
               </Text>
-              <Text
-                style={{ fontFamily: fonte.media, fontSize: 12, lineHeight: 16, color: tinta.sub }}
-              >
+              <Text style={{ ...fonte.media, fontSize: 13, lineHeight: 17, color: tinta.sub }}>
                 Pelo seu link — ela entra já ligada a você
               </Text>
             </View>
             <View
               style={{
                 borderRadius: 999,
-                backgroundColor: tinta.rosa,
+                backgroundColor: cor.primaria,
                 paddingHorizontal: 14,
                 paddingVertical: 9,
               }}
             >
-              <Text style={{ fontFamily: fonte.titulo, fontSize: 13, color: cor.branco }}>
-                Convidar ›
-              </Text>
+              <Text style={{ ...fonte.titulo, fontSize: 14, color: cor.branco }}>Convidar ›</Text>
             </View>
           </LinearGradient>
         </Pressable>
@@ -416,50 +417,87 @@ export default function Amigas() {
   })();
 
   return (
-    <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: "#fcf2f6" }}>
+    <SafeAreaView
+      edges={["top"]}
+      style={{ flex: 1, backgroundColor: ceu ? "transparent" : "#fcf2f6" }}
+    >
       <View
         style={{
           flexDirection: "row",
           alignItems: "center",
           minHeight: ALVO_MINIMO + 4,
-          paddingHorizontal: espaco.lg,
+          paddingHorizontal: 20,
           paddingTop: espaco.sm,
-          paddingBottom: espaco.sm,
+          paddingBottom: espaco.xs,
         }}
       >
         <Text
           accessibilityRole="header"
           style={{
             flex: 1,
-            fontFamily: fonte.titulo,
-            fontSize: 28,
-            color: cor.texto,
-            letterSpacing: -0.4,
+            ...fonte.titulo,
+            fontSize: 32,
+            lineHeight: 38,
+            letterSpacing: aperto.titulo,
+            color: ceu?.tinta ?? cor.texto,
+            ...(ceu ? sombraDoTexto(ceu) : null),
           }}
         >
           Amigas
         </Text>
-        <BotaoDoPerfil tamanho={34} />
+        <BotaoDoPerfil />
       </View>
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 10, paddingBottom: 60 }}
+        contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: fim, gap: 14 }}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <LinearGradient
-          colors={["#feede6", "#fcecf0", "#f7e7f4", "#f1eaf7", "#f9edf8", "#fbf5f8"]}
-          style={{ borderRadius: 28, overflow: "hidden", paddingBottom: 14, gap: 20 }}
-        >
-          <Image
-            source={HEROI}
-            style={{ width: "100%", aspectRatio: 852 / 388 }}
-            contentFit="cover"
-            accessibilityLabel="Amizade que faz bem — convide suas amigas, formem duplas e joguem juntas! Quanto mais conexão, mais recompensas!"
-          />
-          <View style={{ paddingHorizontal: 8 }}>{corpo}</View>
-        </LinearGradient>
+        <HeroiDasAmigas ceu={ceu} />
+        {corpo}
       </ScrollView>
       {aviso}
     </SafeAreaView>
+  );
+}
+
+/**
+ * O topo da aba: a bolha apaixonada solta no céu, com a frase ao lado — o que
+ * a faixa cor-de-rosa dizia numa imagem, agora em texto de verdade (o leitor
+ * de tela lê, e a letra não fica borrada).
+ */
+function HeroiDasAmigas({ ceu }: { ceu: Ceu | null }) {
+  const sombraDoCeu = ceu ? sombraDoTexto(ceu) : null;
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+      <BolhaViva humor="apaixonado" tamanho={132} />
+      {/* A coluna do texto para antes da lua e do sol, que ficam à direita. */}
+      <View style={{ flex: 1, paddingRight: 66 }}>
+        <Text
+          style={{
+            ...fonte.titulo,
+            fontSize: 24,
+            lineHeight: 28,
+            letterSpacing: aperto.subtitulo,
+            color: ceu?.tinta ?? tinta.titulo,
+            ...sombraDoCeu,
+          }}
+        >
+          Amizade que faz bem
+        </Text>
+        <Text
+          style={{
+            marginTop: 4,
+            ...fonte.media,
+            fontSize: 14,
+            lineHeight: 20,
+            color: ceu?.sec ?? tinta.sub,
+            ...sombraDoCeu,
+          }}
+        >
+          Convide suas amigas, formem duplas e joguem juntas! Quanto mais conexão, mais recompensas!
+        </Text>
+      </View>
+    </View>
   );
 }
 
@@ -492,9 +530,7 @@ function Pilula({
         opacity: pressed ? 0.85 : 1,
       })}
     >
-      <Text
-        style={{ fontFamily: fonte.titulo, fontSize: 14, color: cheio ? cor.branco : tinta.sub }}
-      >
+      <Text style={{ ...fonte.titulo, fontSize: 14, color: cheio ? cor.branco : tinta.sub }}>
         {rotulo}
       </Text>
     </Pressable>

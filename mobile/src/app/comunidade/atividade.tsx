@@ -141,7 +141,7 @@ function AtividadeNoApp() {
                   <Text
                     style={{
                       flex: 1,
-                      fontFamily: fonte.normal,
+                      ...fonte.normal,
                       fontSize: 15,
                       lineHeight: 21,
                       color: cor.texto,
@@ -181,7 +181,7 @@ function AtividadeNoApp() {
                   <Text
                     style={{
                       paddingLeft: 44 + espaco.md,
-                      fontFamily: fonte.media,
+                      ...fonte.media,
                       fontSize: 14,
                       color: cor.textoApagado,
                     }}
