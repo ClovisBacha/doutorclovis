@@ -1,20 +1,24 @@
-import { LinearGradient } from "expo-linear-gradient";
+import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
+import { Check, ChevronLeft, ChevronRight, Star } from "lucide-react-native";
 import { useEffect, useState, type ReactNode } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Svg, { Path } from "react-native-svg";
 import { tituloCurtoDaAula } from "~/lib/jornada/aula";
 import { temQuizNoDia, type DailyQuiz } from "@/lib/daily-quizzes";
 import { carregarAulaDoDia } from "~/lib/jornada/aulas-do-app";
 import { recadoDaBolhaNoApp } from "~/lib/recado-da-bolha";
 import { Carregando, toque } from "~/componentes/base";
-import { corCaminho, META_DAS_ATIVIDADES } from "~/componentes/caminho/cores";
-import { EstrelaDoDia, IconeDaAtividade } from "~/componentes/caminho/pecas";
+import { CEUS, CeuVivo, useFaseDoCeu } from "~/componentes/ceu-vivo";
+import { META_DAS_ATIVIDADES } from "~/componentes/caminho/cores";
+import { EstrelaDoDia } from "~/componentes/caminho/pecas";
+import { ARTE, FICHA } from "~/componentes/jornada/hoje";
+import { Painel } from "~/componentes/painel";
+import { Vidro } from "~/componentes/vidro";
 import { rota } from "~/componentes/jornada/bancada";
 import { voltarParaJornada } from "~/componentes/jornada/pecas";
 import { useJornada } from "~/componentes/jornada/usarJornada";
-import { ArteDaBolha, type HumorDaArte } from "~/componentes/movimento";
+import { ArteDaBolha, useParalaxe, type HumorDaArte } from "~/componentes/movimento";
 import {
   contarMomentos,
   feito,
@@ -22,13 +26,14 @@ import {
   TOTAL_DO_DIA,
   type Momento,
 } from "~/lib/jornada/momentos";
-import { cor, espaco, fonte } from "~/tema";
+import { aperto, cor, curva, espaco, fonte, luz, sombra } from "~/tema";
 
 /**
  * A FOLHA DO DIA — "Atividades de hoje", a tela que abre ao tocar num nó do
- * Caminho. É o `WellnessScreen` do site em peças nativas: a bolha grande com um
- * balão de fala, as cinco atividades em cartões de vidro (cada uma na sua cor),
- * e o placar "⭐ Estrelas de hoje" no pé.
+ * Caminho. A bolha com um balão de fala, as cinco atividades e o placar das
+ * estrelas no pé — sobre o céu da hora, como as abas (16/11/2026: antes era
+ * um degradê cor-de-rosa, com ícones chapados; agora as atividades levam os
+ * objetos 3D da aba do bebê, numa lista só dentro de um painel de vidro).
  *
  * Cada linha abre a atividade que o app já tem (aula, mexer, meditar, a carta
  * e a gratidão). ⚠️ Diferença deliberada do site: lá um dia PASSADO também
@@ -118,256 +123,215 @@ export default function FolhaDoDia() {
   return (
     <Fundo>
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 32, paddingTop: topo + 12, paddingBottom: 32 }}
+        contentContainerStyle={{ paddingHorizontal: 14, paddingTop: topo + 12, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
-        <View style={{ alignItems: "center", marginTop: 8 }}>
-          <ArteDaBolha humor={humorDoDia(feitos, hora)} tamanho={298} />
+        <View style={{ alignItems: "center", marginTop: 4 }}>
+          <ArteDaBolha humor={humorDoDia(feitos, hora)} tamanho={210} />
           {/* O balão: o rabinho aponta para CIMA, para a bolha — é o que faz o
               texto ser fala dela em vez de mais um cartão da tela. */}
-          <View style={{ marginTop: -74, width: 257, maxWidth: "100%" }}>
+          <View style={{ marginTop: -36, width: 280, maxWidth: "100%" }}>
             <View
               style={{
                 position: "absolute",
                 left: "50%",
-                top: -8,
+                top: -7,
                 marginLeft: -8,
                 width: 16,
                 height: 16,
                 borderRadius: 3,
-                backgroundColor: corCaminho.vidroBase,
-                borderTopWidth: 1,
-                borderLeftWidth: 1,
-                borderColor: corCaminho.vidroBorda,
+                backgroundColor: luz.cartao,
                 transform: [{ rotate: "45deg" }],
               }}
             />
-            <Vidro raio={26} estilo={{ paddingHorizontal: 20, paddingVertical: 20 }}>
+            <View
+              style={{
+                borderRadius: 24,
+                ...curva,
+                paddingHorizontal: 20,
+                paddingVertical: 16,
+                backgroundColor: luz.cartao,
+                borderWidth: StyleSheet.hairlineWidth,
+                borderColor: "rgba(255,255,255,0.95)",
+                ...sombra,
+              }}
+            >
               <Text
                 style={{
                   textAlign: "center",
-                  ...fonte.normal,
+                  ...fonte.media,
                   fontSize: 15,
-                  lineHeight: 22.5,
-                  color: corCaminho.tinta,
+                  lineHeight: 22,
+                  color: TINTA.corpo,
                 }}
               >
                 {recado}
               </Text>
-            </Vidro>
+            </View>
           </View>
         </View>
 
-        <Text style={{ marginTop: 14, ...fonte.media, fontSize: 16, color: corCaminho.tinta }}>
-          {ehHoje ? "Atividades de hoje" : "As atividades deste dia"}{" "}
-          <Text style={{ opacity: 0.55 }}>✦</Text>
-        </Text>
-        {!ehHoje ? (
-          <Text
-            style={{
-              marginTop: 4,
-              ...fonte.normal,
-              fontSize: 13,
-              color: corCaminho.tintaSec,
-            }}
-          >
-            Esse dia já passou: as atividades valem no dia de hoje.
-          </Text>
-        ) : null}
+        <Painel estilo={{ marginTop: 22 }}>
+          <View style={{ paddingHorizontal: 4 }}>
+            <Text
+              accessibilityRole="header"
+              style={{
+                ...fonte.titulo,
+                fontSize: 24,
+                lineHeight: 29,
+                letterSpacing: aperto.titulo,
+                color: TINTA.titulo,
+              }}
+            >
+              {ehHoje ? "Atividades de hoje" : "As atividades deste dia"}
+            </Text>
+            {!ehHoje ? (
+              <Text style={{ marginTop: 2, ...fonte.media, fontSize: 14, color: TINTA.apagado }}>
+                Esse dia já passou: as atividades valem no dia de hoje.
+              </Text>
+            ) : null}
+          </View>
 
-        <View style={{ marginTop: 10, gap: 8 }}>
-          {ORDEM.map((c) => {
-            const meta = META_DAS_ATIVIDADES[c];
-            const fez = feito(flags, momentoDe(c));
-            return (
-              <Pressable
-                key={c}
-                accessibilityRole="button"
-                accessibilityLabel={`${meta.titulo}${fez ? ", feita" : ""}`}
-                accessibilityState={{ disabled: !ehHoje }}
-                disabled={!ehHoje}
-                onPress={() => {
-                  toque();
-                  router.push(rota(ROTA[c]) as never);
-                }}
-                style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-              >
-                <Vidro
-                  raio={22}
-                  estilo={{ flexDirection: "row", alignItems: "center", gap: 10, padding: 12 }}
-                >
-                  <LinearGradient
-                    colors={[meta.tile, meta.tileB]}
-                    start={{ x: 0.2, y: 0 }}
-                    end={{ x: 0.8, y: 1 }}
-                    style={{
-                      width: 48,
-                      height: 48,
-                      borderRadius: 16,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <IconeDaAtividade chave={c} cor={meta.tinta} />
-                  </LinearGradient>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text
-                      style={{
-                        ...fonte.media,
-                        fontSize: 14.5,
-                        lineHeight: 18,
-                        color: meta.tinta,
-                      }}
-                    >
-                      {meta.titulo}
-                    </Text>
-                    <Text
-                      style={{
-                        marginTop: 2,
-                        ...fonte.normal,
-                        fontSize: 13,
-                        lineHeight: 17.5,
-                        color: corCaminho.tintaSec,
-                      }}
-                    >
-                      {c === "aula" ? descDaAula : meta.desc}
-                    </Text>
-                  </View>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          {/* As cinco numa lista só, cada uma com o seu objeto. */}
+          <View style={{ borderRadius: 26, ...curva, paddingVertical: 4, ...MATERIAL }}>
+            {ORDEM.map((c, i) => {
+              const meta = META_DAS_ATIVIDADES[c];
+              const fez = feito(flags, momentoDe(c));
+              return (
+                <View key={c}>
+                  {i > 0 ? (
                     <View
                       style={{
-                        width: 26,
-                        height: 26,
-                        borderRadius: 13,
+                        height: StyleSheet.hairlineWidth,
+                        marginLeft: 82,
+                        backgroundColor: cor.borda,
+                      }}
+                    />
+                  ) : null}
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`${meta.titulo}${fez ? ", feita" : ""}`}
+                    accessibilityState={{ disabled: !ehHoje }}
+                    disabled={!ehHoje}
+                    onPress={() => {
+                      toque();
+                      router.push(rota(ROTA[c]) as never);
+                    }}
+                    style={({ pressed }) => ({
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 14,
+                      paddingVertical: 10,
+                      paddingLeft: 12,
+                      paddingRight: 14,
+                      opacity: pressed ? 0.6 : 1,
+                    })}
+                  >
+                    <View
+                      style={{
+                        width: 56,
+                        height: 56,
+                        borderRadius: 18,
+                        ...curva,
                         alignItems: "center",
                         justifyContent: "center",
-                        ...(fez
-                          ? { backgroundColor: corCaminho.feitoVerde }
-                          : {
-                              borderWidth: 1.5,
-                              borderStyle: "dashed",
-                              borderColor: corCaminho.circuloVazio,
-                            }),
+                        backgroundColor: FICHA[c],
                       }}
                     >
-                      {fez ? (
-                        <Text style={{ ...fonte.forte, fontSize: 13, color: cor.branco }}>✓</Text>
-                      ) : null}
+                      <Image
+                        source={ARTE[c]}
+                        style={{ width: 46, height: 46 }}
+                        contentFit="contain"
+                      />
                     </View>
-                    <Text
-                      style={{
-                        ...fonte.normal,
-                        fontSize: 13.5,
-                        color: corCaminho.tintaSec,
-                        fontVariant: ["tabular-nums"],
-                      }}
-                    >
-                      {fez ? "1/1" : "0/1"}
-                    </Text>
-                    {ehHoje ? (
-                      <View
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text
                         style={{
-                          width: 30,
-                          height: 30,
-                          borderRadius: 15,
-                          alignItems: "center",
-                          justifyContent: "center",
-                          backgroundColor: corCaminho.setaFundo,
-                          borderWidth: 1,
-                          borderColor: corCaminho.vidroBorda,
+                          ...fonte.forte,
+                          fontSize: 16,
+                          lineHeight: 21,
+                          color: fez ? TINTA.apagado : TINTA.titulo,
                         }}
                       >
-                        <Svg width={14} height={14} viewBox="0 0 24 24">
-                          <Path
-                            d="M9 5l7 7-7 7"
-                            stroke={corCaminho.seta}
-                            strokeWidth={2}
-                            fill="none"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </Svg>
+                        {meta.titulo}
+                      </Text>
+                      <Text
+                        numberOfLines={2}
+                        style={{
+                          marginTop: 1,
+                          ...fonte.media,
+                          fontSize: 13.5,
+                          lineHeight: 18,
+                          color: TINTA.apagado,
+                        }}
+                      >
+                        {fez ? "Feito" : c === "aula" ? descDaAula : meta.desc}
+                      </Text>
+                    </View>
+                    {fez ? (
+                      <View
+                        style={{
+                          width: 26,
+                          height: 26,
+                          borderRadius: 13,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          backgroundColor: "#12a06c",
+                        }}
+                      >
+                        <Check size={15} color={cor.branco} strokeWidth={3.2} />
                       </View>
+                    ) : ehHoje ? (
+                      <ChevronRight size={20} color="#c3bad6" strokeWidth={2.4} />
                     ) : null}
-                  </View>
-                </Vidro>
-              </Pressable>
-            );
-          })}
-        </View>
+                  </Pressable>
+                </View>
+              );
+            })}
+          </View>
+        </Painel>
 
-        <Vidro raio={22} estilo={{ marginTop: 12, paddingHorizontal: 16, paddingVertical: 16 }}>
-          <Text
-            style={{
-              textAlign: "center",
-              ...fonte.media,
-              fontSize: 14.5,
-              color: corCaminho.tinta,
-            }}
-          >
-            ⭐ {ehHoje ? "Estrelas de hoje" : "Estrelas deste dia"}
-          </Text>
+        <Painel estilo={{ marginTop: 14, alignItems: "center", paddingVertical: 18 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Star size={18} color="#d97706" fill="#fbbf24" strokeWidth={2} />
+            <Text style={{ ...fonte.forte, fontSize: 15, color: TINTA.titulo }}>
+              {ehHoje ? "Estrelas de hoje" : "Estrelas deste dia"}
+            </Text>
+          </View>
           <View
             accessible
             accessibilityRole="image"
             accessibilityLabel={`${feitos} de ${TOTAL_DO_DIA} estrelas conquistadas`}
-            style={{ marginTop: 12, flexDirection: "row", justifyContent: "center", gap: 14 }}
+            style={{ flexDirection: "row", justifyContent: "center", gap: 14 }}
           >
             {Array.from({ length: TOTAL_DO_DIA }, (_, i) => (
-              <EstrelaDoDia key={i} acesa={i < feitos} tamanho={38} />
+              <EstrelaDoDia key={i} acesa={i < feitos} tamanho={40} />
             ))}
           </View>
           <Text
             style={{
-              marginTop: 12,
               textAlign: "center",
-              ...fonte.normal,
-              fontSize: 13,
-              color: corCaminho.tintaSec,
+              ...fonte.media,
+              fontSize: 14,
+              lineHeight: 20,
+              color: TINTA.apagado,
             }}
           >
-            <Text
-              style={{
-                ...fonte.forte,
-                fontSize: 16,
-                color: corCaminho.tinta,
-                fontVariant: ["tabular-nums"],
-              }}
-            >
+            <Text style={{ ...fonte.titulo, color: TINTA.titulo, fontVariant: ["tabular-nums"] }}>
               {feitos}/{TOTAL_DO_DIA}
             </Text>{" "}
-            estrelas conquistadas
+            {ehHoje
+              ? feitos >= TOTAL_DO_DIA
+                ? "— o dia está completo."
+                : feitos > 0
+                  ? "— acenda as cinco e ganhe Sementinhas."
+                  : "— comece por onde quiser."
+              : "estrelas neste dia."}
           </Text>
-          {ehHoje ? (
-            <Text
-              style={{
-                marginTop: 4,
-                textAlign: "center",
-                ...fonte.normal,
-                fontSize: 13,
-                color: corCaminho.tintaSec,
-              }}
-            >
-              {feitos >= TOTAL_DO_DIA ? (
-                "Dia completo! Você acendeu as cinco 🌟"
-              ) : (
-                <>
-                  {feitos > 0
-                    ? "Continue assim! Acenda as 5 e ganhe "
-                    : "Comece por onde quiser — acenda as 5 e ganhe "}
-                  <Text style={{ ...fonte.media, color: corCaminho.sementinhasTexto }}>
-                    Sementinhas
-                  </Text>{" "}
-                  🌱
-                </>
-              )}
-            </Text>
-          ) : null}
-        </Vidro>
+        </Painel>
       </ScrollView>
 
-      {/* A seta de voltar, flutuando no canto: a bolha sobe para o lugar que o
-          desenho lhe dá, e as duas dividem a mesma altura sem se tocar. */}
+      {/* A seta de voltar: um botão de vidro solto sobre o céu. */}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Voltar ao Caminho"
@@ -377,79 +341,41 @@ export default function FolhaDoDia() {
         }}
         style={({ pressed }) => ({
           position: "absolute",
-          left: 32,
-          top: topo + 12,
-          width: 44,
-          height: 44,
-          borderRadius: 22,
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: corCaminho.voltarFundo,
-          borderWidth: 1,
-          borderColor: corCaminho.vidroBorda,
-          shadowColor: corCaminho.vidroSombra,
-          shadowOpacity: 0.25,
-          shadowRadius: 10,
-          shadowOffset: { width: 0, height: 6 },
+          left: 16,
+          top: topo + 8,
           transform: [{ scale: pressed ? 0.96 : 1 }],
         })}
       >
-        <Svg width={20} height={20} viewBox="0 0 24 24">
-          <Path
-            d="M15 5l-7 7 7 7"
-            stroke={corCaminho.voltarSeta}
-            strokeWidth={2.1}
-            fill="none"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </Svg>
+        <Vidro
+          interativo
+          tinta="rgba(255,255,255,0.6)"
+          estilo={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}
+        >
+          <ChevronLeft size={22} color={TINTA.titulo} strokeWidth={2.4} />
+        </Vidro>
       </Pressable>
     </Fundo>
   );
 }
 
+/** O fundo: o céu da hora, vivo, na tela inteira (o mesmo das abas). */
 function Fundo({ children }: { children: ReactNode }) {
+  const fase = useFaseDoCeu();
+  const { x, y } = useParalaxe();
   return (
-    <LinearGradient
-      colors={[
-        corCaminho.diaFundo1,
-        corCaminho.diaFundo2,
-        corCaminho.diaFundo3,
-        corCaminho.diaFundo4,
-      ]}
-      locations={[0, 0.34, 0.68, 1]}
-      style={{ flex: 1 }}
-    >
+    <View style={{ flex: 1, backgroundColor: CEUS[fase].chao }}>
+      <CeuVivo fase={fase} x={x} y={y} />
       {children}
-    </LinearGradient>
-  );
-}
-
-/** O cartão de vidro da folha: base quase branca, luz por cima, borda clara. */
-function Vidro({ children, raio, estilo }: { children: ReactNode; raio: number; estilo?: object }) {
-  return (
-    <View
-      style={{
-        borderRadius: raio,
-        backgroundColor: corCaminho.vidroBase,
-        borderWidth: 1,
-        borderColor: corCaminho.vidroBorda,
-        shadowColor: corCaminho.vidroSombra,
-        shadowOpacity: 0.22,
-        shadowRadius: 14,
-        shadowOffset: { width: 0, height: 10 },
-      }}
-    >
-      <LinearGradient
-        colors={[corCaminho.vidroLuzForte, corCaminho.vidroLuzFraca, corCaminho.vidroLuzFraca]}
-        locations={[0, 0.52, 1]}
-        start={{ x: 0.1, y: 0 }}
-        end={{ x: 0.9, y: 1 }}
-        style={[{ borderRadius: raio }, estilo]}
-      >
-        {children}
-      </LinearGradient>
     </View>
   );
 }
+
+const TINTA = { titulo: cor.texto, corpo: "#463d63", apagado: cor.textoApagado } as const;
+
+/** O material da lista: branco, com o fio de luz e a sombra em camadas. */
+const MATERIAL = {
+  backgroundColor: luz.cartao,
+  borderWidth: StyleSheet.hairlineWidth,
+  borderColor: "rgba(255,255,255,0.9)",
+  ...sombra,
+} as const;

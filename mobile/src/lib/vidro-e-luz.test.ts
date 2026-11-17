@@ -202,6 +202,28 @@ describe("o vidro e a luz", () => {
     expect(atividade).not.toMatch(/opacity: desabilitado \? 0\.45 : 1/);
   });
 
+  test("o ciclo do jogo: o dia no céu, a festa no fim, e o pós-parto também no céu", () => {
+    /* A tela do dia era um degradê cor-de-rosa com ícones chapados. */
+    const dia = de(join("app", "jornada", "dia.tsx"));
+    expect(dia).toMatch(/<CeuVivo fase=\{fase\}/);
+    expect(dia).toMatch(/source=\{ARTE\[c\]\}/);
+    expect(dia).not.toMatch(/IconeDaAtividade|diaFundo/);
+    /* O fim das atividades festeja — e as sementinhas só viram número quando
+       o servidor CONFIRMOU o crédito (nunca um ganho que não chegou). */
+    const fim = de(join("componentes", "jornada", "fim.tsx"));
+    expect(fim).toMatch(/<Raios /);
+    expect(fim).toMatch(
+      /const ganhouConfirmado = !!ganho\?\.ok && !!desfecho\?\.ganhou && desfecho\.ganhou > 0/,
+    );
+    expect(fim).toMatch(/\{ganhouConfirmado \? \(\s*<PedraDoPlacar/);
+    /* Os rótulos da aula sem emoji (os ícones fazem o papel). */
+    expect(de(join("app", "jornada", "aula.tsx"))).not.toMatch(/📖 A LIÇÃO|💡 Você sabia/);
+    /* O 4º trimestre sobre o céu das abas, sem a folha branca. */
+    const pos = de(join("componentes", "jornada", "hoje-pos.tsx"));
+    expect(pos).toMatch(/useCeuDasAbas\(\)/);
+    expect(pos).not.toMatch(/borderTopLeftRadius: 32/);
+  });
+
   test("a bancada no simulador nunca sai num build de loja", () => {
     /* Duas travas: o pacote de DEV (`__DEV__`) e a variável do Metro. */
     const bancada = de(join("lib", "bancada.ts"));

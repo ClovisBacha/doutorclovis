@@ -1,9 +1,11 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useState, type ReactNode } from "react";
-import { Animated, Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { Animated, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { toque, useFimDaRolagem } from "~/componentes/base";
+import { CeuVivo, sombraDoTexto, useCeuDasAbas } from "~/componentes/ceu-vivo";
+import { Painel } from "~/componentes/painel";
 import { BotaoDaAtividade, Brilho, sombraDe } from "~/componentes/jornada/atividade";
 import {
   AnelDoDia,
@@ -12,13 +14,12 @@ import {
   ceuDaHora,
   Entrar,
   FICHA,
-  FUNDO,
   Selo,
   useMomentoDoDia,
 } from "~/componentes/jornada/hoje";
 import { RECEM_NASCIDO } from "~/componentes/jornada/nascimento";
 import { Confete } from "~/componentes/jornada/pecas";
-import { ArteDaBolha, Flutuar, type HumorDaArte } from "~/componentes/movimento";
+import { ArteDaBolha, Flutuar, useParalaxe, type HumorDaArte } from "~/componentes/movimento";
 import { CVV, SOS_NO_APP } from "~/config";
 import { ligar } from "~/lib/links";
 import {
@@ -31,7 +32,7 @@ import {
   tarefasFeitas,
 } from "~/lib/jornada/pos-parto";
 import type { FlagsDoDia } from "~/lib/jornada/momentos";
-import { cor, espaco, fonte } from "~/tema";
+import { aperto, cor, espaco, fonte } from "~/tema";
 import { pedirSocorro } from "~/lib/socorro";
 
 /**
@@ -136,7 +137,12 @@ export function TelaDoQuartoTrimestre({
   direita?: ReactNode;
 }) {
   const topo = useSafeAreaInsets().top;
-  const ceu = CEUS[ceuDaHora(hora)];
+  /* Dentro das abas, o céu é o delas (um só, atrás de todas); fora, o seu. */
+  const dasAbas = useCeuDasAbas();
+  const faseDoCeu = dasAbas?.fase ?? ceuDaHora(hora);
+  const ceu = CEUS[faseDoCeu];
+  const propria = useParalaxe();
+  const sombraDoCeu = sombraDoTexto(ceu);
   const quem = nomeDoBebe ?? "o bebê";
   const feitos = tarefasFeitas(flags);
   const total = TAREFAS_DO_POS.length;
@@ -148,39 +154,24 @@ export function TelaDoQuartoTrimestre({
     feitos >= total ? "orgulhosa" : humorPedeApoio(humorDeHoje) ? "apaixonado" : "feliz";
 
   return (
-    <View style={{ flex: 1, backgroundColor: FUNDO }}>
+    <View style={{ flex: 1, backgroundColor: dasAbas ? "transparent" : ceu.chao }}>
+      {/* O céu da hora na tela inteira, como na gestação (16/11/2026): o bebê no
+          colo flutua sobre ele, e os blocos são painéis de vidro. */}
+      {dasAbas ? null : <CeuVivo fase={faseDoCeu} x={propria.x} y={propria.y} />}
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, { backgroundColor: "#fff7e0", opacity: brilho }]}
+      />
       <ScrollView
-        style={{ flex: 1, backgroundColor: FUNDO }}
+        style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: fim }}
         showsVerticalScrollIndicator={false}
       >
-        {/* O céu da hora, com o recém-nascido — o herói da tela. */}
-        <View style={{ height: 430 + topo, overflow: "hidden" }}>
-          <Image
-            source={ceu.arte}
-            style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }}
-            contentFit="cover"
-            accessibilityIgnoresInvertColors
-          />
-          <LinearGradient
-            colors={["rgba(255,248,245,0)", FUNDO]}
-            style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 120 }}
-          />
-          <Animated.View
-            pointerEvents="none"
-            style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              top: 0,
-              bottom: 0,
-              backgroundColor: "#fff7e0",
-              opacity: brilho,
-            }}
-          />
+        {/* O recém-nascido no céu — o herói da tela. */}
+        <View style={{ paddingBottom: espaco.lg }}>
           <View
             style={{
-              paddingTop: topo + espaco.lg,
+              paddingTop: topo + espaco.md,
               paddingHorizontal: 20,
               flexDirection: "row",
               alignItems: "flex-start",
@@ -190,11 +181,12 @@ export function TelaDoQuartoTrimestre({
             <View style={{ flex: 1 }}>
               <Text
                 style={{
-                  ...fonte.titulo,
+                  ...fonte.forte,
                   fontSize: 12,
                   letterSpacing: 1.4,
                   textTransform: "uppercase",
                   color: ceu.sec,
+                  ...sombraDoCeu,
                 }}
               >
                 {data}
@@ -202,12 +194,13 @@ export function TelaDoQuartoTrimestre({
               <Text
                 accessibilityRole="header"
                 style={{
-                  marginTop: 2,
+                  marginTop: 1,
                   ...fonte.titulo,
-                  fontSize: 31,
-                  lineHeight: 37,
-                  letterSpacing: -0.5,
+                  fontSize: 32,
+                  lineHeight: 38,
+                  letterSpacing: aperto.titulo,
                   color: ceu.tinta,
+                  ...sombraDoCeu,
                 }}
               >
                 {saudacao}
@@ -215,29 +208,41 @@ export function TelaDoQuartoTrimestre({
             </View>
             {direita}
           </View>
-          <View style={{ alignItems: "center", marginTop: 2 }}>
+          <View style={{ alignItems: "center", marginTop: espaco.md }}>
             <View style={{ alignItems: "center", justifyContent: "center" }}>
-              <Brilho tamanho={240} />
+              <Brilho tamanho={280} />
               <Flutuar>
                 <Image
                   source={RECEM_NASCIDO}
-                  style={{ width: 186, height: 186 }}
+                  style={{ width: 214, height: 214 }}
                   contentFit="contain"
                   accessibilityLabel={`${quem} numa manta quentinha, nos primeiros dias`}
                 />
               </Flutuar>
             </View>
             {nomeDoBebe ? (
-              <Text style={{ ...fonte.titulo, fontSize: 22, color: "#2e2348" }}>{nomeDoBebe}</Text>
+              <Text
+                style={{
+                  ...fonte.titulo,
+                  fontSize: 28,
+                  lineHeight: 32,
+                  letterSpacing: aperto.subtitulo,
+                  color: ceu.tinta,
+                  ...sombraDoCeu,
+                }}
+              >
+                {nomeDoBebe}
+              </Text>
             ) : null}
             <Text
               style={{
                 marginTop: 2,
                 paddingHorizontal: espaco.lg,
                 textAlign: "center",
-                ...fonte.forte,
-                fontSize: 14,
-                color: "#5d4d84",
+                ...fonte.media,
+                fontSize: 15,
+                color: ceu.sec,
+                ...sombraDoCeu,
               }}
             >
               {formou
@@ -258,33 +263,24 @@ export function TelaDoQuartoTrimestre({
           </View>
         </View>
 
-        {/* A folha que sobe sobre o céu. */}
-        <View
-          style={{
-            marginTop: -34,
-            borderTopLeftRadius: 32,
-            borderTopRightRadius: 32,
-            backgroundColor: FUNDO,
-            paddingHorizontal: 18,
-            paddingTop: 22,
-            gap: espaco.md,
-          }}
-        >
+        {/* Os blocos, soltos sobre o céu. */}
+        <View style={{ paddingHorizontal: 12, gap: 14 }}>
           {avisos}
 
           {formou ? (
             <Formatura quem={quem} />
           ) : (
-            <>
+            <Painel>
               <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.md }}>
                 <View style={{ flex: 1 }}>
                   <Text
                     accessibilityRole="header"
                     style={{
                       ...fonte.titulo,
-                      fontSize: 24,
-                      letterSpacing: -0.3,
-                      color: "#3a2230",
+                      fontSize: 26,
+                      lineHeight: 31,
+                      letterSpacing: aperto.titulo,
+                      color: cor.texto,
                     }}
                   >
                     O cuidado de hoje
@@ -359,37 +355,40 @@ export function TelaDoQuartoTrimestre({
                 rotulo="Ler"
                 aoTocar={() => setSemanaAberta(true)}
               />
-            </>
+            </Painel>
           )}
 
           {amigas}
 
-          <Text
-            accessibilityRole="header"
-            style={{
-              marginTop: espaco.sm,
-              ...fonte.titulo,
-              fontSize: 18,
-              color: "#3a2230",
-            }}
-          >
-            Quando sobrar um minuto
-          </Text>
-          <View style={{ gap: 10 }}>
-            {ATIVIDADES_DO_POS.map((a) => {
-              const t = TEXTO_DA_ATIVIDADE[a](quem);
-              return (
-                <LinhaDaAtividade
-                  key={a}
-                  chave={a}
-                  titulo={t.titulo}
-                  sub={t.sub}
-                  feito={!!flags[`w_${a}`]}
-                  aoAbrir={() => aoAbrir(a)}
-                />
-              );
-            })}
-          </View>
+          <Painel>
+            <Text
+              accessibilityRole="header"
+              style={{
+                paddingHorizontal: 4,
+                ...fonte.titulo,
+                fontSize: 22,
+                letterSpacing: aperto.subtitulo,
+                color: cor.texto,
+              }}
+            >
+              Quando sobrar um minuto
+            </Text>
+            <View style={{ gap: 10 }}>
+              {ATIVIDADES_DO_POS.map((a) => {
+                const t = TEXTO_DA_ATIVIDADE[a](quem);
+                return (
+                  <LinhaDaAtividade
+                    key={a}
+                    chave={a}
+                    titulo={t.titulo}
+                    sub={t.sub}
+                    feito={!!flags[`w_${a}`]}
+                    aoAbrir={() => aoAbrir(a)}
+                  />
+                );
+              })}
+            </View>
+          </Painel>
 
           {agenda}
 

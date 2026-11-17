@@ -1,17 +1,20 @@
 import * as Haptics from "expo-haptics";
 import { useEffect, useRef, useState } from "react";
-import { Modal, Platform, Pressable, Text, View } from "react-native";
+import { Sprout, Target } from "lucide-react-native";
+import { Modal, Platform, Pressable, Text, useWindowDimensions, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Botao, Cartao, Carregando, T } from "~/componentes/base";
 import { pagarAula, pagarDiaFechado, pagarMomento } from "~/componentes/jornada/economia";
 import { corJornada } from "~/componentes/jornada/cores";
 import { marcarLivre } from "~/componentes/jornada/livres";
 import { Constelacao, SementesSubindo } from "~/componentes/jornada/efeitos";
+import { NumeroQueConta, numeroDaPedra, PedraDoPlacar, Raios } from "~/componentes/jornada/festa";
 import { BolhaComBalao, BotaoDaAtividade, Brilho } from "~/componentes/jornada/atividade";
 import { Bolha, Confete, Estrela, Estrelas, voltarParaJornada } from "~/componentes/jornada/pecas";
 import { TrofeuSeConstruindo } from "~/componentes/caminho/pecas";
 import { contarMomentos, flagsDoDia, type Momento } from "~/lib/jornada/momentos";
 import { marcar, useLoja } from "~/lib/jornada/loja";
-import { cor, espaco, fonte, raio } from "~/tema";
+import { aperto, cor, espaco, fonte, raio } from "~/tema";
 
 /**
  * O FIM DE UM MOMENTO — marca, paga, e celebra quando fecha o dia.
@@ -87,6 +90,7 @@ export function FimDoMomento({
   arte,
   confete,
   balao,
+  acertos,
 }: {
   titulo: string;
   fala?: string;
@@ -104,6 +108,8 @@ export function FimDoMomento({
   confete?: boolean | "grande";
   /** A fala da bolha, num balão com a bolha pequena (como no fim do Bebê no site). */
   balao?: string;
+  /** Só a aula: quantas acertou de quantas (vira uma pedra do placar). */
+  acertos?: { feitos: number; total: number };
 }) {
   const loja = useLoja();
   const feitos = D != null && !pos ? contarMomentos(flagsDoDia(loja.blob, D)) : 0;
@@ -129,31 +135,54 @@ export function FimDoMomento({
     }
   }, [festa, confete, cuidado]);
 
+  /* A festa ocupa a tela: o herói no meio, o botão firme no pé. A Tela de
+     cada atividade rola, então a altura vem da janela. */
+  const { height } = useWindowDimensions();
+  const area = useSafeAreaInsets();
+  const altura = height - area.top - area.bottom - espaco.lg * 2;
+  const ganhouConfirmado = !!ganho?.ok && !!desfecho?.ganhou && desfecho.ganhou > 0;
+  /* As estrelas do dia não viram pedra: a fileira delas, que estoura, já diz. */
+  const comPlacar = ganhouConfirmado || !!acertos;
+
   return (
-    <View style={{ flex: 1 }}>
-      <View style={{ alignItems: "center", gap: espaco.md, paddingTop: espaco.lg }}>
-        {festa ? (
-          /* No aparelho, o vídeo da festa já traz as cinco estrelas em órbita;
-             onde ele não toca (web, "reduzir movimento"), a constelação é
-             desenhada em volta da arte parada. */
-          Platform.OS === "web" ? (
-            <Constelacao tamanho={170} estrela={(i) => <Estrela key={i} acesa tamanho={30} />}>
-              <Bolha humor="comemorando" tamanho={170} />
-            </Constelacao>
+    <View style={{ minHeight: altura }}>
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: espaco.md }}>
+        <View style={{ alignItems: "center", justifyContent: "center", minHeight: 230 }}>
+          {/* O sol de raios atrás da bolha: o "você conseguiu" (não no Modo Cuidado,
+              que não festeja desempenho). */}
+          {cuidado ? null : <Raios tamanho={340} forca={festa ? 0.75 : 0.55} />}
+          {festa ? (
+            /* No aparelho, a bolha da festa traz as cinco estrelas em órbita;
+               na web, a constelação é desenhada em volta da arte parada. */
+            Platform.OS === "web" ? (
+              <Constelacao tamanho={170} estrela={(i) => <Estrela key={i} acesa tamanho={30} />}>
+                <Bolha humor="comemorando" tamanho={170} />
+              </Constelacao>
+            ) : (
+              <Bolha humor="estrelas" tamanho={210} />
+            )
           ) : (
-            <Bolha humor="estrelas" tamanho={210} />
-          )
-        ) : (
-          (arte ?? (
-            <View style={{ alignItems: "center", justifyContent: "center" }}>
-              <Brilho tamanho={210} />
-              <Bolha humor={cuidado ? "feliz" : "comemorando"} tamanho={150} />
-            </View>
-          ))
-        )}
-        <T tipo="titulo" centro>
+            (arte ?? (
+              <View style={{ alignItems: "center", justifyContent: "center" }}>
+                <Brilho tamanho={250} />
+                <Bolha humor={cuidado ? "feliz" : "comemorando"} tamanho={210} />
+              </View>
+            ))
+          )}
+        </View>
+        <Text
+          accessibilityRole="header"
+          style={{
+            textAlign: "center",
+            ...fonte.titulo,
+            fontSize: 34,
+            lineHeight: 40,
+            letterSpacing: aperto.titulo,
+            color: cor.texto,
+          }}
+        >
           {festa ? "Cinco estrelas!" : titulo}
-        </T>
+        </Text>
         {festa ? (
           <T tipo="corpo" centro cor={cor.textoApagado}>
             Você fechou os cinco momentos de hoje. Isso é cuidado de verdade.
@@ -166,22 +195,62 @@ export function FimDoMomento({
         {balao && !festa ? (
           <BolhaComBalao humor={cuidado ? "feliz" : "comemorando"} fala={balao} tamanho={72} />
         ) : null}
-        {D != null && !pos && !cuidado ? <Estrelas feitos={estrelasVisiveis} tamanho={30} /> : null}
+
+        {/* O PLACAR: o que ela levou deste momento, em pedras que entram uma
+            depois da outra. As sementinhas só aparecem CONFIRMADAS pelo
+            servidor — nunca um número que não chegou. */}
+        {comPlacar ? (
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "center",
+              gap: 12,
+              alignSelf: "stretch",
+              marginTop: 6,
+            }}
+          >
+            {ganhouConfirmado ? (
+              <PedraDoPlacar
+                ordem={0}
+                rotulo="sementinhas"
+                acessivel={`${desfecho!.ganhou} sementinhas ganhas`}
+                icone={<Sprout size={22} color={corJornada.sementinha} strokeWidth={2.4} />}
+              >
+                <NumeroQueConta
+                  valor={desfecho!.ganhou!}
+                  prefixo="+"
+                  estilo={numeroDaPedra(corJornada.sementinha)}
+                />
+                <SementesSubindo quantidade={desfecho!.ganhou!} disparo={desfecho!.ganhou!} />
+              </PedraDoPlacar>
+            ) : null}
+            {acertos ? (
+              <PedraDoPlacar
+                ordem={1}
+                rotulo="acertos"
+                acessivel={`${acertos.feitos} de ${acertos.total} acertos`}
+                icone={<Target size={20} color={corJornada.roxo} strokeWidth={2.4} />}
+              >
+                <Text allowFontScaling={false} style={numeroDaPedra(corJornada.roxo)}>
+                  {acertos.feitos}/{acertos.total}
+                </Text>
+              </PedraDoPlacar>
+            ) : null}
+          </View>
+        ) : null}
+        {D != null && !pos && !cuidado ? <Estrelas feitos={estrelasVisiveis} tamanho={38} /> : null}
       </View>
 
-      <View style={{ gap: espaco.md, marginTop: espaco.xl }}>
+      <View style={{ gap: espaco.md, marginTop: espaco.lg }}>
         {extra}
         {desfecho == null && !cuidado ? <Carregando texto="Somando as suas sementinhas…" /> : null}
-        {ganho ? (
+        {/* O que NÃO virou pedra do placar: o "não conseguimos confirmar" e o
+            "já estava contado" — ditos por inteiro, nunca escondidos. */}
+        {ganho && !ganhouConfirmado ? (
           <Cartao fundo={ganho.ok ? corJornada.sementinhaFundo : cor.atencaoFundo}>
             <T tipo="rotulo" cor={ganho.ok ? corJornada.sementinha : cor.atencao} centro>
               {ganho.texto}
             </T>
-            {/* As sementinhas sobem do cartão: o ganho que se vê. Só para
-                crédito CONFIRMADO pelo servidor. */}
-            {ganho.ok && desfecho?.ganhou ? (
-              <SementesSubindo quantidade={desfecho.ganhou} disparo={desfecho.ganhou} />
-            ) : null}
             {!ganho.ok && aoTentarPagar ? (
               <Botao rotulo="Tentar de novo" tipo="secundario" aoTocar={aoTentarPagar} />
             ) : null}

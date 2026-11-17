@@ -726,6 +726,9 @@ export function JornadaDoPosParto({
   });
   const avisos = useAvisosDoDia({ carteira, recarregar, conquistas, loja, ehHoje });
   const { recarregarPerfil } = useSessao();
+  /* O céu das abas, atrás do 4º trimestre também (16/11/2026). */
+  const dasAbas = useCeuDasAbas();
+  const posNoCeu = vista === "aba" && !!dasAbas;
 
   const flags = flagsDoDia(loja.blob, D, true);
   const { dias: diasDeChama } = calcularChama(loja.blob, D, true);
@@ -767,12 +770,15 @@ export function JornadaDoPosParto({
 
   if (!ehHoje) {
     return (
-      <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: cor.fundo }}>
+      <SafeAreaView
+        edges={["top"]}
+        style={{ flex: 1, backgroundColor: posNoCeu ? "transparent" : cor.fundo }}
+      >
         <View style={{ paddingHorizontal: espaco.lg }}>
           {vista === "aba" ? (
             <CabecalhoDaTrilha
               sub={`O 4º trimestre${nomeDoBebe ? ` · ${nomeDoBebe}` : ""}`}
-              ceu={null}
+              ceu={posNoCeu && dasAbas ? CEUS[dasAbas.fase] : null}
             />
           ) : (
             <BarraDoTopo titulo="O 4º trimestre" />
@@ -793,7 +799,7 @@ export function JornadaDoPosParto({
   const hora = horaDaTela();
   const feitos = tarefasFeitas(flags);
   return (
-    <View style={{ flex: 1, backgroundColor: cor.fundo }}>
+    <View style={{ flex: 1, backgroundColor: dasAbas ? "transparent" : cor.fundo }}>
       <TelaDoQuartoTrimestre
         D={D}
         pronto={loja.pronto}

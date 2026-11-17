@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Modal, Pressable, Text, View, type LayoutChangeEvent } from "react-native";
 import { useAviso } from "~/componentes/aviso";
 import { toque, useFolgaDaBarra } from "~/componentes/base";
+import { Vidro } from "~/componentes/vidro";
 import { corCaminho } from "~/componentes/caminho/cores";
 import {
   AnelDeTarefas,
@@ -190,54 +191,55 @@ function FaixaDoTopoDoPos({
   figurinhas: number;
 }) {
   const acesa = chama > 0;
+  /* Uma cápsula de vidro, como o placar da trilha da gestação (16/11/2026). */
   return (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-around",
-        paddingHorizontal: espaco.xl,
-        paddingVertical: espaco.md,
-        borderBottomWidth: 1,
-        borderBottomColor: cor.borda,
-        backgroundColor: corCaminho.faixaFundo,
-      }}
-    >
-      <View
-        accessible
-        accessibilityLabel={`${chama} ${chama === 1 ? "dia seguido" : "dias seguidos"}`}
-        style={{ flexDirection: "row", alignItems: "center", gap: 6, minHeight: ALVO_MINIMO }}
+    <View style={{ paddingHorizontal: 12, paddingTop: 4, paddingBottom: 4 }}>
+      <Vidro
+        tinta="rgba(255,255,255,0.72)"
+        estilo={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-around",
+          paddingHorizontal: espaco.md,
+          paddingVertical: 4,
+        }}
       >
-        <ChamaDaSequencia acesa={acesa} />
-        <Text
-          style={[
-            estilo.numero,
-            { color: acesa ? corCaminho.chamaAcesa : corCaminho.numeroApagado },
-          ]}
+        <View
+          accessible
+          accessibilityLabel={`${chama} ${chama === 1 ? "dia seguido" : "dias seguidos"}`}
+          style={{ flexDirection: "row", alignItems: "center", gap: 6, minHeight: ALVO_MINIMO }}
         >
-          {chama}
-        </Text>
-        <Text style={estilo.rotulo}>{chama === 1 ? "dia" : "dias"}</Text>
-      </View>
-      <View style={{ width: 1, height: 24, backgroundColor: corCaminho.divisor }} />
-      <View
-        accessible
-        accessibilityLabel={`Semana ${semana} de vida`}
-        style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
-      >
-        <Emoji tamanho={20}>👶</Emoji>
-        <Text style={[estilo.numero, { color: "#0ea5e9" }]}>S{semana}</Text>
-        <Text style={estilo.rotulo}>de vida</Text>
-      </View>
-      <View style={{ width: 1, height: 24, backgroundColor: corCaminho.divisor }} />
-      <View
-        accessible
-        accessibilityLabel={`${figurinhas} figurinhas no álbum`}
-        style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
-      >
-        <Emoji tamanho={20}>🏅</Emoji>
-        <Text style={[estilo.numero, { color: corCaminho.trofeus }]}>{figurinhas}</Text>
-      </View>
+          <ChamaDaSequencia acesa={acesa} />
+          <Text
+            style={[
+              estilo.numero,
+              { color: acesa ? corCaminho.chamaAcesa : corCaminho.numeroApagado },
+            ]}
+          >
+            {chama}
+          </Text>
+          <Text style={estilo.rotulo}>{chama === 1 ? "dia" : "dias"}</Text>
+        </View>
+        <View style={{ width: 1, height: 24, backgroundColor: corCaminho.divisor }} />
+        <View
+          accessible
+          accessibilityLabel={`Semana ${semana} de vida`}
+          style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+        >
+          <Emoji tamanho={20}>👶</Emoji>
+          <Text style={[estilo.numero, { color: "#0ea5e9" }]}>S{semana}</Text>
+          <Text style={estilo.rotulo}>de vida</Text>
+        </View>
+        <View style={{ width: 1, height: 24, backgroundColor: corCaminho.divisor }} />
+        <View
+          accessible
+          accessibilityLabel={`${figurinhas} figurinhas no álbum`}
+          style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+        >
+          <Emoji tamanho={20}>🏅</Emoji>
+          <Text style={[estilo.numero, { color: corCaminho.trofeus }]}>{figurinhas}</Text>
+        </View>
+      </Vidro>
     </View>
   );
 }

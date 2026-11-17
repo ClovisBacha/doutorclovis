@@ -1,5 +1,5 @@
 import * as Haptics from "expo-haptics";
-import { Check, X } from "lucide-react-native";
+import { BookOpen, Check, Lightbulb, X } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import { Animated, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -279,7 +279,7 @@ function AulaDoDia() {
       <Tela bordas={["top", "bottom"]}>
         <FimDoMomento
           titulo={titulo}
-          fala={`${e.acertos} de ${total} acertos`}
+          acertos={{ feitos: e.acertos, total }}
           arte={
             <Bolha
               humor={perfeito ? "comemorando" : e.acertos > 0 ? "orgulhosa" : "feliz"}
@@ -405,7 +405,7 @@ function AulaDoDia() {
                 {e.acertou ? (
                   <Check size={24} color={corJornada.feito} strokeWidth={3} />
                 ) : (
-                  <Text style={{ fontSize: 20 }}>💡</Text>
+                  <Lightbulb size={22} color={AMBAR.texto} strokeWidth={2.4} />
                 )}
                 <T tipo="subtitulo" cor={e.acertou ? cor.sementinha : AMBAR.texto}>
                   {revisando
@@ -475,25 +475,49 @@ function Licao({ quiz }: { quiz: DailyQuiz }) {
   return (
     <>
       <Cartao>
-        <Text
-          style={{
-            ...fonte.forte,
-            fontSize: 13,
-            color: corJornada.roxo,
-            letterSpacing: 0.4,
-          }}
-        >
-          📖 A LIÇÃO DE HOJE
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <BookOpen size={15} color={corJornada.roxo} strokeWidth={2.4} />
+          <Text
+            style={{
+              ...fonte.forte,
+              fontSize: 13,
+              color: corJornada.roxo,
+              letterSpacing: 0.6,
+            }}
+          >
+            A LIÇÃO DE HOJE
+          </Text>
+        </View>
+        {/* A lição se lê como um artigo: o título grande e o corpo com ar. */}
+        {titulo ? (
+          <Text
+            accessibilityRole="header"
+            style={{
+              ...fonte.titulo,
+              fontSize: 23,
+              lineHeight: 29,
+              letterSpacing: aperto.subtitulo,
+              color: cor.texto,
+            }}
+          >
+            {titulo}
+          </Text>
+        ) : null}
+        <Text style={{ ...fonte.normal, fontSize: 17, lineHeight: 27, color: "#3b3357" }}>
+          {corpo}
         </Text>
-        {titulo ? <T tipo="subtitulo">{titulo}</T> : null}
-        <T>{corpo}</T>
       </Cartao>
       {quiz.funFact ? (
         <Cartao fundo={corJornada.trofeuFundo}>
-          <T tipo="rotulo" cor={corJornada.trofeu}>
-            💡 Você sabia?
-          </T>
-          <T>{quiz.funFact}</T>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Lightbulb size={17} color={corJornada.trofeu} strokeWidth={2.4} />
+            <T tipo="rotulo" cor={corJornada.trofeu}>
+              Você sabia?
+            </T>
+          </View>
+          <Text style={{ ...fonte.normal, fontSize: 16, lineHeight: 24, color: cor.texto }}>
+            {quiz.funFact}
+          </Text>
         </Cartao>
       ) : null}
     </>
