@@ -1,4 +1,5 @@
-import { InteractionManager, Platform } from "react-native";
+import { Platform } from "react-native";
+import { depoisDaVolta } from "~/lib/depois-da-volta";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { seloDasAmigas } from "~/lib/selos";
 import {
@@ -40,35 +41,15 @@ import { ymdLocal } from "~/lib/gestacao";
 
 const espera = (ms = 350) => new Promise((r) => setTimeout(r, ms));
 
-/** O máximo que uma leitura de foco espera a transição acabar. */
-const ESPERA_MAXIMA_MS = 700;
-
 /**
  * Roda `f` depois da transição (a volta de uma atividade, a troca de aba):
  * a animação anda primeiro e a leitura vem depois, em vez de as respostas
- * redesenharem a tela no meio do caminho. Com teto: animação que não usa o
- * fio nativo conta como "interação" e, num laço, seguraria a leitura para
- * sempre (é o que acontece na web, onde nenhuma usa).
+ * redesenharem a tela no meio do caminho. Pelo `depoisDaVolta` do app, um
+ * prazo fixo: o `InteractionManager` foi descontinuado no RN 0.86 (só adia
+ * para o próximo giro do laço e avisa que vai sair). Na web, na hora.
  */
 export function depoisDaTransicao(f: () => void): { cancel: () => void } {
-  let feito = false;
-  let tarefa: { cancel: () => void } | null = null;
-  const uma = () => {
-    if (feito) return;
-    feito = true;
-    clearTimeout(relogio);
-    tarefa?.cancel();
-    f();
-  };
-  const relogio = setTimeout(uma, Platform.OS === "web" ? 0 : ESPERA_MAXIMA_MS);
-  if (Platform.OS !== "web") tarefa = InteractionManager.runAfterInteractions(uma);
-  return {
-    cancel: () => {
-      feito = true;
-      clearTimeout(relogio);
-      tarefa?.cancel();
-    },
-  };
+  return { cancel: depoisDaVolta(f, Platform.OS === "web") };
 }
 
 /**

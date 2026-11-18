@@ -87,7 +87,8 @@ describe("as Amigas no tema", () => {
     const economia = ler("componentes", "amigas", "economia.ts");
     expect(economia).toMatch(/bonusCobradoEm === hoje/);
     expect(economia).toMatch(/ymdLocal\(\)/);
-    expect(economia).toMatch(/InteractionManager\.runAfterInteractions/);
+    expect(economia).toMatch(/depoisDaVolta\(/);
+    expect(economia).not.toMatch(/InteractionManager/);
     for (const arquivo of [
       join("app", "(abas)", "amigas.tsx"),
       join("componentes", "amigas", "faixa-do-hoje.tsx"),
