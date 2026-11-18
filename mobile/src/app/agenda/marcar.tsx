@@ -1,14 +1,33 @@
 import { useLocalSearchParams } from "expo-router";
-import { Trash2 } from "lucide-react-native";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Linking, Platform, Pressable, Text, View } from "react-native";
-import { Botao, Campo, Carregando, T, Tela, toque } from "~/componentes/base";
-import { CabecalhoDaPilha, voltarOu } from "~/componentes/cabecalho";
+import { BellOff, Settings } from "lucide-react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Alert,
+  LayoutAnimation,
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
+import {
+  CampoLivre,
+  LinhaDeAjuste,
+  LinhaDeCampo,
+  RECUO_SEM_ICONE,
+  SecaoDeAjustes,
+} from "~/componentes/ajustes";
+import { Botao, Carregando, selecao, T } from "~/componentes/base";
+import { AcaoDoTopo, TelaDaPilha, voltarOu } from "~/componentes/cabecalho";
 import { CalendarioDoMes, mesDe, type Mes } from "~/componentes/agenda/calendario";
-import { Passo } from "~/componentes/agenda/passo";
+import { ICONE_DO_TIPO } from "~/componentes/agenda/pecas";
+import { RodaDaHora } from "~/componentes/agenda/passo";
 import { apagarCompromisso, salvarCompromisso, useAgenda } from "~/componentes/agenda/usar-agenda";
 import { rota } from "~/componentes/jornada/bancada";
+import { Confirmacao } from "~/componentes/saude/pecas";
 import {
+  diaCurto,
   montarQuando,
   nomePadrao,
   novoId,
@@ -19,12 +38,18 @@ import {
   type TipoDeCompromisso,
 } from "~/lib/agenda/agenda";
 import { ymdLocal } from "~/lib/gestacao";
-import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
+import { useSessao } from "~/lib/sessao";
+import { canto, cor, curva, escala, espaco, fonte, margem } from "~/tema";
 
 /**
- * MARCAR (ou editar) UMA CONSULTA — o tipo, o dia no calendário, a hora, o
- * lugar e as anotações. Depois da consulta, a mesma tela guarda o que o médico
- * disse.
+ * MARCAR (ou editar) UMA CONSULTA — o tipo, o dia, a hora, o lugar e as
+ * anotações. Depois da consulta, a mesma tela guarda o que o médico disse.
+ *
+ * 18/11/2026 (a vistoria: "a tela mais cansativa do grupo"): a folha de criar
+ * um evento do iPhone. "Cancelar" e "Adicionar" no alto; o tipo em fichas com
+ * ícone; "Data" e "Hora" são linhas que se abrem ali mesmo, uma por vez (o
+ * calendário e a roda da hora); apagar pergunta antes, em vermelho. A casca a
+ * apresenta como folha (`modal`); empilhada, funciona igual.
  *
  * Rota: /agenda/marcar [?id=…] [?tipo=ultrassom] [?dia=AAAA-MM-DD] [?titulo=…]
  */
@@ -36,6 +61,7 @@ export default function MarcarConsulta() {
     titulo?: string;
   }>();
   const { lista, pronto } = useAgenda();
+  const { cuidado } = useSessao();
   const existente = params.id ? (lista.find((c) => c.id === params.id) ?? null) : null;
   const editando = !!params.id;
   const agora = useMemo(() => new Date(), []);
@@ -54,6 +80,7 @@ export default function MarcarConsulta() {
   const [minuto, setMinuto] = useState(0);
   const [onde, setOnde] = useState("");
   const [nota, setNota] = useState("");
+  const [aberto, setAberto] = useState<"data" | "hora" | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [semPermissao, setSemPermissao] = useState(false);
   const [confirmarApagar, setConfirmarApagar] = useState(false);
@@ -76,22 +103,23 @@ export default function MarcarConsulta() {
     setNota(existente.nota ?? "");
   }, [existente]);
 
-  const titulo_ = editando ? "Na agenda" : "Marcar na agenda";
+  const fechar = () => voltarOu(rota("/agenda") as never);
+  const cancelar = <AcaoDoTopo rotulo="Cancelar" aoTocar={fechar} />;
+  const tituloDaFolha = editando ? "Na agenda" : "Marcar na agenda";
+
   if (!pronto) {
     return (
-      <Tela>
-        <CabecalhoDaPilha titulo={titulo_} voltarPara={rota("/agenda") as never} />
+      <TelaDaPilha titulo={tituloDaFolha} esquerda={cancelar}>
         <Carregando />
-      </Tela>
+      </TelaDaPilha>
     );
   }
   if (editando && !existente) {
     return (
-      <Tela>
-        <CabecalhoDaPilha titulo={titulo_} voltarPara={rota("/agenda") as never} />
+      <TelaDaPilha titulo={tituloDaFolha} esquerda={cancelar}>
         <T>Esse compromisso não está mais na agenda.</T>
-        <Botao rotulo="Voltar para a agenda" aoTocar={() => voltarOu(rota("/agenda") as never)} />
-      </Tela>
+        <Botao rotulo="Voltar para a agenda" aoTocar={fechar} />
+      </TelaDaPilha>
     );
   }
 
@@ -111,167 +139,182 @@ export default function MarcarConsulta() {
     setSalvando(false);
     /* Sem permissão, a consulta fica guardada e a tela explica antes de sair. */
     if (r === "sem-permissao" && !jaPassou) setSemPermissao(true);
-    else voltarOu(rota("/agenda") as never);
+    else fechar();
+  }
+
+  function abrir(qual: "data" | "hora") {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setAberto((a) => (a === qual ? null : qual));
+  }
+
+  function apagar() {
+    if (!existente) return;
+    const ir = () => void apagarCompromisso(existente.id).then(fechar);
+    /* No iPhone, a pergunta do sistema; na web da bancada, a confirmação na tela. */
+    if (Platform.OS === "web") return setConfirmarApagar(true);
+    Alert.alert("Apagar da agenda?", "Os lembretes dela também saem.", [
+      { text: "Cancelar", style: "cancel" },
+      { text: "Apagar", style: "destructive", onPress: ir },
+    ]);
   }
 
   if (semPermissao) {
     return (
-      <Tela>
-        <CabecalhoDaPilha titulo="Guardado na agenda" voltarPara={rota("/agenda") as never} />
-        <View
-          style={{
-            backgroundColor: cor.atencaoFundo,
-            borderRadius: raio.lg,
-            padding: espaco.lg,
-            gap: espaco.sm,
-          }}
-        >
-          <T tipo="rotulo" cor={cor.atencaoForte}>
-            A consulta está na agenda, mas o lembrete não vai tocar
-          </T>
-          <T tipo="apagado">
-            As notificações do app estão desligadas no iPhone. Ligue nos Ajustes para eu te lembrar
-            na véspera e duas horas antes.
-          </T>
+      <TelaDaPilha
+        titulo="Guardado na agenda"
+        esquerda={<View />}
+      >
+        <SecaoDeAjustes rodape="As notificações do app estão desligadas no iPhone. Ligue nos Ajustes para eu te lembrar na véspera e duas horas antes.">
+          <LinhaDeAjuste
+            Icone={BellOff}
+            tinta={cor.atencao}
+            titulo="Está na agenda, sem lembrete"
+          />
           {Platform.OS !== "web" ? (
-            <Botao
-              rotulo="Abrir os Ajustes"
-              tipo="secundario"
+            <LinhaDeAjuste
+              Icone={Settings}
+              tinta={cor.textoApagado}
+              titulo="Abrir os Ajustes do iPhone"
               aoTocar={() => void Linking.openSettings().catch(() => {})}
             />
           ) : null}
-        </View>
-        <Botao
-          rotulo="Pronto"
-          corFundo={cor.agenda}
-          aoTocar={() => voltarOu(rota("/agenda") as never)}
-        />
-      </Tela>
+        </SecaoDeAjustes>
+        <Botao rotulo="Pronto" aoTocar={fechar} />
+      </TelaDaPilha>
     );
   }
 
   return (
-    <Tela>
-      <CabecalhoDaPilha titulo={titulo_} voltarPara={rota("/agenda") as never} />
-
-      <Secao rotulo="O que é">
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: espaco.sm }}>
+    <TelaDaPilha
+      titulo={tituloDaFolha}
+      esquerda={cancelar}
+      direita={
+        <AcaoDoTopo
+          rotulo={editando ? "Salvar" : "Adicionar"}
+          principal
+          carregando={salvando}
+          aoTocar={() => void salvar()}
+        />
+      }
+    >
+      {/* O que é: as fichas (roláveis) e o nome. */}
+      <SecaoDeAjustes recuo={RECUO_SEM_ICONE}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{
+            gap: espaco.sm,
+            paddingHorizontal: margem.tela - 4,
+            paddingVertical: espaco.md,
+          }}
+        >
           {TIPOS.map((t) => (
-            <Escolha
+            <FichaDoTipo
               key={t.tipo}
-              rotulo={`${t.emoji} ${t.rotulo}`}
-              rotuloAcessivel={t.rotulo}
+              tipo={t.tipo}
+              rotulo={t.rotulo}
               ativa={tipo === t.tipo}
               aoTocar={() => setTipo(t.tipo)}
             />
           ))}
-        </View>
-        <Campo
-          rotulo="Nome (se quiser)"
-          placeholder={nomePadrao(tipo)}
+        </ScrollView>
+        <LinhaDeCampo
+          rotulo="Nome"
+          placeholder={nomePadrao(tipo, { cuidado })}
           value={titulo}
           onChangeText={setTitulo}
           maxLength={60}
         />
-      </Secao>
+      </SecaoDeAjustes>
 
-      <Secao rotulo="Que dia">
-        <CalendarioDoMes
-          mes={mes}
-          aoMudarMes={setMes}
-          hoje={hoje}
-          selecionado={dia}
-          aoEscolher={setDia}
-        />
-      </Secao>
-
-      <Secao rotulo="Que horas">
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: espaco.md,
-          }}
-        >
-          <Passo
-            valor={String(hora)}
-            rotulo="hora"
-            aoMenos={() => setHora((h) => (h + 23) % 24)}
-            aoMais={() => setHora((h) => (h + 1) % 24)}
-          />
-          <Text style={{ ...fonte.titulo, fontSize: 30, color: cor.texto }}>:</Text>
-          <Passo
-            valor={String(minuto).padStart(2, "0")}
-            rotulo="minutos"
-            aoMenos={() => setMinuto((m) => (m + 55) % 60)}
-            aoMais={() => setMinuto((m) => (m + 5) % 60)}
-          />
-        </View>
-        <Text style={{ textAlign: "center", ...fonte.forte, fontSize: 15, color: cor.agenda }}>
-          {quandoPorExtenso(quando, agora)}
-        </Text>
-      </Secao>
-
-      <Campo
-        rotulo="Onde"
-        placeholder="Clínica, hospital, laboratório…"
-        value={onde}
-        onChangeText={setOnde}
-        maxLength={80}
-      />
-      <Campo
-        rotulo={jaPassou ? "O que foi dito" : "Anotações"}
-        placeholder={
+      {/* Quando: as linhas se abrem ali mesmo, uma por vez. */}
+      <SecaoDeAjustes
+        recuo={RECUO_SEM_ICONE}
+        rodape={
           jaPassou
-            ? "Como foi, o que você quer lembrar…"
-            : "Perguntas para levar, o que pedir, o preparo…"
+            ? "Essa data já passou. Dá para guardar o que foi dito na consulta."
+            : "Eu te lembro na véspera, às 19h, e duas horas antes."
         }
-        value={nota}
-        onChangeText={setNota}
-        multiline
-        maxLength={1000}
-      />
+      >
+        <LinhaDeAjuste
+          titulo="Data"
+          valor={diaCurto(dia, agora)}
+          tintaDoValor={aberto === "data" ? cor.agenda : undefined}
+          seta={false}
+          rotulo={`Data, ${quandoPorExtenso(quando, agora)}`}
+          dica={aberto === "data" ? "Fecha o calendário" : "Abre o calendário"}
+          aoTocar={() => abrir("data")}
+        />
+        {aberto === "data" ? (
+          <CalendarioDoMes
+            plano
+            mes={mes}
+            aoMudarMes={setMes}
+            hoje={hoje}
+            selecionado={dia}
+            aoEscolher={setDia}
+            tinta={cor.agenda}
+          />
+        ) : null}
+        <LinhaDeAjuste
+          titulo="Hora"
+          valor={`${hora}:${String(minuto).padStart(2, "0")}`}
+          tintaDoValor={aberto === "hora" ? cor.agenda : undefined}
+          seta={false}
+          dica={aberto === "hora" ? "Fecha a roda da hora" : "Abre a roda da hora"}
+          aoTocar={() => abrir("hora")}
+        />
+        {aberto === "hora" ? (
+          <RodaDaHora
+            hora={hora}
+            minuto={minuto}
+            aoMudar={(h, m) => {
+              setHora(h);
+              setMinuto(m);
+            }}
+          />
+        ) : null}
+      </SecaoDeAjustes>
 
-      <Botao
-        rotulo={editando ? "Salvar" : "Pôr na agenda"}
-        corFundo={cor.agenda}
-        carregando={salvando}
-        aoTocar={() => void salvar()}
-      />
-      {!jaPassou ? (
-        <T tipo="apagado" centro>
-          Eu te lembro na véspera, às 19h, e duas horas antes.
-        </T>
-      ) : null}
+      <SecaoDeAjustes recuo={RECUO_SEM_ICONE}>
+        <LinhaDeCampo
+          rotulo="Onde"
+          placeholder="Clínica, hospital"
+          value={onde}
+          onChangeText={setOnde}
+          maxLength={80}
+        />
+      </SecaoDeAjustes>
+
+      <SecaoDeAjustes titulo={jaPassou ? "O que foi dito" : "Anotações"}>
+        <CampoLivre
+          rotulo={jaPassou ? "O que foi dito" : "Anotações"}
+          placeholder={
+            jaPassou
+              ? "Como foi, o que você quer lembrar"
+              : "Perguntas para levar, o que pedir, o preparo"
+          }
+          value={nota}
+          onChangeText={setNota}
+          maxLength={1000}
+        />
+      </SecaoDeAjustes>
 
       {existente ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={confirmarApagar ? "Toque de novo para apagar" : "Apagar da agenda"}
-          onPress={() => {
-            toque(false);
-            if (!confirmarApagar) {
-              setConfirmarApagar(true);
-              return;
-            }
-            void apagarCompromisso(existente.id).then(() => voltarOu(rota("/agenda") as never));
-          }}
-          style={{
-            minHeight: ALVO_MINIMO,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: espaco.sm,
-          }}
-        >
-          <Trash2 size={18} color={cor.urgente} />
-          <Text style={{ ...fonte.forte, fontSize: 15, color: cor.urgente }}>
-            {confirmarApagar ? "Toque de novo para apagar" : "Apagar da agenda"}
-          </Text>
-        </Pressable>
+        confirmarApagar ? (
+          <Confirmacao
+            pergunta="Apagar da agenda? Os lembretes dela também saem."
+            rotuloSim="Apagar"
+            aoConfirmar={() => void apagarCompromisso(existente.id).then(fechar)}
+            aoCancelar={() => setConfirmarApagar(false)}
+          />
+        ) : (
+          <SecaoDeAjustes>
+            <LinhaDeAjuste titulo="Apagar da agenda" perigo centro aoTocar={apagar} />
+          </SecaoDeAjustes>
+        )
       ) : null}
-    </Tela>
+    </TelaDaPilha>
   );
 }
 
@@ -281,46 +324,46 @@ function amanha(agora: Date): string {
   return ymdLocal(d);
 }
 
-function Secao({ rotulo, children }: { rotulo: string; children: ReactNode }) {
-  return (
-    <View style={{ gap: espaco.sm }}>
-      <T tipo="rotulo">{rotulo}</T>
-      {children}
-    </View>
-  );
-}
-
-function Escolha({
+/** Uma ficha de tipo: o ícone e o nome; a escolhida em índigo, com o ícone branco. */
+function FichaDoTipo({
+  tipo,
   rotulo,
-  rotuloAcessivel,
   ativa,
   aoTocar,
 }: {
+  tipo: TipoDeCompromisso;
   rotulo: string;
-  rotuloAcessivel: string;
   ativa: boolean;
   aoTocar: () => void;
 }) {
+  const Icone = ICONE_DO_TIPO[tipo];
   return (
     <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={rotuloAcessivel}
+      accessibilityRole="radio"
+      accessibilityLabel={rotulo}
       accessibilityState={{ selected: ativa }}
+      hitSlop={{ top: 4, bottom: 4 }}
       onPress={() => {
-        toque();
+        selecao();
         aoTocar();
       }}
-      style={{
-        minHeight: ALVO_MINIMO,
-        justifyContent: "center",
-        paddingHorizontal: espaco.lg,
-        borderRadius: raio.pilula,
-        backgroundColor: ativa ? cor.agenda : cor.cartao,
-        borderWidth: 1,
-        borderColor: ativa ? cor.agenda : cor.borda,
-      }}
+      style={({ pressed }) => ({
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        minHeight: 40,
+        paddingLeft: espaco.md,
+        paddingRight: espaco.md + 2,
+        borderRadius: canto.pilula,
+        ...curva,
+        backgroundColor: ativa ? cor.agenda : cor.apagado,
+        opacity: pressed ? 0.8 : 1,
+      })}
     >
-      <Text style={{ ...fonte.forte, fontSize: 15, color: ativa ? cor.branco : cor.texto }}>
+      <Icone size={17} strokeWidth={2.2} color={ativa ? cor.branco : cor.agenda} />
+      <Text
+        style={{ ...fonte.forte, ...escala.legenda, color: ativa ? cor.branco : cor.texto }}
+      >
         {rotulo}
       </Text>
     </Pressable>

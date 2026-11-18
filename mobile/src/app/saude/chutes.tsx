@@ -1,24 +1,27 @@
 import { comPacote, ehLocal, mesclar } from "@/lib/fila-local";
 import { FORCA_PADRAO, NIVEIS_DE_FORCA, nivelDeForca } from "@/lib/forca-do-movimento";
 import type { SessaoDeChutes } from "@/lib/serie-de-chutes";
+import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { Redirect } from "expo-router";
-import { ChevronRight } from "lucide-react-native";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { CloudOff, Minus, Phone } from "lucide-react-native";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Animated, Pressable, Text, View } from "react-native";
+import { Grupo, Ladrilho, Seta } from "~/componentes/ajustes";
 import {
   Botao,
   Carregando,
-  Cartao,
-  Linha,
   NaoConsegueLer,
-  Pilula,
-  T,
-  Tela,
+  TituloDaSecao,
   toque,
 } from "~/componentes/base";
-import { Cabecalho, Escolha } from "~/componentes/saude/pecas";
+import { BotaoDeVidro, TelaDaPilha } from "~/componentes/cabecalho";
+import { useAviso } from "~/componentes/comunidade/folha";
+import { useMovimentoReduzido } from "~/componentes/movimento";
+import { ARTES, Escolha } from "~/componentes/saude/pecas";
 import { apagar, gravarJson, lerJson } from "~/lib/armazem";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
+import { clarear, comAlfa, escurecer } from "~/lib/cor";
 import { gravarFila, lerFila } from "~/lib/saude/armazem-de-filas";
 import { sessaoEmCursoDeExemplo, sessoesDeExemplo } from "~/lib/saude/bancada";
 import {
@@ -40,11 +43,10 @@ import { duracaoFalada, quandoFoi, relogio } from "~/lib/saude/formato";
 import { usarRelogio, usarRetorno, usarTelaAcesa } from "~/lib/saude/usar-retorno";
 import { useSessao } from "~/lib/sessao";
 import { supabase } from "~/servidor/supabase";
-import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
+import { cor, escala, espaco, fonte, fonteDoNumero, margem } from "~/tema";
 import { pedirSocorro, ROTULO_DO_SOCORRO } from "~/lib/socorro";
 
 type Contagem = SessaoDeChutes & { id: string; strength?: number | null };
-type Aviso = { texto: string; tom: "ok" | "aparelho" | "neutro" } | null;
 
 /**
  * OS MOVIMENTOS DO BEBÊ — acompanhar o bebê, e não protocolo.
@@ -54,6 +56,14 @@ type Aviso = { texto: string; tom: "ok" | "aparelho" | "neutro" } | null;
  * gráfico do tempo até 10. Ela conta quando quiser, pelo tempo que quiser, e
  * o histórico fica. O que o app diz sobre um bebê diferente é uma linha fixa
  * que abre o SOS — o único lugar com sinais de alerta.
+ *
+ * 18/11/2026 (a vistoria: "o círculo, que é a alma dela, só aparece depois de
+ * Começar"): o círculo está SEMPRE na tela. Parado, mostra os pés e
+ * "Começar"; tocado, vira o contador ali mesmo, e cada toque dá uma mola. O
+ * relógio da contagem mora num componente só (`Cronometro`), para o segundo
+ * que passa não redesenhar a tela inteira.
+ *
+ * Bancada: /saude/chutes?bancada=1 [&estado=contando|falhou]
  */
 export default function Chutes() {
   const { sessao, perfil, cuidado, estadoDoPerfil } = useSessao();
@@ -63,9 +73,8 @@ export default function Chutes() {
   const [historico, setHistorico] = useState<Contagem[]>([]);
   const [pendentes, setPendentes] = useState<SessaoPendente[]>([]);
   const [emCurso, setEmCurso] = useState<SessaoEmCurso | null>(null);
-  const [aviso, setAviso] = useState<Aviso>(null);
   const sincronizando = useRef(false);
-  const agora = usarRelogio(!!emCurso);
+  const aviso = useAviso();
   usarTelaAcesa(!!emCurso, "dc-chutes");
 
   const buscar = useCallback(async () => {
@@ -170,7 +179,6 @@ export default function Chutes() {
   }
 
   function comecar() {
-    setAviso(null);
     guardar({ startedAt: new Date().toISOString(), count: 0, forca: FORCA_PADRAO });
   }
 
@@ -185,7 +193,7 @@ export default function Chutes() {
     const fim = Date.now();
     if (encerrarDescarta(emCurso, fim)) {
       guardar(null);
-      setAviso({ texto: "Contagem cancelada. Nada foi guardado.", tom: "neutro" });
+      aviso.mostrar("Contagem cancelada. Nada foi guardado.");
       return;
     }
     const pacote = pacoteDaSessao(emCurso, fim, FORCA_PADRAO);
@@ -193,7 +201,7 @@ export default function Chutes() {
     if (ehBancada() || !uid) {
       setHistorico((h) => [{ ...pacote }, ...h]);
       guardar(null);
-      setAviso({ texto: `Contagem guardada: ${resumo}.`, tom: "ok" });
+      aviso.mostrar(`Contagem guardada: ${resumo}.`);
       return;
     }
     /* Primeiro o aparelho, depois o banco: sem rede, nada se perde. */
@@ -204,76 +212,91 @@ export default function Chutes() {
     guardar(null);
     const ficaram = await sincronizar();
     const aindaAqui = (await lerFila(chave, ehSessaoPendente)).some((p) => p.id === pacote.id);
-    setAviso(
-      aindaAqui || ficaram === -1
-        ? {
-            texto: `Contagem guardada no aparelho: ${resumo}. Ela sobe para a sua conta quando a internet voltar.`,
-            tom: "aparelho",
-          }
-        : { texto: `Contagem guardada: ${resumo}.`, tom: "ok" },
-    );
+    if (aindaAqui || ficaram === -1)
+      aviso.mostrar(
+        `Guardada no aparelho: ${resumo}. Ela sobe para a sua conta quando a internet voltar.`,
+        true,
+      );
+    else aviso.mostrar(`Contagem guardada: ${resumo}.`);
     void buscar();
   }
 
+  const todas = useMemo(() => mesclar(historico, pendentes) as Contagem[], [historico, pendentes]);
+
   if (estadoDoPerfil === "carregando")
     return (
-      <Tela>
+      <TelaDaPilha titulo="Movimentos do bebê" voltarPara="/inicio">
         <Carregando />
-      </Tela>
+      </TelaDaPilha>
     );
   if (cuidado || perfil?.birth_date) return <Redirect href="/inicio" />;
 
-  const todas = mesclar(historico, pendentes) as Contagem[];
   const forca = emCurso?.forca ?? FORCA_PADRAO;
 
   return (
-    <Tela>
-      <Cabecalho titulo="Movimentos do bebê" arte="chutes" fundo={cor.chutesFundo} />
-
-      {emCurso ? (
-        <Cartao fundo={cor.chutesFundo} estilo={{ alignItems: "center", gap: espaco.md }}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Senti um movimento. Contados: ${emCurso.count}`}
-            onPress={() => somar(1)}
-            style={({ pressed }) => ({
-              width: 210,
-              height: 210,
-              borderRadius: 105,
-              backgroundColor: pressed ? "#075985" : cor.chutes,
-              alignItems: "center",
-              justifyContent: "center",
-              transform: [{ scale: pressed ? 0.97 : 1 }],
-              shadowColor: cor.chutes,
-              shadowOpacity: 0.3,
-              shadowRadius: 14,
-              shadowOffset: { width: 0, height: 6 },
-            })}
-          >
+    <TelaDaPilha titulo="Movimentos do bebê" voltarPara="/inicio" sobre={aviso.elemento}>
+      <View style={{ alignItems: "center", gap: espaco.md, paddingTop: espaco.sm }}>
+        <Circulo
+          contagem={emCurso?.count ?? null}
+          aoComecar={comecar}
+          aoSomar={() => somar(1)}
+        />
+        {emCurso ? (
+          <>
             <Text
               style={{
-                ...fonte.titulo,
-                fontSize: 72,
-                color: cor.branco,
-                fontVariant: ["tabular-nums"],
+                ...fonte.normal,
+                ...escala.legenda,
+                color: cor.textoCorpo,
+                textAlign: "center",
               }}
             >
-              {emCurso.count}
+              Toque no círculo a cada movimento que sentir.
             </Text>
-          </Pressable>
-          <T tipo="apagado" centro>
-            Toque no círculo a cada movimento que sentir.
-          </T>
-          <T tipo="subtitulo" cor={cor.chutes} estilo={{ fontVariant: ["tabular-nums"] }}>
-            {relogio(agora - new Date(emCurso.startedAt).getTime())}
-          </T>
-        </Cartao>
-      ) : null}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.lg }}>
+              <BotaoDeVidro
+                rotulo="Contei um a mais. Tirar 1"
+                desabilitado={emCurso.count === 0}
+                aoTocar={() => somar(-1)}
+              >
+                <Minus size={20} strokeWidth={2.4} color={cor.texto} />
+              </BotaoDeVidro>
+              <Cronometro inicio={emCurso.startedAt} />
+              <View style={{ width: 44 }} />
+            </View>
+          </>
+        ) : (
+          <View style={{ gap: espaco.xs, paddingHorizontal: espaco.lg }}>
+            <Text
+              style={{
+                ...fonte.normal,
+                ...escala.corpo,
+                color: cor.textoCorpo,
+                textAlign: "center",
+              }}
+            >
+              Conte as mexidinhas quando quiser, pelo tempo que quiser.
+            </Text>
+            <Text
+              style={{
+                ...fonte.normal,
+                ...escala.legenda,
+                color: cor.textoApagado,
+                textAlign: "center",
+              }}
+            >
+              Valem chutes, socos, rolamentos e cutucadas. Soluços não contam.
+            </Text>
+          </View>
+        )}
+      </View>
 
       {emCurso ? (
         <View style={{ gap: espaco.md }}>
           <View style={{ gap: espaco.sm }}>
-            <T tipo="rotulo">Como estão os movimentos?</T>
+            <Text style={{ ...fonte.forte, ...escala.legenda, color: cor.texto }}>
+              Como estão os movimentos?
+            </Text>
             <Escolha
               opcoes={NIVEIS_DE_FORCA.map((n) => ({ valor: n.valor, rotulo: n.rotulo }))}
               valor={forca}
@@ -282,61 +305,11 @@ export default function Chutes() {
               aoEscolher={(v) => guardar({ ...emCurso, forca: v })}
             />
           </View>
-          <Botao
-            rotulo={encerrarDescarta(emCurso, agora) ? "Cancelar contagem" : "Encerrar e guardar"}
-            aoTocar={() => void encerrar()}
-            corFundo={cor.chutes}
-          />
-          {emCurso.count > 0 ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Contei um a mais — tirar 1"
-              onPress={() => somar(-1)}
-              style={{
-                minHeight: ALVO_MINIMO,
-                alignItems: "center",
-                justifyContent: "center",
-                marginTop: espaco.lg,
-              }}
-            >
-              <Text
-                style={{
-                  ...fonte.media,
-                  fontSize: 14,
-                  color: cor.textoApagado,
-                  textDecorationLine: "underline",
-                }}
-              >
-                Contei um a mais — tirar 1
-              </Text>
-            </Pressable>
-          ) : null}
+          <BotaoEncerrar emCurso={emCurso} aoTocar={() => void encerrar()} />
         </View>
-      ) : (
-        <Cartao fundo={cor.chutesFundo}>
-          <T>Conte as mexidinhas do bebê quando quiser, pelo tempo que quiser.</T>
-          <T tipo="apagado">Valem chutes, socos, rolamentos e cutucadas. Soluços não contam.</T>
-          <Botao rotulo="Começar a contar" aoTocar={comecar} corFundo={cor.chutes} />
-        </Cartao>
-      )}
+      ) : null}
 
       <LinhaDoSos />
-
-      {aviso ? (
-        <Cartao
-          fundo={
-            aviso.tom === "aparelho"
-              ? cor.atencaoFundo
-              : aviso.tom === "ok"
-                ? cor.chutesFundo
-                : cor.apagado
-          }
-        >
-          <T tipo="rotulo" cor={aviso.tom === "aparelho" ? cor.atencao : cor.texto}>
-            {aviso.texto}
-          </T>
-        </Cartao>
-      ) : null}
 
       {estado === "carregando" ? <Carregando texto="Lendo suas contagens…" /> : null}
       {estado === "falhou" ? (
@@ -351,50 +324,244 @@ export default function Chutes() {
 
       {estado === "pronto" && todas.length ? (
         <View style={{ gap: espaco.sm }}>
-          <T tipo="subtitulo">Contagens</T>
-          {todas.slice(0, 8).map((s) => {
-            const f = nivelDeForca(s.strength ?? null);
-            const dur =
-              s.ended_at != null
-                ? duracaoFalada(
-                    (new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()) / 1000,
-                  )
-                : "sem fim";
-            return (
-              <View
-                key={s.id}
-                style={{
-                  backgroundColor: cor.cartao,
-                  borderRadius: raio.md,
-                  borderWidth: 1,
-                  borderColor: cor.borda,
-                  padding: espaco.md,
-                  gap: 4,
-                }}
-              >
-                <Linha estilo={{ justifyContent: "space-between" }}>
-                  <T tipo="rotulo">{quandoFoi(s.started_at, Date.now())}</T>
-                  <T tipo="apagado">{dur}</T>
-                </Linha>
-                <Linha estilo={{ flexWrap: "wrap" }}>
-                  <T>
-                    {s.kick_count} {s.kick_count === 1 ? "movimento" : "movimentos"}
-                  </T>
-                  {f?.chip ? (
-                    <Pilula texto={f.chip} fundo={cor.chutesFundo} corTexto={cor.chutes} />
-                  ) : null}
-                  {ehLocal(s.id) ? (
-                    <Pilula texto="no aparelho" fundo={cor.atencaoFundo} corTexto={cor.atencao} />
-                  ) : null}
-                </Linha>
-              </View>
-            );
-          })}
+          <TituloDaSecao>Contagens</TituloDaSecao>
+          <Historico todas={todas} />
         </View>
       ) : null}
-    </Tela>
+    </TelaDaPilha>
   );
 }
+
+const DEGRADE_DO_CIRCULO = [
+  clarear(cor.chutes, 0.24),
+  cor.chutes,
+  escurecer(cor.chutes, 0.12),
+] as const;
+const TAMANHO_DO_CIRCULO = 220;
+
+/**
+ * O CÍRCULO, sempre presente. Parado: os pés e "Começar". Contando: o número,
+ * e cada toque dá uma mola (1 → 1,06 → 1, no fio nativo; parada com "reduzir
+ * movimento").
+ */
+function Circulo({
+  contagem,
+  aoComecar,
+  aoSomar,
+}: {
+  contagem: number | null;
+  aoComecar: () => void;
+  aoSomar: () => void;
+}) {
+  const escala_ = useRef(new Animated.Value(1)).current;
+  const reduzido = useMovimentoReduzido();
+  const contando = contagem != null;
+
+  function afundar() {
+    if (reduzido) return;
+    Animated.spring(escala_, {
+      toValue: 0.96,
+      speed: 50,
+      bounciness: 0,
+      useNativeDriver: true,
+    }).start();
+  }
+  function soltar() {
+    if (reduzido) return;
+    Animated.sequence([
+      Animated.spring(escala_, { toValue: 1.06, speed: 40, bounciness: 0, useNativeDriver: true }),
+      Animated.spring(escala_, { toValue: 1, speed: 18, bounciness: 10, useNativeDriver: true }),
+    ]).start();
+  }
+
+  return (
+    <View
+      style={{
+        width: TAMANHO_DO_CIRCULO + 32,
+        height: TAMANHO_DO_CIRCULO + 32,
+        borderRadius: (TAMANHO_DO_CIRCULO + 32) / 2,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: comAlfa(cor.chutes, 0.1),
+      }}
+    >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={
+          contando ? `Senti um movimento. Contados: ${contagem}` : "Começar a contar os movimentos"
+        }
+        onPressIn={afundar}
+        onPressOut={soltar}
+        onPress={contando ? aoSomar : () => {
+          toque();
+          aoComecar();
+        }}
+      >
+        <Animated.View
+          style={{
+            width: TAMANHO_DO_CIRCULO,
+            height: TAMANHO_DO_CIRCULO,
+            borderRadius: TAMANHO_DO_CIRCULO / 2,
+            overflow: "hidden",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: `0px 18px 36px -14px ${comAlfa(cor.chutes, 0.7)}`,
+            transform: [{ scale: escala_ }],
+          }}
+        >
+          <LinearGradient
+            colors={DEGRADE_DO_CIRCULO}
+            start={{ x: 0.15, y: 0 }}
+            end={{ x: 0.85, y: 1 }}
+            style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }}
+          />
+          {contando ? (
+            <>
+              <Text
+                style={{
+                  ...fonteDoNumero,
+                  fontSize: 76,
+                  lineHeight: 84,
+                  color: cor.branco,
+                  fontVariant: ["tabular-nums"],
+                }}
+              >
+                {contagem}
+              </Text>
+              <Text style={{ ...fonte.media, ...escala.legenda, color: comAlfa(cor.branco, 0.86) }}>
+                {contagem === 1 ? "movimento" : "movimentos"}
+              </Text>
+            </>
+          ) : (
+            <>
+              <Image
+                source={ARTES.chutes}
+                style={{ width: 96, height: 96 }}
+                contentFit="contain"
+                accessible={false}
+              />
+              <Text style={{ ...fonte.forte, ...escala.titulo3, color: cor.branco, marginTop: 4 }}>
+                Começar
+              </Text>
+            </>
+          )}
+        </Animated.View>
+      </Pressable>
+    </View>
+  );
+}
+
+/** O relógio da contagem: o ÚNICO dono do segundo que passa. */
+function Cronometro({ inicio }: { inicio: string }) {
+  const agora = usarRelogio(true);
+  const t = relogio(agora - new Date(inicio).getTime());
+  return (
+    <Text
+      accessibilityLabel={`Tempo de contagem: ${t}`}
+      style={{
+        minWidth: 110,
+        textAlign: "center",
+        ...fonteDoNumero,
+        ...escala.titulo2,
+        color: cor.texto,
+        fontVariant: ["tabular-nums"],
+      }}
+    >
+      {t}
+    </Text>
+  );
+}
+
+/**
+ * "Cancelar contagem" enquanto nada foi contado (e por pouco tempo), e
+ * "Encerrar e guardar" depois. Sem relógio por segundo: confere de minuto em
+ * minuto, só enquanto o rótulo ainda pode mudar sozinho.
+ */
+function BotaoEncerrar({ emCurso, aoTocar }: { emCurso: SessaoEmCurso; aoTocar: () => void }) {
+  const [, conferir] = useState(0);
+  const descarta = encerrarDescarta(emCurso, Date.now());
+  useEffect(() => {
+    if (!descarta) return;
+    const t = setTimeout(() => conferir((n) => n + 1), 60_000);
+    return () => clearTimeout(t);
+  });
+  return (
+    <Botao
+      rotulo={descarta ? "Cancelar contagem" : "Encerrar e guardar"}
+      tipo={descarta ? "secundario" : "primario"}
+      aoTocar={aoTocar}
+    />
+  );
+}
+
+const maiuscula = (s: string) => (s ? s[0]!.toUpperCase() + s.slice(1) : s);
+
+/** As últimas contagens, num grupo só. Só se redesenha quando a lista muda. */
+const Historico = memo(function Historico({ todas }: { todas: readonly Contagem[] }) {
+  const agora = Date.now();
+  return (
+    <Grupo recuo={margem.tela + 44 + espaco.md}>
+      {todas.slice(0, 8).map((s) => {
+        const f = nivelDeForca(s.strength ?? null);
+        const dur =
+          s.ended_at != null
+            ? duracaoFalada(
+                (new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()) / 1000,
+              )
+            : "sem fim";
+        const local = ehLocal(s.id);
+        return (
+          <View
+            key={s.id}
+            accessible
+            accessibilityLabel={`${s.kick_count} ${s.kick_count === 1 ? "movimento" : "movimentos"}, ${quandoFoi(s.started_at, agora)}, ${dur}${f?.chip ? `, ${f.chip}` : ""}${local ? ", guardada no aparelho" : ""}`}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: espaco.md,
+              minHeight: 56,
+              paddingHorizontal: margem.tela,
+              paddingVertical: espaco.sm,
+            }}
+          >
+            <Text
+              style={{
+                width: 44,
+                textAlign: "center",
+                ...fonteDoNumero,
+                ...escala.titulo2,
+                color: cor.chutes,
+                fontVariant: ["tabular-nums"],
+              }}
+            >
+              {s.kick_count}
+            </Text>
+            <View style={{ flex: 1, gap: 1 }}>
+              <Text style={{ ...fonte.forte, ...escala.legenda, color: cor.texto }}>
+                {s.kick_count === 1 ? "movimento" : "movimentos"}
+              </Text>
+              <Text style={{ ...fonte.normal, ...escala.nota, color: cor.textoApagado }}>
+                {maiuscula(quandoFoi(s.started_at, agora))}
+                {f?.chip ? ` · ${f.chip}` : ""}
+              </Text>
+            </View>
+            {local ? <CloudOff size={15} strokeWidth={2.2} color={cor.atencao} /> : null}
+            <Text
+              style={{
+                ...fonte.normal,
+                ...escala.legenda,
+                color: cor.textoApagado,
+                fontVariant: ["tabular-nums"],
+              }}
+            >
+              {dur}
+            </Text>
+          </View>
+        );
+      })}
+    </Grupo>
+  );
+});
 
 /**
  * A LINHA FIXA: o que o app diz a quem sente o bebê diferente. Sem número, sem
@@ -403,31 +570,38 @@ export default function Chutes() {
  */
 function LinhaDoSos() {
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`Sentiu o bebê diferente? ${ROTULO_DO_SOCORRO}`}
-      onPress={() => {
-        toque();
-        pedirSocorro();
-      }}
-      style={({ pressed }) => ({
-        flexDirection: "row",
-        alignItems: "center",
-        gap: espaco.sm,
-        minHeight: ALVO_MINIMO + 4,
-        paddingHorizontal: espaco.lg,
-        borderRadius: raio.md,
-        borderWidth: 1,
-        borderColor: cor.urgenteBorda,
-        backgroundColor: cor.cartao,
-        opacity: pressed ? 0.8 : 1,
-      })}
-    >
-      <Text style={{ flex: 1, ...fonte.media, fontSize: 15, color: cor.texto }}>
-        Sentiu o bebê diferente?{" "}
-        <Text style={{ ...fonte.forte, color: cor.urgente }}>{ROTULO_DO_SOCORRO}</Text>
-      </Text>
-      <ChevronRight size={20} color={cor.urgente} />
-    </Pressable>
+    <Grupo>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Sentiu o bebê diferente? ${ROTULO_DO_SOCORRO}`}
+        onPress={() => {
+          toque();
+          pedirSocorro();
+        }}
+        style={({ pressed }) => ({
+          flexDirection: "row",
+          alignItems: "center",
+          gap: espaco.md,
+          minHeight: 60,
+          paddingHorizontal: margem.tela,
+          paddingVertical: espaco.sm + 2,
+          backgroundColor: pressed ? cor.apagado : "transparent",
+        })}
+      >
+        <Ladrilho Icone={Phone} tinta={cor.urgente} />
+        <View style={{ flex: 1, gap: 1 }}>
+          <Text style={{ ...fonte.normal, ...escala.legenda, color: cor.texto }}>
+            Sentiu o bebê diferente?
+          </Text>
+          <Text
+            numberOfLines={1}
+            style={{ ...fonte.forte, ...escala.legenda, color: cor.urgente }}
+          >
+            {ROTULO_DO_SOCORRO}
+          </Text>
+        </View>
+        <Seta />
+      </Pressable>
+    </Grupo>
   );
 }

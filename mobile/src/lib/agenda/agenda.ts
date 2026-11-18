@@ -48,10 +48,22 @@ const NOME_PADRAO: Record<TipoDeCompromisso, string> = {
   outro: "Compromisso",
 };
 
+/**
+ * O nome-padrão no Modo Cuidado (luto): o app não escreve "pré-natal" para
+ * quem perdeu a gestação. É só o nome que o APP escolhe; o que ela escreveu
+ * fica como ela escreveu.
+ */
+const NOME_NO_CUIDADO: Partial<Record<TipoDeCompromisso, string>> = { consulta: "Consulta" };
+
+/** O jeito de falar: no Modo Cuidado, sem pré-natal nem gestação. */
+export type ModoDaAgenda = { cuidado?: boolean };
+
+/** O emoji do tipo: só no texto das notificações (na tela, o ícone). */
 export const emojiDo = (t: TipoDeCompromisso) => TIPOS.find((x) => x.tipo === t)?.emoji ?? "📌";
-export const nomeDo = (c: Pick<Compromisso, "tipo" | "titulo">) =>
-  c.titulo?.trim() || NOME_PADRAO[c.tipo];
-export const nomePadrao = (t: TipoDeCompromisso) => NOME_PADRAO[t];
+export const nomePadrao = (t: TipoDeCompromisso, modo?: ModoDaAgenda) =>
+  (modo?.cuidado ? NOME_NO_CUIDADO[t] : undefined) ?? NOME_PADRAO[t];
+export const nomeDo = (c: Pick<Compromisso, "tipo" | "titulo">, modo?: ModoDaAgenda) =>
+  c.titulo?.trim() || nomePadrao(c.tipo, modo);
 
 const RE_QUANDO = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
 
@@ -164,6 +176,39 @@ export function diasAte(d: Date, agora: Date): number {
 
 export const horaDe = (d: Date) => `${d.getHours()}:${dois(d.getMinutes())}`;
 
+const DIAS_CURTOS = ["dom.", "seg.", "ter.", "qua.", "qui.", "sex.", "sáb."];
+const MESES_CURTOS = [
+  "jan.",
+  "fev.",
+  "mar.",
+  "abr.",
+  "maio",
+  "jun.",
+  "jul.",
+  "ago.",
+  "set.",
+  "out.",
+  "nov.",
+  "dez.",
+];
+
+/**
+ * O dia em poucas letras, para o valor de uma linha ("Data · qua., 18 de
+ * nov."): "Hoje, 17 de nov." · "Ontem, 16 de nov." · "Amanhã, 18 de nov." ·
+ * "qua., 25 de nov." (o ano só quando não é o de agora).
+ */
+export function diaCurto(ymd: string, agora: Date): string {
+  const d = paraData(`${ymd}T12:00`);
+  if (!d) return "";
+  const ano = d.getFullYear() !== agora.getFullYear() ? ` de ${d.getFullYear()}` : "";
+  const resto = `${d.getDate()} de ${MESES_CURTOS[d.getMonth()]}${ano}`;
+  const n = diasAte(d, agora);
+  if (n === 0) return `Hoje, ${resto}`;
+  if (n === -1) return `Ontem, ${resto}`;
+  if (n === 1) return `Amanhã, ${resto}`;
+  return `${DIAS_CURTOS[d.getDay()]}, ${resto}`;
+}
+
 /** "Hoje, 14:30" · "Amanhã, 9:00" · "Quinta, 23 de outubro · 14:30". */
 export function quandoPorExtenso(quando: string, agora: Date): string {
   const d = paraData(quando);
@@ -203,15 +248,21 @@ const PREPARO: Record<TipoDeCompromisso, string> = {
   outro: "",
 };
 
+/** No Modo Cuidado, sem a caderneta da gestante. */
+const PREPARO_NO_CUIDADO: Partial<Record<TipoDeCompromisso, string>> = {
+  consulta: "Leve os últimos exames.",
+};
+
 function linhaDoLugar(c: Compromisso, d: Date): string {
   return c.onde ? `Às ${horaDe(d)} · ${c.onde}.` : `Às ${horaDe(d)}.`;
 }
 
 /** Os lembretes de um compromisso que ainda estão no futuro. */
-export function lembretesDe(c: Compromisso, agora: Date): Lembrete[] {
+export function lembretesDe(c: Compromisso, agora: Date, modo?: ModoDaAgenda): Lembrete[] {
   const d = paraData(c.quando);
   if (!d) return [];
-  const nome = nomeDo(c);
+  const nome = nomeDo(c, modo);
+  const preparo = (modo?.cuidado ? PREPARO_NO_CUIDADO[c.tipo] : undefined) ?? PREPARO[c.tipo];
   const fora: Lembrete[] = [];
   const vespera = new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1, HORA_DA_VESPERA, 0);
   if (vespera > agora) {
@@ -219,7 +270,7 @@ export function lembretesDe(c: Compromisso, agora: Date): Lembrete[] {
       id: `${c.id}-vespera`,
       quando: vespera,
       titulo: `Amanhã: ${nome}`,
-      corpo: [linhaDoLugar(c, d), PREPARO[c.tipo]].filter(Boolean).join(" "),
+      corpo: [linhaDoLugar(c, d), preparo].filter(Boolean).join(" "),
     });
   }
   const antes = new Date(d.getTime() - ANTES_MS);
@@ -241,9 +292,14 @@ export function lembretesDe(c: Compromisso, agora: Date): Lembrete[] {
  * total. 20 bastam para os próximos dez compromissos, e a próxima abertura do
  * app completa.
  */
-export function lembretesDaAgenda(lista: readonly Compromisso[], agora: Date, max = 20) {
+export function lembretesDaAgenda(
+  lista: readonly Compromisso[],
+  agora: Date,
+  max = 20,
+  modo?: ModoDaAgenda,
+) {
   return lista
-    .flatMap((c) => lembretesDe(c, agora))
+    .flatMap((c) => lembretesDe(c, agora, modo))
     .sort((a, b) => a.quando.getTime() - b.quando.getTime())
     .slice(0, max);
 }

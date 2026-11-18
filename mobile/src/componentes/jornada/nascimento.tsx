@@ -1,20 +1,33 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
+import { ChevronRight, Share, Sprout, Trophy } from "lucide-react-native";
 import { useState } from "react";
-import { Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { toque } from "~/componentes/base";
-import { BotaoDaAtividade, Brilho, sombraDe } from "~/componentes/jornada/atividade";
+import { Botao, Cartao, Tocavel, toque } from "~/componentes/base";
+import { Brilho } from "~/componentes/jornada/atividade";
 import { FolhaDeCompartilhar } from "~/componentes/jornada/compartilhar";
 import { legendaDaChegada } from "~/lib/jornada/cartoes";
 import { Confete } from "~/componentes/jornada/pecas";
 import { ArteDaBolha, Flutuar } from "~/componentes/movimento";
+import { comAlfa } from "~/lib/cor";
 import {
   medidasPorExtenso,
   nascimentoPorExtenso,
   type DadosDoNascimento,
 } from "~/lib/jornada/pos-parto";
-import { cor, espaco, fonte } from "~/tema";
+import {
+  canto,
+  cor,
+  curva,
+  escala,
+  espaco,
+  fonte,
+  luz,
+  margem,
+  ouro,
+  sombra,
+} from "~/tema";
 
 /**
  * A CHEGADA DO BEBÊ — a festa que abre uma vez depois de ela contar o
@@ -24,6 +37,11 @@ import { cor, espaco, fonte } from "~/tema";
  * O site abria "{bebê} chegou!" com confete, o troféu da jornada da gestação e
  * o "Começar o 4º trimestre"; o app trocava de modo em silêncio. Nunca no Modo
  * Cuidado: a perda perinatal mora nesta fase (o portão é `abreFestaDoNascimento`).
+ *
+ * 18/11/2026 (a vistoria: "o maior momento da jornada precisa ser o mais coeso
+ * do app"): toda cor vem do tema (eram 16 soltas, com um botão azul-céu e o
+ * degradê rosa-violeta de fábrica na porta); os dois botões são o `Botao` do
+ * app, em pílulas de 48; o título é a serifada.
  */
 
 export const RECEM_NASCIDO = require("../../../../src/assets/bebe/semana.webp");
@@ -49,31 +67,31 @@ export function CartaoDaChegada({
         contentFit="cover"
       />
       <LinearGradient
-        colors={["rgba(255,255,255,0)", "rgba(255,240,246,0.85)"]}
+        colors={[comAlfa(cor.destaque, 0), comAlfa(cor.destaque, 0.85)]}
         style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: ALTURA * 0.5 }}
       />
       <View style={{ flex: 1, alignItems: "center", paddingTop: 40, paddingHorizontal: 22 }}>
         <Text
           style={{
-            ...fonte.titulo,
-            fontSize: 13,
+            ...fonte.forte,
+            ...escala.nota,
             letterSpacing: 2.4,
             textTransform: "uppercase",
-            color: "#5d4d84",
+            color: cor.textoCorpo,
           }}
         >
-          Chegou!
+          Chegou
         </Text>
         <Text
           numberOfLines={2}
           style={{
             marginTop: 4,
             textAlign: "center",
-            ...fonte.titulo,
+            ...fonte.display,
             fontSize: nome && nome.length > 10 ? 38 : 46,
             lineHeight: 52,
-            letterSpacing: -1,
-            color: "#2e2348",
+            letterSpacing: -0.4,
+            color: cor.texto,
           }}
         >
           {nome ?? "Nosso bebê"}
@@ -83,19 +101,21 @@ export function CartaoDaChegada({
           <Image source={RECEM_NASCIDO} style={{ width: 200, height: 200 }} contentFit="contain" />
         </View>
         <View style={{ marginTop: 18, alignItems: "center", gap: 6 }}>
-          <Text style={{ ...fonte.titulo, fontSize: 18, color: "#2e2348" }}>
+          <Text style={{ ...fonte.forte, ...escala.manchete, color: cor.texto }}>
             {nascimentoPorExtenso(dados)}
           </Text>
           {medidas ? (
             <View
               style={{
-                borderRadius: 999,
-                backgroundColor: "rgba(255,255,255,0.8)",
+                borderRadius: canto.pilula,
+                backgroundColor: comAlfa(cor.branco, 0.8),
                 paddingHorizontal: 14,
                 paddingVertical: 6,
               }}
             >
-              <Text style={{ ...fonte.titulo, fontSize: 15, color: "#7d1d45" }}>{medidas}</Text>
+              <Text style={{ ...fonte.forte, ...escala.legenda, color: cor.textoDestaque }}>
+                {medidas}
+              </Text>
             </View>
           ) : null}
         </View>
@@ -104,12 +124,12 @@ export function CartaoDaChegada({
           style={{
             marginBottom: 22,
             ...fonte.forte,
-            fontSize: 12,
-            letterSpacing: 0.5,
-            color: "#7d5a72",
+            ...escala.nota,
+            letterSpacing: 0.3,
+            color: cor.textoApagado,
           }}
         >
-          feito com carinho no app Mãe Esperta 💛
+          Mãe Esperta · @maeesperta.app
         </Text>
       </View>
     </View>
@@ -146,20 +166,20 @@ export function FestaDoNascimento({
   const quem = nome ?? "O bebê";
   return (
     <Modal visible transparent={false} animationType="fade" onRequestClose={aoComecar}>
-      <View style={{ flex: 1, backgroundColor: "#fff8f5" }}>
+      <View style={{ flex: 1, backgroundColor: luz.base }}>
         <Image
           source={CEU}
           style={{ position: "absolute", left: 0, right: 0, top: 0, height: 520 }}
           contentFit="cover"
         />
         <LinearGradient
-          colors={["rgba(255,248,245,0)", "#fff8f5"]}
+          colors={[comAlfa(luz.base, 0), luz.base]}
           style={{ position: "absolute", left: 0, right: 0, top: 340, height: 180 }}
         />
         <ScrollView
           contentContainerStyle={{
             paddingTop: topo + espaco.xl,
-            paddingHorizontal: espaco.xl,
+            paddingHorizontal: margem.foco,
             paddingBottom: espaco.xxl,
             alignItems: "center",
             gap: espaco.md,
@@ -167,11 +187,11 @@ export function FestaDoNascimento({
         >
           <Text
             style={{
-              ...fonte.titulo,
-              fontSize: 13,
-              letterSpacing: 2,
+              ...fonte.forte,
+              ...escala.nota,
+              letterSpacing: 1.6,
               textTransform: "uppercase",
-              color: "#5d4d84",
+              color: cor.textoCorpo,
             }}
           >
             {nascimentoPorExtenso(dados)}
@@ -180,11 +200,11 @@ export function FestaDoNascimento({
             accessibilityRole="header"
             style={{
               textAlign: "center",
-              ...fonte.titulo,
-              fontSize: 38,
-              lineHeight: 44,
-              letterSpacing: -0.8,
-              color: "#2e2348",
+              ...fonte.display,
+              fontSize: 40,
+              lineHeight: 46,
+              letterSpacing: -0.4,
+              color: cor.texto,
             }}
           >
             {quem} chegou!
@@ -203,86 +223,79 @@ export function FestaDoNascimento({
           <Text
             style={{
               textAlign: "center",
-              ...fonte.media,
-              fontSize: 16,
-              lineHeight: 23,
-              color: "#5b3a4a",
+              ...fonte.normal,
+              ...escala.corpo,
+              color: cor.textoCorpo,
             }}
           >
-            Parabéns, mamãe. Vocês completaram a maior jornada que existe.
+            Parabéns, mamãe. A espera acabou.
           </Text>
 
-          <View
-            style={{
+          <Cartao
+            fundo={cor.atencaoFundo}
+            estilo={{
               alignSelf: "stretch",
               flexDirection: "row",
               alignItems: "center",
               gap: espaco.md,
-              borderRadius: 22,
-              backgroundColor: "#fff4dc",
-              padding: espaco.lg,
-              ...sombraDe("#c27a00", 0.5),
             }}
           >
-            <Text style={{ fontSize: 40 }}>🏆</Text>
+            <LinearGradient
+              colors={[ouro.claro, ouro.medio, ouro.escuro]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{
+                width: 52,
+                height: 52,
+                borderRadius: 16,
+                ...curva,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Trophy size={26} strokeWidth={2.2} color={cor.atencaoForte} />
+            </LinearGradient>
             <View style={{ flex: 1, gap: 2 }}>
-              <Text style={{ ...fonte.titulo, fontSize: 16, color: "#8a4b00" }}>
-                Jornada da gestação completa
+              <Text style={{ ...fonte.forte, ...escala.manchete, color: cor.atencaoForte }}>
+                A gestação completa
               </Text>
-              <Text style={{ ...fonte.media, fontSize: 14, color: "#9a6a2a" }}>
-                {diasCompletos} {diasCompletos === 1 ? "dia" : "dias"} de cuidado completo ·{" "}
+              <Text style={{ ...fonte.media, ...escala.legenda, color: cor.atencaoTexto }}>
+                {diasCompletos} {diasCompletos === 1 ? "dia" : "dias"} de cuidado ·{" "}
                 {figurinhas} {figurinhas === 1 ? "figurinha" : "figurinhas"}
               </Text>
-              <Text style={{ ...fonte.normal, fontSize: 13, color: "#9a6a2a" }}>
-                O álbum da gestação fica guardado para sempre 💝
+              <Text style={{ ...fonte.normal, ...escala.nota, color: cor.atencaoTexto }}>
+                O álbum da gestação fica guardado para sempre.
               </Text>
             </View>
-          </View>
+          </Cartao>
 
           {sementinhas ? (
             <View
               style={{
-                borderRadius: 999,
-                backgroundColor: "#e7f8ee",
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 6,
+                borderRadius: canto.pilula,
+                backgroundColor: cor.sementinhaFundo,
                 paddingHorizontal: espaco.lg,
                 paddingVertical: espaco.sm,
               }}
             >
-              <Text style={{ ...fonte.titulo, fontSize: 16, color: "#15803d" }}>
-                +{sementinhas} sementinhas de boas-vindas 🌱
+              <Sprout size={16} strokeWidth={2.4} color={cor.sementinha} />
+              <Text style={{ ...fonte.forte, ...escala.chamada, color: cor.sementinha }}>
+                +{sementinhas} sementinhas de boas-vindas
               </Text>
             </View>
           ) : null}
 
           <View style={{ alignSelf: "stretch", gap: espaco.sm, marginTop: espaco.sm }}>
-            <BotaoDaAtividade
-              cor="#0284c7"
-              rotulo="Começar o 4º trimestre 🍼"
-              aoTocar={aoComecar}
+            <Botao rotulo="Começar o 4º trimestre" aoTocar={aoComecar} />
+            <Botao
+              rotulo="Anunciar a chegada"
+              tipo="secundario"
+              icone={<Share size={18} strokeWidth={2.2} color={cor.primariaEscura} />}
+              aoTocar={() => setCartao(true)}
             />
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => {
-                toque();
-                setCartao(true);
-              }}
-              style={({ pressed }) => ({
-                minHeight: 52,
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: espaco.sm,
-                borderRadius: 999,
-                backgroundColor: cor.branco,
-                borderWidth: 1,
-                borderColor: "#f3d3e0",
-                opacity: pressed ? 0.85 : 1,
-              })}
-            >
-              <Text style={{ ...fonte.titulo, fontSize: 16, color: "#b0306a" }}>
-                Anunciar a chegada 💌
-              </Text>
-            </Pressable>
           </View>
 
           <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
@@ -290,87 +303,52 @@ export function FestaDoNascimento({
             <Text
               style={{
                 flex: 1,
-                ...fonte.media,
-                fontSize: 13,
-                lineHeight: 18,
-                color: "#7d5a72",
+                ...fonte.normal,
+                ...escala.nota,
+                color: cor.textoApagado,
               }}
             >
-              A trilha agora acompanha as 12 primeiras semanas de vocês dois. Um dia de cada vez.
+              A trilha agora acompanha as 12 primeiras semanas de vocês dois.
             </Text>
           </View>
 
           {confirmando ? (
-            <View
-              style={{
-                alignSelf: "stretch",
-                gap: espaco.sm,
-                borderRadius: 18,
-                backgroundColor: "#fdf2f8",
-                padding: espaco.lg,
-              }}
-            >
-              <Text style={{ ...fonte.forte, fontSize: 14, color: "#7d1d45" }}>
+            <Cartao fundo={cor.destaque} estilo={{ alignSelf: "stretch", gap: espaco.md }}>
+              <Text style={{ ...fonte.forte, ...escala.legenda, color: cor.textoDestaque }}>
                 Voltar para a gestação? O nascimento sai do perfil e a jornada da gestação volta
                 como estava.
               </Text>
               <View style={{ flexDirection: "row", gap: espaco.sm }}>
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={desfazendo}
-                  onPress={() => {
+                <Botao
+                  rotulo={desfazendo ? "Voltando…" : "Sim, voltar"}
+                  tamanho="compacto"
+                  estilo={{ flex: 1 }}
+                  carregando={desfazendo}
+                  aoTocar={() => {
                     setDesfazendo(true);
                     void aoDesfazer().finally(() => setDesfazendo(false));
                   }}
-                  style={{
-                    flex: 1,
-                    minHeight: 44,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    borderRadius: 999,
-                    backgroundColor: "#b0306a",
-                    opacity: desfazendo ? 0.6 : 1,
-                  }}
-                >
-                  <Text style={{ ...fonte.titulo, fontSize: 14, color: cor.branco }}>
-                    {desfazendo ? "Voltando…" : "Sim, voltar"}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => setConfirmando(false)}
-                  style={{
-                    flex: 1,
-                    minHeight: 44,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    borderRadius: 999,
-                    backgroundColor: cor.branco,
-                  }}
-                >
-                  <Text style={{ ...fonte.titulo, fontSize: 14, color: "#7d5a72" }}>
-                    Não, já nasceu
-                  </Text>
-                </Pressable>
+                />
+                <Botao
+                  rotulo="Não, já nasceu"
+                  tipo="secundario"
+                  tamanho="compacto"
+                  estilo={{ flex: 1 }}
+                  desabilitado={desfazendo}
+                  aoTocar={() => setConfirmando(false)}
+                />
               </View>
-            </View>
+            </Cartao>
           ) : (
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setConfirmando(true)}
-              style={{ minHeight: 44, justifyContent: "center" }}
+            <Tocavel
+              rotulo="Marquei sem querer. Voltar para a gestação"
+              aoTocar={() => setConfirmando(true)}
+              estilo={{ minHeight: 44, justifyContent: "center", paddingHorizontal: espaco.md }}
             >
-              <Text
-                style={{
-                  ...fonte.media,
-                  fontSize: 13,
-                  color: "#9a7486",
-                  textDecorationLine: "underline",
-                }}
-              >
-                Declarei sem querer — voltar para a gestação
+              <Text style={{ ...fonte.media, ...escala.nota, color: cor.textoApagado }}>
+                Marquei sem querer. Voltar para a gestação
               </Text>
-            </Pressable>
+            </Tocavel>
           )}
         </ScrollView>
         <Confete pecas={70} />
@@ -379,7 +357,7 @@ export function FestaDoNascimento({
         aberta={cartao}
         aoFechar={() => setCartao(false)}
         largura={LARGURA}
-        corDoBotao="#b0306a"
+        corDoBotao={cor.primaria}
         legenda={legendaDaChegada(nome)}
       >
         <CartaoDaChegada nome={nome} dados={dados} />
@@ -389,44 +367,85 @@ export function FestaDoNascimento({
 }
 
 /**
- * A porta, na tela Hoje da gestação, a partir da semana 37 — o "🎉 {bebê}
- * nasceu!" do site. Leva ao fluxo de contar o nascimento.
+ * A PORTA, na tela do Bebê a partir da semana 37 — o "{bebê} nasceu?" do
+ * site. Leva ao fluxo de contar o nascimento. É uma LINHA do grupo de atalhos
+ * do Bebê (64 pt, a ficha de 44 com o degradê, o fio recuado 70): o material é
+ * o do grupo. `solta` lhe dá o material próprio, para quem a puser fora dele.
  */
-export function PortaDoNascimento({ nome, aoTocar }: { nome: string | null; aoTocar: () => void }) {
+export function PortaDoNascimento({
+  nome,
+  aoTocar,
+  solta = false,
+}: {
+  nome: string | null;
+  aoTocar: () => void;
+  solta?: boolean;
+}) {
+  const quem = nome ?? "O bebê";
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${nome ?? "O bebê"} nasceu? Contar o nascimento`}
+      accessibilityLabel={`${quem} nasceu? Contar o nascimento`}
       onPress={() => {
         toque();
         aoTocar();
       }}
-      style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1 })}
-    >
-      <LinearGradient
-        colors={["#ec4899", "#8b5cf6"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={{
+      style={({ pressed }) => [
+        {
           flexDirection: "row",
           alignItems: "center",
           gap: espaco.md,
-          borderRadius: 22,
-          paddingHorizontal: espaco.lg,
-          paddingVertical: espaco.md,
+          minHeight: 64,
+          paddingVertical: 10,
+          paddingHorizontal: 14,
+        },
+        !solta
+          ? { backgroundColor: pressed ? cor.apagado : "transparent" }
+          : [
+              {
+                backgroundColor: pressed ? cor.apagado : luz.cartao,
+                borderRadius: canto.cartao,
+                ...curva,
+                borderWidth: StyleSheet.hairlineWidth,
+                borderColor: comAlfa(cor.branco, 0.9),
+              },
+              sombra,
+            ],
+      ]}
+    >
+      <LinearGradient
+        colors={[cor.primaria, cor.jogo]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{
+          width: 44,
+          height: 44,
+          borderRadius: canto.campo,
+          ...curva,
+          alignItems: "center",
+          justifyContent: "center",
+          overflow: "hidden",
         }}
       >
-        <Image source={RECEM_NASCIDO} style={{ width: 52, height: 52 }} contentFit="contain" />
-        <View style={{ flex: 1 }}>
-          <Text style={{ ...fonte.titulo, fontSize: 17, color: cor.branco }}>
-            🎉 {nome ?? "O bebê"} nasceu?
-          </Text>
-          <Text style={{ ...fonte.media, fontSize: 13, color: "rgba(255,255,255,0.9)" }}>
-            Conte aqui e a jornada vira o 4º trimestre
-          </Text>
-        </View>
-        <Text style={{ ...fonte.titulo, fontSize: 22, color: cor.branco }}>›</Text>
+        <Image
+          source={RECEM_NASCIDO}
+          style={{ width: 40, height: 40 }}
+          contentFit="contain"
+          accessible={false}
+        />
       </LinearGradient>
+      <View style={{ flex: 1, gap: 1 }}>
+        <Text numberOfLines={1} style={{ ...fonte.forte, ...escala.chamada, color: cor.texto }}>
+          {quem} nasceu?
+        </Text>
+        <Text
+          numberOfLines={2}
+          style={{ ...fonte.media, fontSize: 14, lineHeight: 19, color: cor.textoApagado }}
+        >
+          Conte aqui, e a trilha vira o 4º trimestre
+        </Text>
+      </View>
+      <ChevronRight size={18} strokeWidth={2.4} color={cor.chevron} />
     </Pressable>
   );
 }

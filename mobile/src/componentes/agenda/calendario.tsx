@@ -1,15 +1,21 @@
 import { ChevronLeft, ChevronRight } from "lucide-react-native";
 import type { ReactNode } from "react";
-import { Pressable, Text, View } from "react-native";
-import { toque } from "~/componentes/base";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { selecao } from "~/componentes/base";
 import { nomeDoMes, semanasDoMes } from "~/lib/agenda/agenda";
-import { ALVO_MINIMO, cor, espaco, fonte, raio, sombra } from "~/tema";
+import { comAlfa } from "~/lib/cor";
+import { ALVO_MINIMO, canto, cor, curva, escala, espaco, fonte, luz, sombra } from "~/tema";
 
 /**
- * O CALENDÁRIO DO MÊS — o da agenda e o de escolher a data de uma consulta.
- * Ponto embaixo do dia = há consulta; o dia de hoje tem aro; a data provável
- * do parto ganha o 👶. Tudo em JavaScript (sem seletor nativo): funciona na
+ * O CALENDÁRIO DO MÊS — o da agenda, o de escolher a data de uma consulta e o
+ * do nascimento. Ponto embaixo do dia = há consulta; o dia de hoje tem aro; a
+ * data provável do parto ganha um selo 👶 no canto (o número continua lá: ela
+ * precisa ver que dia é). Tudo em JavaScript (sem seletor nativo): funciona na
  * bancada e não pede módulo nativo novo.
+ *
+ * `tinta` é a cor do dia escolhido, do aro e dos pontos (a da agenda, por
+ * padrão; o nascimento usa a framboesa). `plano` tira o cartão, para morar
+ * dentro de um grupo.
  */
 
 const INICIAIS = ["D", "S", "T", "Q", "Q", "S", "S"];
@@ -34,6 +40,8 @@ export function CalendarioDoMes({
   contagem,
   dpp,
   bloqueado,
+  tinta = cor.agenda,
+  plano = false,
 }: {
   mes: Mes;
   aoMudarMes: (m: Mes) => void;
@@ -44,34 +52,48 @@ export function CalendarioDoMes({
   dpp?: string | null;
   /** Dias que não se pode escolher (o futuro, na data do nascimento): ficam apagados. */
   bloqueado?: (ymd: string) => boolean;
+  tinta?: string;
+  plano?: boolean;
 }) {
   const semanas = semanasDoMes(mes.ano, mes.mes);
   const titulo = `${nomeDoMes(mes.mes)[0]!.toUpperCase()}${nomeDoMes(mes.mes).slice(1)} ${mes.ano}`;
   return (
     <View
       style={[
-        { backgroundColor: cor.cartao, borderRadius: raio.lg, padding: espaco.md, gap: 6 },
-        sombra,
+        { gap: 6 },
+        plano
+          ? { paddingHorizontal: espaco.sm, paddingVertical: espaco.sm }
+          : [
+              {
+                backgroundColor: luz.cartao,
+                borderRadius: canto.cartao,
+                ...curva,
+                padding: espaco.md,
+                borderWidth: StyleSheet.hairlineWidth,
+                borderColor: comAlfa(cor.branco, 0.9),
+              },
+              sombra,
+            ],
       ]}
     >
       <View style={{ flexDirection: "row", alignItems: "center" }}>
-        <SetaDoMes rotulo="Mês anterior" aoTocar={() => aoMudarMes(somarMes(mes, -1))}>
-          <ChevronLeft size={22} color={cor.agenda} />
+        <SetaDoMes rotulo="Mês anterior" tinta={tinta} aoTocar={() => aoMudarMes(somarMes(mes, -1))}>
+          <ChevronLeft size={22} strokeWidth={2.4} color={tinta} />
         </SetaDoMes>
         <Text
           accessibilityRole="header"
           style={{
             flex: 1,
             textAlign: "center",
-            ...fonte.titulo,
-            fontSize: 17,
+            ...fonte.forte,
+            ...escala.manchete,
             color: cor.texto,
           }}
         >
           {titulo}
         </Text>
-        <SetaDoMes rotulo="Próximo mês" aoTocar={() => aoMudarMes(somarMes(mes, 1))}>
-          <ChevronRight size={22} color={cor.agenda} />
+        <SetaDoMes rotulo="Próximo mês" tinta={tinta} aoTocar={() => aoMudarMes(somarMes(mes, 1))}>
+          <ChevronRight size={22} strokeWidth={2.4} color={tinta} />
         </SetaDoMes>
       </View>
       <View style={{ flexDirection: "row" }}>
@@ -102,6 +124,7 @@ export function CalendarioDoMes({
                 consultas={contagem?.get(ymd) ?? 0}
                 ehDpp={ymd === dpp}
                 fechado={bloqueado?.(ymd) ?? false}
+                tinta={tinta}
                 aoTocar={() => aoEscolher(ymd)}
               />
             ) : (
@@ -117,10 +140,12 @@ export function CalendarioDoMes({
 function SetaDoMes({
   rotulo,
   aoTocar,
+  tinta,
   children,
 }: {
   rotulo: string;
   aoTocar: () => void;
+  tinta: string;
   children: ReactNode;
 }) {
   return (
@@ -128,7 +153,7 @@ function SetaDoMes({
       accessibilityRole="button"
       accessibilityLabel={rotulo}
       onPress={() => {
-        toque();
+        selecao();
         aoTocar();
       }}
       style={({ pressed }) => ({
@@ -137,7 +162,7 @@ function SetaDoMes({
         borderRadius: ALVO_MINIMO / 2,
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: pressed ? cor.agendaFundo : "transparent",
+        backgroundColor: pressed ? comAlfa(tinta, 0.12) : "transparent",
       })}
     >
       {children}
@@ -152,6 +177,7 @@ function Dia({
   consultas,
   ehDpp,
   fechado,
+  tinta,
   aoTocar,
 }: {
   ymd: string;
@@ -160,6 +186,7 @@ function Dia({
   consultas: number;
   ehDpp: boolean;
   fechado: boolean;
+  tinta: string;
   aoTocar: () => void;
 }) {
   const n = Number(ymd.slice(8, 10));
@@ -176,7 +203,7 @@ function Dia({
       accessibilityState={{ selected: escolhido, disabled: fechado }}
       disabled={fechado}
       onPress={() => {
-        toque();
+        selecao();
         aoTocar();
       }}
       style={{
@@ -194,26 +221,41 @@ function Dia({
           borderRadius: 19,
           alignItems: "center",
           justifyContent: "center",
-          backgroundColor: escolhido ? cor.agenda : "transparent",
+          backgroundColor: escolhido ? tinta : ehDpp ? cor.destaque : "transparent",
           borderWidth: ehHoje && !escolhido ? 2 : 0,
-          borderColor: cor.agenda,
+          borderColor: tinta,
         }}
       >
-        {ehDpp && !escolhido ? (
-          <Text style={{ fontSize: 18 }}>👶</Text>
-        ) : (
-          <Text
-            style={{
-              ...(ehHoje || escolhido ? fonte.titulo : fonte.media),
-              fontSize: 16,
-              color: escolhido ? cor.branco : cor.texto,
-              fontVariant: ["tabular-nums"],
-            }}
-          >
-            {n}
-          </Text>
-        )}
+        <Text
+          style={{
+            ...(ehHoje || escolhido || ehDpp ? fonte.titulo : fonte.normal),
+            fontSize: 17,
+            color: escolhido ? cor.branco : ehDpp ? cor.textoDestaque : cor.texto,
+            fontVariant: ["tabular-nums"],
+          }}
+        >
+          {n}
+        </Text>
       </View>
+      {ehDpp ? (
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            top: -1,
+            right: 0,
+            width: 20,
+            height: 20,
+            borderRadius: 10,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: cor.branco,
+            ...sombra,
+          }}
+        >
+          <Text style={{ fontSize: 12, lineHeight: 15 }}>👶</Text>
+        </View>
+      ) : null}
       <View
         style={{
           position: "absolute",
@@ -225,7 +267,12 @@ function Dia({
         {Array.from({ length: Math.min(consultas, 3) }, (_, k) => (
           <View
             key={k}
-            style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: cor.agenda }}
+            style={{
+              width: 5,
+              height: 5,
+              borderRadius: 3,
+              backgroundColor: tinta,
+            }}
           />
         ))}
       </View>

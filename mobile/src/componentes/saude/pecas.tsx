@@ -1,8 +1,8 @@
 import { Image } from "expo-image";
 import { Pressable, Text, View } from "react-native";
-import { Botao, Linha, T, toque } from "~/componentes/base";
+import { Botao, Linha, selecao, T } from "~/componentes/base";
 import { BotaoVoltar, PilulaSos } from "~/componentes/cabecalho";
-import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
+import { ALVO_MINIMO, canto, cor, curva, escala, espaco, fonte, raio } from "~/tema";
 
 /** As peças 3D do site (mesmas artes, um lugar só). */
 export const ARTES = {
@@ -13,9 +13,9 @@ export const ARTES = {
 } as const;
 
 /**
- * O topo das telas da Saúde (os Movimentos do bebê, o cronômetro de
- * contrações): voltar, a peça da família e o título. A aba Saúde saiu da barra
- * na fase 3; sem pilha para voltar, os Movimentos caem no Bebê, onde moram.
+ * O topo do cronômetro de contrações: voltar, a peça da família e o título.
+ * Os Movimentos do bebê já usam o topo único das telas empilhadas
+ * (`TelaDaPilha`), com a arte dos pés dentro do círculo.
  */
 export function Cabecalho({
   titulo,
@@ -37,7 +37,8 @@ export function Cabecalho({
           style={{
             width: 52,
             height: 52,
-            borderRadius: raio.md,
+            borderRadius: canto.campo,
+            ...curva,
             backgroundColor: fundo ?? cor.apagado,
             alignItems: "center",
             justifyContent: "center",
@@ -46,7 +47,7 @@ export function Cabecalho({
           <Image source={ARTES[arte]} style={{ width: 44, height: 44 }} contentFit="contain" />
         </View>
       ) : null}
-      <T tipo="titulo" estilo={{ flex: 1, fontSize: 24 }} linhas={2}>
+      <T tipo="titulo" estilo={{ flex: 1, ...escala.titulo2 }} linhas={2}>
         {titulo}
       </T>
       <PilulaSos />
@@ -54,7 +55,7 @@ export function Cabecalho({
   );
 }
 
-/** Escolha de uma entre poucas opções (pílulas de 44 pt). */
+/** Escolha de uma entre poucas opções (fichas preenchidas de 44 pt, a escolhida na cor pedida). */
 export function Escolha<V extends string | number>({
   opcoes,
   valor,
@@ -83,7 +84,7 @@ export function Escolha<V extends string | number>({
             accessibilityState={{ selected: ativo }}
             accessibilityLabel={o.rotulo}
             onPress={() => {
-              toque();
+              selecao();
               aoEscolher(o.valor);
             }}
             style={({ pressed }) => ({
@@ -91,18 +92,17 @@ export function Escolha<V extends string | number>({
               minHeight: ALVO_MINIMO,
               paddingHorizontal: espaco.md,
               borderRadius: raio.pilula,
+              ...curva,
               alignItems: "center",
               justifyContent: "center",
-              backgroundColor: ativo ? corAtiva : cor.cartao,
-              borderWidth: 1.5,
-              borderColor: ativo ? corAtiva : cor.borda,
+              backgroundColor: ativo ? corAtiva : cor.apagado,
               opacity: pressed ? 0.8 : 1,
             })}
           >
             <Text
               style={{
                 ...(ativo ? fonte.forte : fonte.media),
-                fontSize: 15,
+                ...escala.legenda,
                 color: ativo ? cor.branco : cor.texto,
               }}
             >
@@ -135,9 +135,10 @@ export function Confirmacao({
     <View
       style={{
         backgroundColor: cor.urgenteFundo,
-        borderRadius: raio.md,
-        padding: espaco.md,
-        gap: espaco.sm,
+        borderRadius: canto.cartao,
+        ...curva,
+        padding: espaco.lg,
+        gap: espaco.md,
       }}
     >
       <T tipo="rotulo">{pergunta}</T>
@@ -147,8 +148,20 @@ export function Confirmacao({
         </T>
       ) : null}
       <Linha estilo={{ flexWrap: "wrap" }}>
-        <Botao rotulo={rotuloSim} tipo="perigo" aoTocar={aoConfirmar} carregando={carregando} />
-        <Botao rotulo="Cancelar" tipo="secundario" aoTocar={aoCancelar} desabilitado={carregando} />
+        <Botao
+          rotulo={rotuloSim}
+          tipo="perigo"
+          tamanho="compacto"
+          aoTocar={aoConfirmar}
+          carregando={carregando}
+        />
+        <Botao
+          rotulo="Cancelar"
+          tipo="secundario"
+          tamanho="compacto"
+          aoTocar={aoCancelar}
+          desabilitado={carregando}
+        />
       </Linha>
     </View>
   );

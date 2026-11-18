@@ -1,7 +1,18 @@
+import Constants from "expo-constants";
 import { router, useFocusEffect } from "expo-router";
-import { Ban, Bell, ChevronRight, HeartPulse } from "lucide-react-native";
-import { useCallback, useState, type ComponentType } from "react";
-import { Alert, Platform, Pressable, Switch, Text, View } from "react-native";
+import {
+  Ban,
+  Bell,
+  Download,
+  FileText,
+  Feather,
+  HeartPulse,
+  Lock,
+  Mail,
+} from "lucide-react-native";
+import { useCallback, useEffect, useState } from "react";
+import { Alert, Platform, Text, View } from "react-native";
+import { LinhaDeAjuste, SecaoDeAjustes } from "~/componentes/ajustes";
 import { AvisoMedico } from "~/componentes/aviso-medico";
 import {
   Botao,
@@ -11,12 +22,13 @@ import {
   NaoConsegueLer,
   Pilula,
   T,
-  Tela,
-  toque,
+  Tocavel,
 } from "~/componentes/base";
-import { CabecalhoDaPilha } from "~/componentes/cabecalho";
+import { TelaDaPilha } from "~/componentes/cabecalho";
+import { useAviso } from "~/componentes/comunidade/folha";
 import { Avatar } from "~/componentes/comunidade/imagem";
 import { rota } from "~/componentes/jornada/bancada";
+import { usePreferenciaDosLembretes } from "~/componentes/jornada/lembretes";
 import { COMUNIDADE_NO_APP, CONTATO_EMAIL, IA_NO_APP, SOS_NO_APP } from "~/config";
 import { limparRastrosLocais } from "~/lib/armazem";
 import { ehBancada } from "~/lib/bancada";
@@ -36,37 +48,41 @@ import {
 } from "~/servidor/conta";
 import type { PerfilNaTela } from "~/servidor/rede";
 import { supabase } from "~/servidor/supabase";
-import { cor, espaco, fonte } from "~/tema";
+import { cor, escala, espaco, fonte, sombra } from "~/tema";
 
 /**
  * O PERFIL — um só (fase 3, a rede social no centro).
  *
- * No topo, ela como a rede a vê: a foto, o nome, o @, a bio, quem segue e é
- * seguida, e se o perfil é aberto ou fechado — com "Editar perfil" e "Ver como
- * os outros veem" (o espelho do servidor). Embaixo, a conta: os dados do bebê e
- * do SOS, o Modo Cuidado, os lembretes, as bloqueadas, os documentos, a cópia
- * dos dados (LGPD, art. 18), sair e excluir a conta (exigência da Apple:
- * excluir DENTRO do app).
+ * 18/11/2026 (a vistoria: "a tela mais 'formulário genérico' do grupo"): a
+ * lista agrupada dos Ajustes do iPhone. No alto, ela (a foto, o nome e
+ * "Editar perfil"); embaixo, três grupos: a conta (Seus dados, Lembretes,
+ * Modo Cuidado), a ajuda e os documentos, e as duas ações de sair, em
+ * vermelho. O aviso médico e a versão do app ficam no pé, como nota.
  *
- * Antes eram dois "meu perfil" — este, com os dados, e o "Meu perfil" da
- * Comunidade, com a foto e a bio — e o mesmo nome se gravava pelos dois, com
- * regras diferentes. O `/comunidade/eu` antigo agora cai aqui.
+ * O Modo Cuidado não explica mais, na vista de todo dia, que é "para quando a
+ * gestação não seguiu": a explicação vem no aviso, na hora de ligar.
+ * Excluir a conta DENTRO do app é exigência da Apple; a cópia dos dados é a
+ * LGPD (art. 18).
  *
- * Bancada: /perfil?bancada=1 [&luto=1]
+ * Bancada: /perfil?bancada=1 [&luto=1] [&lembrete-jornada=20:00]
  */
 export default function Perfil() {
   const { sessao, perfil, recarregarPerfil, cuidado: cuidadoDaSessao } = useSessao();
   const uid = sessao?.user.id ?? null;
   const [social, setSocial] = useState<PerfilNaTela | null>(null);
   const [leitura, setLeitura] = useState<"carregando" | "pronto" | "falhou">("carregando");
-  const [recado, setRecado] = useState<{ texto: string; erro: boolean } | null>(null);
   const [cuidado, setCuidado] = useState(perfil?.care_mode === true);
+  /* O perfil pode chegar depois da tela: a linha mostra o que está gravado. */
+  useEffect(() => {
+    setCuidado(perfil?.care_mode === true);
+  }, [perfil?.care_mode]);
   const [trocandoCuidado, setTrocandoCuidado] = useState(false);
   const [excluindo, setExcluindo] = useState<"fechado" | "aberto" | "enviando">("fechado");
   const [palavra, setPalavra] = useState("");
   const [erroExcluir, setErroExcluir] = useState<string | null>(null);
-  const [copia, setCopia] = useState<{ texto: string; erro: boolean } | null>(null);
   const [baixando, setBaixando] = useState(false);
+  const [pref] = usePreferenciaDosLembretes(uid);
+  const aviso = useAviso();
 
   /* Relê ao voltar de "Editar perfil": o topo mostra o que ficou gravado. */
   const carregar = useCallback(async () => {
@@ -95,25 +111,32 @@ export default function Perfil() {
         setCuidado(r.careMode);
         await recarregarPerfil();
       } else {
-        setRecado({
-          texto: "Não conseguimos mudar o Modo Cuidado agora. Tente de novo.",
-          erro: true,
-        });
+        aviso.mostrar("Não conseguimos mudar o Modo Cuidado agora. Tente de novo.", true);
       }
     } catch {
-      setRecado({ texto: "Sem conexão. O Modo Cuidado não foi alterado.", erro: true });
+      aviso.mostrar("Sem conexão. O Modo Cuidado ficou como estava.", true);
     } finally {
       setTrocandoCuidado(false);
     }
   }
 
+  /** Ligar ou desligar passa sempre por uma pergunta: a troca muda o app inteiro. */
   function pedirCuidado(on: boolean) {
-    if (!on) return void trocarCuidado(false);
-    const msg = `O app para de mostrar o bebê, a semana e as contagens. ${SOS_NO_APP ? "O SOS e o acolhimento continuam." : "O acolhimento continua."} Você pode desligar quando quiser.`;
-    if (Platform.OS === "web") return void trocarCuidado(true);
-    Alert.alert("Ligar o Modo Cuidado?", msg, [
+    if (Platform.OS === "web") return void trocarCuidado(on);
+    if (on) {
+      Alert.alert(
+        "Ligar o Modo Cuidado?",
+        `O app para de mostrar o bebê, a semana e as contagens. ${SOS_NO_APP ? "O SOS e o acolhimento continuam." : "O acolhimento continua."} Você pode desligar quando quiser.`,
+        [
+          { text: "Agora não", style: "cancel" },
+          { text: "Ligar", onPress: () => void trocarCuidado(true) },
+        ],
+      );
+      return;
+    }
+    Alert.alert("Desligar o Modo Cuidado?", "O app volta a mostrar o bebê, a semana e as contagens.", [
       { text: "Agora não", style: "cancel" },
-      { text: "Ligar", onPress: () => void trocarCuidado(true) },
+      { text: "Desligar", onPress: () => void trocarCuidado(false) },
     ]);
   }
 
@@ -129,9 +152,8 @@ export default function Perfil() {
   /* A cópia dos dados: o servidor monta o arquivo; o app o entrega à folha de
      compartilhar do iPhone e o apaga do aparelho em seguida. */
   async function baixarCopia() {
-    setCopia(null);
     if (ehBancada() || Platform.OS === "web") {
-      return setCopia({ texto: "Na bancada nenhum arquivo é gerado.", erro: false });
+      return aviso.mostrar("Na bancada nenhum arquivo é gerado.");
     }
     setBaixando(true);
     try {
@@ -139,20 +161,18 @@ export default function Perfil() {
       try {
         r = await exportarMeusDados();
       } catch {
-        return setCopia({ texto: "Sem conexão. Tente de novo com internet.", erro: true });
+        return aviso.mostrar("Sem conexão. Tente de novo com internet.", true);
       }
       if (r.ok) {
         try {
           const fim = await compartilharCopia(JSON.stringify(r.arquivo, null, 2));
           if (fim === "fechou" && !recadoDaCopia(r).erro) return;
         } catch {
-          return setCopia({
-            texto: "Não conseguimos abrir o arquivo no aparelho. Tente de novo.",
-            erro: true,
-          });
+          return aviso.mostrar("Não conseguimos abrir o arquivo no aparelho. Tente de novo.", true);
         }
       }
-      setCopia(recadoDaCopia(r));
+      const recado = recadoDaCopia(r);
+      aviso.mostrar(recado.texto, recado.erro);
     } finally {
       setBaixando(false);
     }
@@ -175,217 +195,215 @@ export default function Perfil() {
         r.motivo === "sessao"
           ? "Sua sessão expirou. Entre de novo e repita."
           : r.motivo === "medico"
-            ? "Esta é uma conta de médico — a exclusão passa pelo suporte."
-            : "Não conseguimos excluir agora. Nada foi apagado; tente de novo.",
+            ? "Esta é uma conta de médico. A exclusão passa pelo suporte."
+            : "Não conseguimos excluir agora. Nada foi apagado. Tente de novo.",
       );
     } catch {
-      setErroExcluir("Sem conexão. Nada foi apagado; tente de novo com internet.");
+      setErroExcluir("Sem conexão. Nada foi apagado. Tente de novo com internet.");
     }
     setExcluindo("aberto");
   }
 
   const nome = social?.nome ?? perfil?.display_name ?? perfil?.full_name ?? "Você";
+  const editar = () => router.push(rota("/perfil/editar") as never);
+  const valorDosLembretes = pref
+    ? (pref.hora ?? (pref.semanaNova && !cuidadoDaSessao ? "Semana nova" : "Desligados"))
+    : null;
+  const versao = Constants.expoConfig?.version;
+  const build = Constants.expoConfig?.ios?.buildNumber;
 
   return (
-    <Tela bordas={["top", "bottom"]}>
-      <CabecalhoDaPilha titulo="Perfil" voltarPara="/jornada" />
-
-      {/* ── Ela, como a rede a vê ── */}
-      <Cartao estilo={{ gap: espaco.md }}>
-        <Linha estilo={{ gap: espaco.lg, alignItems: "center" }}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Editar a foto e o perfil"
-            onPress={() => {
-              toque();
-              router.push(rota("/perfil/editar") as never);
-            }}
-          >
-            <Avatar id={uid ?? "eu"} nome={nome} url={social?.avatarUrl ?? null} tamanho={76} />
-          </Pressable>
-          <View style={{ flex: 1, gap: 2 }}>
-            <T tipo="subtitulo" linhas={2}>
-              {nome}
-            </T>
-            {social?.handle && COMUNIDADE_NO_APP ? <T tipo="apagado">@{social.handle}</T> : null}
-            {social && !cuidadoDaSessao && COMUNIDADE_NO_APP ? (
-              <Linha estilo={{ gap: espaco.lg, marginTop: 2 }}>
-                <Contagem valor={social.seguidores} rotulo="seguidores" />
-                <Contagem valor={social.seguindo} rotulo="seguindo" />
-              </Linha>
-            ) : null}
+    <TelaDaPilha titulo="Perfil" grande voltarPara="/jornada" sobre={aviso.elemento}>
+      {/* ── Ela ── */}
+      <View style={{ alignItems: "center", gap: espaco.sm }}>
+        <Tocavel rotulo="Editar a foto e o perfil" aoTocar={editar} profundidade={0.95}>
+          <View style={[{ padding: 3, borderRadius: 50, backgroundColor: cor.branco }, sombra]}>
+            <Avatar id={uid ?? "eu"} nome={nome} url={social?.avatarUrl ?? null} tamanho={88} />
           </View>
-        </Linha>
-        {social?.bio && COMUNIDADE_NO_APP ? <T>{social.bio}</T> : null}
+        </Tocavel>
+        <Text
+          numberOfLines={2}
+          style={{
+            ...fonte.display,
+            ...escala.titulo1,
+            letterSpacing: -0.2,
+            color: cor.texto,
+            textAlign: "center",
+            marginTop: espaco.xs,
+          }}
+        >
+          {nome}
+        </Text>
+        {social?.handle && COMUNIDADE_NO_APP ? <T tipo="apagado">@{social.handle}</T> : null}
+        {social && !cuidadoDaSessao && COMUNIDADE_NO_APP ? (
+          <Linha estilo={{ gap: espaco.lg }}>
+            <Contagem valor={social.seguidores} rotulo="seguidores" />
+            <Contagem valor={social.seguindo} rotulo="seguindo" />
+          </Linha>
+        ) : null}
+        {social?.bio && COMUNIDADE_NO_APP ? <T centro>{social.bio}</T> : null}
         {social && !cuidadoDaSessao && COMUNIDADE_NO_APP ? (
           <Pilula
-            texto={social.publico ? "🌐 Perfil público" : "🔒 Perfil fechado"}
+            texto={social.publico ? "Perfil público" : "Perfil fechado"}
             fundo={cor.apagado}
             corTexto={cor.texto}
           />
         ) : null}
-        {leitura === "falhou" ? (
-          <NaoConsegueLer
-            sossego="O seu perfil continua guardado."
-            aoTentar={() => {
-              setLeitura("carregando");
-              void carregar();
-            }}
-          />
-        ) : null}
-        <Linha estilo={{ gap: espaco.sm }}>
-          <Botao
-            rotulo="Editar perfil"
-            tipo="secundario"
-            estilo={{ flex: 1 }}
-            aoTocar={() => router.push(rota("/perfil/editar") as never)}
-          />
+        <Linha estilo={{ gap: espaco.sm, marginTop: espaco.xs }}>
+          <Botao rotulo="Editar perfil" tipo="suave" tamanho="compacto" aoTocar={editar} />
           {/* O espelho: no Modo Cuidado ninguém a vê na rede, então não há o que mostrar. */}
           {uid && !cuidadoDaSessao && COMUNIDADE_NO_APP ? (
             <Botao
               rotulo="Ver como os outros veem"
-              tipo="secundario"
-              estilo={{ flex: 1 }}
+              tipo="suave"
+              tamanho="compacto"
               aoTocar={() => router.push(rota(`/comunidade/perfil/${uid}?como=estranha`) as never)}
             />
           ) : null}
         </Linha>
-      </Cartao>
-
-      {/* ── A conta ── */}
-      <LinhaDoPerfil
-        Icone={HeartPulse}
-        titulo={SOS_NO_APP ? "Seus dados e o SOS" : "Seus dados"}
-        texto={
-          SOS_NO_APP
-            ? cuidadoDaSessao
-              ? "O contato de emergência, a sua ficha e quem acompanha você."
-              : "O bebê, o contato de emergência, a sua ficha e quem acompanha a sua gestação."
-            : cuidadoDaSessao
-              ? "Quem acompanha você."
-              : "O bebê, a data da gestação e quem acompanha a sua gestação."
-        }
-        aoTocar={() => router.push(rota("/perfil/dados") as never)}
-      />
-
-      <Cartao>
-        <Linha estilo={{ justifyContent: "space-between" }}>
-          <View style={{ flex: 1, gap: 2 }}>
-            <T tipo="rotulo">Modo Cuidado</T>
-            <T tipo="apagado" estilo={{ fontSize: 14 }}>
-              Para quando a gestação não seguiu. O app para de falar do bebê
-              {SOS_NO_APP ? "; o SOS continua." : "."}
-            </T>
-          </View>
-          <Switch
-            accessibilityLabel="Modo Cuidado"
-            value={cuidado}
-            disabled={trocandoCuidado}
-            onValueChange={pedirCuidado}
-            trackColor={{ true: cor.primaria, false: cor.borda }}
-          />
-        </Linha>
-      </Cartao>
-      {recado ? (
-        <T tipo="corpo" cor={recado.erro ? cor.urgente : cor.ok}>
-          {recado.texto}
-        </T>
-      ) : null}
-
-      <LinhaDoPerfil
-        Icone={Bell}
-        titulo="Lembretes"
-        texto="O cuidado de hoje, a semana nova, a meditação e as consultas."
-        aoTocar={() => router.push(rota("/lembretes") as never)}
-      />
-      {COMUNIDADE_NO_APP ? (
-        <LinhaDoPerfil
-          Icone={Ban}
-          titulo="Pessoas bloqueadas"
-          texto="Quem você bloqueou na Comunidade."
-          aoTocar={() => router.push(rota("/comunidade/bloqueados") as never)}
+      </View>
+      {leitura === "falhou" ? (
+        <NaoConsegueLer
+          sossego="O seu perfil continua guardado."
+          aoTentar={() => {
+            setLeitura("carregando");
+            void carregar();
+          }}
         />
       ) : null}
+
+      {/* ── A conta ── */}
+      <SecaoDeAjustes>
+        <LinhaDeAjuste
+          Icone={HeartPulse}
+          tinta={cor.primaria}
+          titulo={SOS_NO_APP ? "Seus dados e o SOS" : "Seus dados"}
+          aoTocar={() => router.push(rota("/perfil/dados") as never)}
+        />
+        <LinhaDeAjuste
+          Icone={Bell}
+          tinta={cor.atencao}
+          titulo="Lembretes"
+          valor={valorDosLembretes}
+          aoTocar={() => router.push(rota("/lembretes") as never)}
+        />
+        <LinhaDeAjuste
+          Icone={Feather}
+          tinta={cor.textoApagado}
+          titulo="Modo Cuidado"
+          valor={cuidado ? "Ligado" : "Desligado"}
+          carregando={trocandoCuidado}
+          rotulo={`Modo Cuidado, ${cuidado ? "ligado" : "desligado"}`}
+          dica={cuidado ? "Toque para desligar" : "Toque para ligar"}
+          aoTocar={() => pedirCuidado(!cuidado)}
+        />
+        {COMUNIDADE_NO_APP ? (
+          <LinhaDeAjuste
+            Icone={Ban}
+            tinta={cor.urgente}
+            titulo="Pessoas bloqueadas"
+            aoTocar={() => router.push(rota("/comunidade/bloqueados") as never)}
+          />
+        ) : null}
+      </SecaoDeAjustes>
 
       {IA_NO_APP ? <CartaoDaPermissaoDeIA /> : null}
 
-      <AvisoMedico />
-
-      {/* O contato publicado (Apple 1.2: app com conteúdo de usuárias precisa
-          de um jeito fácil de falar com quem cuida dele). */}
-      <Cartao>
-        <T tipo="rotulo">Fale com a gente</T>
-        <T tipo="apagado">
-          Dúvidas sobre o app, a sua conta{COMUNIDADE_NO_APP ? " ou a Comunidade" : " ou o jogo"}:{" "}
-          {CONTATO_EMAIL}. Assuntos de saúde são com o seu médico — em emergência, ligue 192.
-        </T>
-        <Botao
-          rotulo="Escrever um e-mail"
-          tipo="texto"
+      {/* O contato publicado (Apple 1.2: um jeito fácil de falar com quem cuida
+          do app) e os documentos do APP (fase 4), em telas próprias. */}
+      <SecaoDeAjustes
+        titulo="Ajuda e documentos"
+        rodape={`Dúvidas sobre o app ou a sua conta: ${CONTATO_EMAIL}`}
+      >
+        <LinhaDeAjuste
+          Icone={Mail}
+          tinta={cor.chutes}
+          titulo="Fale com a gente"
           aoTocar={() => abrir(`mailto:${CONTATO_EMAIL}`)}
         />
-      </Cartao>
-
-      <Cartao>
-        {/* Os documentos do APP (fase 4), em telas próprias — não as páginas do site. */}
-        <Botao
-          rotulo="Termos de uso"
-          tipo="texto"
+        <LinhaDeAjuste
+          Icone={FileText}
+          tinta={cor.agenda}
+          titulo="Termos de uso"
           aoTocar={() => router.push(rota("/termos") as never)}
         />
-        <Botao
-          rotulo="Política de privacidade"
-          tipo="texto"
+        <LinhaDeAjuste
+          Icone={Lock}
+          tinta={cor.saude}
+          titulo="Política de privacidade"
           aoTocar={() => router.push(rota("/privacidade") as never)}
         />
-        <Botao
-          rotulo="Baixar uma cópia dos meus dados"
-          tipo="texto"
+        <LinhaDeAjuste
+          Icone={Download}
+          tinta={cor.jogo}
+          titulo="Baixar uma cópia dos meus dados"
           carregando={baixando}
+          seta={false}
           aoTocar={() => void baixarCopia()}
         />
-        {copia ? (
-          <T tipo="apagado" cor={copia.erro ? cor.urgente : cor.ok} estilo={{ fontSize: 14 }}>
-            {copia.texto}
-          </T>
-        ) : null}
-        <Botao rotulo="Sair da conta" tipo="secundario" aoTocar={() => void esquecerAConta()} />
-      </Cartao>
+      </SecaoDeAjustes>
 
-      <Cartao>
-        {excluindo === "fechado" ? (
-          <Botao rotulo="Excluir minha conta" tipo="texto" aoTocar={() => setExcluindo("aberto")} />
-        ) : (
-          <>
-            <T tipo="subtitulo" cor={cor.urgente}>
-              Excluir a conta
+      <SecaoDeAjustes>
+        <LinhaDeAjuste titulo="Sair da conta" perigo centro aoTocar={() => void esquecerAConta()} />
+      </SecaoDeAjustes>
+
+      {excluindo === "fechado" ? (
+        <SecaoDeAjustes>
+          <LinhaDeAjuste
+            titulo="Excluir minha conta"
+            perigo
+            centro
+            aoTocar={() => setExcluindo("aberto")}
+          />
+        </SecaoDeAjustes>
+      ) : (
+        <Cartao estilo={{ gap: espaco.md }}>
+          <T tipo="subtitulo" cor={cor.urgente}>
+            Excluir a conta
+          </T>
+          <T tipo="corpo" cor={cor.textoCorpo}>
+            Apaga para sempre o seu perfil, a jornada, os registros de saúde, as publicações e as
+            conversas. Não dá para desfazer.
+          </T>
+          <Campo
+            rotulo={`Digite ${PALAVRA_DE_CONFIRMACAO} para confirmar`}
+            value={palavra}
+            onChangeText={setPalavra}
+            autoCapitalize="characters"
+          />
+          {erroExcluir ? (
+            <T tipo="apagado" cor={cor.urgente}>
+              {erroExcluir}
             </T>
-            <T tipo="corpo">
-              Apaga para sempre o seu perfil, a jornada, os registros de saúde, as publicações e as
-              conversas. Não dá para desfazer.
-            </T>
-            <Campo
-              rotulo={`Digite ${PALAVRA_DE_CONFIRMACAO} para confirmar`}
-              value={palavra}
-              onChangeText={setPalavra}
-              autoCapitalize="characters"
-            />
-            {erroExcluir ? (
-              <T tipo="corpo" cor={cor.urgente}>
-                {erroExcluir}
-              </T>
-            ) : null}
-            <Botao
-              rotulo="Excluir para sempre"
-              tipo="perigo"
-              carregando={excluindo === "enviando"}
-              aoTocar={() => void excluir()}
-            />
-            <Botao rotulo="Cancelar" tipo="texto" aoTocar={() => setExcluindo("fechado")} />
-          </>
-        )}
-      </Cartao>
-    </Tela>
+          ) : null}
+          <Botao
+            rotulo="Excluir para sempre"
+            tipo="perigo"
+            carregando={excluindo === "enviando"}
+            aoTocar={() => void excluir()}
+          />
+          <Botao rotulo="Cancelar" tipo="texto" aoTocar={() => setExcluindo("fechado")} />
+        </Cartao>
+      )}
+
+      {/* ── O pé ── */}
+      <View style={{ gap: espaco.md, marginTop: espaco.sm }}>
+        <AvisoMedico />
+        {versao ? (
+          <Text
+            style={{
+              ...fonte.normal,
+              ...escala.nota,
+              color: cor.textoApagado,
+              textAlign: "center",
+            }}
+          >
+            Mãe Esperta · versão {versao}
+            {build ? ` (${build})` : ""}
+          </Text>
+        ) : null}
+      </View>
+    </TelaDaPilha>
   );
 }
 
@@ -395,33 +413,5 @@ function Contagem({ valor, rotulo }: { valor: number | null; rotulo: string }) {
     <T tipo="apagado">
       <Text style={{ ...fonte.forte, color: cor.texto }}>{valor}</Text> {rotulo}
     </T>
-  );
-}
-
-/** Uma linha da conta: ícone, título, o que tem lá e a seta. */
-function LinhaDoPerfil({
-  Icone,
-  titulo,
-  texto,
-  aoTocar,
-}: {
-  Icone: ComponentType<{ size?: number; color?: string }>;
-  titulo: string;
-  texto: string;
-  aoTocar: () => void;
-}) {
-  return (
-    <Cartao aoTocar={aoTocar} rotuloAcessivel={titulo}>
-      <Linha estilo={{ gap: espaco.md }}>
-        <Icone size={22} color={cor.primariaEscura} />
-        <View style={{ flex: 1, gap: 2 }}>
-          <T tipo="rotulo">{titulo}</T>
-          <T tipo="apagado" estilo={{ fontSize: 14 }}>
-            {texto}
-          </T>
-        </View>
-        <ChevronRight size={20} color={cor.textoApagado} />
-      </Linha>
-    </Cartao>
   );
 }

@@ -1,28 +1,25 @@
 import { HANDLE_MAX, normalizarHandle, recusaDoHandle } from "@/lib/mencoes";
 import { LIMITE_DA_BIO, PERFIL_PUBLICO_PADRAO } from "@/lib/rede-social";
-import { Camera, Trash2 } from "lucide-react-native";
+import { Camera, Image as ImageIcon, Trash2 } from "lucide-react-native";
 import { useCallback, useEffect, useState } from "react";
+import { Switch, Text, TextInput, View } from "react-native";
 import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  Switch,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+  CampoLivre,
+  LinhaDeCampo,
+  RECUO_SEM_ICONE,
+  SecaoDeAjustes,
+} from "~/componentes/ajustes";
 import {
   Botao,
-  Campo,
   Cartao,
   Carregando,
   Linha,
   NaoConsegueLer,
+  sucesso,
   T,
-  Tela,
-  toque,
+  Tocavel,
 } from "~/componentes/base";
-import { CabecalhoDaPilha } from "~/componentes/cabecalho";
+import { AcaoDoTopo, TelaDaPilha, voltarOu } from "~/componentes/cabecalho";
 import { FolhaDeOpcoes, useAviso } from "~/componentes/comunidade/folha";
 import { Avatar } from "~/componentes/comunidade/imagem";
 import { api } from "~/lib/comunidade/api";
@@ -31,12 +28,18 @@ import { guardarMeuPerfilSocial } from "~/lib/comunidade/meu-perfil";
 import { ehOfensivo, mensagemDoErro, recadoDaOfensa } from "~/lib/comunidade/regras";
 import { useSessao } from "~/lib/sessao";
 import type { PerfilNaTela } from "~/servidor/rede";
-import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
+import { ALVO_MINIMO, canto, cor, escala, espaco, fonte, sombra } from "~/tema";
 import { COMUNIDADE_NO_APP } from "~/config";
 
 /**
  * EDITAR PERFIL — o que a rede vê dela: a foto, o nome, a bio, o @, se o
  * perfil é aberto ou fechado, e o que aparece nele (a semana e o nome do bebê).
+ *
+ * 18/11/2026 (a vistoria): uma FOLHA, como a de editar um contato no iPhone:
+ * "Cancelar" e "Salvar" no alto (o Salvar só acende quando algo muda e fecha a
+ * folha), a foto com o selo da câmera (uma porta só) e o nome num campo em
+ * linha. A casca a apresenta como folha (`formSheet`); empilhada, funciona
+ * igual.
  *
  * Era o "Meu perfil" da Comunidade (`/comunidade/eu`). Na fase 3 o Perfil virou
  * um só, e o NOME dela se grava só aqui, pelas regras da Comunidade
@@ -133,18 +136,21 @@ export default function EditarPerfil() {
       else aviso.mostrar(m, true);
       return;
     }
-    toque(false);
-    aviso.mostrar(
-      r.parcial
-        ? "Salvo em parte. Uma das mudanças não pegou — tente de novo mais tarde."
-        : "Perfil salvo.",
-    );
+    sucesso();
     setPerfil({ ...perfil, nome: nome.trim(), bio: bio.trim() || null, avatarUrl: fotoNaTela });
     setAvatar(undefined);
     /* O nome é o `display_name` do perfil: a saudação do Hoje e do Bebê o lê
        da sessão; a foto do topo das abas, da memória do perfil social. */
     if (uid) guardarMeuPerfilSocial(uid, { nome: nome.trim(), avatarUrl: fotoNaTela });
     void recarregarPerfil();
+    /* Salvar fecha a folha, como nos apps da Apple: o Perfil relê ao voltar.
+       Fica aberta se algo não pegou, ou se há mais a mexer (a Comunidade). */
+    if (r.parcial) {
+      aviso.mostrar("Salvo em parte. Uma das mudanças não pegou. Tente de novo mais tarde.", true);
+      return;
+    }
+    if (COMUNIDADE_NO_APP) aviso.mostrar("Perfil salvo.");
+    else voltarOu("/perfil");
   };
 
   /** Uma chave que grava na hora: volta atrás se o servidor não aceitou. */
@@ -204,242 +210,250 @@ export default function EditarPerfil() {
   const handleMudou =
     !!perfil && normalizarHandle(handle.replace(/^@/, "")) !== (perfil.handle ?? "");
 
+  const fechar = () => voltarOu("/perfil");
+
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    <TelaDaPilha
+      titulo="Editar perfil"
+      voltarPara="/perfil"
+      sobre={aviso.elemento}
+      esquerda={<AcaoDoTopo rotulo="Cancelar" aoTocar={fechar} />}
+      direita={
+        <AcaoDoTopo
+          rotulo="Salvar"
+          principal
+          aoTocar={() => void salvar()}
+          carregando={salvando}
+          desabilitado={!mudou}
+        />
+      }
     >
-      <Tela bordas={["top", "bottom"]}>
-        <CabecalhoDaPilha titulo="Editar perfil" voltarPara="/perfil" />
-        {estado === "carregando" ? <Carregando /> : null}
-        {estado === "falhou" ? (
-          <NaoConsegueLer
-            sossego="Seu perfil e o que você publicou continuam guardados."
-            aoTentar={() => void carregar()}
-          />
-        ) : null}
-        {estado === "pronto" && perfil ? (
-          <>
-            {/* A foto, o nome e a bio: um Salvar para os três. Sem a Comunidade
-                (`COMUNIDADE_NO_APP`), ficam só a foto e o nome, que as Amigas mostram. */}
-            <Cartao estilo={{ gap: espaco.md }}>
-              <View style={{ alignItems: "center", gap: espaco.sm }}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Trocar a foto de perfil"
-                  onPress={() => setMenuFoto(true)}
-                >
-                  <Avatar id={perfil.id} nome={nome || perfil.nome} url={fotoNaTela} tamanho={96} />
-                  <View
-                    style={{
-                      position: "absolute",
-                      right: -2,
-                      bottom: -2,
-                      width: 32,
-                      height: 32,
-                      borderRadius: 16,
-                      backgroundColor: cor.primaria,
-                      alignItems: "center",
-                      justifyContent: "center",
-                      borderWidth: 2,
-                      borderColor: cor.cartao,
-                    }}
-                  >
-                    <Camera size={16} color={cor.branco} />
-                  </View>
-                </Pressable>
-                <Botao rotulo="Trocar a foto" tipo="texto" aoTocar={() => setMenuFoto(true)} />
+      {estado === "carregando" ? <Carregando /> : null}
+      {estado === "falhou" ? (
+        <NaoConsegueLer
+          sossego="Seu perfil e o que você publicou continuam guardados."
+          aoTentar={() => void carregar()}
+        />
+      ) : null}
+      {estado === "pronto" && perfil ? (
+        <>
+          {/* A foto: o selo da câmera é a porta (uma só). */}
+          <View style={{ alignItems: "center", paddingTop: espaco.sm }}>
+            <Tocavel
+              rotulo="Trocar a foto de perfil"
+              aoTocar={() => setMenuFoto(true)}
+              profundidade={0.95}
+            >
+              <View style={[{ padding: 3, borderRadius: 51, backgroundColor: cor.branco }, sombra]}>
+                <Avatar id={perfil.id} nome={nome || perfil.nome} url={fotoNaTela} tamanho={96} />
               </View>
-              <Campo
-                rotulo="Seu nome"
-                value={nome}
-                onChangeText={setNome}
-                maxLength={60}
-                autoCapitalize="words"
+              <View
+                style={{
+                  position: "absolute",
+                  right: 0,
+                  bottom: 0,
+                  width: 34,
+                  height: 34,
+                  borderRadius: 17,
+                  backgroundColor: cor.primaria,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderWidth: 3,
+                  borderColor: cor.branco,
+                }}
+              >
+                <Camera size={16} strokeWidth={2.2} color={cor.branco} />
+              </View>
+            </Tocavel>
+          </View>
+
+          {/* O nome e, com a Comunidade (`COMUNIDADE_NO_APP`), a bio: um Salvar
+              para os três, no alto. */}
+          <SecaoDeAjustes
+            recuo={RECUO_SEM_ICONE}
+            rodape={
+              COMUNIDADE_NO_APP
+                ? undefined
+                : "A foto e o nome aparecem para as suas amigas no app."
+            }
+          >
+            <LinhaDeCampo
+              rotulo="Nome"
+              value={nome}
+              onChangeText={setNome}
+              maxLength={60}
+              autoCapitalize="words"
+              placeholder="Seu nome"
+              returnKeyType="done"
+            />
+            {COMUNIDADE_NO_APP ? (
+              <CampoLivre
+                rotulo="Bio"
+                value={bio}
+                onChangeText={(t) => {
+                  setBio(t);
+                  if (erroBio) setErroBio(null);
+                }}
+                maxLength={LIMITE_DA_BIO}
+                placeholder="Uma frase sobre você"
               />
-              {COMUNIDADE_NO_APP ? (
-                <View style={{ gap: 6 }}>
-                  <Campo
-                    rotulo="Bio"
-                    value={bio}
-                    onChangeText={(t) => {
-                      setBio(t);
-                      if (erroBio) setErroBio(null);
-                    }}
-                    maxLength={LIMITE_DA_BIO}
-                    multiline
-                    placeholder="Uma frase sobre você"
-                    style={{ minHeight: 80 }}
-                  />
-                  <Text
-                    style={{
-                      alignSelf: "flex-end",
-                      ...fonte.normal,
-                      fontSize: 13,
-                      color: cor.textoApagado,
-                    }}
-                  >
-                    {bio.length}/{LIMITE_DA_BIO}
+            ) : null}
+          </SecaoDeAjustes>
+          {COMUNIDADE_NO_APP ? (
+            <View style={{ gap: espaco.sm, marginTop: -espaco.md }}>
+              <Text
+                style={{
+                  alignSelf: "flex-end",
+                  ...fonte.normal,
+                  ...escala.nota,
+                  color: cor.textoApagado,
+                  paddingHorizontal: espaco.lg,
+                }}
+              >
+                {bio.length}/{LIMITE_DA_BIO}
+              </Text>
+              {erroBio ? (
+                <View
+                  style={{
+                    backgroundColor: cor.atencaoFundo,
+                    borderRadius: canto.campo,
+                    padding: espaco.md,
+                  }}
+                >
+                  <Text style={{ ...fonte.media, ...escala.legenda, color: cor.texto }}>
+                    {erroBio}
                   </Text>
-                  {erroBio ? (
-                    <View
-                      style={{
-                        backgroundColor: cor.atencaoFundo,
-                        borderRadius: raio.md,
-                        padding: espaco.md,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          ...fonte.media,
-                          fontSize: 14,
-                          lineHeight: 20,
-                          color: cor.texto,
-                        }}
-                      >
-                        {erroBio}
-                      </Text>
-                    </View>
-                  ) : null}
                 </View>
               ) : null}
-              <Botao
-                rotulo="Salvar"
-                aoTocar={() => void salvar()}
-                carregando={salvando}
-                desabilitado={!mudou}
-              />
-            </Cartao>
+            </View>
+          ) : null}
 
-            {COMUNIDADE_NO_APP ? (
-              <>
-                {/* O @: tem limite de troca no servidor, então se salva à parte. */}
-                <Cartao>
-                  <T tipo="rotulo">Seu @</T>
-                  <Linha>
-                    <View
+          {COMUNIDADE_NO_APP ? (
+            <>
+              {/* O @: tem limite de troca no servidor, então se salva à parte. */}
+              <Cartao>
+                <T tipo="rotulo">Seu @</T>
+                <Linha>
+                  <View
+                    style={{
+                      flex: 1,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      minHeight: ALVO_MINIMO + 4,
+                      borderRadius: canto.campo,
+                      backgroundColor: cor.apagado,
+                      borderWidth: 1,
+                      borderColor: erroHandle ? cor.atencao : "transparent",
+                      paddingLeft: espaco.md,
+                    }}
+                  >
+                    <Text style={{ ...fonte.forte, fontSize: 17, color: cor.textoApagado }}>@</Text>
+                    <TextInput
+                      value={handle}
+                      onChangeText={(t) => {
+                        setHandle(t.replace(/^@/, ""));
+                        setErroHandle(null);
+                        setOkHandle(null);
+                      }}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      maxLength={HANDLE_MAX}
+                      accessibilityLabel="Seu @"
+                      placeholder="seunome"
+                      placeholderTextColor={cor.placeholder}
                       style={{
                         flex: 1,
-                        flexDirection: "row",
-                        alignItems: "center",
-                        minHeight: ALVO_MINIMO + 4,
-                        borderRadius: raio.md,
-                        borderWidth: 1,
-                        borderColor: erroHandle ? cor.atencao : cor.borda,
-                        backgroundColor: cor.cartao,
-                        paddingLeft: espaco.md,
+                        minHeight: ALVO_MINIMO,
+                        paddingHorizontal: 4,
+                        ...fonte.normal,
+                        fontSize: 17,
+                        color: cor.texto,
                       }}
-                    >
-                      <Text style={{ ...fonte.forte, fontSize: 16, color: cor.textoApagado }}>
-                        @
-                      </Text>
-                      <TextInput
-                        value={handle}
-                        onChangeText={(t) => {
-                          setHandle(t.replace(/^@/, ""));
-                          setErroHandle(null);
-                          setOkHandle(null);
-                        }}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        maxLength={HANDLE_MAX}
-                        accessibilityLabel="Seu @"
-                        placeholder="seunome"
-                        placeholderTextColor={cor.textoApagado}
-                        style={{
-                          flex: 1,
-                          minHeight: ALVO_MINIMO,
-                          paddingHorizontal: 4,
-                          ...fonte.normal,
-                          fontSize: 16,
-                          color: cor.texto,
-                        }}
-                      />
-                    </View>
-                    <Botao
-                      rotulo="Salvar @"
-                      tipo="secundario"
-                      aoTocar={() => void salvarHandle()}
-                      carregando={salvandoHandle}
-                      desabilitado={!handleMudou}
-                      estilo={{ paddingHorizontal: espaco.lg }}
                     />
-                  </Linha>
-                  <T tipo="apagado">
-                    Letras sem acento, números, ponto e sublinhado. Dá para trocar duas vezes a cada
-                    14 dias.
-                  </T>
-                  {erroHandle ? (
-                    <T tipo="apagado" cor={cor.atencao}>
-                      {erroHandle}
-                    </T>
-                  ) : null}
-                  {okHandle ? (
-                    <T tipo="apagado" cor={cor.ok}>
-                      {okHandle}
-                    </T>
-                  ) : null}
-                </Cartao>
-
-                {/* Quem vê, e o que aparece: cada chave grava na hora. */}
-                <Cartao estilo={{ gap: espaco.md }}>
-                  <T tipo="subtitulo">Quem vê o seu perfil</T>
-                  <Chave
-                    rotulo="Perfil público"
-                    valor={publico}
-                    aoMudar={(v) => void trocarPublico(v)}
+                  </View>
+                  <Botao
+                    rotulo="Salvar @"
+                    tipo="suave"
+                    tamanho="compacto"
+                    aoTocar={() => void salvarHandle()}
+                    carregando={salvandoHandle}
+                    desabilitado={!handleMudou}
                   />
-                  <T tipo="apagado" cor={cor.texto}>
-                    {publico
-                      ? "Qualquer pessoa no app pode abrir o seu perfil e ver as publicações marcadas para todo mundo, e a busca encontra você. Seguir não precisa de aprovação."
-                      : "Fechado: só quem você aceitou vê o seu perfil, e a busca não encontra você. Quem quiser te acompanhar manda um pedido, e você decide."}
+                </Linha>
+                <T tipo="apagado">
+                  Letras sem acento, números, ponto e sublinhado. Dá para trocar duas vezes a cada
+                  14 dias.
+                </T>
+                {erroHandle ? (
+                  <T tipo="apagado" cor={cor.atencao}>
+                    {erroHandle}
                   </T>
-                  {/* No Modo Cuidado o perfil não fala do bebê: as duas chaves somem. */}
-                  {!cuidado ? (
-                    <>
-                      <Chave
-                        rotulo="Mostrar a semana da gestação"
-                        valor={mostrarSemana}
-                        aoMudar={(v) =>
-                          void trocarChave(
-                            "mostrarSemana",
-                            v,
-                            mostrarSemana,
-                            setMostrarSemana,
-                            v ? "A semana aparece no seu perfil." : "A semana saiu do seu perfil.",
-                          )
-                        }
-                      />
-                      <Chave
-                        rotulo="Mostrar o nome do bebê"
-                        valor={mostrarBebe}
-                        aoMudar={(v) =>
-                          void trocarChave(
-                            "mostrarBebe",
-                            v,
-                            mostrarBebe,
-                            setMostrarBebe,
-                            v
-                              ? "O nome do bebê aparece no seu perfil."
-                              : "O nome do bebê saiu do seu perfil.",
-                          )
-                        }
-                      />
-                      {/* As amigas recebem o nome do bebê do servidor com a chave ligada ou
-                      não (amigas.functions.ts): a tela não pode prometer o contrário. */}
-                      <T tipo="apagado">
-                        Aparecem como um selo embaixo do seu nome, para quem pode abrir o seu perfil
-                        na Comunidade. As suas amigas veem o nome do bebê de qualquer jeito, na
-                        página de amiga.
-                      </T>
-                    </>
-                  ) : null}
-                </Cartao>
-              </>
-            ) : null}
-          </>
-        ) : null}
-      </Tela>
+                ) : null}
+                {okHandle ? (
+                  <T tipo="apagado" cor={cor.ok}>
+                    {okHandle}
+                  </T>
+                ) : null}
+              </Cartao>
+
+              {/* Quem vê, e o que aparece: cada chave grava na hora. */}
+              <Cartao estilo={{ gap: espaco.md }}>
+                <T tipo="subtitulo">Quem vê o seu perfil</T>
+                <Chave
+                  rotulo="Perfil público"
+                  valor={publico}
+                  aoMudar={(v) => void trocarPublico(v)}
+                />
+                <T tipo="apagado" cor={cor.texto}>
+                  {publico
+                    ? "Qualquer pessoa no app pode abrir o seu perfil e ver as publicações marcadas para todo mundo, e a busca encontra você. Seguir não precisa de aprovação."
+                    : "Fechado: só quem você aceitou vê o seu perfil, e a busca não encontra você. Quem quiser te acompanhar manda um pedido, e você decide."}
+                </T>
+                {/* No Modo Cuidado o perfil não fala do bebê: as duas chaves somem. */}
+                {!cuidado ? (
+                  <>
+                    <Chave
+                      rotulo="Mostrar a semana da gestação"
+                      valor={mostrarSemana}
+                      aoMudar={(v) =>
+                        void trocarChave(
+                          "mostrarSemana",
+                          v,
+                          mostrarSemana,
+                          setMostrarSemana,
+                          v ? "A semana aparece no seu perfil." : "A semana saiu do seu perfil.",
+                        )
+                      }
+                    />
+                    <Chave
+                      rotulo="Mostrar o nome do bebê"
+                      valor={mostrarBebe}
+                      aoMudar={(v) =>
+                        void trocarChave(
+                          "mostrarBebe",
+                          v,
+                          mostrarBebe,
+                          setMostrarBebe,
+                          v
+                            ? "O nome do bebê aparece no seu perfil."
+                            : "O nome do bebê saiu do seu perfil.",
+                        )
+                      }
+                    />
+                    {/* As amigas recebem o nome do bebê do servidor com a chave ligada ou
+                    não (amigas.functions.ts): a tela não pode prometer o contrário. */}
+                    <T tipo="apagado">
+                      Aparecem como um selo embaixo do seu nome, para quem pode abrir o seu perfil
+                      na Comunidade. As suas amigas veem o nome do bebê de qualquer jeito, na
+                      página de amiga.
+                    </T>
+                  </>
+                ) : null}
+              </Cartao>
+            </>
+          ) : null}
+        </>
+      ) : null}
 
       <FolhaDeOpcoes
         aberta={menuFoto}
@@ -448,8 +462,8 @@ export default function EditarPerfil() {
         opcoes={[
           {
             rotulo: "Escolher da galeria",
-            sub: "A foto fica quadrada. Toque em Salvar depois.",
-            icone: <Camera size={22} color={cor.texto} />,
+            sub: "A foto fica quadrada. Depois, toque em Salvar.",
+            icone: <ImageIcon size={22} color={cor.texto} />,
             aoTocar: () =>
               setTimeout(() => {
                 void escolherAvatar().then((r) => {
@@ -463,7 +477,7 @@ export default function EditarPerfil() {
             ? [
                 {
                   rotulo: "Remover a foto",
-                  sub: "Volta a inicial do seu nome. Toque em Salvar depois.",
+                  sub: "Volta a inicial do seu nome. Depois, toque em Salvar.",
                   icone: <Trash2 size={22} color={cor.urgente} />,
                   perigo: true,
                   aoTocar: () => setAvatar(null),
@@ -472,8 +486,7 @@ export default function EditarPerfil() {
             : []),
         ]}
       />
-      {aviso.elemento}
-    </KeyboardAvoidingView>
+    </TelaDaPilha>
   );
 }
 
@@ -495,7 +508,7 @@ function Chave({
       <Switch
         value={valor}
         onValueChange={aoMudar}
-        trackColor={{ true: cor.primaria, false: cor.borda }}
+        trackColor={{ true: cor.primaria }}
         accessibilityLabel={rotulo}
       />
     </Linha>

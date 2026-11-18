@@ -2,10 +2,13 @@ import { describe, expect, test } from "bun:test";
 import {
   comCompromisso,
   contagemPorDia,
+  diaCurto,
   faltaQuanto,
   lembretesDaAgenda,
   lembretesDe,
   lerAgenda,
+  nomeDo,
+  nomePadrao,
   paraData,
   proximo,
   quandoPorExtenso,
@@ -130,5 +133,27 @@ describe("a agenda do pré-natal", () => {
     expect(
       contagemPorDia([c("a", "2026-10-22T09:00"), c("b", "2026-10-22T15:00")]).get("2026-10-22"),
     ).toBe(2);
+  });
+
+  test("no Modo Cuidado o nome que o app escolhe não diz pré-natal; o dela fica", () => {
+    expect(nomeDo({ tipo: "consulta" })).toBe("Consulta pré-natal");
+    expect(nomeDo({ tipo: "consulta" }, { cuidado: true })).toBe("Consulta");
+    expect(nomePadrao("consulta", { cuidado: true })).toBe("Consulta");
+    expect(nomeDo({ tipo: "ultrassom" }, { cuidado: true })).toBe("Ultrassom");
+    expect(nomeDo({ tipo: "consulta", titulo: "Consulta pré-natal" }, { cuidado: true })).toBe(
+      "Consulta pré-natal",
+    );
+    const [vespera] = lembretesDe(c("l", "2026-10-25T14:00"), AGORA, { cuidado: true });
+    expect(vespera!.titulo).toBe("Amanhã: Consulta");
+    expect(vespera!.corpo).not.toMatch(/gestante|pré-natal/);
+  });
+
+  test("o dia curto: hoje, ontem, amanhã, ou o dia da semana", () => {
+    expect(diaCurto("2026-10-19", AGORA)).toBe("Hoje, 19 de out.");
+    expect(diaCurto("2026-10-18", AGORA)).toBe("Ontem, 18 de out.");
+    expect(diaCurto("2026-10-20", AGORA)).toBe("Amanhã, 20 de out.");
+    expect(diaCurto("2026-11-18", AGORA)).toBe("qua., 18 de nov.");
+    expect(diaCurto("2027-05-03", AGORA)).toBe("seg., 3 de maio de 2027");
+    expect(diaCurto("2026-02-31", AGORA)).toBe("");
   });
 });
