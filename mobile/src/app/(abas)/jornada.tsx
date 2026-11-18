@@ -1,5 +1,5 @@
 import { router, useFocusEffect } from "expo-router";
-import { Award, ChevronRight, PenLine, Wind, X } from "lucide-react-native";
+import { Award, PenLine, Wind, X } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -20,7 +20,7 @@ import { rota } from "~/componentes/jornada/bancada";
 import { SementesSubindo } from "~/componentes/jornada/efeitos";
 import { BolhaViva } from "~/componentes/movimento";
 import { corJornada } from "~/componentes/jornada/cores";
-import { CartaoDoDia, type ItemDoDia } from "~/componentes/jornada/dia-de-hoje";
+import { CartaoDoDia } from "~/componentes/jornada/dia-de-hoje";
 import {
   lerCarteiraDoDia,
   lerContagemDeAmigas,
@@ -36,7 +36,7 @@ import { lerOCantinho, type CantinhoOk } from "~/componentes/recompensas/economi
 import { fundoBgFor } from "@/lib/cantinho";
 import { SKIN_KEY, TRILHA_SKINS } from "@/lib/trilha-skins";
 import { CHAVE_DECOR, lerDecoracao, type Decoracao } from "~/lib/jornada/enfeites";
-import { Pulsando } from "~/componentes/jornada/pecas";
+
 import { FolhasDoPlacar, type FolhaDoPlacar } from "~/componentes/jornada/placar";
 import { FestaDoMarco } from "~/componentes/jornada/marco";
 import { CHAVE_MARCOS_VISTOS, festaDoExtrato, lerVistos, marcarVistos } from "~/lib/jornada/marcos";
@@ -47,9 +47,9 @@ import { depoisDaVolta } from "~/lib/depois-da-volta";
 import { TelaDeHoje } from "~/componentes/jornada/hoje";
 import { CHAVE_REGUA_USADA } from "~/componentes/jornada/ceu-do-bebe";
 import { BebeNestaSemana } from "~/componentes/jornada/bebe-nesta-semana";
-import { aulaDoAppNoDia } from "~/lib/jornada/aulas-do-app";
-import { tituloCurtoDaAula } from "~/lib/jornada/aula";
+import { tituloDaAulaDoApp } from "~/lib/jornada/aulas-do-app";
 import { TelaDoQuartoTrimestre } from "~/componentes/jornada/hoje-pos";
+import { TelaDoCuidado } from "~/componentes/jornada/cuidado";
 import { FestaDoNascimento, PortaDoNascimento } from "~/componentes/jornada/nascimento";
 import { TrilhaDoPosParto } from "~/componentes/caminho/caminho-pos";
 import { gravarPerfil } from "~/lib/gravar-perfil";
@@ -87,12 +87,7 @@ import { BarraDoTopo, voltarParaJornada } from "~/componentes/jornada/pecas";
 import { FundoDeLuz } from "~/componentes/luz";
 import { CEUS, sombraDoTexto, useCeuDasAbas, type Ceu } from "~/componentes/ceu-vivo";
 import { useSessao } from "~/lib/sessao";
-import {
-  conquistaNoApp,
-  montarGrade,
-  paraResgatar,
-  placar as placarDasConquistas,
-} from "~/lib/jornada/conquistas";
+import { conquistaNoApp, montarGrade, paraResgatar } from "~/lib/jornada/conquistas";
 import { type ConquistaDef } from "@/lib/conquistas";
 import { diaLongo } from "~/lib/jornada/dia";
 import {
@@ -124,9 +119,20 @@ import {
 } from "~/lib/jornada/reconciliacao";
 import type { Atividade } from "~/servidor/economia";
 import { chama as calcularChama } from "~/lib/jornada/trilha";
-import { ALVO_MINIMO, canto, cor, curva, escala, espaco, fonte, luz, margem, raio, sombra, vidro } from "~/tema";
+import {
+  ALVO_MINIMO,
+  canto,
+  cor,
+  curva,
+  escala,
+  espaco,
+  fonte,
+  luz,
+  margem,
+  sombra,
+  vidro,
+} from "~/tema";
 import { pedirSocorro, ROTULO_DO_SOCORRO, SE_PRECISAR } from "~/lib/socorro";
-import { SOS_NO_APP } from "~/config";
 
 /**
  * A ABA JORNADA — o coração do app: um dia de cada vez, cinco momentos por dia.
@@ -171,7 +177,7 @@ export default function AbaJornada() {
       </Tela>
     );
   }
-  if (dia.cuidado) return <JornadaDoCuidado uid={dia.uid} />;
+  if (dia.cuidado) return <TelaDoCuidado uid={dia.uid} direita={<BotaoDoPerfil />} />;
   /* A aba do meio é a tela do bebê, e o app abre nela (decisão do dono,
      13/11/2026: "o bebê é o centro"). A trilha mora na aba da direita. */
   if (dia.modo === "gestacao") return <JornadaDaGestacao dia={dia} loja={loja} vista="hoje" />;
@@ -231,9 +237,11 @@ const INTERVALO_DO_BEBE_MS = 45_000;
 function useLeiturasDoFoco(intervaloMinimo = 0) {
   const [carteira, setCarteira] = useState<EstadoDaCarteira>({ estado: "carregando" });
   const [conquistas, setConquistas] = useState<LeituraDeConquistas>("carregando");
-  const atual = useRef<{ carteira: string; conquistas: string; estado: EstadoDaCarteira["estado"] }>(
-    { carteira: "", conquistas: "", estado: "carregando" },
-  );
+  const atual = useRef<{
+    carteira: string;
+    conquistas: string;
+    estado: EstadoDaCarteira["estado"];
+  }>({ carteira: "", conquistas: "", estado: "carregando" });
   const ultima = useRef(0);
   const primeira = useRef(true);
   const viva = useRef(true);
@@ -331,28 +339,32 @@ function useReconciliacao(D: number, pronta: boolean, aoMudarSaldo: () => void) 
         if (emVoo.current) return;
         emVoo.current = true;
         void (async () => {
-        try {
-          let pagou = false;
-          for (const dia of diasDaReconciliacao(D)) {
-            const noServidor = await lerProgressoDoDia(dia);
-            if (!noServidor) continue;
-            for (const a of noServidor) marcar(dia, a);
-            const pagas: Atividade[] = [];
-            for (const a of atividadesSemRecibo(flagsDoDia(estadoAtual().blob, dia), noServidor)) {
-              const g = await pagarMomento(dia, a);
-              if (g != null) pagas.push(a);
-              if (g && g > 0) pagou = true;
+          try {
+            let pagou = false;
+            for (const dia of diasDaReconciliacao(D)) {
+              const noServidor = await lerProgressoDoDia(dia);
+              if (!noServidor) continue;
+              for (const a of noServidor) marcar(dia, a);
+              const pagas: Atividade[] = [];
+              for (const a of atividadesSemRecibo(
+                flagsDoDia(estadoAtual().blob, dia),
+                noServidor,
+              )) {
+                const g = await pagarMomento(dia, a);
+                if (g != null) pagas.push(a);
+                if (g && g > 0) pagou = true;
+              }
+              if (bonusResolvidos.has(dia) || !diasFechados(estadoAtual().blob).includes(dia))
+                continue;
+              const b = await pagarDiaFechado(dia);
+              if (b && b > 0) pagou = true;
+              if (b != null && (b > 0 || bonusResolvido(noServidor, pagas)))
+                bonusResolvidos.add(dia);
             }
-            if (bonusResolvidos.has(dia) || !diasFechados(estadoAtual().blob).includes(dia))
-              continue;
-            const b = await pagarDiaFechado(dia);
-            if (b && b > 0) pagou = true;
-            if (b != null && (b > 0 || bonusResolvido(noServidor, pagas))) bonusResolvidos.add(dia);
+            if (pagou) aoMudarSaldo();
+          } finally {
+            emVoo.current = false;
           }
-          if (pagou) aoMudarSaldo();
-        } finally {
-          emVoo.current = false;
-        }
         })();
       });
     }, [D, pronta, aoMudarSaldo]),
@@ -395,9 +407,7 @@ export function JornadaDaGestacao({
      ela acabou de ganhar — por isso a aba confere ao ganhar foco. E o que a
      conferência traz agora aparece aqui: o aviso da conquista nova e, na
      cestinha da loja, quantas esperam o toque que paga. */
-  const { carteira, conquistas, recarregar } = useLeiturasDoFoco(
-    ehHoje ? INTERVALO_DO_BEBE_MS : 0,
-  );
+  const { carteira, conquistas, recarregar } = useLeiturasDoFoco(ehHoje ? INTERVALO_DO_BEBE_MS : 0);
   /* O servidor sabe do Modo Cuidado antes do aparelho (ligado noutro lugar):
      a carteira volta com `careMode`, e a trilha relê o perfil na hora em vez
      de seguir mostrando o bebê e as estrelas a quem acabou de perdê-lo. */
@@ -447,8 +457,7 @@ export function JornadaDaGestacao({
   );
   const flags = flagsDoDia(loja.blob, D);
   const assinaturaDosFeitos = JSON.stringify(flags);
-  const aulaDeHoje = aulaDoAppNoDia(D);
-  const assuntoDaAula = aulaDeHoje ? tituloCurtoDaAula(aulaDeHoje.teach) : null;
+  const assuntoDaAula = tituloDaAulaDoApp(D);
   const cuidados = useMemo(
     () =>
       cuidadosDoDia({
@@ -805,9 +814,7 @@ export function JornadaDoPosParto({
 }) {
   const ehHoje = vista === "hoje";
   const { D, idadeDias, perfil, hoje } = dia;
-  const { carteira, conquistas, recarregar } = useLeiturasDoFoco(
-    ehHoje ? INTERVALO_DO_BEBE_MS : 0,
-  );
+  const { carteira, conquistas, recarregar } = useLeiturasDoFoco(ehHoje ? INTERVALO_DO_BEBE_MS : 0);
   const marco = useFestaDoMarco({ carteira, loja, cuidado: dia.cuidado || !ehHoje });
   const avisos = useAvisosDoDia({ carteira, recarregar, conquistas, loja, ehHoje });
   const { recarregarPerfil } = useSessao();
@@ -920,11 +927,7 @@ export function JornadaDoPosParto({
             <AgendaNaHoje loja={loja} />
           </>
         }
-        extra={
-          <>
-            <BotaoDeConquistas leitura={conquistas} posParto />
-          </>
-        }
+        conquistas={conquistas}
         aoMarcarHumor={(humor) => {
           gravarChave(CHAVE_CHECKIN, novoCheckin(checkin, humor, hoje));
           marcarNoPos(D, "humor");
@@ -963,55 +966,6 @@ export function JornadaDoPosParto({
         <FestaDoMarco festa={marco.festa} nomeDoBebe={nomeDoBebe} aoFechar={marco.fechar} />
       )}
     </View>
-  );
-}
-
-/* ══════════════════════════════════════════════════════════════════════════
-   Modo Cuidado — sem placar, sem bebê, sem festa
-   ══════════════════════════════════════════════════════════════════════════ */
-
-function JornadaDoCuidado({ uid }: { uid: string }) {
-  const feitos = useLivresDeHoje(uid);
-  const itens: ItemDoDia[] = [
-    {
-      chave: "meditar",
-      titulo: "Respirar",
-      sub: "Um minuto de respiração lenta",
-      Icone: Wind,
-      feito: feitos.has("meditation"),
-      rotuloDoFeito: "Feito hoje",
-      aoTocar: () => ir("/jornada/meditar"),
-    },
-    {
-      chave: "gratidao",
-      titulo: "Escrever",
-      sub: "Uma linha sobre o seu dia",
-      Icone: PenLine,
-      feito: feitos.has("gratitude"),
-      rotuloDoFeito: "Feito hoje",
-      aoTocar: () => ir("/jornada/gratidao"),
-    },
-  ];
-  return (
-    <Tela>
-      <Saudacao
-        titulo="Cuidar de você"
-        sub="Um momento por dia, no seu ritmo. Sem placar e sem pressa."
-      />
-      <CartaoDoDia
-        sobre={dataPorExtenso(new Date())}
-        titulo="Dois cuidados com você"
-        feitos={0}
-        total={2}
-        itens={itens}
-        mostrarEstrelas={false}
-      />
-      <T tipo="apagado">
-        {SOS_NO_APP
-          ? "Se precisar de ajuda agora, o botão SOS fica sempre aqui embaixo, em qualquer tela."
-          : "Se precisar de ajuda agora, ligue 192 — ou 188, o CVV, para conversar."}
-      </T>
-    </Tela>
   );
 }
 
@@ -1102,88 +1056,6 @@ function Saudacao({ titulo, sub }: { titulo: string; sub: string }) {
       </View>
       <BotaoDoPerfil />
     </View>
-  );
-}
-
-function BotaoDeConquistas({
-  leitura,
-  posParto,
-}: {
-  leitura: LeituraDasConquistas | null | "carregando";
-  posParto: boolean;
-}) {
-  const resumo = useMemo(() => {
-    if (!leitura || leitura === "carregando") return null;
-    const g = montarGrade(leitura.unlocked, leitura.resgatadas);
-    return { ...placarDasConquistas(g, posParto), resgatar: paraResgatar(g) };
-  }, [leitura, posParto]);
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={
-        resumo
-          ? `Conquistas: ${resumo.feitas} de ${resumo.total}${resumo.resgatar ? `, ${resumo.resgatar} para resgatar` : ""}`
-          : "Conquistas"
-      }
-      onPress={() => {
-        toque();
-        ir("/jornada/recompensas?aba=conquistas");
-      }}
-      style={({ pressed }) => [
-        {
-          flexDirection: "row",
-          alignItems: "center",
-          gap: espaco.md,
-          padding: espaco.lg,
-          borderRadius: raio.lg,
-          backgroundColor: cor.cartao,
-          opacity: pressed ? 0.8 : 1,
-          marginTop: espaco.sm,
-        },
-        sombra,
-      ]}
-    >
-      <View
-        style={{
-          width: 48,
-          height: 48,
-          borderRadius: 24,
-          backgroundColor: corJornada.trofeuFundo,
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Award size={26} color={corJornada.trofeu} strokeWidth={2.2} />
-      </View>
-      <View style={{ flex: 1, gap: 2 }}>
-        <Text style={{ ...fonte.forte, fontSize: 17, color: cor.texto }}>Conquistas</Text>
-        <Text style={{ ...fonte.normal, fontSize: 14, color: cor.textoApagado }}>
-          {leitura === "carregando"
-            ? "Conferindo…"
-            : resumo
-              ? `${resumo.feitas} de ${resumo.total} desbloqueadas`
-              : "Os emblemas da sua jornada"}
-        </Text>
-      </View>
-      {resumo && resumo.resgatar > 0 ? (
-        <Pulsando>
-          <View
-            style={{
-              backgroundColor: corJornada.roxo,
-              borderRadius: raio.pilula,
-              paddingHorizontal: 10,
-              paddingVertical: 5,
-            }}
-          >
-            <Text style={{ ...fonte.forte, fontSize: 13, color: cor.branco }}>
-              {resumo.resgatar} para resgatar
-            </Text>
-          </View>
-        </Pulsando>
-      ) : (
-        <ChevronRight size={22} color={cor.textoApagado} />
-      )}
-    </Pressable>
   );
 }
 

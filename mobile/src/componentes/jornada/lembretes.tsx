@@ -7,8 +7,7 @@ import { Folha } from "~/componentes/jornada/pecas";
 import { RAIO_DENTRO_DO_PAINEL } from "~/componentes/painel";
 import type { DiaDaJornada } from "~/componentes/jornada/usarJornada";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
-import { tituloCurtoDaAula } from "~/lib/jornada/aula";
-import { aulaDoAppNoDia } from "~/lib/jornada/aulas-do-app";
+import { tituloDaAulaDoApp } from "~/lib/jornada/aulas-do-app";
 import {
   HORA_PADRAO_DA_JORNADA,
   horaValida,
@@ -79,8 +78,7 @@ export function contextoDoLembrete(
        para a notificação. */
     desafio: () => null,
     aula: (D) => {
-      const a = aulaDoAppNoDia(D);
-      return a ? tituloCurtoDaAula(a.teach) : null;
+      return tituloDaAulaDoApp(D);
     },
   };
 }
@@ -290,8 +288,7 @@ export function AvisoSemPermissao() {
   return (
     <View style={{ gap: 2 }}>
       <Text style={{ ...fonte.normal, ...escala.nota, color: cor.atencaoForte }}>
-        As notificações do app estão desligadas no iPhone. Ligue nos Ajustes para o lembrete
-        chegar.
+        As notificações do app estão desligadas no iPhone. Ligue nos Ajustes para o lembrete chegar.
       </Text>
       {Platform.OS !== "web" ? (
         <Pressable

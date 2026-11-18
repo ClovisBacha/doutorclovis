@@ -1,8 +1,7 @@
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import { gravarJson, lerJson } from "~/lib/armazem";
-import { carregarAulaDoDia } from "~/lib/jornada/aulas-do-app";
-import { tituloCurtoDaAula } from "~/lib/jornada/aula";
+import { tituloDaAulaDoApp } from "~/lib/jornada/aulas-do-app";
 import {
   DIAS_AGENDADOS,
   lembretesDaJornada,
@@ -73,19 +72,13 @@ export async function cancelarLembretesDaJornada() {
 
 /**
  * O assunto das aulas dos dias agendados (gestação), para o aviso dizer do
- * que é a aula de amanhã. O banco de aulas é baixado uma vez por sessão;
- * se falhar, o aviso fala do desafio do dia.
+ * que é a aula de amanhã. Desde 18/11/2026 sai do índice pequeno das aulas
+ * DO APP (`tituloDaAulaDoApp`): antes baixava o banco do SITE, cujo assunto
+ * nem sempre é o da aula que o app mostra.
  */
 async function comAulas(c: ContextoDoLembrete): Promise<ContextoDoLembrete> {
   if (c.modo !== "gestacao" || c.D == null) return c;
-  const assuntos: Record<number, string> = {};
-  await Promise.all(
-    Array.from({ length: DIAS_AGENDADOS }, (_, i) => c.D! + i).map(async (D) => {
-      const q = await carregarAulaDoDia(D);
-      if (q) assuntos[D] = tituloCurtoDaAula(q.teach);
-    }),
-  );
-  return { ...c, aula: (D) => assuntos[D] ?? null };
+  return { ...c, aula: (D) => tituloDaAulaDoApp(D) };
 }
 
 async function agendar(pref: PreferenciaDosLembretes, contexto: ContextoDoLembrete) {

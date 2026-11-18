@@ -98,8 +98,9 @@ describe("a faixa das amigas nas telas do Hoje", () => {
     const hoje = ler("app", "(abas)", "jornada.tsx");
     expect(hoje).toContain("amigas={<AmigasNoHoje pos={false} />}");
     expect(hoje).toContain("amigas={<AmigasNoHoje pos />}");
-    const cuidado = hoje.slice(hoje.indexOf("function JornadaDoCuidado"));
-    expect(cuidado.slice(0, cuidado.indexOf("\nfunction ", 10))).not.toContain("AmigasNoHoje");
+    /* O Modo Cuidado é a TelaDoCuidado (18/11/2026): ela não traz as amigas. */
+    expect(hoje).toContain("if (dia.cuidado) return <TelaDoCuidado");
+    expect(ler("componentes", "jornada", "cuidado.tsx")).not.toContain("AmigasNoHoje");
   });
 
   test("o bônus da dupla só se cobra na gestação, fora do Modo Cuidado, com a dupla ativa", () => {
