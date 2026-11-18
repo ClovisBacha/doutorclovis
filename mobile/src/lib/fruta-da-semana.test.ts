@@ -77,7 +77,10 @@ describe("a fruta da semana no app", () => {
       "Limão",
       "Vagem",
     ])
-      expect({ fruta, emoji: EMOJI_DA_FRUTA_NO_APP[fruta] ?? null }).toEqual({ fruta, emoji: null });
+      expect({ fruta, emoji: EMOJI_DA_FRUTA_NO_APP[fruta] ?? null }).toEqual({
+        fruta,
+        emoji: null,
+      });
     /* Semana 24 é milho; 38 é alho-poró (sem par); 8 é framboesa (sem par). */
     expect(emojiDaFrutaNoApp(24)).toBe("🌽");
     expect(emojiDaFrutaNoApp(38)).toBeNull();

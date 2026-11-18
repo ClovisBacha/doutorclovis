@@ -159,7 +159,8 @@ function FormularioDosDados() {
     });
     const r = await gravarPerfil(uid, campos);
     setSalvando(false);
-    if (!r.ok) return aviso.mostrar("Não conseguimos salvar. Confira a internet e tente de novo.", true);
+    if (!r.ok)
+      return aviso.mostrar("Não conseguimos salvar. Confira a internet e tente de novo.", true);
     await recarregarPerfil();
     sucesso();
     aviso.mostrar(

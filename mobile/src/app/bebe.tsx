@@ -50,8 +50,7 @@ export default function Bebe() {
   const gest = gestacaoDoPerfil(perfil);
   const hoje = gest ? Math.min(Math.max(gest.weeks, WEEK_MIN), WEEK_MAX) : 20;
   const pedida = Number(parametroDaBancada("ver"));
-  const inicial =
-    Number.isFinite(pedida) && pedida >= WEEK_MIN ? Math.min(pedida, WEEK_MAX) : hoje;
+  const inicial = Number.isFinite(pedida) && pedida >= WEEK_MIN ? Math.min(pedida, WEEK_MAX) : hoje;
   const [vista, setVista] = useState(inicial);
   const nome = perfil?.baby_name?.trim() || null;
 

@@ -176,8 +176,13 @@ export default function ContarONascimento() {
 
   const previa = montar();
   const ontem = ontemDe(agora);
-  const ficha: "hoje" | "ontem" | "outro" =
-    outroDia ? "outro" : data === hoje ? "hoje" : data === ontem ? "ontem" : "outro";
+  const ficha: "hoje" | "ontem" | "outro" = outroDia
+    ? "outro"
+    : data === hoje
+      ? "hoje"
+      : data === ontem
+        ? "ontem"
+        : "outro";
 
   function escolherFicha(f: "hoje" | "ontem" | "outro") {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -193,10 +198,7 @@ export default function ContarONascimento() {
   }
 
   return (
-    <TelaDaPilha
-      titulo={jaNasceu ? "O nascimento" : "Contar o nascimento"}
-      voltarPara="/jornada"
-    >
+    <TelaDaPilha titulo={jaNasceu ? "O nascimento" : "Contar o nascimento"} voltarPara="/jornada">
       <View style={{ alignItems: "center", gap: espaco.sm }}>
         <Image
           source={RECEM_NASCIDO}
@@ -233,7 +235,11 @@ export default function ContarONascimento() {
 
       {/* O dia: quase sempre hoje ou ontem; o calendário só no "Outro dia". */}
       <SecaoDeAjustes recuo={RECUO_SEM_ICONE}>
-        <LinhaDeAjuste titulo="Dia" valor={diaCurto(data, agora)} rotulo={`Dia do nascimento, ${diaCurto(data, agora)}`} />
+        <LinhaDeAjuste
+          titulo="Dia"
+          valor={diaCurto(data, agora)}
+          rotulo={`Dia do nascimento, ${diaCurto(data, agora)}`}
+        />
         <View style={{ paddingHorizontal: 12, paddingVertical: espaco.md }}>
           <Escolha
             opcoes={[
