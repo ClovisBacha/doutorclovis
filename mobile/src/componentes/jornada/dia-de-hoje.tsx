@@ -1,11 +1,9 @@
-import { LinearGradient } from "expo-linear-gradient";
 import { Check, ChevronRight } from "lucide-react-native";
 import { type ComponentType, type ReactNode } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { toque } from "~/componentes/base";
-import { corJornada } from "~/componentes/jornada/cores";
 import { Estrelas } from "~/componentes/jornada/pecas";
-import { ALVO_MINIMO, cor, espaco, fonte, raio, sombra } from "~/tema";
+import { canto, cor, curva, escala, espaco, fonte, luz, sombra } from "~/tema";
 
 type Icone = ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
 
@@ -24,7 +22,15 @@ export type ItemDoDia = {
   marcaPorToque?: boolean;
 };
 
-/** O cartão do dia: cabeçalho roxo + os momentos tocáveis + o rodapé. */
+const FIO = StyleSheet.hairlineWidth;
+
+/**
+ * O cartão do dia de quem ainda não tem a semana da gestação (o luto tem a
+ * tela dele, `TelaDoCuidado`). Era um cabeçalho violeta de jogo, em degradê,
+ * com a pílula "HOJE" e a data a 3,6:1 sobre o roxo: agora é o MATERIAL do app
+ * (branco com a luz do fundo, o fio e a sombra), a data em sobrelinha e uma
+ * lista só, com o ícone na névoa e o feito sem verde.
+ */
 export function CartaoDoDia({
   sobre,
   titulo,
@@ -33,7 +39,7 @@ export function CartaoDoDia({
   total,
   itens,
   rodape,
-  mostrarEstrelas = true,
+  mostrarEstrelas = false,
 }: {
   sobre: string;
   titulo: string;
@@ -46,59 +52,59 @@ export function CartaoDoDia({
 }) {
   return (
     <View
-      style={[{ borderRadius: raio.lg, backgroundColor: cor.cartao, overflow: "hidden" }, sombra]}
+      style={[
+        {
+          borderRadius: canto.cartao,
+          ...curva,
+          backgroundColor: luz.cartao,
+          borderWidth: FIO,
+          borderColor: "rgba(255,255,255,0.9)",
+          overflow: "hidden",
+        },
+        sombra,
+      ]}
     >
-      <LinearGradient
-        colors={[corJornada.roxoEscuro, corJornada.roxo, corJornada.roxoMedio]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={{ padding: espaco.lg, gap: 6 }}
-      >
+      <View style={{ paddingHorizontal: espaco.lg, paddingTop: espaco.lg, gap: 2 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
-          <View
+          <Text
             style={{
-              backgroundColor: "rgba(255,255,255,0.22)",
-              borderRadius: raio.pilula,
-              paddingHorizontal: 10,
-              paddingVertical: 3,
+              flex: 1,
+              ...fonte.forte,
+              ...escala.nota,
+              letterSpacing: 1,
+              textTransform: "uppercase",
+              color: cor.textoApagado,
             }}
           >
-            <Text
-              style={{
-                ...fonte.titulo,
-                fontSize: 13,
-                color: cor.branco,
-                letterSpacing: 0.6,
-              }}
-            >
-              HOJE
-            </Text>
-          </View>
-          <Text style={{ flex: 1, ...fonte.forte, fontSize: 15, color: cor.jogoFundo }}>
             {sobre}
           </Text>
           {mostrarEstrelas ? <Estrelas feitos={feitos} total={total} tamanho={17} /> : null}
         </View>
-        <Text style={{ ...fonte.titulo, fontSize: 24, color: cor.branco, letterSpacing: -0.3 }}>
+        <Text
+          accessibilityRole="header"
+          style={{ ...fonte.display, ...escala.titulo2, letterSpacing: -0.2, color: cor.texto }}
+        >
           {titulo}
         </Text>
         {linha ? (
-          <Text style={{ ...fonte.media, fontSize: 14, color: "#ddd6fe" }}>{linha}</Text>
+          <Text style={{ ...fonte.normal, ...escala.legenda, color: cor.textoApagado }}>
+            {linha}
+          </Text>
         ) : null}
-      </LinearGradient>
+      </View>
       <View style={{ paddingVertical: espaco.xs }}>
         {itens.map((it, i) => (
-          <LinhaDoMomento key={it.chave} item={it} ultimo={i === itens.length - 1} />
+          <LinhaDoMomento key={it.chave} item={it} primeiro={i === 0} />
         ))}
       </View>
       {rodape ? (
         <View
           style={{
-            borderTopWidth: 1,
+            borderTopWidth: FIO,
             borderTopColor: cor.borda,
             paddingHorizontal: espaco.lg,
             paddingVertical: espaco.md,
-            backgroundColor: corJornada.roxoNevoa,
+            backgroundColor: cor.apagado,
           }}
         >
           {rodape}
@@ -108,79 +114,77 @@ export function CartaoDoDia({
   );
 }
 
-function LinhaDoMomento({ item, ultimo }: { item: ItemDoDia; ultimo: boolean }) {
+function LinhaDoMomento({ item, primeiro }: { item: ItemDoDia; primeiro: boolean }) {
   const { Icone } = item;
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${item.titulo}. ${item.sub}`}
-      accessibilityState={{ checked: item.feito }}
-      accessibilityHint={
-        item.feito ? "Já feito hoje" : item.marcaPorToque ? "Toque quando tiver feito" : undefined
-      }
-      onPress={() => {
-        toque();
-        item.aoTocar();
-      }}
-      style={({ pressed }) => ({
-        flexDirection: "row",
-        alignItems: "center",
-        gap: espaco.md,
-        paddingHorizontal: espaco.lg,
-        paddingVertical: espaco.md,
-        minHeight: ALVO_MINIMO + 16,
-        backgroundColor: pressed ? corJornada.roxoNevoa : "transparent",
-        borderBottomWidth: ultimo ? 0 : 1,
-        borderBottomColor: cor.divisor,
-      })}
-    >
-      <View
-        style={{
-          width: 46,
-          height: 46,
-          borderRadius: 23,
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: item.feito ? corJornada.feito : corJornada.roxoFundo,
+    <View>
+      {primeiro ? null : (
+        <View style={{ height: FIO, marginLeft: 72, backgroundColor: cor.borda }} />
+      )}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${item.titulo}. ${item.sub}`}
+        accessibilityState={{ checked: item.feito }}
+        accessibilityHint={
+          item.feito ? "Já feito hoje" : item.marcaPorToque ? "Toque quando tiver feito" : undefined
+        }
+        onPress={() => {
+          toque();
+          item.aoTocar();
         }}
+        style={({ pressed }) => ({
+          flexDirection: "row",
+          alignItems: "center",
+          gap: espaco.md,
+          paddingLeft: espaco.lg,
+          paddingRight: 14,
+          paddingVertical: 10,
+          minHeight: 64,
+          opacity: pressed ? 0.6 : 1,
+        })}
       >
-        {item.feito ? (
-          <Check size={24} color={cor.branco} strokeWidth={3} />
-        ) : (
-          <Icone size={22} color={corJornada.roxo} strokeWidth={2.2} />
-        )}
-      </View>
-      <View style={{ flex: 1, gap: 2 }}>
-        <Text style={{ ...fonte.forte, fontSize: 16, color: cor.texto }}>{item.titulo}</Text>
-        <Text
-          numberOfLines={item.linhasDoSub ?? 1}
-          style={{
-            ...fonte.normal,
-            fontSize: 14,
-            lineHeight: 19,
-            color: cor.textoApagado,
-          }}
-        >
-          {item.sub}
-        </Text>
-      </View>
-      {item.feito ? (
-        <Text style={{ ...fonte.forte, fontSize: 13, color: corJornada.feito }}>
-          {item.rotuloDoFeito ?? "Feito"}
-        </Text>
-      ) : item.marcaPorToque ? (
         <View
           style={{
-            width: 28,
-            height: 28,
-            borderRadius: 14,
-            borderWidth: 2.5,
-            borderColor: corJornada.roxoClaro,
+            width: 44,
+            height: 44,
+            borderRadius: 22,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: cor.apagado,
           }}
-        />
-      ) : (
-        <ChevronRight size={22} color={corJornada.roxoClaro} />
-      )}
-    </Pressable>
+        >
+          <Icone size={22} color={cor.texto} strokeWidth={2} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ ...fonte.forte, ...escala.chamada, color: cor.texto }}>{item.titulo}</Text>
+          <Text
+            numberOfLines={item.linhasDoSub ?? 1}
+            style={{ ...fonte.normal, ...escala.legenda, color: cor.textoApagado }}
+          >
+            {item.sub}
+          </Text>
+        </View>
+        {item.feito ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <Check size={16} color={cor.textoApagado} strokeWidth={2.6} />
+            <Text style={{ ...fonte.forte, ...escala.nota, color: cor.textoApagado }}>
+              {item.rotuloDoFeito ?? "Feito"}
+            </Text>
+          </View>
+        ) : item.marcaPorToque ? (
+          <View
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: 13,
+              borderWidth: 2,
+              borderColor: cor.chevron,
+            }}
+          />
+        ) : (
+          <ChevronRight size={20} color={cor.chevron} strokeWidth={2.4} />
+        )}
+      </Pressable>
+    </View>
   );
 }

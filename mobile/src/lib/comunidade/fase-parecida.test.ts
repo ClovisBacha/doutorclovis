@@ -49,8 +49,11 @@ describe("o filtro de fase parecida", () => {
     const quemLiga = FONTES.filter((f) => /\/comunidade\/busca\?fase=1/.test(f.codigo)).map(
       (f) => f.arquivo,
     );
-    expect(quemLiga).toEqual([join("app", "(abas)", "inicio.tsx")]);
-    expect(fonte(join("app", "(abas)", "inicio.tsx"))).toContain("texto={`${ROTULO_DO_FILTRO}.`}");
+    /* O único atalho que dizia isso morava no Início, que desde 13/11/2026 só
+       abre no Modo Cuidado — onde a Comunidade não aparece. Era inalcançável e
+       saiu com a tela do luto (18/11/2026): hoje só a chave da busca liga. Um
+       atalho novo entra aqui, e diz o filtro com `ROTULO_DO_FILTRO`. */
+    expect(quemLiga).toEqual([]);
   });
 
   test("o rótulo fala da fase DELA, nunca das outras (nada de trimestre na tela)", () => {

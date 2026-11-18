@@ -133,6 +133,44 @@ export function tarefasFeitas(flags: FlagsDoDia): number {
   return TAREFAS_DO_POS.filter((t) => flags[t]).length;
 }
 
+/**
+ * COMO O DIA SE ARRUMA NA TELA (18/11/2026, a vistoria): o check-in de humor
+ * fica no alto enquanto não foi respondido; a PRÓXIMA tarefa pendente (o
+ * desafio, depois a leitura) vira o destaque; o resto vai numa lista só, as
+ * pendentes primeiro e as feitas depois — o mesmo desenho da gestação.
+ */
+export type DiaDoPosNaTela = {
+  /** O humor ainda não foi marcado hoje: o check-in aparece inteiro. */
+  perguntarHumor: boolean;
+  /** A tarefa em destaque (ou `null`, se não sobrou nenhuma). */
+  destaque: Exclude<TarefaDoPos, "humor"> | null;
+  /** As outras, na ordem da lista. */
+  lista: { tarefa: TarefaDoPos; feita: boolean }[];
+};
+
+export function arrumarODiaDoPos(flags: FlagsDoDia, temDesafio: boolean): DiaDoPosNaTela {
+  const tarefas: Exclude<TarefaDoPos, "humor">[] = temDesafio
+    ? ["desafio", "leitura"]
+    : ["leitura"];
+  const destaque = tarefas.find((t) => !flags[t]) ?? null;
+  const resto: TarefaDoPos[] = [...(flags.humor ? (["humor"] as const) : []), ...tarefas].filter(
+    (t) => t !== destaque,
+  );
+  const lista = resto.map((tarefa) => ({ tarefa, feita: !!flags[tarefa] }));
+  return {
+    perguntarHumor: !flags.humor,
+    destaque,
+    lista: [...lista.filter((l) => !l.feita), ...lista.filter((l) => l.feita)],
+  };
+}
+
+/** A etiqueta do topo: "Nasceu hoje", "1 dia de vocês", "20 dias de vocês". */
+export function diasDeVoces(idadeDias: number): string {
+  const n = Math.max(0, Math.floor(idadeDias));
+  if (n === 0) return "Nasceu hoje";
+  return `${n} ${n === 1 ? "dia" : "dias"} de vocês`;
+}
+
 export function diasDoPosFechados(blob: Blob): number[] {
   return listaDeNumeros(blob[CHAVE_FEITOS_POS]);
 }
