@@ -1,41 +1,54 @@
 import { Image } from "expo-image";
+import { useScrollToTop } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
-import * as Haptics from "expo-haptics";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Animated,
   Easing,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
+  type LayoutChangeEvent,
   type ScrollView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Check, ChevronRight, Flame, Play, Sprout } from "lucide-react-native";
+import { Check, ChevronRight, Flame, Play } from "lucide-react-native";
 import Svg, { Circle, Text as SvgText } from "react-native-svg";
-import { toque, useFimDaRolagem } from "~/componentes/base";
+import {
+  Sobrelinha,
+  sucesso,
+  TituloDaSecao,
+  Tocavel,
+  toque,
+  useFimDaRolagem,
+  useFolgaDaBarra,
+} from "~/componentes/base";
 import { Vidro } from "~/componentes/vidro";
 import { Brilho } from "~/componentes/jornada/atividade";
 import { CEUS, ceuDaHora, CeuVivo, useCeuDasAbas, type Ceu } from "~/componentes/ceu-vivo";
-import { Painel } from "~/componentes/painel";
-import { ALTURA_DO_CEU, CeuDoBebe } from "~/componentes/jornada/ceu-do-bebe";
+import { Painel, RAIO_DENTRO_DO_PAINEL } from "~/componentes/painel";
 import {
-  ArteDaBolha,
-  Flutuar,
-  Inclinacao3D,
-  useMovimentoReduzido,
-  useParalaxe,
-  type HumorDaArte,
-} from "~/componentes/movimento";
+  CeuDoBebe,
+  SaudacaoNoCeu,
+  useAlturaDoCeu,
+} from "~/componentes/jornada/ceu-do-bebe";
+import { GrupoDeAtalhos } from "~/componentes/jornada/atalhos";
+import {
+  corBebe,
+  corGratidao,
+  corJornada,
+  corMeditacao,
+  corMovimento,
+} from "~/componentes/jornada/cores";
+import { ArteDaBolha, useMovimentoReduzido, useParalaxe, type HumorDaArte } from "~/componentes/movimento";
 import { CompartilharASemana, type DadosDoCartao } from "~/componentes/jornada/cartao-da-semana";
 import { Confete } from "~/componentes/jornada/pecas";
 import { parametroDaBancada } from "~/lib/bancada";
 import { arteDoBebe } from "~/componentes/jornada/arte-do-bebe";
 import { clarear, comAlfa } from "~/lib/cor";
 import type { ChaveDoCuidado, Cuidado } from "~/lib/jornada/hoje";
-import { aperto, cor, curva, espaco, fonte, luz, sombra } from "~/tema";
+import { cor, curva, escala, espaco, fonte, luz, margem, ouro, sombra } from "~/tema";
 
 export { Selo } from "~/componentes/jornada/ceu-do-bebe";
 /* O céu da hora mora em `ceu-vivo.tsx` (é também o fundo da entrada); o
@@ -51,8 +64,12 @@ export { CEUS, ceuDaHora } from "~/componentes/ceu-vivo";
  * pintado da hora do dia; a bolha entra pequena, como personagem que ajuda
  * (pedido do dono: "o bebê bolha só entra como auxiliador personagem"). Os
  * cinco momentos viram gestos com tempo e porquê, o próximo vem em destaque, e
- * um anel de cinco partes se fecha ao longo do dia. A trilha, o Cantinho e os
- * troféus ficam a um toque ("Ver minha jornada").
+ * um anel de cinco partes se fecha ao longo do dia.
+ *
+ * 18/11/2026 (a vistoria): um produto só do começo ao fim. O céu fica com a
+ * emoção e a chama (que abre a Trilha); o acompanhamento e o cuidado do dia
+ * vêm em painéis; e a metade de baixo, que eram cinco cartões soltos de cinco
+ * cores, vira UM grupo de atalhos no material do app (`atalhos.tsx`).
  *
  * ⚠️ Nunca "a Helena"/"o Theo": o nome do bebê vai sem artigo, para a tela não
  * supor o sexo. Sem nome, "o bebê".
@@ -66,56 +83,65 @@ export const ARTE: Record<ChaveDoCuidado, number> = {
   gratitude: require("../../../../src/assets/grades/diario.webp"),
 };
 
+/**
+ * A ficha de cada cuidado, na cor da atividade (`cores.ts`). A aula é do
+ * violeta do jogo, por fora e por dentro (18/11/2026: era laranja aqui e
+ * violeta ao abrir, e o toque parecia levar a outro lugar).
+ */
 export const FICHA: Record<ChaveDoCuidado, string> = {
-  aula: "#fff1df",
-  movement: "#e3f7ee",
-  meditation: "#f1eaff",
-  bonding: "#ffe9ef",
-  gratitude: "#fff6d6",
+  aula: corJornada.roxoFundo,
+  movement: corMovimento.forteFundo,
+  meditation: corMeditacao.halo,
+  bonding: corBebe.fundoTopo,
+  gratitude: corGratidao.escolhidaFundo,
 };
 
-/* O destaque do "próximo cuidado", na cor da atividade. */
-const DESTAQUE: Record<
-  ChaveDoCuidado,
-  { de: string; ate: string; labio: string; forte: string; tinta: string }
-> = {
-  aula: { de: "#fff6e8", ate: "#ffe9cc", labio: "#f7d29f", forte: "#c26a00", tinta: "#6b3a00" },
-  movement: { de: "#e9fbf2", ate: "#d4f5e6", labio: "#b5e9d1", forte: "#007a55", tinta: "#0b4a35" },
-  meditation: {
-    de: "#f6efff",
-    ate: "#ebe0ff",
-    labio: "#d8c6ff",
-    forte: "#7008e7",
-    tinta: "#3f1585",
-  },
-  bonding: { de: "#fff0f3", ate: "#ffe0e7", labio: "#ffc3d0", forte: "#c70036", tinta: "#7d0b2c" },
-  gratitude: {
-    de: "#fffbe8",
-    ate: "#fff1c2",
-    labio: "#fbe08a",
-    forte: "#bb4d00",
-    tinta: "#6e3203",
-  },
-};
+/* O destaque do "próximo cuidado", na cor da atividade — lida de `cores.ts`,
+   e não repetida à mão. */
+const DESTAQUE: Record<ChaveDoCuidado, { de: string; ate: string; forte: string; tinta: string }> =
+  {
+    aula: {
+      de: corJornada.roxoNevoa,
+      ate: corJornada.roxoFundo,
+      forte: corJornada.roxo,
+      tinta: corJornada.roxoEscuro,
+    },
+    movement: {
+      de: corMovimento.fundoMeio,
+      ate: corMovimento.fundoTopo,
+      forte: corMovimento.forte,
+      tinta: corMovimento.titulo,
+    },
+    meditation: {
+      de: corMeditacao.fundoMeio,
+      ate: corMeditacao.fundoTopo,
+      forte: corMeditacao.forte,
+      tinta: corMeditacao.titulo,
+    },
+    bonding: {
+      de: corBebe.fundoMeio,
+      ate: corBebe.fundoTopo,
+      forte: corBebe.forte,
+      tinta: corBebe.titulo,
+    },
+    gratitude: {
+      de: corGratidao.fundoMeio,
+      ate: corGratidao.fundoTopo,
+      forte: corGratidao.forte,
+      tinta: corGratidao.titulo,
+    },
+  };
 
 /** A névoa da paleta: o fundo do pós-parto, que ainda tem a folha sobre o céu. */
 export const FUNDO = cor.fundo;
 
-/* As tintas da folha: a ameixa da paleta, e um degrau mais suave para o texto corrido. */
-const TINTA = {
-  titulo: cor.texto,
-  corpo: "#463d63",
-  apagado: cor.textoApagado,
-  link: cor.primariaEscura,
-} as const;
-
 const FIO = StyleSheet.hairlineWidth;
 
-/** O material dos cartões da folha: branco, com o fio de luz e a sombra em camadas. */
+/** O material dos blocos dentro de um painel: branco, com o fio de luz e a sombra em camadas. */
 const MATERIAL = {
   backgroundColor: luz.cartao,
   borderWidth: FIO,
-  borderColor: "rgba(255,255,255,0.9)",
+  borderColor: comAlfa(cor.branco, 0.9),
   ...curva,
   ...sombra,
 } as const;
@@ -125,12 +151,11 @@ const vistosPorDia = new Map<string, number>();
 
 /**
  * O instante em que um cuidado se acende: ela volta da atividade e a tela
- * reage — o anel pulsa, o celular vibra, e o quinto acende o céu e solta o
- * confete, uma vez. Ao ABRIR o app nada festeja: o que já estava feito é
- * estado, não acontecimento — e "abrir" inclui o instante em que a jornada
- * ainda não foi lida do aparelho (`pronto`): contar com o blob vazio fazia a
- * abertura festejar o que já estava feito. (`&animar=1` na bancada finge o
- * último.)
+ * reage — o anel pulsa, o celular vibra, e o quinto solta o confete, uma vez.
+ * Ao ABRIR o app nada festeja: o que já estava feito é estado, não
+ * acontecimento — e "abrir" inclui o instante em que a jornada ainda não foi
+ * lida do aparelho (`pronto`): contar com o blob vazio fazia a abertura
+ * festejar o que já estava feito. (`&animar=1` na bancada finge o último.)
  */
 export function useMomentoDoDia(
   D: number,
@@ -154,13 +179,8 @@ export function useMomentoDoDia(
     vistosPorDia.set(chave, feitos);
     if (anterior === undefined || feitos <= anterior) return;
     const fechou = feitos >= total && anterior < total;
-    if (Platform.OS !== "web") {
-      void (
-        fechou
-          ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
-          : Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
-      ).catch(() => {});
-    }
+    if (fechou) sucesso();
+    else toque(false);
     if (!reduzido) {
       Animated.sequence([
         Animated.timing(pulso, {
@@ -213,6 +233,9 @@ export function Entrar({ atraso = 0, children }: { atraso?: number; children: Re
   );
 }
 
+/** O que cobre o pé da tela nas abas (a barra flutuante), no mínimo. */
+const PE_DAS_ABAS = 96;
+
 export function TelaDeHoje({
   D,
   pronto = true,
@@ -228,13 +251,15 @@ export function TelaDeHoje({
   recado,
   humor,
   chama,
+  reguaUsada = false,
   avisos,
   nascimento,
   acompanhamento,
+  lembrete,
   amigas,
   agenda,
   aoAbrir,
-  aoVerJornada,
+  aoVerTrilha,
   direita,
 }: {
   D: number;
@@ -254,23 +279,30 @@ export function TelaDeHoje({
   recado: string;
   humor: HumorDaArte;
   chama: number;
+  /** Ela já arrastou a régua do céu: a dica não aparece mais. */
+  reguaUsada?: boolean;
   /** Os avisos do momento (presente, conquista nova, carteira que falhou). */
   avisos?: ReactNode;
-  /** A partir da semana 37: a porta para contar o nascimento. */
+  /** A partir da semana 37: a porta para contar o nascimento (a primeira linha do grupo). */
   nascimento?: ReactNode;
   /** O acompanhamento da semana (peso, frase, data provável, semana a semana,
    * movimentos), logo abaixo do céu: o bebê é o centro da tela (13/11/2026). */
   acompanhamento?: ReactNode;
-  /** As amigas e a dupla, logo depois do cuidado do dia (fase 3). */
+  /** O convite para o lembrete do cuidado (um cartão, acima do grupo). */
+  lembrete?: ReactNode;
+  /** As amigas: uma LINHA do grupo de atalhos. */
   amigas?: ReactNode;
-  /** A próxima consulta da agenda (ou o convite para marcar). */
+  /** A próxima consulta da agenda: uma LINHA do grupo de atalhos. */
   agenda?: ReactNode;
+  /** Abre um cuidado (estável: as linhas não se redesenham à toa). */
   aoAbrir: (c: ChaveDoCuidado) => void;
-  aoVerJornada: () => void;
-  /** O canto direito do topo: a foto dela, que abre o Perfil. */
+  /** A chama do céu abre a Trilha (estável). */
+  aoVerTrilha: () => void;
+  /** O canto direito do topo: a foto dela, que abre o Perfil (estável). */
   direita?: ReactNode;
 }) {
   const topo = useSafeAreaInsets().top;
+  const altura = useAlturaDoCeu(topo, Math.max(PE_DAS_ABAS, useFolgaDaBarra()));
   /* Dentro das abas o céu é o delas (um só, atrás de todas): a tela fica
      transparente e lê dele a fase e a inclinação do celular. Fora, o seu. */
   const dasAbas = useCeuDasAbas();
@@ -279,8 +311,12 @@ export function TelaDeHoje({
   const quem = nomeDoBebe ?? "o bebê";
   const feitos = cuidados.filter((c) => c.feito).length;
   const proximo = cuidados.find((c) => !c.feito) ?? null;
-  const resto = cuidados.filter((c) => c !== proximo);
-  const { pulso, brilho, festa } = useMomentoDoDia(D, feitos, 5, "gestacao", pronto);
+  /* O que falta primeiro, o feito depois: o olho lê antes o que ainda pede. */
+  const resto = [
+    ...cuidados.filter((c) => !c.feito && c !== proximo),
+    ...cuidados.filter((c) => c.feito),
+  ];
+  const { pulso, festa } = useMomentoDoDia(D, feitos, 5, "gestacao", pronto);
   const fim = useFimDaRolagem(espaco.xxl);
   /* A rolagem e a inclinação do celular movem as camadas (o céu, o número, o
      bebê) e fazem nascer a barra de vidro do topo: tudo no fio nativo, sem
@@ -289,6 +325,8 @@ export function TelaDeHoje({
   const propria = useParalaxe();
   const { x, y } = dasAbas ?? propria;
   const lista = useRef<ScrollView>(null);
+  /* Tocar de novo na aba já aberta volta ao topo (a barra emite o `tabPress`). */
+  useScrollToTop(lista);
   const aoRolar = useMemo(
     () =>
       Animated.event([{ nativeEvent: { contentOffset: { y: rolagem } } }], {
@@ -297,16 +335,39 @@ export function TelaDeHoje({
     [rolagem],
   );
 
+  /* Onde começa "O cuidado de hoje": a barra que nasce leva até ele. */
+  const yDosPaineis = useRef(0);
+  const yDoCuidado = useRef(0);
+  const irAoCuidado = useCallback(
+    () =>
+      lista.current?.scrollTo({
+        y: Math.max(0, yDosPaineis.current + yDoCuidado.current - topo - 64),
+        animated: true,
+      }),
+    [topo],
+  );
+
+  /* O alto do céu não muda a cada leitura que chega: o herói não se redesenha. */
+  const cabecalho = useMemo(
+    () => (
+      <SaudacaoNoCeu
+        topo={topo}
+        ceu={ceu}
+        data={data}
+        saudacao={saudacao}
+        chama={chama}
+        aoVerTrilha={aoVerTrilha}
+        direita={direita}
+      />
+    ),
+    [topo, ceu, data, saudacao, chama, aoVerTrilha, direita],
+  );
+
   return (
     <View style={{ flex: 1, backgroundColor: dasAbas ? "transparent" : ceu.chao }}>
       {/* O CÉU DA HORA É A TELA INTEIRA: fica parado atrás da rolagem, vivo, e
           tudo o mais flutua sobre ele (16/11/2026). */}
       {dasAbas ? null : <CeuVivo fase={fase} rolagem={rolagem} x={x} y={y} />}
-      {/* O céu se ilumina quando o quinto cuidado se acende. */}
-      <Animated.View
-        pointerEvents="none"
-        style={[StyleSheet.absoluteFill, { backgroundColor: "#fff7e0", opacity: brilho }]}
-      />
 
       <Animated.ScrollView
         ref={lista}
@@ -319,10 +380,8 @@ export function TelaDeHoje({
         {/* O bebê da semana no céu — o herói da tela. */}
         <CeuDoBebe
           topo={topo}
+          altura={altura}
           ceu={ceu}
-          data={data}
-          saudacao={saudacao}
-          direita={direita}
           semana={semana}
           dias={dias}
           nomeDoBebe={nomeDoBebe}
@@ -330,151 +389,112 @@ export function TelaDeHoje({
           rolagem={rolagem}
           x={x}
           y={y}
+          reguaUsada={reguaUsada}
+          cabecalho={cabecalho}
         />
 
-        {/* Os painéis, soltos sobre o céu. */}
-        <View style={{ paddingHorizontal: 12, paddingTop: 6, gap: 14 }}>
+        {/* Os painéis, soltos sobre o céu, na margem da saudação. */}
+        <View
+          onLayout={(e: LayoutChangeEvent) => {
+            yDosPaineis.current = e.nativeEvent.layout.y;
+          }}
+          style={{ paddingHorizontal: margem.tela, paddingTop: 6, gap: 14 }}
+        >
           {avisos}
-          {nascimento}
           {acompanhamento ? (
             <Entrar atraso={80}>
               <Painel>{acompanhamento}</Painel>
             </Entrar>
           ) : null}
 
-          <Entrar atraso={160}>
-            <Painel>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.md }}>
-                <View style={{ flex: 1 }}>
-                  <Text
-                    accessibilityRole="header"
+          <View
+            onLayout={(e: LayoutChangeEvent) => {
+              yDoCuidado.current = e.nativeEvent.layout.y;
+            }}
+          >
+            <Entrar atraso={160}>
+              <Painel>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.md }}>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <TituloDaSecao>O cuidado de hoje</TituloDaSecao>
+                    <Text style={{ ...fonte.media, ...escala.legenda, color: cor.textoCorpo }}>
+                      5 minutinhos para você e {quem}
+                    </Text>
+                  </View>
+                  <Animated.View style={{ transform: [{ scale: pulso }] }}>
+                    <AnelDoDia feitos={feitos} />
+                  </Animated.View>
+                </View>
+
+                {/* A bolha, pequena: a personagem que acompanha, e não a dona da tela. */}
+                <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
+                  <ArteDaBolha humor={humor} tamanho={58} />
+                  <View
                     style={{
-                      ...fonte.titulo,
-                      fontSize: 26,
-                      lineHeight: 31,
-                      letterSpacing: aperto.titulo,
-                      color: TINTA.titulo,
+                      flex: 1,
+                      borderRadius: RAIO_DENTRO_DO_PAINEL,
+                      borderTopLeftRadius: 6,
+                      paddingHorizontal: 14,
+                      paddingVertical: 11,
+                      ...MATERIAL,
                     }}
                   >
-                    O cuidado de hoje
-                  </Text>
-                  <Text
-                    style={{ marginTop: 2, ...fonte.media, fontSize: 15, color: TINTA.apagado }}
-                  >
-                    5 minutinhos para você e {quem}
-                  </Text>
+                    <Text style={{ ...fonte.media, ...escala.legenda, color: cor.textoCorpo }}>
+                      {recado}
+                    </Text>
+                  </View>
                 </View>
-                <Animated.View style={{ transform: [{ scale: pulso }] }}>
-                  <AnelDoDia feitos={feitos} />
-                </Animated.View>
-              </View>
 
-              {/* A bolha, pequena: a personagem que acompanha, e não a dona da tela. */}
-              <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
-                <ArteDaBolha humor={humor} tamanho={58} />
-                <View
-                  style={{
-                    flex: 1,
-                    borderRadius: 20,
-                    borderTopLeftRadius: 6,
-                    paddingHorizontal: 14,
-                    paddingVertical: 11,
-                    ...MATERIAL,
-                  }}
-                >
-                  <Text
-                    style={{ ...fonte.media, fontSize: 15, lineHeight: 21, color: TINTA.corpo }}
-                  >
-                    {recado}
-                  </Text>
-                </View>
-              </View>
+                <Entrar key={proximo?.chave ?? "cheio"}>
+                  {proximo ? (
+                    <ProximoCuidado c={proximo} aoAbrir={aoAbrir} />
+                  ) : (
+                    <DiaCheio />
+                  )}
+                </Entrar>
 
-              <Entrar key={proximo?.chave ?? "cheio"}>
-                {proximo ? (
-                  <ProximoCuidado c={proximo} aoAbrir={() => aoAbrir(proximo.chave)} />
-                ) : (
-                  <DiaCheio quem={quem} />
-                )}
-              </Entrar>
+                {/* Os outros cuidados, numa lista só (e não quatro cartões soltos). */}
+                {resto.length ? (
+                  <View style={{ borderRadius: RAIO_DENTRO_DO_PAINEL, paddingVertical: 4, ...MATERIAL }}>
+                    {resto.map((c, i) => (
+                      <View key={c.chave}>
+                        {i > 0 ? (
+                          <View style={{ height: FIO, marginLeft: 82, backgroundColor: cor.borda }} />
+                        ) : null}
+                        <LinhaDoCuidado c={c} aoAbrir={aoAbrir} />
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+              </Painel>
+            </Entrar>
+          </View>
 
-              {/* Os outros cuidados, numa lista só (e não quatro cartões soltos). */}
-              {resto.length ? (
-                <View style={{ borderRadius: 26, paddingVertical: 4, ...MATERIAL }}>
-                  {resto.map((c, i) => (
-                    <View key={c.chave}>
-                      {i > 0 ? (
-                        <View style={{ height: FIO, marginLeft: 82, backgroundColor: cor.borda }} />
-                      ) : null}
-                      <LinhaDoCuidado c={c} aoAbrir={() => aoAbrir(c.chave)} />
-                    </View>
-                  ))}
-                </View>
-              ) : null}
+          {/* A metade de baixo num grupo só: o convite do lembrete e as portas. */}
+          <Entrar atraso={240}>
+            <Painel>
+              {lembrete}
+              <GrupoDeAtalhos>
+                {nascimento}
+                {amigas}
+                {agenda}
+                <CompartilharASemana d={cartao} />
+              </GrupoDeAtalhos>
             </Painel>
           </Entrar>
-
-          {amigas}
-
-          {agenda}
-
-          <CompartilharASemana d={cartao} />
-
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`${chama} dias seguidos. Ver a trilha`}
-            onPress={() => {
-              toque();
-              aoVerJornada();
-            }}
-            style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
-          >
-            <LinearGradient
-              colors={["#fff0e3", "#ffe6ef"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: espaco.sm,
-                borderRadius: 22,
-                ...curva,
-                paddingHorizontal: 16,
-                paddingVertical: 15,
-              }}
-            >
-              {chama > 0 ? (
-                <Flame size={20} color="#e2560f" fill="#ff9d4d" strokeWidth={2} />
-              ) : (
-                <Sprout size={20} color="#15803d" strokeWidth={2.2} />
-              )}
-              <Text style={{ flex: 1, ...fonte.media, fontSize: 15, color: "#7a4324" }}>
-                {chama > 0 ? (
-                  <>
-                    <Text style={{ ...fonte.titulo, color: "#c2571a" }}>
-                      {chama} {chama === 1 ? "dia" : "dias"}
-                    </Text>{" "}
-                    cuidando de vocês
-                  </>
-                ) : (
-                  "Sua jornada começa hoje"
-                )}
-              </Text>
-              <Text style={{ ...fonte.forte, fontSize: 15, color: TINTA.link }}>Ver a trilha</Text>
-              <ChevronRight size={18} color={TINTA.link} strokeWidth={2.4} />
-            </LinearGradient>
-          </Pressable>
         </View>
       </Animated.ScrollView>
 
       <BarraQueNasce
         topo={topo}
+        altura={altura}
         ceu={ceu}
         rolagem={rolagem}
         semana={semana}
         nomeDoBebe={nomeDoBebe}
         feitos={feitos}
-        aoTocar={() => lista.current?.scrollTo({ y: 0, animated: true })}
+        chama={chama}
+        aoTocar={irAoCuidado}
       />
       {festa ? <Confete pecas={60} /> : null}
     </View>
@@ -483,46 +503,64 @@ export function TelaDeHoje({
 
 /**
  * A BARRA QUE NASCE: quando o céu sai da tela, desce do topo uma cápsula de
- * vidro com o bebê, o nome, a semana e os cuidados do dia — o que o céu dizia
- * continua à vista, e um toque nela volta ao topo. Ela desliza (e não aparece
- * esmaecendo): vidro com transparência animada perde o efeito no meio do caminho.
+ * vidro com o bebê, o nome, a semana, a chama e os cuidados do dia — o que o
+ * céu dizia continua à vista, e um toque nela leva ao cuidado de hoje. Ela
+ * desliza (e não aparece esmaecendo): vidro com transparência animada perde o
+ * efeito no meio do caminho.
  */
 function BarraQueNasce({
   topo,
+  altura,
   ceu,
   rolagem,
   semana,
   nomeDoBebe,
   feitos,
+  chama,
   aoTocar,
 }: {
   topo: number;
+  /** A altura do céu desta tela (`useAlturaDoCeu`). */
+  altura: number;
   ceu: Ceu;
   rolagem: Animated.Value;
   semana: number;
   nomeDoBebe: string | null;
   feitos: number;
+  chama: number;
   aoTocar: () => void;
 }) {
-  const some = ALTURA_DO_CEU + topo - 190;
+  const some = altura + topo - 190;
+  const estilos = useMemo(
+    () => ({
+      veu: {
+        opacity: rolagem.interpolate({
+          inputRange: [some, some + 90],
+          outputRange: [0, 1],
+          extrapolate: "clamp",
+        }),
+      },
+      desce: {
+        transform: [
+          {
+            translateY: rolagem.interpolate({
+              inputRange: [some, some + 90],
+              outputRange: [-(topo + 80), 0],
+              extrapolate: "clamp",
+            }),
+          },
+        ],
+      },
+    }),
+    [rolagem, some, topo],
+  );
   return (
     <>
       {/* Com o bebê fora da tela, o topo se desfaz na cor do alto do céu: o que
           rola não passa por baixo do relógio do iPhone. */}
       <Animated.View
         pointerEvents="none"
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: topo + 64,
-          opacity: rolagem.interpolate({
-            inputRange: [some, some + 90],
-            outputRange: [0, 1],
-            extrapolate: "clamp",
-          }),
-        }}
+        style={[{ position: "absolute", top: 0, left: 0, right: 0, height: topo + 64 }, estilos.veu]}
       >
         <LinearGradient
           colors={[ceu.topo, comAlfa(ceu.topo, 0.85), comAlfa(ceu.topo, 0)]}
@@ -532,26 +570,14 @@ function BarraQueNasce({
       </Animated.View>
       <Animated.View
         pointerEvents="box-none"
-        style={{
-          position: "absolute",
-          top: topo + 4,
-          left: 0,
-          right: 0,
-          alignItems: "center",
-          transform: [
-            {
-              translateY: rolagem.interpolate({
-                inputRange: [some, some + 90],
-                outputRange: [-(topo + 80), 0],
-                extrapolate: "clamp",
-              }),
-            },
-          ],
-        }}
+        style={[
+          { position: "absolute", top: topo + 4, left: 0, right: 0, alignItems: "center" },
+          estilos.desce,
+        ]}
       >
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${nomeDoBebe ?? "O bebê"}, ${semana} semanas. ${feitos} de 5 cuidados feitos hoje. Voltar ao topo`}
+          accessibilityLabel={`${nomeDoBebe ?? "O bebê"}, ${semana} semanas. ${chama} ${chama === 1 ? "dia seguido" : "dias seguidos"}. ${feitos} de 5 cuidados feitos hoje. Ir para o cuidado de hoje`}
           onPress={() => {
             toque();
             aoTocar();
@@ -563,6 +589,7 @@ function BarraQueNasce({
               flexDirection: "row",
               alignItems: "center",
               gap: 8,
+              minHeight: 44,
               paddingLeft: 6,
               paddingRight: 14,
               paddingVertical: 5,
@@ -573,14 +600,42 @@ function BarraQueNasce({
               style={{ width: 34, height: 34 }}
               contentFit="contain"
             />
-            <Text style={{ ...fonte.titulo, fontSize: 15, color: TINTA.titulo }}>
+            <Text style={{ ...fonte.forte, ...escala.legenda, color: cor.texto }}>
               {nomeDoBebe ?? "O bebê"}
             </Text>
-            <Text style={{ ...fonte.media, fontSize: 14, color: TINTA.apagado }}>
+            <Text style={{ ...fonte.media, ...escala.legenda, color: cor.textoApagado }}>
               {semana} semanas
             </Text>
-            <View style={{ width: 1, height: 16, backgroundColor: cor.borda }} />
-            <Text style={{ ...fonte.titulo, fontSize: 14, color: TINTA.link }}>{feitos}/5</Text>
+            <View style={{ width: FIO * 2, height: 16, backgroundColor: cor.borda }} />
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+              <Flame
+                size={15}
+                color={chama > 0 ? corJornada.chama : cor.textoApagado}
+                fill={chama > 0 ? ouro.medio : "transparent"}
+                strokeWidth={2.2}
+              />
+              <Text
+                style={{
+                  ...fonte.titulo,
+                  ...escala.legenda,
+                  fontVariant: ["tabular-nums"],
+                  color: cor.texto,
+                }}
+              >
+                {chama}
+              </Text>
+            </View>
+            <View style={{ width: FIO * 2, height: 16, backgroundColor: cor.borda }} />
+            <Text
+              style={{
+                ...fonte.titulo,
+                ...escala.legenda,
+                fontVariant: ["tabular-nums"],
+                color: cor.primariaEscura,
+              }}
+            >
+              {feitos}/5
+            </Text>
           </Vidro>
         </Pressable>
       </Animated.View>
@@ -588,7 +643,11 @@ function BarraQueNasce({
   );
 }
 
-/** O anel do dia: uma parte por cuidado (cinco na gestação, três no pós-parto). */
+/**
+ * O anel do dia: uma parte por cuidado (cinco na gestação, três no pós-parto).
+ * Dentro, só o "2/5" (a palavra "cuidados", em 9,5 pt, encostava no traço; ela
+ * mora no rótulo do leitor de tela).
+ */
 export function AnelDoDia({
   feitos,
   total = 5,
@@ -624,25 +683,14 @@ export function AnelDoDia({
         ))}
         <SvgText
           x={40}
-          y={39}
+          y={47}
           textAnchor="middle"
           fontFamily={fonte.titulo.fontFamily}
           fontWeight={fonte.titulo.fontWeight}
-          fontSize={19}
-          fill={TINTA.titulo}
+          fontSize={20}
+          fill={cor.texto}
         >
           {`${feitos}/${total}`}
-        </SvgText>
-        <SvgText
-          x={40}
-          y={54}
-          textAnchor="middle"
-          fontFamily={fonte.forte.fontFamily}
-          fontWeight={fonte.forte.fontWeight}
-          fontSize={9.5}
-          fill={TINTA.apagado}
-        >
-          cuidados
         </SvgText>
       </Svg>
     </View>
@@ -651,19 +699,29 @@ export function AnelDoDia({
 
 /**
  * O PRÓXIMO CUIDADO, em destaque: o objeto da atividade SALTA para fora do
- * cartão (passa da borda de cima, com o brilho por trás), e o cartão inteiro
- * inclina com o celular e com o dedo (`Inclinacao3D`). O cartão é o botão: o
- * "Começar" é só o desenho dele, para o leitor de tela não ler dois botões.
+ * cartão (passa da borda de cima, com o brilho por trás). O cartão é o botão,
+ * e afunda de leve com o dedo (a mola do `Tocavel`); o "Começar" é só o
+ * desenho dele, para o leitor de tela não ler dois botões.
+ *
+ * Não inclina mais com o celular nem flutua (18/11/2026): a paralaxe é do
+ * herói, e só dele — um cartão de lista que balança briga com a rolagem.
  */
-function ProximoCuidado({ c, aoAbrir }: { c: Cuidado; aoAbrir: () => void }) {
+const ProximoCuidado = memo(function ProximoCuidado({
+  c,
+  aoAbrir,
+}: {
+  c: Cuidado;
+  aoAbrir: (c: ChaveDoCuidado) => void;
+}) {
   const d = DESTAQUE[c.chave];
   return (
-    <Inclinacao3D
-      raio={30}
-      aoTocar={aoAbrir}
-      rotuloAcessivel={`Próximo cuidado: ${c.titulo}. ${c.sub}. Começar`}
-      estiloDeFora={{ marginTop: 30 }}
+    <Tocavel
+      aoTocar={() => aoAbrir(c.chave)}
+      rotulo={`Próximo cuidado: ${c.titulo}. ${c.sub}. Começar`}
       estilo={{
+        marginTop: 30,
+        borderRadius: RAIO_DENTRO_DO_PAINEL,
+        ...curva,
         boxShadow: `0px 2px 4px ${comAlfa(d.forte, 0.06)}, 0px 22px 40px -18px ${comAlfa(d.forte, 0.5)}`,
       }}
     >
@@ -677,10 +735,10 @@ function ProximoCuidado({ c, aoAbrir }: { c: Cuidado; aoAbrir: () => void }) {
         style={[
           StyleSheet.absoluteFill,
           {
-            borderRadius: 30,
+            borderRadius: RAIO_DENTRO_DO_PAINEL,
             ...curva,
             borderWidth: FIO,
-            borderColor: "rgba(255,255,255,0.95)",
+            borderColor: comAlfa(cor.branco, 0.95),
           },
         ]}
       />
@@ -697,9 +755,7 @@ function ProximoCuidado({ c, aoAbrir }: { c: Cuidado; aoAbrir: () => void }) {
         }}
       >
         <Brilho tamanho={170} />
-        <Flutuar amplitude={4} periodo={3800}>
-          <Image source={ARTE[c.chave]} style={{ width: 134, height: 134 }} contentFit="contain" />
-        </Flutuar>
+        <Image source={ARTE[c.chave]} style={{ width: 134, height: 134 }} contentFit="contain" />
       </View>
       <View
         style={{
@@ -710,40 +766,27 @@ function ProximoCuidado({ c, aoAbrir }: { c: Cuidado; aoAbrir: () => void }) {
           paddingLeft: 124,
         }}
       >
-        <Text
-          style={{
-            ...fonte.titulo,
-            fontSize: 11,
-            letterSpacing: 1.3,
-            textTransform: "uppercase",
-            color: d.forte,
-          }}
-        >
-          Próximo cuidado
-        </Text>
+        <Sobrelinha tinta={d.forte}>Próximo cuidado</Sobrelinha>
         <Text
           style={{
             marginTop: 2,
-            ...fonte.titulo,
-            fontSize: 22,
-            lineHeight: 26,
-            letterSpacing: aperto.subtitulo,
+            ...fonte.display,
+            ...escala.titulo2,
+            letterSpacing: -0.2,
             color: d.tinta,
           }}
         >
-          {c.titulo}
+          {comEspacoFirme(c.titulo)}
         </Text>
         <Text
           style={{
             marginTop: 2,
             ...fonte.media,
-            fontSize: 14,
-            lineHeight: 19,
+            ...escala.legenda,
             color: d.tinta,
-            opacity: 0.8,
           }}
         >
-          {c.sub}
+          {comEspacoFirme(c.sub)}
         </Text>
         <View
           style={{
@@ -767,29 +810,29 @@ function ProximoCuidado({ c, aoAbrir }: { c: Cuidado; aoAbrir: () => void }) {
             }}
           >
             <Play size={15} color={cor.branco} fill={cor.branco} />
-            <Text style={{ ...fonte.titulo, fontSize: 16, color: cor.branco }}>Começar</Text>
+            <Text style={{ ...fonte.forte, ...escala.chamada, color: cor.branco }}>Começar</Text>
           </LinearGradient>
         </View>
       </View>
-    </Inclinacao3D>
+    </Tocavel>
   );
-}
+});
 
-function DiaCheio({ quem }: { quem: string }) {
+function DiaCheio() {
   return (
     <LinearGradient
-      colors={["#fff3f8", "#ffe1ec"]}
+      colors={[clarear(cor.rosaMarca, 0.5), cor.rosaMarca]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={{
         flexDirection: "row",
         alignItems: "center",
         gap: 14,
-        borderRadius: 30,
+        borderRadius: RAIO_DENTRO_DO_PAINEL,
         ...curva,
         padding: 18,
         borderWidth: FIO,
-        borderColor: "rgba(255,255,255,0.95)",
+        borderColor: comAlfa(cor.branco, 0.95),
         boxShadow: `0px 22px 40px -18px ${comAlfa(cor.primaria, 0.45)}`,
       }}
     >
@@ -797,30 +840,36 @@ function DiaCheio({ quem }: { quem: string }) {
       <View style={{ flex: 1, gap: 2 }}>
         <Text
           style={{
-            ...fonte.titulo,
-            fontSize: 22,
-            letterSpacing: aperto.subtitulo,
+            ...fonte.display,
+            ...escala.titulo2,
+            letterSpacing: -0.2,
             color: cor.textoDestaque,
           }}
         >
-          Dia cheio 💛
+          Dia cheio
         </Text>
-        <Text style={{ ...fonte.media, fontSize: 15, lineHeight: 21, color: "#8a3a5c" }}>
-          Os cinco cuidados de hoje estão feitos. {primeiraMaiuscula(quem)} sentiu cada minuto.
+        <Text style={{ ...fonte.media, ...escala.legenda, color: cor.textoDestaque }}>
+          {comEspacoFirme("Você fez os cinco cuidados de hoje. Amanhã tem aula nova.")}
         </Text>
       </View>
     </LinearGradient>
   );
 }
 
-function LinhaDoCuidado({ c, aoAbrir }: { c: Cuidado; aoAbrir: () => void }) {
+const LinhaDoCuidado = memo(function LinhaDoCuidado({
+  c,
+  aoAbrir,
+}: {
+  c: Cuidado;
+  aoAbrir: (c: ChaveDoCuidado) => void;
+}) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${c.titulo}. ${c.feito ? "Feito hoje" : c.sub}`}
       onPress={() => {
         toque();
-        aoAbrir();
+        aoAbrir(c.chave);
       }}
       style={({ pressed }) => ({
         flexDirection: "row",
@@ -849,23 +898,21 @@ function LinhaDoCuidado({ c, aoAbrir }: { c: Cuidado; aoAbrir: () => void }) {
         <Text
           style={{
             ...fonte.forte,
-            fontSize: 16,
-            lineHeight: 21,
-            color: c.feito ? TINTA.apagado : TINTA.titulo,
+            ...escala.chamada,
+            color: c.feito ? cor.textoApagado : cor.texto,
           }}
         >
-          {c.titulo}
+          {comEspacoFirme(c.titulo)}
         </Text>
         <Text
           style={{
             marginTop: 1,
-            ...fonte.media,
-            fontSize: 13.5,
-            lineHeight: 18,
-            color: TINTA.apagado,
+            ...fonte.normal,
+            ...escala.legenda,
+            color: cor.textoApagado,
           }}
         >
-          {c.feito ? "Feito hoje 💛" : c.sub}
+          {c.feito ? "Feito hoje" : comEspacoFirme(c.sub)}
         </Text>
       </View>
       {c.feito ? (
@@ -876,18 +923,23 @@ function LinhaDoCuidado({ c, aoAbrir }: { c: Cuidado; aoAbrir: () => void }) {
             borderRadius: 13,
             alignItems: "center",
             justifyContent: "center",
-            backgroundColor: "#12a06c",
+            backgroundColor: cor.ok,
           }}
         >
           <Check size={15} color={cor.branco} strokeWidth={3.2} />
         </View>
       ) : (
-        <ChevronRight size={20} color="#c3bad6" strokeWidth={2.4} />
+        <ChevronRight size={18} color={cor.chevron} strokeWidth={2.4} />
       )}
     </Pressable>
   );
-}
+});
 
-function primeiraMaiuscula(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
+/**
+ * A última palavra não fica sozinha na linha de baixo ("Aprender sobre a
+ * semana / 24"): o último espaço vira um espaço que não quebra. A frase de
+ * `lib/jornada/hoje.ts` não muda; só o desenho dela.
+ */
+function comEspacoFirme(titulo: string): string {
+  return titulo.replace(/ (\S+)$/, " $1");
 }

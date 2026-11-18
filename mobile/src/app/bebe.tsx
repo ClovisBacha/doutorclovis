@@ -1,54 +1,70 @@
-import { semanaDaArte } from "@/lib/arte-do-bebe";
-import { fruitEmojiForWeek, trimesterForWeek, WEEK_MAX, WEEK_MIN } from "@/lib/gestacao";
-import { Image } from "expo-image";
+import { WEEK_MAX, WEEK_MIN } from "@/lib/gestacao";
 import { router } from "expo-router";
-import { ChevronLeft, ChevronRight } from "lucide-react-native";
-import { useEffect, useRef, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { BEBE } from "~/componentes/artes";
-import { Botao, Cartao, Linha, Pilula, T, Tela, toque } from "~/componentes/base";
-import { CEUS, faseDeAgora } from "~/componentes/ceu-vivo";
-import { parametroDaBancada } from "~/lib/bancada";
-import { bebeDaSemana } from "~/lib/bebe-da-semana";
-import { gestacaoDoPerfil } from "~/lib/gestacao";
-import { semGeneroDoBebe } from "~/lib/nutricao/frase-do-topo";
-import { BolhaViva, Entrada, Flutuar, Inclinacao3D } from "~/componentes/movimento";
-import { CabecalhoDaPilha } from "~/componentes/cabecalho";
-import { Medida } from "~/componentes/medida";
-import { useSessao } from "~/lib/sessao";
-import { ALVO_MINIMO, cor, curva, espaco, fonte, fonteDoNumero, raio, sombra } from "~/tema";
+import { useMemo, useRef, useState } from "react";
+import { Animated, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AvisoMedico } from "~/componentes/aviso-medico";
-
-const SEMANAS = Array.from({ length: WEEK_MAX - WEEK_MIN + 1 }, (_, i) => WEEK_MIN + i);
-const LARGURA_CHIP = 52;
+import { Botao, Carregando, T, Tela } from "~/componentes/base";
+import { BotaoVoltar, PilulaSos } from "~/componentes/cabecalho";
+import { CEUS, CeuVivo, faseDeAgora, sombraDoTexto, type Ceu } from "~/componentes/ceu-vivo";
+import { BebeNestaSemana } from "~/componentes/jornada/bebe-nesta-semana";
+import { CeuDoBebe, CHAVE_REGUA_USADA, useAlturaDoCeu } from "~/componentes/jornada/ceu-do-bebe";
+import { BolhaViva, useParalaxe } from "~/componentes/movimento";
+import { Painel } from "~/componentes/painel";
+import { parametroDaBancada } from "~/lib/bancada";
+import { gestacaoDoPerfil } from "~/lib/gestacao";
+import { useLoja } from "~/lib/jornada/loja";
+import { useSessao } from "~/lib/sessao";
+import { ALVO_MINIMO, escala, espaco, fonte, margem } from "~/tema";
 
 /**
- * O bebê semana a semana: ela abre na semana de hoje e pode andar para trás
- * (o que já passou) e para frente (o que vem). No Modo Cuidado esta tela não
- * mostra o bebê — devolve para o início com acolhimento.
+ * O bebê SEMANA A SEMANA: ela abre na semana de hoje (ou na pedida) e anda
+ * para trás (o que já passou) e para frente (o que vem). No Modo Cuidado esta
+ * tela não mostra o bebê — devolve para o início com acolhimento.
+ *
+ * 18/11/2026 (a vistoria: "uma segunda implementação, mais pobre, da mesma
+ * viagem pelas semanas — e chega a mostrar outro bebê para a mesma semana").
+ * Agora é a MESMA cena da aba do bebê: o céu vivo da hora, o número atrás, o
+ * bebê da semana (`arteDoBebe`, a regra única) e a régua do tempo — um
+ * controle só, no lugar da faixa de 37 fichas e das setas. Embaixo, o mesmo
+ * painel da aba (`BebeNestaSemana`) acompanha a semana que a régua mostra; a
+ * data provável só aparece na semana de hoje (é dela, e não da semana vista).
  */
 export default function Bebe() {
   const { perfil, cuidado } = useSessao();
+  const { top: topo, bottom: baixo } = useSafeAreaInsets();
+  const altura = useAlturaDoCeu(topo, baixo);
+  const loja = useLoja();
+  /* O céu de quando a tela abriu (o mesmo das abas). */
+  const [{ fase, ceu }] = useState(() => ({ fase: faseDeAgora(), ceu: CEUS[faseDeAgora()] }));
+  const rolagem = useRef(new Animated.Value(0)).current;
+  const { x, y } = useParalaxe();
+  const aoRolar = useMemo(
+    () =>
+      Animated.event([{ nativeEvent: { contentOffset: { y: rolagem } } }], {
+        useNativeDriver: true,
+      }),
+    [rolagem],
+  );
+
   const gest = gestacaoDoPerfil(perfil);
   const hoje = gest ? Math.min(Math.max(gest.weeks, WEEK_MIN), WEEK_MAX) : 20;
   const pedida = Number(parametroDaBancada("ver"));
-  /* null = "a semana de hoje": o perfil pode chegar depois do primeiro
-     desenho, e a tela tem de abrir na semana dela, não num padrão. */
-  const [escolhida, setEscolhida] = useState<number | null>(
-    Number.isFinite(pedida) && pedida >= WEEK_MIN ? pedida : null,
-  );
-  const semana = escolhida ?? hoje;
-  /* O céu de quando a tela abriu (o mesmo das abas). */
-  const [ceu] = useState(() => CEUS[faseDeAgora()]);
-  const setSemana = (f: (s: number) => number) => setEscolhida(f(semana));
-  const faixa = useRef<ScrollView>(null);
-  const [larguraDaFaixa, setLarguraDaFaixa] = useState(0);
+  const inicial =
+    Number.isFinite(pedida) && pedida >= WEEK_MIN ? Math.min(pedida, WEEK_MAX) : hoje;
+  const [vista, setVista] = useState(inicial);
+  const nome = perfil?.baby_name?.trim() || null;
 
-  useEffect(() => {
-    if (!larguraDaFaixa) return;
-    const x = (semana - WEEK_MIN) * (LARGURA_CHIP + 8) - (larguraDaFaixa - LARGURA_CHIP) / 2;
-    faixa.current?.scrollTo({ x: Math.max(0, x), animated: true });
-  }, [semana, larguraDaFaixa]);
+  const cabecalho = useMemo(
+    () => (
+      <TopoDaViagem
+        topo={topo}
+        ceu={ceu}
+        titulo={nome ? `${nome}, semana a semana` : "Semana a semana"}
+      />
+    ),
+    [topo, ceu, nome],
+  );
 
   if (cuidado) {
     return (
@@ -70,190 +86,92 @@ export default function Bebe() {
     );
   }
 
-  const bebe = bebeDaSemana(semana);
-  const rotulo =
-    gest && semana === hoje
-      ? "Esta semana"
-      : gest && semana < hoje
-        ? "Já passou"
-        : gest
-          ? "Vem aí"
-          : null;
-  const andar = (d: number) => {
-    toque();
-    setSemana((s) => Math.min(Math.max(s + d, WEEK_MIN), WEEK_MAX));
-  };
+  /* A régua abre na semana dela: espera o perfil, para não abrir num padrão. */
+  if (!perfil) {
+    return (
+      <Tela>
+        <Carregando />
+      </Tela>
+    );
+  }
 
   return (
-    <Tela bordas={["top", "bottom"]}>
-      <CabecalhoDaPilha
-        titulo={perfil?.baby_name ? `${perfil.baby_name}, semana a semana` : "Semana a semana"}
-        voltarPara="/jornada"
-      />
-
-      <ScrollView
-        ref={faixa}
-        onLayout={(e) => setLarguraDaFaixa(e.nativeEvent.layout.width)}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 8, paddingVertical: 4 }}
+    <View style={{ flex: 1, backgroundColor: ceu.chao }}>
+      <CeuVivo fase={fase} rolagem={rolagem} x={x} y={y} />
+      <Animated.ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: baixo + espaco.xl }}
+        showsVerticalScrollIndicator={false}
+        onScroll={aoRolar}
+        scrollEventThrottle={16}
       >
-        {SEMANAS.map((s) => {
-          const ativa = s === semana;
-          return (
-            <Pressable
-              key={s}
-              accessibilityRole="button"
-              accessibilityLabel={`Semana ${s}`}
-              accessibilityState={{ selected: ativa }}
-              onPress={() => {
-                toque();
-                setEscolhida(s);
-              }}
-              style={{
-                width: LARGURA_CHIP,
-                minHeight: ALVO_MINIMO + 8,
-                borderRadius: raio.md,
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: ativa
-                  ? cor.primaria
-                  : s === hoje && gest
-                    ? cor.destaque
-                    : cor.cartao,
-                borderWidth: 1,
-                borderColor: ativa ? cor.primaria : cor.borda,
-              }}
-            >
-              <Text
-                style={{
-                  ...fonte.titulo,
-                  fontSize: 18,
-                  color: ativa ? cor.branco : cor.texto,
-                }}
-              >
-                {s}
-              </Text>
-              <Text
-                style={{
-                  ...fonte.normal,
-                  fontSize: 13,
-                  color: ativa ? cor.branco : cor.textoApagado,
-                }}
-              >
-                sem
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-
-      {/* O bebê no céu da hora, com o número da semana atrás dele — a mesma
-          cena do topo da aba do bebê, e não mais um cartão cor-de-rosa
-          (16/11/2026). O cartão inclina com o celular e com o dedo. */}
-      <Inclinacao3D raio={32}>
-        <View style={[{ height: 318, borderRadius: 32, ...curva, overflow: "hidden" }, sombra]}>
-          <Image
-            source={ceu.arte}
-            style={StyleSheet.absoluteFill}
-            contentFit="cover"
-            contentPosition="top"
-            accessibilityIgnoresInvertColors
-          />
-          <View
-            pointerEvents="none"
-            accessible={false}
-            importantForAccessibility="no-hide-descendants"
-            accessibilityElementsHidden
-            style={[StyleSheet.absoluteFill, { alignItems: "center", paddingTop: 22 }]}
-          >
-            <Text
-              allowFontScaling={false}
-              style={{
-                ...fonteDoNumero,
-                fontSize: 190,
-                lineHeight: 200,
-                letterSpacing: -9,
-                fontVariant: ["tabular-nums"],
-                color: ceu.numero,
-              }}
-            >
-              {semana}
-            </Text>
-          </View>
-          <Linha estilo={{ gap: espaco.sm, justifyContent: "center", marginTop: espaco.md }}>
-            <Pilula texto={`${trimesterForWeek(semana)}º trimestre`} fundo={cor.cartao} />
-            {rotulo ? <Pilula texto={rotulo} fundo={cor.cartao} /> : null}
-          </Linha>
-          <Linha
-            estilo={{
-              flex: 1,
-              justifyContent: "space-between",
-              alignSelf: "stretch",
-              paddingHorizontal: espaco.md,
-              paddingBottom: espaco.md,
-            }}
-          >
-            <Seta direcao={-1} desabilitada={semana <= WEEK_MIN} aoTocar={() => andar(-1)} />
-            {/* A chave reinicia a entrada a cada semana: a arte chega de novo. */}
-            <Entrada key={semana} deslocamento={10}>
-              <Flutuar>
-                <Image
-                  source={BEBE[semanaDaArte(semana)]}
-                  style={{ width: 190, height: 190 }}
-                  contentFit="contain"
-                  accessibilityLabel={`Ilustração do bebê na semana ${semana}`}
-                />
-              </Flutuar>
-            </Entrada>
-            <Seta direcao={1} desabilitada={semana >= WEEK_MAX} aoTocar={() => andar(1)} />
-          </Linha>
+        <CeuDoBebe
+          topo={topo}
+          altura={altura}
+          ceu={ceu}
+          semana={hoje}
+          inicial={inicial}
+          dias={gest?.days ?? 0}
+          nomeDoBebe={nome}
+          faltam={null}
+          rolagem={rolagem}
+          x={x}
+          y={y}
+          reguaUsada={loja.blob[CHAVE_REGUA_USADA] === true}
+          cabecalho={cabecalho}
+          modo="semanas"
+          semData={!gest}
+          aoVer={setVista}
+        />
+        <View style={{ paddingHorizontal: margem.tela, paddingTop: 6 }}>
+          <Painel>
+            <BebeNestaSemana
+              semana={vista}
+              totalDias={gest?.totalDays ?? null}
+              nomeDoBebe={nome}
+              titulo={null}
+              mostrarDataProvavel={!!gest && vista === hoje}
+              portas={false}
+            />
+            <AvisoMedico curto />
+          </Painel>
         </View>
-      </Inclinacao3D>
-
-      <Cartao estilo={{ gap: espaco.md }}>
-        <T tipo="titulo">Semana {semana}</T>
-        <Linha estilo={{ gap: espaco.md, alignSelf: "stretch" }}>
-          <Medida titulo="Tamanho" valor={bebe.size} />
-          <Medida titulo="Peso" valor={bebe.weight} />
-          <Medida titulo="Como" valor={`${fruitEmojiForWeek(semana)} ${bebe.fruit}`} />
-        </Linha>
-        <T estilo={{ alignSelf: "stretch" }}>{semGeneroDoBebe(bebe.desc)}</T>
-      </Cartao>
-
-      <AvisoMedico curto />
-    </Tela>
+      </Animated.ScrollView>
+    </View>
   );
 }
 
-function Seta({
-  direcao,
-  desabilitada,
-  aoTocar,
-}: {
-  direcao: 1 | -1;
-  desabilitada: boolean;
-  aoTocar: () => void;
-}) {
-  const Icone = direcao < 0 ? ChevronLeft : ChevronRight;
+/** O alto do céu no semana a semana: o voltar, o título na tinta do céu e o SOS. */
+function TopoDaViagem({ topo, ceu, titulo }: { topo: number; ceu: Ceu; titulo: string }) {
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={direcao < 0 ? "Semana anterior" : "Próxima semana"}
-      accessibilityState={{ disabled: desabilitada }}
-      disabled={desabilitada}
-      onPress={aoTocar}
+    <View
       style={{
-        width: ALVO_MINIMO,
-        height: ALVO_MINIMO,
-        borderRadius: ALVO_MINIMO / 2,
-        backgroundColor: cor.cartao,
+        paddingTop: topo + espaco.xs,
+        paddingHorizontal: margem.tela,
+        flexDirection: "row",
         alignItems: "center",
-        justifyContent: "center",
-        opacity: desabilitada ? 0.35 : 1,
+        gap: espaco.sm,
+        minHeight: ALVO_MINIMO,
       }}
     >
-      <Icone size={24} color={cor.primariaEscura} />
-    </Pressable>
+      <BotaoVoltar voltarPara="/jornada" />
+      <Text
+        accessibilityRole="header"
+        numberOfLines={1}
+        style={{
+          flex: 1,
+          textAlign: "center",
+          ...fonte.forte,
+          ...escala.manchete,
+          color: ceu.tinta,
+          ...sombraDoTexto(ceu),
+        }}
+      >
+        {titulo}
+      </Text>
+      <View style={{ minWidth: ALVO_MINIMO, alignItems: "flex-end" }}>
+        <PilulaSos />
+      </View>
+    </View>
   );
 }

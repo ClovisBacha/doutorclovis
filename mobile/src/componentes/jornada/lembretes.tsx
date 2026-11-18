@@ -1,9 +1,10 @@
 import { useFocusEffect } from "expo-router";
-import { Bell } from "lucide-react-native";
+import { Bell, ChevronRight, X } from "lucide-react-native";
 import { useCallback, useEffect, useState } from "react";
-import { Linking, Modal, Platform, Pressable, ScrollView, Text, View } from "react-native";
-import { toque } from "~/componentes/base";
-import { sombraDe } from "~/componentes/jornada/atividade";
+import { Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Botao, selecao, toque } from "~/componentes/base";
+import { Folha } from "~/componentes/jornada/pecas";
+import { RAIO_DENTRO_DO_PAINEL } from "~/componentes/painel";
 import type { DiaDaJornada } from "~/componentes/jornada/usarJornada";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { tituloCurtoDaAula } from "~/lib/jornada/aula";
@@ -24,7 +25,7 @@ import {
   reagendarLembretesDaJornada,
   type PreferenciaGuardada,
 } from "~/lib/lembretes-da-jornada";
-import { ALVO_MINIMO, cor, espaco, fonte, raio } from "~/tema";
+import { ALVO_MINIMO, canto, cor, curva, escala, espaco, fonte, luz, sombra, vidro } from "~/tema";
 
 /**
  * Os lembretes da jornada na tela: o contexto que a régua precisa (de onde ela
@@ -134,11 +135,25 @@ export function usePreferenciaDosLembretes(uid: string | null) {
   return [pref, setPref] as const;
 }
 
+/** O material dos cartões dentro de um painel (o mesmo dos cuidados e dos atalhos). */
+const MATERIAL = {
+  backgroundColor: luz.cartao,
+  borderWidth: StyleSheet.hairlineWidth,
+  borderColor: vidro.borda,
+  borderRadius: RAIO_DENTRO_DO_PAINEL,
+  ...curva,
+  ...sombra,
+} as const;
+
 /**
  * O CONVITE, na tela Hoje — depois do primeiro cuidado feito (o momento em que
  * o lembrete faz sentido para ela), até ela ligar ou dispensar. É o "lembrar
  * do app" do dono, pedido do jeito certo: o iPhone só pergunta pelas
  * notificações quando ela toca em "Às 20h".
+ *
+ * 18/11/2026 (a vistoria): no material do app, com a ação na cor de agir (era
+ * um azul de outro app), e o "Agora não" virou o X do canto (deixava um vão
+ * branco embaixo).
  */
 export function ConviteDosLembretes({
   uid,
@@ -162,15 +177,14 @@ export function ConviteDosLembretes({
         style={{
           flexDirection: "row",
           alignItems: "center",
-          gap: espaco.sm,
-          borderRadius: 18,
-          backgroundColor: "#eef7ff",
-          paddingHorizontal: 14,
-          paddingVertical: 12,
+          gap: espaco.md,
+          paddingHorizontal: espaco.lg,
+          paddingVertical: espaco.md,
+          ...MATERIAL,
         }}
       >
-        <Bell size={18} color="#0369a1" />
-        <Text style={{ flex: 1, ...fonte.media, fontSize: 14, color: "#0c3a5a" }}>
+        <FichaDoSino />
+        <Text style={{ flex: 1, ...fonte.media, ...escala.legenda, color: cor.textoCorpo }}>
           Combinado: eu te lembro às {ligado.replace(":00", "h")}. Dá para mudar no Perfil, em
           Lembretes.
         </Text>
@@ -190,60 +204,60 @@ export function ConviteDosLembretes({
     else setLigado(hora);
   }
 
+  const dispensar = () => {
+    setPref({ ...pref, dispensado: true });
+    if (!ehBancada()) void definirLembretesDaJornada(uid, { dispensado: true }, null);
+  };
+
   return (
-    <View
-      style={{
-        borderRadius: 22,
-        backgroundColor: cor.branco,
-        padding: espaco.lg,
-        gap: espaco.sm,
-        ...sombraDe("#b0708d", 0.6),
-      }}
-    >
-      <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
-        <View
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: 20,
+    <View style={{ padding: espaco.lg, gap: espaco.md, ...MATERIAL }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.md }}>
+        <FichaDoSino />
+        <Text style={{ flex: 1, ...fonte.forte, ...escala.chamada, color: cor.texto }}>
+          Quer um lembrete do cuidado de hoje?
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Agora não"
+          onPress={() => {
+            toque();
+            dispensar();
+          }}
+          style={({ pressed }) => ({
+            width: ALVO_MINIMO,
+            height: ALVO_MINIMO,
+            marginVertical: -8,
+            marginRight: -10,
             alignItems: "center",
             justifyContent: "center",
-            backgroundColor: "#eef7ff",
-          }}
+            borderRadius: canto.pilula,
+            backgroundColor: pressed ? cor.apagado : "transparent",
+          })}
         >
-          <Bell size={20} color="#0369a1" />
-        </View>
-        <Text style={{ flex: 1, ...fonte.titulo, fontSize: 16, color: "#3a2230" }}>
-          Quer que eu te lembre do cuidado de hoje?
-        </Text>
+          <X size={18} color={cor.textoApagado} strokeWidth={2.4} />
+        </Pressable>
       </View>
-      <Text style={{ ...fonte.media, fontSize: 14, lineHeight: 20, color: "#7d5a72" }}>
-        Um aviso por dia, na hora que você escolher — e silêncio no dia em que você já cuidou.
+      <Text style={{ marginTop: -4, ...fonte.normal, ...escala.legenda, color: cor.textoCorpo }}>
+        Um aviso por dia, na hora que você escolher. Se você já cuidou, ele não toca.
       </Text>
-      <View style={{ flexDirection: "row", gap: espaco.sm, marginTop: 2 }}>
-        <BotaoPilula
+      <View style={{ flexDirection: "row", gap: espaco.sm }}>
+        <Botao
           rotulo={`Às ${HORA_PADRAO_DA_JORNADA.replace(":00", "h")}`}
-          cheio
+          estilo={{ flexGrow: 1 }}
           aoTocar={() => void ligar(HORA_PADRAO_DA_JORNADA)}
         />
-        <BotaoPilula rotulo="Outro horário" aoTocar={() => setEscolhendo(true)} />
+        <Botao
+          rotulo="Outro horário"
+          tipo="suave"
+          estilo={{ flexGrow: 1 }}
+          aoTocar={() => setEscolhendo(true)}
+        />
       </View>
       {semPermissao ? <AvisoSemPermissao /> : null}
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => {
-          toque();
-          setPref({ ...pref, dispensado: true });
-          if (!ehBancada()) void definirLembretesDaJornada(uid, { dispensado: true }, null);
-        }}
-        style={{ minHeight: ALVO_MINIMO, justifyContent: "center", alignSelf: "flex-start" }}
-      >
-        <Text style={{ ...fonte.forte, fontSize: 14, color: "#9a7486" }}>Agora não</Text>
-      </Pressable>
       <FolhaDoHorario
         aberta={escolhendo}
         hora={null}
-        titulo="Lembrar do cuidado de hoje às"
+        titulo="Lembrar do cuidado às"
         aoFechar={() => setEscolhendo(false)}
         aoEscolher={(h) => {
           setEscolhendo(false);
@@ -254,62 +268,58 @@ export function ConviteDosLembretes({
   );
 }
 
+function FichaDoSino() {
+  return (
+    <View
+      style={{
+        width: 40,
+        height: 40,
+        borderRadius: canto.campo,
+        ...curva,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: cor.destaque,
+      }}
+    >
+      <Bell size={20} color={cor.primaria} strokeWidth={2.2} />
+    </View>
+  );
+}
+
 export function AvisoSemPermissao() {
   return (
-    <View style={{ gap: 6 }}>
-      <Text style={{ ...fonte.normal, fontSize: 13, lineHeight: 18, color: cor.atencaoForte }}>
-        As notificações do app estão desligadas no iPhone. Ative nos Ajustes para o lembrete chegar.
+    <View style={{ gap: 2 }}>
+      <Text style={{ ...fonte.normal, ...escala.nota, color: cor.atencaoForte }}>
+        As notificações do app estão desligadas no iPhone. Ligue nos Ajustes para o lembrete
+        chegar.
       </Text>
       {Platform.OS !== "web" ? (
         <Pressable
           accessibilityRole="button"
           onPress={() => void Linking.openSettings().catch(() => {})}
-          style={{ minHeight: ALVO_MINIMO, justifyContent: "center", alignSelf: "flex-start" }}
+          style={{
+            minHeight: ALVO_MINIMO,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 2,
+            alignSelf: "flex-start",
+          }}
         >
-          <Text style={{ ...fonte.titulo, fontSize: 14, color: "#0369a1" }}>
-            Abrir os Ajustes ›
+          <Text style={{ ...fonte.forte, ...escala.legenda, color: cor.primariaEscura }}>
+            Abrir os Ajustes
           </Text>
+          <ChevronRight size={16} color={cor.primariaEscura} strokeWidth={2.4} />
         </Pressable>
       ) : null}
     </View>
   );
 }
 
-function BotaoPilula({
-  rotulo,
-  cheio,
-  aoTocar,
-}: {
-  rotulo: string;
-  cheio?: boolean;
-  aoTocar: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={rotulo}
-      onPress={() => {
-        toque();
-        aoTocar();
-      }}
-      style={({ pressed }) => ({
-        flex: 1,
-        minHeight: ALVO_MINIMO + 4,
-        alignItems: "center",
-        justifyContent: "center",
-        borderRadius: 999,
-        backgroundColor: cheio ? "#0284c7" : "#eef7ff",
-        opacity: pressed ? 0.85 : 1,
-      })}
-    >
-      <Text style={{ ...fonte.titulo, fontSize: 15, color: cheio ? cor.branco : "#0369a1" }}>
-        {rotulo}
-      </Text>
-    </Pressable>
-  );
-}
-
-/** A folha das horas: de meia em meia hora, das 6h às 23h30 (as mesmas da meditação). */
+/**
+ * A folha das horas: de meia em meia hora, das 6h às 23h30 (as mesmas da
+ * meditação). É a `Folha` do app (a mesma alça, o mesmo X, o mesmo véu), e não
+ * um Modal desenhado à parte.
+ */
 export function FolhaDoHorario({
   aberta,
   hora,
@@ -324,89 +334,52 @@ export function FolhaDoHorario({
   aoEscolher: (h: string) => void;
 }) {
   return (
-    <Modal visible={aberta} transparent animationType="slide" onRequestClose={aoFechar}>
-      <View style={{ flex: 1, justifyContent: "flex-end" }}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Fechar"
-          onPress={aoFechar}
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            top: 0,
-            bottom: 0,
-            backgroundColor: "rgba(20,10,30,0.35)",
-          }}
-        />
-        <View
-          accessibilityViewIsModal
-          style={{
-            maxHeight: "70%",
-            borderTopLeftRadius: 24,
-            borderTopRightRadius: 24,
-            backgroundColor: cor.branco,
-            paddingTop: 20,
-          }}
-        >
-          <Text
-            style={{
-              textAlign: "center",
-              ...fonte.forte,
-              fontSize: 13,
-              letterSpacing: 0.65,
-              textTransform: "uppercase",
-              color: "#0369a1",
-            }}
-          >
-            {titulo}
-          </Text>
-          <ScrollView
-            contentContainerStyle={{
-              flexDirection: "row",
-              flexWrap: "wrap",
-              gap: espaco.sm,
-              padding: espaco.xl,
-              paddingBottom: 40,
-            }}
-          >
-            {HORARIOS.map((h) => {
-              const ativa = h === hora;
-              return (
-                <Pressable
-                  key={h}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Às ${h}`}
-                  accessibilityState={{ selected: ativa }}
-                  onPress={() => {
-                    toque();
-                    aoEscolher(h);
-                  }}
-                  style={{
-                    width: "23%",
-                    minHeight: ALVO_MINIMO,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    borderRadius: raio.md,
-                    backgroundColor: ativa ? "#0284c7" : "#eef7ff",
-                  }}
-                >
-                  <Text
-                    style={{
-                      ...fonte.titulo,
-                      fontSize: 15,
-                      color: ativa ? cor.branco : "#0c3a5a",
-                      fontVariant: ["tabular-nums"],
-                    }}
-                  >
-                    {h}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
-      </View>
-    </Modal>
+    <Folha aberta={aberta} aoFechar={aoFechar} titulo={titulo}>
+      <ScrollView
+        style={{ maxHeight: 420 }}
+        contentContainerStyle={{
+          flexDirection: "row",
+          flexWrap: "wrap",
+          gap: espaco.sm,
+          paddingBottom: espaco.sm,
+        }}
+      >
+        {HORARIOS.map((h) => {
+          const ativa = h === hora;
+          return (
+            <Pressable
+              key={h}
+              accessibilityRole="button"
+              accessibilityLabel={`Às ${h}`}
+              accessibilityState={{ selected: ativa }}
+              onPress={() => {
+                selecao();
+                aoEscolher(h);
+              }}
+              style={({ pressed }) => ({
+                width: "23%",
+                minHeight: ALVO_MINIMO,
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: canto.campo,
+                ...curva,
+                backgroundColor: ativa ? cor.primaria : pressed ? cor.destaque : cor.apagado,
+              })}
+            >
+              <Text
+                style={{
+                  ...fonte.titulo,
+                  ...escala.legenda,
+                  color: ativa ? cor.branco : cor.texto,
+                  fontVariant: ["tabular-nums"],
+                }}
+              >
+                {h}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    </Folha>
   );
 }

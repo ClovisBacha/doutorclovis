@@ -1,12 +1,11 @@
-import { fruitEmojiForWeek, trimesterForWeek } from "@/lib/gestacao";
+import { trimesterForWeek } from "@/lib/gestacao";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { CalendarHeart, ChevronRight, HeartHandshake, Ruler, Weight } from "lucide-react-native";
-import { useEffect, useRef, type ReactNode } from "react";
+import { CalendarHeart, HeartHandshake, Ruler, Weight } from "lucide-react-native";
+import { memo, useEffect, useRef, type ReactNode } from "react";
 import {
   Animated,
   Easing,
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -14,211 +13,242 @@ import {
   type ViewStyle,
 } from "react-native";
 import Svg, { Circle, Defs, LinearGradient as Degrade, Stop } from "react-native-svg";
-import { toque } from "~/componentes/base";
+import { Sobrelinha, TituloDaSecao } from "~/componentes/base";
+import { FichaDoAtalho, GrupoDeAtalhos, LinhaDoAtalho } from "~/componentes/jornada/atalhos";
 import { useMovimentoReduzido } from "~/componentes/movimento";
-import { bebeDaSemana, retaFinalNoApp } from "~/lib/bebe-da-semana";
+import { RAIO_DENTRO_DO_PAINEL } from "~/componentes/painel";
+import { bebeDaSemana, emojiDaFrutaNoApp, retaFinalNoApp } from "~/lib/bebe-da-semana";
+import { clarear, comAlfa } from "~/lib/cor";
 import { ferramentasDaGestacao, NOME_DOS_MOVIMENTOS } from "~/lib/ferramentas";
-import { dataCurta, dataProvavel, diasAteADpp, fracaoDaGestacao } from "~/lib/inicio";
+import { dataCurta, dataProvavel, fracaoDaGestacao } from "~/lib/inicio";
 import { semGeneroDoBebe } from "~/lib/nutricao/frase-do-topo";
 import {
-  ALVO_MINIMO,
   amanhecer,
-  aperto,
+  canto,
   cor,
   curva,
-  espaco,
+  escala,
   fonte,
   fonteDoNumero,
   luz,
   sombra,
+  vidro,
 } from "~/tema";
-
-const TEXTO = cor.texto;
-const CORPO = "#463d63";
-const APAGADO = cor.textoApagado;
-const LINK = cor.primariaEscura;
 
 /**
  * O BEBÊ NESTA SEMANA — o acompanhamento, na tela do bebê (a aba do meio, que
  * abre o app; decisão do dono, 13/11/2026: "o bebê é o centro [...] esse
  * acompanhamento que é a alma do aplicativo").
  *
- * O céu do topo já diz a semana, a fruta, o tamanho e quantos dias faltam;
- * aqui fica o resto: o peso, a frase da semana, a data provável com o quanto
- * da gestação já passou, a reta final, o semana a semana e os movimentos.
+ * O céu do topo diz o nome, a semana e quantos dias faltam; aqui ficam os
+ * dados: o tamanho, o peso, a fruta e a frase da semana, a data provável com o
+ * quanto da gestação já passou, a reta final, o semana a semana e os
+ * movimentos. Nada se repete entre os dois (18/11/2026, a vistoria).
  *
- * O desenho é um MOSAICO (16/11/2026), e não mais uma pilha de linhas iguais:
- * o anel da gestação grande à esquerda, com o degradê do amanhecer se fechando
- * ao abrir a tela; o tamanho e o peso ao lado; a fruta numa faixa larga. Nada
- * do que a tela dizia saiu — mudou de lugar e de peso.
+ * O desenho é um MOSAICO (16/11/2026): o anel da gestação grande à esquerda,
+ * o tamanho e o peso ao lado, a fruta numa faixa larga. O semana a semana
+ * (`app/bebe.tsx`) usa este mesmo painel para a semana que a régua mostra.
  */
-export function BebeNestaSemana({
+export const BebeNestaSemana = memo(function BebeNestaSemana({
   semana,
   totalDias,
   nomeDoBebe,
+  titulo = "Nesta semana",
+  mostrarDataProvavel = true,
+  portas = true,
 }: {
   semana: number;
-  totalDias: number;
+  /** O dia da gestação HOJE (a data provável e o anel saem dele). */
+  totalDias: number | null;
   nomeDoBebe: string | null;
+  /** O título do painel (sem título no semana a semana, que tem o céu em cima). */
+  titulo?: string | null;
+  /** A data provável é de hoje: o semana a semana a esconde nas outras semanas. */
+  mostrarDataProvavel?: boolean;
+  /** As portas para o semana a semana e os movimentos (o semana a semana não abre a si mesmo). */
+  portas?: boolean;
 }) {
   const bebe = bebeDaSemana(semana);
-  const faltam = diasAteADpp(totalDias);
   const reta = retaFinalNoApp(semana);
   const { movimentos } = ferramentasDaGestacao({ semanas: semana, cuidado: false, nasceu: false });
-  const dpp = dataCurta(dataProvavel(totalDias));
-  const fracao = Math.min(1, Math.max(0, fracaoDaGestacao(totalDias)));
+  const comData = mostrarDataProvavel && totalDias != null;
+  const dpp = totalDias != null ? dataCurta(dataProvavel(totalDias)) : null;
+  const fracao = totalDias != null ? Math.min(1, Math.max(0, fracaoDaGestacao(totalDias))) : 0;
+  /* Nas semanas 4–7 o peso é "—": um travessão de 28 pt parece dado quebrado. */
+  const temPeso = bebe.weight.trim() !== "—";
+
+  const tamanho = (
+    <Medida
+      titulo="Tamanho"
+      valor={bebe.size}
+      icone={<Ruler size={16} color={cor.agenda} strokeWidth={2.3} />}
+      ficha={cor.agendaFundo}
+    />
+  );
+  const peso = temPeso ? (
+    <Medida
+      titulo="Peso"
+      valor={bebe.weight}
+      icone={<Weight size={16} color={cor.contracoes} strokeWidth={2.3} />}
+      ficha={cor.contracoesFundo}
+    />
+  ) : null;
 
   return (
     <View style={{ gap: 10 }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
-        <Text
-          accessibilityRole="header"
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.75}
-          style={{
-            flex: 1,
-            ...fonte.titulo,
-            fontSize: 24,
-            lineHeight: 30,
-            letterSpacing: aperto.titulo,
-            color: TEXTO,
-          }}
-        >
-          {nomeDoBebe ? `${nomeDoBebe} nesta semana` : "O bebê nesta semana"}
-        </Text>
-        <View
-          style={{
-            borderRadius: 999,
-            backgroundColor: cor.destaque,
-            paddingHorizontal: 11,
-            paddingVertical: 5,
-          }}
-        >
-          <Text style={{ ...fonte.forte, fontSize: 13, color: LINK }}>
-            {trimesterForWeek(semana)}º trimestre
-          </Text>
-        </View>
-      </View>
-
-      <View style={{ flexDirection: "row", gap: 10 }}>
-        {/* O anel: quanto da gestação já passou, e a data provável. */}
-        <Ladrilho
-          estilo={{ flex: 1.12, alignItems: "center", paddingVertical: 16 }}
-          rotulo={
-            faltam > 0
-              ? `Data provável ${dpp}. Faltam ${faltam} ${faltam === 1 ? "dia" : "dias"}.`
-              : `Data provável ${dpp}.`
+      {titulo ? (
+        <TituloDaSecao
+          direita={
+            <View
+              style={{
+                borderRadius: canto.pilula,
+                backgroundColor: cor.destaque,
+                paddingHorizontal: 11,
+                paddingVertical: 5,
+              }}
+            >
+              <Text style={{ ...fonte.forte, ...escala.nota, color: cor.textoDestaque }}>
+                {trimesterForWeek(semana)}º trimestre
+              </Text>
+            </View>
           }
         >
-          <AnelDaGestacao fracao={fracao} />
-          <View style={{ alignItems: "center", marginTop: 10 }}>
-            <Text style={{ ...fonte.media, fontSize: 13, color: APAGADO }}>Data provável</Text>
-            <Text style={{ marginTop: 1, ...fonte.forte, fontSize: 15, color: TEXTO }}>{dpp}</Text>
-            {faltam > 0 ? (
-              <Text style={{ marginTop: 1, ...fonte.media, fontSize: 13, color: APAGADO }}>
-                faltam {faltam} {faltam === 1 ? "dia" : "dias"}
+          {titulo}
+        </TituloDaSecao>
+      ) : null}
+
+      {comData && dpp ? (
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          {/* O anel: quanto da gestação já passou, e a data provável. */}
+          <Ladrilho
+            estilo={{ flex: 1.12, alignItems: "center", paddingVertical: 16 }}
+            rotulo={`${Math.round(fracao * 100)}% da gestação. Data provável ${dpp}.`}
+          >
+            <AnelDaGestacao fracao={fracao} />
+            <View style={{ alignItems: "center", marginTop: 10 }}>
+              <Text style={{ ...fonte.media, ...escala.nota, color: cor.textoApagado }}>
+                Data provável
               </Text>
-            ) : null}
+              <Text style={{ marginTop: 1, ...fonte.forte, ...escala.legenda, color: cor.texto }}>
+                {dpp}
+              </Text>
+            </View>
+          </Ladrilho>
+          <View style={{ flex: 1, gap: 10 }}>
+            {tamanho}
+            {peso}
           </View>
-        </Ladrilho>
-        <View style={{ flex: 1, gap: 10 }}>
-          <Medida
-            titulo="Tamanho"
-            valor={bebe.size}
-            icone={<Ruler size={16} color={amanhecer[2]} strokeWidth={2.3} />}
-            ficha="#efe9ff"
-          />
-          <Medida
-            titulo="Peso"
-            valor={bebe.weight}
-            icone={<Weight size={16} color="#e8672d" strokeWidth={2.3} />}
-            ficha="#ffeadc"
-          />
         </View>
-      </View>
+      ) : (
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          {tamanho}
+          {peso}
+        </View>
+      )}
 
       {/* A fruta e a frase da semana, numa faixa larga com a luz do amanhecer. */}
       <LinearGradient
-        colors={["#fff3ea", "#ffeaf2", "#f1ebff"]}
+        colors={[clarear(luz.pessego, 0.55), clarear(luz.rose, 0.55), clarear(luz.lilas, 0.55)]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={{
           flexDirection: "row",
           alignItems: "center",
           gap: 14,
-          borderRadius: 24,
+          borderRadius: RAIO_DENTRO_DO_PAINEL,
           ...curva,
           padding: 16,
           borderWidth: StyleSheet.hairlineWidth,
-          borderColor: "rgba(255,255,255,0.95)",
+          borderColor: vidro.borda,
           ...sombra,
         }}
       >
-        <View
-          style={{
-            width: 64,
-            height: 64,
-            borderRadius: 20,
-            ...curva,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: "rgba(255,255,255,0.8)",
-            boxShadow: "0px 8px 18px -8px rgba(35,25,66,0.25)",
-          }}
-        >
-          <Text allowFontScaling={false} style={{ fontSize: 36, lineHeight: 44 }}>
-            {fruitEmojiForWeek(semana)}
-          </Text>
-        </View>
+        <FichaDaFruta semana={semana} />
         <View style={{ flex: 1 }}>
-          <Text style={{ ...fonte.media, fontSize: 13, color: APAGADO }}>Como</Text>
-          <Text
-            style={{
-              ...fonte.titulo,
-              fontSize: 19,
-              lineHeight: 23,
-              letterSpacing: aperto.subtitulo,
-              color: TEXTO,
-            }}
-          >
+          <Text style={{ ...fonte.media, ...escala.nota, color: cor.textoApagado }}>
+            Do tamanho de
+          </Text>
+          <Text style={{ ...fonte.forte, ...escala.titulo3, color: cor.texto }}>
             {bebe.fruit}
           </Text>
-          <Text
-            style={{ marginTop: 3, ...fonte.media, fontSize: 14, lineHeight: 20, color: CORPO }}
-          >
+          <Text style={{ marginTop: 3, ...fonte.normal, ...escala.legenda, color: cor.textoCorpo }}>
             {semGeneroDoBebe(bebe.desc)}
           </Text>
         </View>
       </LinearGradient>
 
       {reta ? (
-        <View
-          style={{ borderRadius: 20, ...curva, backgroundColor: "#fff1e6", padding: 14, gap: 2 }}
-        >
-          <Text style={{ ...fonte.forte, fontSize: 15, color: "#8a4d2a" }}>{reta.titulo}</Text>
-          <Text style={{ ...fonte.media, fontSize: 14, lineHeight: 20, color: "#8a5a3c" }}>
+        <Ladrilho estilo={{ gap: 2 }}>
+          <Sobrelinha tinta={cor.primariaEscura}>Reta final</Sobrelinha>
+          <Text style={{ marginTop: 2, ...fonte.forte, ...escala.chamada, color: cor.texto }}>
+            {reta.titulo}
+          </Text>
+          <Text style={{ ...fonte.normal, ...escala.legenda, color: cor.textoCorpo }}>
             {reta.corpo}
           </Text>
-        </View>
+        </Ladrilho>
       ) : null}
 
-      <View style={{ flexDirection: "row", gap: 10 }}>
-        <Porta
-          titulo="Ver semana a semana"
-          rotulo={`Ver ${nomeDoBebe ?? "o bebê"} semana a semana`}
-          icone={<CalendarHeart size={18} color={LINK} strokeWidth={2.2} />}
-          aoTocar={() => router.push("/bebe")}
-        />
-        {movimentos ? (
-          <Porta
-            titulo={NOME_DOS_MOVIMENTOS}
-            rotulo={`${NOME_DOS_MOVIMENTOS}: conte as mexidinhas, no seu tempo`}
-            icone={<HeartHandshake size={18} color={LINK} strokeWidth={2.2} />}
-            aoTocar={() => router.push("/saude/chutes")}
+      {portas ? (
+        <GrupoDeAtalhos recuo={14 + 32 + 12}>
+          <LinhaDoAtalho
+            altura={52}
+            ficha={
+              <FichaDoAtalho lado={32} fundo={cor.agendaFundo}>
+                <CalendarHeart size={17} color={cor.agenda} strokeWidth={2.2} />
+              </FichaDoAtalho>
+            }
+            titulo="Semana a semana"
+            rotulo={`Ver ${nomeDoBebe ?? "o bebê"} semana a semana`}
+            aoTocar={() => router.push("/bebe")}
           />
-        ) : null}
-      </View>
+          {movimentos ? (
+            <LinhaDoAtalho
+              altura={52}
+              ficha={
+                <FichaDoAtalho lado={32} fundo={cor.destaque}>
+                  <HeartHandshake size={17} color={cor.primaria} strokeWidth={2.2} />
+                </FichaDoAtalho>
+              }
+              titulo={NOME_DOS_MOVIMENTOS}
+              rotulo={`${NOME_DOS_MOVIMENTOS}: conte as mexidinhas, no seu tempo`}
+              aoTocar={() => router.push("/saude/chutes")}
+            />
+          ) : null}
+        </GrupoDeAtalhos>
+      ) : null}
+    </View>
+  );
+});
+
+/**
+ * A fruta da semana: o emoji só quando ele desenha a fruta escrita ao lado
+ * (`EMOJI_DA_FRUTA_NO_APP`); sem par fiel, a régua — e nunca um parente.
+ */
+function FichaDaFruta({ semana }: { semana: number }) {
+  const emoji = emojiDaFrutaNoApp(semana);
+  return (
+    <View
+      accessible={false}
+      importantForAccessibility="no-hide-descendants"
+      style={{
+        width: 64,
+        height: 64,
+        borderRadius: canto.dentro,
+        ...curva,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: luz.cartao,
+        boxShadow: `0px 8px 18px -8px ${comAlfa(cor.texto, 0.25)}`,
+      }}
+    >
+      {emoji ? (
+        <Text allowFontScaling={false} style={{ fontSize: 36, lineHeight: 44 }}>
+          {emoji}
+        </Text>
+      ) : (
+        <Ruler size={28} color={cor.primaria} strokeWidth={2.2} />
+      )}
     </View>
   );
 }
@@ -239,12 +269,12 @@ function Ladrilho({
       accessibilityLabel={rotulo}
       style={[
         {
-          borderRadius: 24,
+          borderRadius: RAIO_DENTRO_DO_PAINEL,
           ...curva,
           padding: 14,
           backgroundColor: luz.cartao,
           borderWidth: StyleSheet.hairlineWidth,
-          borderColor: "rgba(255,255,255,0.9)",
+          borderColor: vidro.borda,
           ...sombra,
         },
         estilo,
@@ -267,13 +297,16 @@ function Medida({
   ficha: string;
 }) {
   return (
-    <Ladrilho estilo={{ flex: 1, justifyContent: "space-between", gap: 10 }}>
+    <Ladrilho
+      estilo={{ flex: 1, justifyContent: "space-between", gap: 10 }}
+      rotulo={`${titulo}: ${valor}`}
+    >
       <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
         <View
           style={{
             width: 30,
             height: 30,
-            borderRadius: 10,
+            borderRadius: canto.icone,
             ...curva,
             alignItems: "center",
             justifyContent: "center",
@@ -282,7 +315,7 @@ function Medida({
         >
           {icone}
         </View>
-        <Text style={{ ...fonte.media, fontSize: 14, color: APAGADO }}>{titulo}</Text>
+        <Text style={{ ...fonte.media, ...escala.legenda, color: cor.textoApagado }}>{titulo}</Text>
       </View>
       <Text
         numberOfLines={1}
@@ -292,7 +325,7 @@ function Medida({
           fontSize: 28,
           lineHeight: 32,
           letterSpacing: -0.6,
-          color: TEXTO,
+          color: cor.texto,
         }}
       >
         {valor}
@@ -307,27 +340,39 @@ const RAIO = (LADO - TRACO) / 2;
 const VOLTA = 2 * Math.PI * RAIO;
 const CirculoAnimado = Animated.createAnimatedComponent(Circle);
 
+/** O último número inteiro que o anel mostrou, neste processo. */
+let ultimoPorcento: number | null = null;
+
 /**
- * O anel da gestação: o degradê do amanhecer se fecha, ao abrir a tela, até o
- * ponto em que ela está. É o mesmo dado da barra antiga (`fracaoDaGestacao`),
- * agora com o tamanho que ele merece.
+ * O anel da gestação: o degradê do amanhecer até o ponto em que ela está.
+ *
+ * Abre JÁ DESENHADO (18/11/2026): a volta inteira se fechando a cada abertura
+ * era pelo JavaScript, quadro a quadro, no instante mais carregado do app. Só
+ * anda quando o número muda (um dia novo vira 62%), do último que ela viu.
  */
 function AnelDaGestacao({ fracao }: { fracao: number }) {
   const reduzido = useMovimentoReduzido();
-  const v = useRef(new Animated.Value(reduzido ? fracao : 0)).current;
+  const porcento = Math.round(fracao * 100);
+  const de = useRef(
+    ultimoPorcento != null && ultimoPorcento !== porcento ? ultimoPorcento / 100 : fracao,
+  );
+  const v = useRef(new Animated.Value(de.current)).current;
   useEffect(() => {
-    if (reduzido) {
+    const andou = Math.round(de.current * 100) !== porcento;
+    de.current = fracao;
+    ultimoPorcento = porcento;
+    if (!andou || reduzido) {
       v.setValue(fracao);
       return;
     }
     Animated.timing(v, {
       toValue: fracao,
-      duration: 1300,
+      duration: 900,
       delay: 250,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
     }).start();
-  }, [fracao, reduzido, v]);
+  }, [fracao, porcento, reduzido, v]);
   return (
     <View style={{ width: LADO, height: LADO, alignItems: "center", justifyContent: "center" }}>
       <Svg width={LADO} height={LADO} style={{ position: "absolute" }}>
@@ -343,7 +388,7 @@ function AnelDaGestacao({ fracao }: { fracao: number }) {
           cy={LADO / 2}
           r={RAIO}
           fill="none"
-          stroke={cor.apagado}
+          stroke={cor.trilho}
           strokeWidth={TRACO}
         />
         <CirculoAnimado
@@ -361,73 +406,30 @@ function AnelDaGestacao({ fracao }: { fracao: number }) {
       </Svg>
       <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
         <Text
-          allowFontScaling={false}
+          maxFontSizeMultiplier={1.15}
           style={{
             ...fonteDoNumero,
             fontSize: 38,
             lineHeight: 42,
             letterSpacing: -1.2,
-            color: TEXTO,
+            color: cor.texto,
           }}
         >
-          {Math.round(fracao * 100)}
+          {porcento}
         </Text>
         <Text
-          allowFontScaling={false}
-          style={{ marginTop: 6, ...fonte.titulo, fontSize: 16, color: APAGADO }}
+          maxFontSizeMultiplier={1.15}
+          style={{ marginTop: 6, ...fonte.titulo, fontSize: 16, color: cor.textoApagado }}
         >
           %
         </Text>
       </View>
-      <Text allowFontScaling={false} style={{ ...fonte.media, fontSize: 11.5, color: APAGADO }}>
+      <Text
+        maxFontSizeMultiplier={1.15}
+        style={{ ...fonte.media, ...escala.nota, color: cor.textoApagado }}
+      >
         da gestação
       </Text>
     </View>
-  );
-}
-
-function Porta({
-  titulo,
-  rotulo,
-  icone,
-  aoTocar,
-}: {
-  titulo: string;
-  rotulo: string;
-  icone: ReactNode;
-  aoTocar: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={rotulo}
-      onPress={() => {
-        toque();
-        aoTocar();
-      }}
-      style={({ pressed }) => ({
-        flex: 1,
-        minHeight: ALVO_MINIMO + 12,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: espaco.sm,
-        borderRadius: 20,
-        ...curva,
-        paddingLeft: 14,
-        paddingRight: 10,
-        paddingVertical: 10,
-        backgroundColor: luz.cartao,
-        borderWidth: StyleSheet.hairlineWidth,
-        borderColor: "rgba(255,255,255,0.9)",
-        ...sombra,
-        opacity: pressed ? 0.7 : 1,
-      })}
-    >
-      {icone}
-      <Text style={{ flex: 1, ...fonte.forte, fontSize: 14, lineHeight: 18, color: LINK }}>
-        {titulo}
-      </Text>
-      <ChevronRight size={18} color={LINK} strokeWidth={2.4} />
-    </Pressable>
   );
 }

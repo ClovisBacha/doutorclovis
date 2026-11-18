@@ -39,7 +39,7 @@ export const DESCRICAO_NO_APP: Readonly<Record<number, { site: string; app: stri
   },
   20: {
     site: "Você já pode sentir os movimentos!",
-    app: "Metade do caminho — e agora medido da cabeça aos pés.",
+    app: "Metade do caminho, e agora medido da cabeça aos pés.",
   },
   24: {
     site: "Limite da viabilidade fetal.",
@@ -87,9 +87,52 @@ export const DESCRICAO_NO_APP: Readonly<Record<number, { site: string; app: stri
   },
   42: {
     site: "Reta final — o bem-estar do bebê é acompanhado de perto pela sua equipe.",
-    app: "Reta final — o encontro de vocês está pertinho.",
+    app: "Reta final: o encontro de vocês está pertinho.",
   },
 };
+
+/**
+ * A FRUTA DA SEMANA EM EMOJI, como o app a desenha (18/11/2026, a vistoria).
+ * O emoji do site (`fruitEmojiForWeek`) usa "o parente mais próximo" quando a
+ * fruta não existe no Unicode, e a tela mostrava uma cebola ao lado de
+ * "Alho-poró", um melão ao lado de "Mamão", brócolis ao lado de "Couve-flor".
+ * Uma imagem que contradiz o texto ao lado é erro à vista.
+ *
+ * Aqui só entram os pares FIÉIS, pelo nome da fruta (o emoji desenha
+ * exatamente aquilo). Sem par, a tela desenha uma régua, e não um parente.
+ * `fruta-da-semana.test.ts` cobra cada par. Ficam de fora, de propósito: o
+ * limão (no Brasil é o verde, e 🍋 é o siciliano), a vagem (🫛 é ervilha), a
+ * alface, o repolho, a acelga e o aipo (🥬 é uma folha só para todos) e a
+ * abóbora (🎃 é a lanterna de Halloween, com cara).
+ */
+export const EMOJI_DA_FRUTA_NO_APP: Readonly<Record<string, string>> = {
+  Mirtilo: "🫐",
+  Uva: "🍇",
+  Morango: "🍓",
+  "Limão siciliano": "🍋",
+  Maçã: "🍎",
+  Abacate: "🥑",
+  Cebola: "🧅",
+  Pimentão: "🫑",
+  Tomate: "🍅",
+  Banana: "🍌",
+  Cenoura: "🥕",
+  "Espiga de milho": "🌽",
+  "Manga grande": "🥭",
+  Milho: "🌽",
+  Berinjela: "🍆",
+  "Pepino grande": "🥒",
+  Coco: "🥥",
+  Abacaxi: "🍍",
+  Melão: "🍈",
+  "Melão honeydew": "🍈",
+  "Melancia pequena": "🍉",
+};
+
+/** O emoji fiel da fruta da semana, ou `null` (a tela desenha a régua). */
+export function emojiDaFrutaNoApp(semana: number): string | null {
+  return EMOJI_DA_FRUTA_NO_APP[babyForWeek(semana).fruit] ?? null;
+}
 
 export function bebeDaSemana(semana: number) {
   const b = babyForWeek(semana);
@@ -108,17 +151,17 @@ export function bebeDaSemana(semana: number) {
  */
 const RETA_FINAL_NO_APP = {
   40: {
-    titulo: "Você chegou às 40 semanas 💛",
+    titulo: "Você chegou às 40 semanas",
     corpo:
       "A data provável é só uma estimativa: poucos bebês chegam exatamente nela. Que a espera seja leve, do seu jeito.",
   },
   41: {
-    titulo: "Cada bebê tem o seu tempo 💛",
+    titulo: "Cada bebê tem o seu tempo",
     corpo:
       "Enquanto o encontro não acontece, vale guardar estes dias com calma: descanso, colo e gente querida por perto.",
   },
   42: {
-    titulo: "Na reta final, com carinho 💛",
+    titulo: "Pertinho do encontro",
     corpo: "Que estes dias sejam de descanso e de gente querida por perto, no tempo do bebê.",
   },
 } as const;

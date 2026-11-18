@@ -1,16 +1,19 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Flame, Hourglass, Star } from "lucide-react-native";
+import { memo, useState, type ReactNode } from "react";
+import { Text, View } from "react-native";
 import { bebeDaSemana } from "~/lib/bebe-da-semana";
+import { comAlfa } from "~/lib/cor";
 import { Brilho } from "~/componentes/jornada/atividade";
+import { LinhaDoAtalho } from "~/componentes/jornada/atalhos";
 import { FolhaDeCompartilhar } from "~/componentes/jornada/compartilhar";
 import { legendaDaSemana } from "~/lib/jornada/cartoes";
 import { arteDoBebe } from "~/componentes/jornada/arte-do-bebe";
-import { cor, espaco, fonte } from "~/tema";
+import { cor, escala, fonte, sombra, veu } from "~/tema";
 
 /**
- * O CARTÃO DA SEMANA — o que ela posta nos Stories ("24 semanas! 💛", que toda
+ * O CARTÃO DA SEMANA — o que ela posta nos Stories ("24 semanas!", que toda
  * grávida já posta), pronto e bonito, feito da jornada dela: o bebê da semana,
  * o tamanho, os dias de cinco estrelas e a chama. É a gamificação virando
  * orgulho, e cada cartão postado mostra o app às amigas grávidas dela.
@@ -19,6 +22,10 @@ import { cor, espaco, fonte } from "~/tema";
  * imagem sai da própria vista (`react-native-view-shot`) em 9:16, e vai pela
  * folha de compartilhar do iPhone (Instagram, WhatsApp, Fotos…). Nada do que é
  * íntimo entra: nem gratidão, nem humor, nem sintoma.
+ *
+ * 18/11/2026: a assinatura leva o @ do app no Instagram (quem vê o Stories
+ * acha o app), sem emoji; as cores soltas passaram ao tema; e a linha da tela
+ * do bebê mostra o PRÓPRIO cartão, em miniatura, no lugar de um retângulo.
  */
 
 const CEU = require("../../../../src/assets/ceu/por-do-sol.webp");
@@ -34,6 +41,9 @@ export type DadosDoCartao = {
 const LARGURA = 300;
 const ALTURA = Math.round((LARGURA * 16) / 9);
 
+/** A miniatura da linha: o cartão inteiro, a 15%. */
+const MINIATURA = 0.15;
+
 export function CartaoDaSemana({ d }: { d: DadosDoCartao }) {
   const bebe = bebeDaSemana(d.semana);
   return (
@@ -44,17 +54,17 @@ export function CartaoDaSemana({ d }: { d: DadosDoCartao }) {
         contentFit="cover"
       />
       <LinearGradient
-        colors={["rgba(40,20,60,0)", "rgba(40,20,60,0.55)"]}
+        colors={[veu.tinta(0), veu.tinta(0.55)]}
         style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: ALTURA * 0.55 }}
       />
       <View style={{ flex: 1, alignItems: "center", paddingTop: 34, paddingHorizontal: 22 }}>
         <Text
           style={{
-            ...fonte.titulo,
-            fontSize: 13,
-            letterSpacing: 2,
+            ...fonte.forte,
+            ...escala.nota,
+            letterSpacing: 1.6,
             textTransform: "uppercase",
-            color: "rgba(255,255,255,0.85)",
+            color: comAlfa(cor.branco, 0.88),
           }}
         >
           {d.nomeDoBebe ? `${d.nomeDoBebe} está chegando` : "Esperando você"}
@@ -62,10 +72,10 @@ export function CartaoDaSemana({ d }: { d: DadosDoCartao }) {
         <Text
           style={{
             marginTop: 4,
-            ...fonte.titulo,
+            ...fonte.display,
             fontSize: 46,
             lineHeight: 52,
-            letterSpacing: -1,
+            letterSpacing: -0.4,
             color: cor.branco,
           }}
         >
@@ -83,8 +93,8 @@ export function CartaoDaSemana({ d }: { d: DadosDoCartao }) {
           style={{
             marginTop: 6,
             textAlign: "center",
-            ...fonte.titulo,
-            fontSize: 17,
+            ...fonte.forte,
+            ...escala.manchete,
             color: cor.branco,
           }}
         >
@@ -93,35 +103,38 @@ export function CartaoDaSemana({ d }: { d: DadosDoCartao }) {
         <View style={{ marginTop: 18, width: "100%", gap: 8 }}>
           {d.diasCheios > 0 ? (
             <Linha
-              emoji="⭐"
+              icone={<Star size={17} color={cor.branco} fill={cor.branco} strokeWidth={2} />}
               texto={`${d.diasCheios} ${d.diasCheios === 1 ? "dia" : "dias"} de cuidado completo nesta semana`}
             />
           ) : null}
           {d.chama > 1 ? (
-            <Linha emoji="🔥" texto={`${d.chama} dias seguidos cuidando de nós`} />
+            <Linha
+              icone={<Flame size={17} color={cor.branco} fill={cor.branco} strokeWidth={2} />}
+              texto={`${d.chama} dias seguidos cuidando de nós`}
+            />
           ) : null}
           {d.faltam != null ? (
-            <Linha emoji="⏳" texto={`faltam ${d.faltam} ${d.faltam === 1 ? "dia" : "dias"}`} />
+            <Linha
+              icone={<Hourglass size={17} color={cor.branco} strokeWidth={2.2} />}
+              texto={`faltam ${d.faltam} ${d.faltam === 1 ? "dia" : "dias"}`}
+            />
           ) : null}
         </View>
         <View style={{ flex: 1 }} />
-        <Text
-          style={{
-            marginBottom: 22,
-            ...fonte.forte,
-            fontSize: 12,
-            letterSpacing: 0.5,
-            color: "rgba(255,255,255,0.8)",
-          }}
-        >
-          feito com carinho no app Mãe Esperta 💛
-        </Text>
+        <View style={{ marginBottom: 22, alignItems: "center", gap: 1 }}>
+          <Text style={{ ...fonte.forte, ...escala.nota, color: comAlfa(cor.branco, 0.9) }}>
+            app Mãe Esperta
+          </Text>
+          <Text style={{ ...fonte.media, ...escala.nota, color: comAlfa(cor.branco, 0.78) }}>
+            @maeesperta.app
+          </Text>
+        </View>
       </View>
     </View>
   );
 }
 
-function Linha({ emoji, texto }: { emoji: string; texto: string }) {
+function Linha({ icone, texto }: { icone: ReactNode; texto: string }) {
   return (
     <View
       style={{
@@ -129,12 +142,12 @@ function Linha({ emoji, texto }: { emoji: string; texto: string }) {
         alignItems: "center",
         gap: 10,
         borderRadius: 16,
-        backgroundColor: "rgba(255,255,255,0.18)",
+        backgroundColor: comAlfa(cor.branco, 0.18),
         paddingHorizontal: 14,
         paddingVertical: 9,
       }}
     >
-      <Text style={{ fontSize: 18 }}>{emoji}</Text>
+      {icone}
       <Text
         style={{
           flex: 1,
@@ -150,57 +163,53 @@ function Linha({ emoji, texto }: { emoji: string; texto: string }) {
   );
 }
 
-/** A linha da tela Hoje que abre a prévia, e a prévia com o compartilhar. */
+/**
+ * O cartão de verdade, pequeno: 45×80, recortado no canto do cartão. É a
+ * prévia do que ela vai postar — e não um retângulo com o número.
+ */
+const Miniatura = memo(function Miniatura({ d }: { d: DadosDoCartao }) {
+  const w = Math.round(LARGURA * MINIATURA);
+  const h = Math.round(ALTURA * MINIATURA);
+  return (
+    <View style={[{ width: w, height: h, borderRadius: 7 }, sombra]}>
+      <View
+        pointerEvents="none"
+        style={{ width: w, height: h, borderRadius: 7, overflow: "hidden" }}
+      >
+        <View
+          style={{
+            position: "absolute",
+            left: (w - LARGURA) / 2,
+            top: (h - ALTURA) / 2,
+            transform: [{ scale: MINIATURA }],
+          }}
+        >
+          <CartaoDaSemana d={d} />
+        </View>
+      </View>
+    </View>
+  );
+});
+
+/** A linha do grupo de atalhos que abre a prévia, e a prévia com o compartilhar. */
 export function CompartilharASemana({ d }: { d: DadosDoCartao }) {
   const [aberta, setAberta] = useState(false);
 
   return (
     <>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Ver o cartão da semana ${d.semana} para compartilhar`}
-        onPress={() => setAberta(true)}
-        style={({ pressed }) => ({
-          flexDirection: "row",
-          alignItems: "center",
-          gap: espaco.md,
-          borderRadius: 20,
-          backgroundColor: "#fff",
-          padding: 12,
-          opacity: pressed ? 0.85 : 1,
-          shadowColor: "#7a3fd1",
-          shadowOpacity: 0.12,
-          shadowRadius: 12,
-          shadowOffset: { width: 0, height: 5 },
-        })}
-      >
-        <LinearGradient
-          colors={["#f9b17a", "#8f5bd6"]}
-          style={{
-            width: 46,
-            height: 58,
-            borderRadius: 10,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Text style={{ ...fonte.titulo, fontSize: 15, color: cor.branco }}>{d.semana}</Text>
-        </LinearGradient>
-        <View style={{ flex: 1 }}>
-          <Text style={{ ...fonte.titulo, fontSize: 15, color: "#3a2230" }}>
-            O cartão da semana {d.semana}
-          </Text>
-          <Text style={{ ...fonte.media, fontSize: 13, color: "#9a7486" }}>
-            Pronto para os Stories e o WhatsApp
-          </Text>
-        </View>
-        <Text style={{ ...fonte.titulo, fontSize: 14, color: "#7a3fd1" }}>Ver ›</Text>
-      </Pressable>
+      <LinhaDoAtalho
+        ficha={<Miniatura d={d} />}
+        titulo={`O cartão da semana ${d.semana}`}
+        sub="Pronto para os Stories"
+        rotulo={`Ver o cartão da semana ${d.semana} para compartilhar`}
+        aoTocar={() => setAberta(true)}
+      />
 
       <FolhaDeCompartilhar
         aberta={aberta}
         aoFechar={() => setAberta(false)}
         largura={LARGURA}
+        corDoBotao={cor.primaria}
         legenda={legendaDaSemana(d.semana)}
       >
         <CartaoDaSemana d={d} />

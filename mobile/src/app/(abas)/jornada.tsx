@@ -1,7 +1,7 @@
 import { router, useFocusEffect } from "expo-router";
-import { Award, ChevronRight, PenLine, Wind } from "lucide-react-native";
+import { Award, ChevronRight, PenLine, Wind, X } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   Botao,
@@ -43,7 +43,9 @@ import { CHAVE_MARCOS_VISTOS, festaDoExtrato, lerVistos, marcarVistos } from "~/
 import { Caminho } from "~/componentes/caminho/caminho";
 import { useJornada, type DiaDaJornada } from "~/componentes/jornada/usarJornada";
 import { ehBancada, parametroDaBancada, recarregarNaBancada } from "~/lib/bancada";
+import { depoisDaVolta } from "~/lib/depois-da-volta";
 import { TelaDeHoje } from "~/componentes/jornada/hoje";
+import { CHAVE_REGUA_USADA } from "~/componentes/jornada/ceu-do-bebe";
 import { BebeNestaSemana } from "~/componentes/jornada/bebe-nesta-semana";
 import { aulaDoAppNoDia } from "~/lib/jornada/aulas-do-app";
 import { tituloCurtoDaAula } from "~/lib/jornada/aula";
@@ -112,7 +114,6 @@ import {
   CHAVE_FIGURINHAS,
   chaveDoPresente,
   diasFechados,
-  feito,
   listaDeNumeros,
   flagsDoDia,
 } from "~/lib/jornada/momentos";
@@ -123,7 +124,7 @@ import {
 } from "~/lib/jornada/reconciliacao";
 import type { Atividade } from "~/servidor/economia";
 import { chama as calcularChama } from "~/lib/jornada/trilha";
-import { ALVO_MINIMO, cor, espaco, fonte, raio, sombra } from "~/tema";
+import { ALVO_MINIMO, canto, cor, curva, escala, espaco, fonte, luz, margem, raio, sombra, vidro } from "~/tema";
 import { pedirSocorro, ROTULO_DO_SOCORRO, SE_PRECISAR } from "~/lib/socorro";
 import { SOS_NO_APP } from "~/config";
 
@@ -205,55 +206,95 @@ type EstadoDaCarteira =
   | { estado: "falhou" }
   | { estado: "ok"; dados: CarteiraOk };
 
-function useCarteira(ativa: boolean) {
-  const [carteira, setCarteira] = useState<EstadoDaCarteira>({ estado: "carregando" });
-  const carregar = useCallback(async () => {
-    setCarteira((c) => (c.estado === "ok" ? c : { estado: "carregando" }));
-    const r = await lerCarteiraDoDia();
-    setCarteira(r ? { estado: "ok", dados: r } : { estado: "falhou" });
-  }, []);
-  useFocusEffect(
-    useCallback(() => {
-      if (ativa) void carregar();
-    }, [ativa, carregar]),
-  );
-  return { carteira, recarregar: carregar };
-}
+type LeituraDeConquistas = LeituraDasConquistas | null | "carregando";
 
-function useConquistas(ativa: boolean) {
-  const [leitura, setLeitura] = useState<LeituraDasConquistas | null | "carregando">("carregando");
+/**
+ * O intervalo mínimo entre duas releituras na tela do bebê (18/11/2026). Ela
+ * não mostra o saldo, e cada volta de atividade relia tudo; a trilha, que
+ * mostra o saldo, relê a cada foco.
+ */
+const INTERVALO_DO_BEBE_MS = 45_000;
+
+/**
+ * As leituras do foco da aba (18/11/2026, a vistoria: "cada vez que a aba ganha
+ * foco saem umas oito leituras do servidor"):
+ * - as conquistas PRIMEIRO — é a conferência delas que DESBLOQUEIA no servidor
+ *   as que ela acabou de ganhar e paga a semana nova e o trimestre;
+ * - a carteira DEPOIS, uma vez só: ela já traz o marco que a conferência
+ *   pagou (antes era lida duas vezes a cada foco, a segunda depois das
+ *   conquistas, para a festa do marco);
+ * - depois da animação de volta (`depoisDaVolta`), e não no meio dela;
+ * - com um intervalo mínimo entre releituras, quando pedido;
+ * - e o estado só muda quando o dado mudou: a mesma resposta não redesenha a
+ *   tela.
+ */
+function useLeiturasDoFoco(intervaloMinimo = 0) {
+  const [carteira, setCarteira] = useState<EstadoDaCarteira>({ estado: "carregando" });
+  const [conquistas, setConquistas] = useState<LeituraDeConquistas>("carregando");
+  const atual = useRef<{ carteira: string; conquistas: string; estado: EstadoDaCarteira["estado"] }>(
+    { carteira: "", conquistas: "", estado: "carregando" },
+  );
+  const ultima = useRef(0);
+  const primeira = useRef(true);
+  const viva = useRef(true);
+  useEffect(
+    () => () => {
+      viva.current = false;
+    },
+    [],
+  );
+
+  const porCarteira = useCallback((novo: EstadoDaCarteira) => {
+    const s = JSON.stringify(novo);
+    if (s === atual.current.carteira) return;
+    atual.current.carteira = s;
+    atual.current.estado = novo.estado;
+    setCarteira(novo);
+  }, []);
+
+  const recarregar = useCallback(async () => {
+    /* Tentar de novo depois de uma falha mostra que está tentando. */
+    if (atual.current.estado === "falhou") porCarteira({ estado: "carregando" });
+    const r = await lerCarteiraDoDia();
+    if (!viva.current) return;
+    porCarteira(r ? { estado: "ok", dados: r } : { estado: "falhou" });
+  }, [porCarteira]);
+
+  const ler = useCallback(async () => {
+    const c = await lerConquistas();
+    if (!viva.current) return;
+    const s = JSON.stringify(c);
+    if (s !== atual.current.conquistas) {
+      atual.current.conquistas = s;
+      setConquistas(c);
+    }
+    await recarregar();
+  }, [recarregar]);
+
   useFocusEffect(
     useCallback(() => {
-      if (!ativa) return;
-      let vivo = true;
-      void lerConquistas().then((r) => {
-        if (vivo) setLeitura(r);
-      });
-      return () => {
-        vivo = false;
-      };
-    }, [ativa]),
+      if (intervaloMinimo > 0 && Date.now() - ultima.current < intervaloMinimo) return;
+      /* Na abertura do app não há volta a esperar: lê na hora. */
+      const cancelar = depoisDaVolta(() => {
+        ultima.current = Date.now();
+        void ler();
+      }, primeira.current);
+      primeira.current = false;
+      return cancelar;
+    }, [intervaloMinimo, ler]),
   );
-  return leitura;
+  return { carteira, conquistas, recarregar };
 }
 
 /**
  * A festa dos marcos (`~/lib/jornada/marcos`). A conferência das conquistas é
- * quando o servidor paga a semana nova e o trimestre: depois dela a carteira é
- * relida, e o marco novo do extrato vira festa uma vez (os vistos sobem com a
- * jornada, e a festa não se repete noutro aparelho).
+ * quando o servidor paga a semana nova e o trimestre, e a carteira é lida
+ * logo depois dela (`useLeiturasDoFoco`): o marco novo do extrato vira festa
+ * uma vez (os vistos sobem com a jornada, e a festa não se repete noutro
+ * aparelho).
  */
-function useFestaDoMarco(o: {
-  carteira: EstadoDaCarteira;
-  recarregar: () => Promise<void>;
-  conquistas: LeituraDasConquistas | null | "carregando";
-  loja: EstadoDaLoja;
-  cuidado: boolean;
-}) {
-  const { carteira, recarregar, conquistas, loja, cuidado } = o;
-  useEffect(() => {
-    if (conquistas && conquistas !== "carregando" && !conquistas.careMode) void recarregar();
-  }, [conquistas, recarregar]);
+function useFestaDoMarco(o: { carteira: EstadoDaCarteira; loja: EstadoDaLoja; cuidado: boolean }) {
+  const { carteira, loja, cuidado } = o;
   const vistos = lerVistos(loja.blob[CHAVE_MARCOS_VISTOS]);
   const pronta = loja.pronto && (loja.nuvem === "ok" || loja.bancada);
   const festa =
@@ -278,15 +319,18 @@ const bonusResolvidos = new Set<number>();
  * fecha. Antes, a resposta engolida no fim da quinta atividade era a única
  * tentativa: os 20 🌱 sumiam sem rastro (o site já tentava de novo; out/2026).
  * O servidor não paga duas vezes a mesma atividade nem o mesmo bônus, e
- * reconfere as quatro atividades antes de pagá-lo: repetir é seguro.
+ * reconfere as quatro atividades antes de pagá-lo: repetir é seguro. Começa
+ * depois da animação de volta (`depoisDaVolta`).
  */
 function useReconciliacao(D: number, pronta: boolean, aoMudarSaldo: () => void) {
   const emVoo = useRef(false);
   useFocusEffect(
     useCallback(() => {
       if (!pronta || ehBancada() || emVoo.current) return;
-      emVoo.current = true;
-      void (async () => {
+      return depoisDaVolta(() => {
+        if (emVoo.current) return;
+        emVoo.current = true;
+        void (async () => {
         try {
           let pagou = false;
           for (const dia of diasDaReconciliacao(D)) {
@@ -309,7 +353,8 @@ function useReconciliacao(D: number, pronta: boolean, aoMudarSaldo: () => void) 
         } finally {
           emVoo.current = false;
         }
-      })();
+        })();
+      });
     }, [D, pronta, aoMudarSaldo]),
   );
 }
@@ -341,10 +386,18 @@ export function JornadaDaGestacao({
   /* O que é da abertura do dia (festa, reconciliação, avisos) roda na tela
      do bebê, que abre o app. */
   const abre = ehHoje;
+  /* O que só a trilha mostra (o Cantinho, o número de amigas) só a trilha lê. */
+  const trilha = !ehHoje;
   const { D, semana, perfil, hoje } = dia;
-  const { carteira, recarregar } = useCarteira(true);
-  /* A festa dos marcos chama a conferência das conquistas lá embaixo; os
-     hooks ficam todos antes do retorno das 42 semanas. */
+  /* As conquistas primeiro, a carteira depois, uma vez só. Os hooks ficam
+     todos antes do retorno das 42 semanas. As conquistas moram nas
+     Recompensas, mas a leitura delas é o que DESBLOQUEIA no servidor as que
+     ela acabou de ganhar — por isso a aba confere ao ganhar foco. E o que a
+     conferência traz agora aparece aqui: o aviso da conquista nova e, na
+     cestinha da loja, quantas esperam o toque que paga. */
+  const { carteira, conquistas, recarregar } = useLeiturasDoFoco(
+    ehHoje ? INTERVALO_DO_BEBE_MS : 0,
+  );
   /* O servidor sabe do Modo Cuidado antes do aparelho (ligado noutro lugar):
      a carteira volta com `careMode`, e a trilha relê o perfil na hora em vez
      de seguir mostrando o bebê e as estrelas a quem acabou de perdê-lo. */
@@ -353,26 +406,14 @@ export function JornadaDaGestacao({
   useEffect(() => {
     if (servidorDizCuidado) void recarregarPerfil();
   }, [servidorDizCuidado, recarregarPerfil]);
-  /* As conquistas moram nas Recompensas, mas a leitura delas é o que
-     DESBLOQUEIA no servidor as que ela acabou de ganhar — por isso a aba
-     confere ao ganhar foco. E o que a conferência traz agora aparece aqui: o
-     aviso da conquista nova e, na cestinha da loja, quantas esperam o toque
-     que paga (antes ela ganhava e não sabia). */
-  const conquistas = useConquistas(true);
-  const marco = useFestaDoMarco({
-    carteira,
-    recarregar,
-    conquistas,
-    loja,
-    cuidado: dia.cuidado || !abre,
-  });
+  const marco = useFestaDoMarco({ carteira, loja, cuidado: dia.cuidado || !abre });
   const aResgatar = useMemo(() => {
     if (!conquistas || conquistas === "carregando" || conquistas.careMode) return 0;
     if (conquistas.resgatadas === null) return 0;
     return paraResgatar(montarGrade(conquistas.unlocked, conquistas.resgatadas));
   }, [conquistas]);
   useReconciliacao(D, loja.pronto && abre, recarregar);
-  const amigas = useContagemDeAmigas();
+  const amigas = useContagemDeAmigas(trilha);
   const [folha, setFolha] = useState<FolhaDoPlacar>(null);
 
   const { dias: diasDeChama, perdoes } = calcularChama(loja.blob, D);
@@ -383,7 +424,7 @@ export function JornadaDaGestacao({
   const avisos = useAvisosDoDia({ carteira, recarregar, conquistas, loja, ehHoje: abre });
 
   /* ── O Cantinho na trilha: o que ela tem, o cenário e a pele ── */
-  const cantinho = useCantinhoDaTrilha();
+  const cantinho = useCantinhoDaTrilha(trilha);
   /* O céu das abas, atrás da trilha (se ela não equipou um cenário da lojinha). */
   const dasAbas = useCeuDasAbas();
   const decorGravada = loja.blob[CHAVE_DECOR];
@@ -395,6 +436,66 @@ export function JornadaDaGestacao({
   const pele = typeof skin === "string" ? (TRILHA_SKINS[skin] ?? null) : null;
   const aoGravarDecoracao = useCallback((d: Decoracao) => gravarChave(CHAVE_DECOR, d), []);
 
+  /* ── O que a tela do bebê recebe, ESTÁVEL entre um desenho e outro: o
+     herói (memo) não se redesenha a cada leitura que chega (18/11/2026). ── */
+  const direita = useMemo(() => <BotaoDoPerfil />, []);
+  const diasCheios = diasFechados(loja.blob).filter((d) => Math.floor(d / 7) === semana).length;
+  const faltam = diasQueFaltam(D);
+  const cartao = useMemo(
+    () => ({ semana, nomeDoBebe, diasCheios, chama: diasDeChama, faltam }),
+    [semana, nomeDoBebe, diasCheios, diasDeChama, faltam],
+  );
+  const flags = flagsDoDia(loja.blob, D);
+  const assinaturaDosFeitos = JSON.stringify(flags);
+  const aulaDeHoje = aulaDoAppNoDia(D);
+  const assuntoDaAula = aulaDeHoje ? tituloCurtoDaAula(aulaDeHoje.teach) : null;
+  const cuidados = useMemo(
+    () =>
+      cuidadosDoDia({
+        flags,
+        semana,
+        nomeDoBebe,
+        /* "Você está na semana 24; hoje você aprende…": o assunto da aula do dia. */
+        assuntoDaAula,
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [assinaturaDosFeitos, semana, nomeDoBebe, assuntoDaAula],
+  );
+
+  /* ── As ações da trilha, estáveis ── */
+  const aoMarcarHumor = useCallback(
+    (humor: string) => {
+      gravarChave(
+        CHAVE_CHECKIN,
+        novoCheckin(lerCheckin(estadoAtual().blob[CHAVE_CHECKIN]), humor, hoje),
+      );
+      marcarFlagDoDia(D, "humor");
+    },
+    [D, hoje],
+  );
+  const aoAbrirDia = useCallback((d: number) => ir(`/jornada/dia?D=${d}`), []);
+  const aoAbrirSemana = useCallback(
+    (s: number) => {
+      /* Abrir o álbum de uma semana que já chegou guarda a figurinha dela,
+         como no site (`collectSticker`). */
+      const figurinhas = listaDeNumeros(estadoAtual().blob[CHAVE_FIGURINHAS]);
+      if (s <= semana && !figurinhas.includes(s))
+        gravarChave(
+          CHAVE_FIGURINHAS,
+          [...figurinhas, s].sort((a, b) => a - b),
+        );
+      ir(`/jornada/semana?semana=${s}`);
+    },
+    [semana],
+  );
+  const aoAbrirLoja = useCallback(
+    () => ir(aResgatar > 0 ? "/jornada/recompensas?aba=conquistas" : "/jornada/recompensas"),
+    [aResgatar],
+  );
+  const aoAbrirAmigas = useCallback(() => irParaAba(rota("/amigas") as never), []);
+  const aoContarNascimento = useCallback(() => ir("/jornada/nascimento"), []);
+  const aoFecharFolha = useCallback(() => setFolha(null), []);
+
   /* A trilha no céu: só como aba, e só sem cenário da lojinha (ele cobre). */
   const noCeu = vista === "aba" && !!dasAbas && !cenario;
 
@@ -403,34 +504,19 @@ export function JornadaDaGestacao({
 
   if (ehHoje) {
     const hora = horaDaTela();
-    const flags = flagsDoDia(loja.blob, D);
-    const aulaDeHoje = aulaDoAppNoDia(D);
-    const cuidados = cuidadosDoDia({
-      flags,
-      semana,
-      nomeDoBebe,
-      /* "Você está na semana 24; hoje você aprende…": o assunto da aula do dia. */
-      assuntoDaAula: aulaDeHoje ? tituloCurtoDaAula(aulaDeHoje.teach) : null,
-    });
     const feitos = cuidados.filter((c) => c.feito).length;
     return (
       <View style={{ flex: 1, backgroundColor: dasAbas ? "transparent" : cor.fundo }}>
         <TelaDeHoje
           D={D}
           pronto={loja.pronto}
-          cartao={{
-            semana,
-            nomeDoBebe,
-            diasCheios: diasFechados(loja.blob).filter((d) => Math.floor(d / 7) === semana).length,
-            chama: diasDeChama,
-            faltam: diasQueFaltam(D),
-          }}
+          cartao={cartao}
           saudacao={saudacao(hora, primeiroNome(perfil.display_name))}
           data={dataDeHoje(hoje)}
           nomeDoBebe={nomeDoBebe}
           semana={semana}
           dias={dia.diaNaSemana}
-          faltam={diasQueFaltam(D)}
+          faltam={faltam}
           hora={hora}
           cuidados={cuidados}
           recado={recadoDaBolhaNoApp({
@@ -445,27 +531,26 @@ export function JornadaDaGestacao({
           })}
           humor={feitos >= 5 ? "orgulhosa" : feitos >= 4 ? "surpresa" : "feliz"}
           chama={diasDeChama}
+          reguaUsada={loja.blob[CHAVE_REGUA_USADA] === true}
           avisos={avisos}
           nascimento={
             semana >= 37 ? (
-              <PortaDoNascimento nome={nomeDoBebe} aoTocar={() => ir("/jornada/nascimento")} />
+              <PortaDoNascimento nome={nomeDoBebe} aoTocar={aoContarNascimento} />
             ) : null
           }
           amigas={<AmigasNoHoje pos={false} />}
-          agenda={
-            <>
-              <ConviteDosLembretes
-                uid={dia.uid}
-                contexto={contextoDoLembrete(dia, loja.blob)}
-                mostrar={feitos > 0 || diasDeChama > 0}
-              />
-              <AgendaNaHoje loja={loja} />
-            </>
+          lembrete={
+            <ConviteDosLembretes
+              uid={dia.uid}
+              contexto={contextoDoLembrete(dia, loja.blob)}
+              mostrar={feitos > 0 || diasDeChama > 0}
+            />
           }
-          aoAbrir={(c) => ir(ROTA_DO_CUIDADO[c])}
+          agenda={<AgendaNaHoje loja={loja} />}
+          aoAbrir={abrirCuidado}
           acompanhamento={<BebeNestaSemana semana={semana} totalDias={D} nomeDoBebe={nomeDoBebe} />}
-          aoVerJornada={() => irParaAba("/trilha")}
-          direita={<BotaoDoPerfil />}
+          aoVerTrilha={verTrilha}
+          direita={direita}
         />
         <FestaDoMarco festa={marco.festa} nomeDoBebe={nomeDoBebe} aoFechar={marco.fechar} />
       </View>
@@ -481,14 +566,14 @@ export function JornadaDaGestacao({
           cenário da lojinha equipado, ou aberta fora das abas, a luz de fundo
           (e o cenário, por cima). */}
       {noCeu ? null : <FundoDeLuz />}
-      <View style={{ paddingHorizontal: espaco.lg }}>
+      <View style={{ paddingHorizontal: margem.tela }}>
         {vista === "aba" ? (
           <CabecalhoDaTrilha
             sub={`Semana ${semana}${nomeDoBebe ? ` · ${nomeDoBebe}` : ""}`}
             ceu={noCeu && dasAbas ? CEUS[dasAbas.fase] : null}
           />
         ) : (
-          <BarraDoTopo titulo="Minha jornada" />
+          <BarraDoTopo titulo="Trilha" />
         )}
       </View>
       <Caminho
@@ -504,29 +589,14 @@ export function JornadaDaGestacao({
         amigas={amigas}
         nomeDoBebe={nomeDoBebe}
         humorFeito={marcouHumorHoje(checkin, hoje)}
-        aoMarcarHumor={(humor) => {
-          gravarChave(CHAVE_CHECKIN, novoCheckin(checkin, humor, hoje));
-          marcarFlagDoDia(D, "humor");
-        }}
-        aoAbrirDia={(d) => ir(`/jornada/dia?D=${d}`)}
-        aoAbrirSemana={(s) => {
-          /* Abrir o álbum de uma semana que já chegou guarda a figurinha dela,
-             como no site (`collectSticker`). */
-          const figurinhas = listaDeNumeros(loja.blob[CHAVE_FIGURINHAS]);
-          if (s <= semana && !figurinhas.includes(s))
-            gravarChave(
-              CHAVE_FIGURINHAS,
-              [...figurinhas, s].sort((a, b) => a - b),
-            );
-          ir(`/jornada/semana?semana=${s}`);
-        }}
+        aoMarcarHumor={aoMarcarHumor}
+        aoAbrirDia={aoAbrirDia}
+        aoAbrirSemana={aoAbrirSemana}
         aResgatar={aResgatar}
-        aoAbrirLoja={() =>
-          ir(aResgatar > 0 ? "/jornada/recompensas?aba=conquistas" : "/jornada/recompensas")
-        }
-        aoAbrirAmigas={() => irParaAba(rota("/amigas") as never)}
+        aoAbrirLoja={aoAbrirLoja}
+        aoAbrirAmigas={aoAbrirAmigas}
         aoAbrirFolha={setFolha}
-        aoContarNascimento={() => ir("/jornada/nascimento")}
+        aoContarNascimento={aoContarNascimento}
         decoracao={decoracao}
         possuidos={possuidos}
         cenario={cenario}
@@ -537,7 +607,7 @@ export function JornadaDaGestacao({
       />
       <FolhasDoPlacar
         aberta={folha}
-        aoFechar={() => setFolha(null)}
+        aoFechar={aoFecharFolha}
         chama={diasDeChama}
         perdoes={perdoes}
         trofeus={carteira.estado === "ok" ? carteira.dados.trofeus : null}
@@ -547,9 +617,16 @@ export function JornadaDaGestacao({
   );
 }
 
+/** Abre um cuidado da tela do bebê (estável: fora do componente). */
+const abrirCuidado = (c: ChaveDoCuidado) => ir(ROTA_DO_CUIDADO[c]);
+
+/** A chama do céu abre a Trilha: troca de aba, sem empurrar outra barra. */
+const verTrilha = () => irParaAba("/trilha");
+
 /**
  * O topo da trilha quando ela é a aba da direita: o nome da trilha e a semana
- * à esquerda, o perfil à direita — sem voltar (é uma aba).
+ * à esquerda, o perfil à direita — sem voltar (é uma aba). O título é o de
+ * aba do app: a serifada em 34/41, na margem de 16 (18/11/2026).
  */
 function CabecalhoDaTrilha({ sub, ceu }: { sub: string; ceu: Ceu | null }) {
   const sombra = ceu ? sombraDoTexto(ceu) : null;
@@ -567,10 +644,9 @@ function CabecalhoDaTrilha({ sub, ceu }: { sub: string; ceu: Ceu | null }) {
           accessibilityRole="header"
           numberOfLines={1}
           style={{
-            ...fonte.titulo,
-            fontSize: 28,
-            lineHeight: 33,
-            letterSpacing: -0.6,
+            ...fonte.display,
+            ...escala.grande,
+            letterSpacing: -0.2,
             color: ceu?.tinta ?? cor.texto,
             ...sombra,
           }}
@@ -581,8 +657,8 @@ function CabecalhoDaTrilha({ sub, ceu }: { sub: string; ceu: Ceu | null }) {
           numberOfLines={1}
           style={{
             ...fonte.media,
-            fontSize: 14,
-            color: ceu?.sec ?? cor.textoApagado,
+            ...escala.legenda,
+            color: ceu ? (ceu.claro ? ceu.tinta : ceu.sec) : cor.textoApagado,
             ...sombra,
           }}
         >
@@ -657,35 +733,49 @@ function useAvisosDoDia({
  * guarda a última leitura boa (e, sem nenhuma, `null`: a trilha mostra o
  * layout gravado, como o site enquanto a lista não chega).
  */
-function useCantinhoDaTrilha(): CantinhoOk | null {
+function useCantinhoDaTrilha(ativa: boolean): CantinhoOk | null {
   const [c, setC] = useState<CantinhoOk | null>(null);
+  const assinatura = useRef("");
   useFocusEffect(
     useCallback(() => {
+      /* Só a trilha usa o Cantinho: a tela do bebê não lê. */
+      if (!ativa) return;
       let vivo = true;
-      void lerOCantinho().then((r) => {
-        if (vivo && r) setC(r);
+      const cancelar = depoisDaVolta(() => {
+        void lerOCantinho().then((r) => {
+          if (!vivo || !r) return;
+          const s = JSON.stringify(r);
+          if (s === assinatura.current) return;
+          assinatura.current = s;
+          setC(r);
+        });
       });
       return () => {
         vivo = false;
+        cancelar();
       };
-    }, []),
+    }, [ativa]),
   );
   return c;
 }
 
-/** O número de amigas da faixa do Caminho, relido a cada foco da aba. */
-function useContagemDeAmigas(): number | null {
+/** O número de amigas da faixa do Caminho, relido a cada foco da aba (só na trilha). */
+function useContagemDeAmigas(ativa: boolean): number | null {
   const [n, setN] = useState<number | null>(null);
   useFocusEffect(
     useCallback(() => {
+      if (!ativa) return;
       let vivo = true;
-      void lerContagemDeAmigas().then((r) => {
-        if (vivo && r != null) setN(r);
+      const cancelar = depoisDaVolta(() => {
+        void lerContagemDeAmigas().then((r) => {
+          if (vivo && r != null) setN(r);
+        });
       });
       return () => {
         vivo = false;
+        cancelar();
       };
-    }, []),
+    }, [ativa]),
   );
   return n;
 }
@@ -715,15 +805,10 @@ export function JornadaDoPosParto({
 }) {
   const ehHoje = vista === "hoje";
   const { D, idadeDias, perfil, hoje } = dia;
-  const { carteira, recarregar } = useCarteira(true);
-  const conquistas = useConquistas(true);
-  const marco = useFestaDoMarco({
-    carteira,
-    recarregar,
-    conquistas,
-    loja,
-    cuidado: dia.cuidado || !ehHoje,
-  });
+  const { carteira, conquistas, recarregar } = useLeiturasDoFoco(
+    ehHoje ? INTERVALO_DO_BEBE_MS : 0,
+  );
+  const marco = useFestaDoMarco({ carteira, loja, cuidado: dia.cuidado || !ehHoje });
   const avisos = useAvisosDoDia({ carteira, recarregar, conquistas, loja, ehHoje });
   const { recarregarPerfil } = useSessao();
   /* O céu das abas, atrás do 4º trimestre também (16/11/2026). */
@@ -938,7 +1023,7 @@ function JornadaSemData({ uid }: { uid: string }) {
   const feitos = useLivresDeHoje(uid);
   return (
     <Tela>
-      <Saudacao titulo="Sua jornada" sub="Um dia de cada vez." />
+      <Saudacao titulo="Sua jornada" sub="Dois cuidados com você enquanto isso." />
       <Cartao fundo={corJornada.roxoNevoa}>
         <T tipo="rotulo" cor={corJornada.roxoEscuro}>
           Falta saber de quantas semanas você está
@@ -1102,6 +1187,44 @@ function BotaoDeConquistas({
   );
 }
 
+/** O material dos avisos sobre o céu: o mesmo dos cartões da tela (não vidro). */
+const MATERIAL_DO_AVISO = {
+  backgroundColor: luz.cartao,
+  borderRadius: canto.cartao,
+  ...curva,
+  borderWidth: StyleSheet.hairlineWidth,
+  borderColor: vidro.borda,
+  padding: espaco.lg,
+  gap: espaco.md,
+  ...sombra,
+} as const;
+
+function FecharAviso({ aoFechar }: { aoFechar: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Fechar o aviso"
+      onPress={() => {
+        toque();
+        aoFechar();
+      }}
+      style={({ pressed }) => ({
+        width: ALVO_MINIMO,
+        height: ALVO_MINIMO,
+        marginTop: -10,
+        marginRight: -10,
+        alignSelf: "flex-start",
+        alignItems: "center",
+        justifyContent: "center",
+        borderRadius: canto.pilula,
+        backgroundColor: pressed ? cor.apagado : "transparent",
+      })}
+    >
+      <X size={18} color={cor.textoApagado} strokeWidth={2.4} />
+    </Pressable>
+  );
+}
+
 function AvisoDePresente({
   quantidade,
   de,
@@ -1123,20 +1246,22 @@ function AvisoDePresente({
         ? "de uma amiga"
         : "de quem te trouxe para cá";
   return (
-    <Cartao fundo={corJornada.sementinhaFundo}>
+    <View style={MATERIAL_DO_AVISO}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.md }}>
         {/* A bolha abre a caixa e brotam sementinhas. */}
-        <BolhaViva humor="presente" tamanho={88} />
-        <View style={{ flex: 1 }}>
-          <T tipo="rotulo" cor={corJornada.sementinha}>
-            Você ganhou {quantidade} sementinhas 🌱
-          </T>
-          <T tipo="apagado">Um presente {deQuem}.</T>
+        <BolhaViva humor="presente" tamanho={72} />
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={{ ...fonte.forte, ...escala.chamada, color: cor.texto }}>
+            Você ganhou {quantidade} sementinhas
+          </Text>
+          <Text style={{ ...fonte.normal, ...escala.legenda, color: cor.textoCorpo }}>
+            Um presente {deQuem}.
+          </Text>
         </View>
+        <FecharAviso aoFechar={aoFechar} />
       </View>
-      <Botao rotulo="Que bom!" tipo="secundario" aoTocar={aoFechar} />
       <SementesSubindo quantidade={quantidade} disparo={quantidade} />
-    </Cartao>
+    </View>
   );
 }
 
@@ -1156,30 +1281,38 @@ function AvisoDeConquista({
 }) {
   const uma = conquistas.length === 1 ? conquistas[0]! : null;
   return (
-    <Cartao fundo={corJornada.roxoFundo}>
+    <View style={MATERIAL_DO_AVISO}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.md }}>
-        <Text style={{ fontSize: 40, lineHeight: 48 }}>{uma ? uma.emoji : "🏅"}</Text>
-        <View style={{ flex: 1 }}>
-          <T tipo="rotulo" cor={corJornada.roxo}>
-            {uma ? `Conquista nova: ${uma.title}` : `${conquistas.length} conquistas novas!`}
-          </T>
-          <T tipo="apagado">Toque nela em Conquistas para pegar as suas sementinhas 🌱</T>
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Fechar o aviso"
-          hitSlop={10}
-          onPress={() => {
-            toque();
-            aoFechar();
+        <View
+          style={{
+            width: 52,
+            height: 52,
+            borderRadius: canto.pilula,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: corJornada.roxoFundo,
           }}
-          style={{ alignSelf: "flex-start", minWidth: 28, minHeight: 28, alignItems: "center" }}
         >
-          <Text style={{ ...fonte.titulo, fontSize: 18, color: corJornada.roxo }}>×</Text>
-        </Pressable>
+          {uma ? (
+            <Text style={{ fontSize: 30, lineHeight: 36 }}>{uma.emoji}</Text>
+          ) : (
+            <Award size={26} color={corJornada.roxo} strokeWidth={2.2} />
+          )}
+        </View>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={{ ...fonte.forte, ...escala.chamada, color: cor.texto }}>
+            {uma ? `Conquista nova: ${uma.title}` : `${conquistas.length} conquistas novas`}
+          </Text>
+          <Text style={{ ...fonte.normal, ...escala.legenda, color: cor.textoCorpo }}>
+            {uma
+              ? "Toque nela em Conquistas para pegar as sementinhas."
+              : "Toque nelas em Conquistas para pegar as sementinhas."}
+          </Text>
+        </View>
+        <FecharAviso aoFechar={aoFechar} />
       </View>
-      <Botao rotulo="Ver as conquistas" corFundo={corJornada.roxo} aoTocar={aoPegar} />
-    </Cartao>
+      <Botao rotulo="Ver as conquistas" aoTocar={aoPegar} />
+    </View>
   );
 }
 
@@ -1229,11 +1362,11 @@ function AlertaDas42Semanas({ nomeDoBebe }: { nomeDoBebe: string | null }) {
             accessibilityRole="header"
             style={{ ...fonte.forte, fontSize: 18, lineHeight: 24, color: cor.texto }}
           >
-            {nomeDoBebe ?? "O bebê"} está chegando 💛
+            {nomeDoBebe ?? "O bebê"} está chegando
           </Text>
           <Text style={{ ...fonte.normal, fontSize: 14, lineHeight: 22, color: cor.texto }}>
-            Falta pouquíssimo para vocês se encontrarem. O seu caminho, as figurinhas e tudo o que
-            vocês viveram até aqui estão guardados. {SE_PRECISAR}
+            Falta pouquíssimo para vocês se encontrarem. A trilha, as figurinhas e tudo o que vocês
+            viveram até aqui estão guardados. {SE_PRECISAR}
           </Text>
           <View style={{ marginTop: espaco.sm, flexDirection: "row" }}>
             <Pressable
@@ -1265,7 +1398,7 @@ function AlertaDas42Semanas({ nomeDoBebe }: { nomeDoBebe: string | null }) {
           }}
         >
           <Text style={{ ...fonte.forte, fontSize: 14, color: cor.texto }}>
-            {nomeDoBebe ?? "O bebê"} já nasceu? 🎉
+            {nomeDoBebe ?? "O bebê"} já nasceu?
           </Text>
           <Text
             style={{
@@ -1275,8 +1408,8 @@ function AlertaDas42Semanas({ nomeDoBebe }: { nomeDoBebe: string | null }) {
               color: cor.textoApagado,
             }}
           >
-            Informe a data para celebrar e começar a jornada do 4º trimestre. Seu caminho e as
-            figurinhas continuam guardados. 💛
+            Conte a data e a jornada vira o 4º trimestre. A trilha e as figurinhas continuam
+            guardadas.
           </Text>
           <View style={{ marginTop: espaco.sm }}>
             <Botao

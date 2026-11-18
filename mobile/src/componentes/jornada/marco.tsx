@@ -1,13 +1,34 @@
-import { Modal, Text, View } from "react-native";
-import { fruitEmojiForWeek } from "@/lib/gestacao";
-import { bebeDaSemana } from "~/lib/bebe-da-semana";
-import { BotaoDaAtividade, Brilho } from "~/componentes/jornada/atividade";
-import { corJornada } from "~/componentes/jornada/cores";
+import { Image } from "expo-image";
+import { Sprout } from "lucide-react-native";
+import { useEffect, useRef, useState } from "react";
+import { Animated, Modal, StyleSheet, Text, View } from "react-native";
+import { Botao, Sobrelinha, sucesso } from "~/componentes/base";
+import { CEUS, faseDeAgora } from "~/componentes/ceu-vivo";
+import { arteDoBebe } from "~/componentes/jornada/arte-do-bebe";
+import { Brilho } from "~/componentes/jornada/atividade";
 import { CompartilharConquista } from "~/componentes/jornada/cartao-de-conquista";
 import { Confete } from "~/componentes/jornada/pecas";
+import { useMovimentoReduzido } from "~/componentes/movimento";
+import { bebeDaSemana } from "~/lib/bebe-da-semana";
 import { cartaoDoMarco } from "~/lib/jornada/cartoes";
-import type { Festa } from "~/lib/jornada/marcos";
-import { cor, espaco, fonte } from "~/tema";
+import type { Festa, Marco } from "~/lib/jornada/marcos";
+import {
+  canto,
+  cor,
+  curva,
+  escala,
+  espaco,
+  fonte,
+  fonteDoNumero,
+  sombras,
+  veu,
+} from "~/tema";
+
+/** O recém-nascido (o mesmo da festa e da porta do nascimento). */
+const RECEM_NASCIDO = require("../../../../src/assets/bebe/semana.webp");
+
+/** A altura da vitrine: o céu da hora com o bebê na frente do número. */
+const VITRINE = 236;
 
 /**
  * "CHEGOU UM NOVO MARCO" — a festa da semana nova, do fim de um trimestre, do
@@ -15,6 +36,12 @@ import { cor, espaco, fonte } from "~/tema";
  * esses marcos sozinho; o app passava o crédito em silêncio, e o site abria
  * esta tela com o bebê da semana. Só abre sobre um crédito que o extrato
  * mostra — a soma dita aqui é a que entrou.
+ *
+ * É o "uau" de toda semana (18/11/2026, a vistoria: "ninguém a abriu"). Era um
+ * emoji de fruta num cartão branco solto (às vezes a fruta errada). Agora é a
+ * mesma cena da tela do bebê, em miniatura: o céu da hora, o número da semana
+ * atrás e o bebê da semana na frente, chegando numa mola só, com o toque de
+ * sucesso na mão.
  */
 export function FestaDoMarco({
   festa,
@@ -26,33 +53,72 @@ export function FestaDoMarco({
   aoFechar: () => void;
 }) {
   if (!festa) return null;
+  return <ConteudoDaFesta festa={festa} nomeDoBebe={nomeDoBebe} aoFechar={aoFechar} />;
+}
+
+/** O que a vitrine mostra: a arte e o número que fica atrás dela. */
+function vitrineDo(m: Marco): { arte: number; numero: string | null } {
+  if (m.tipo === "semana") return { arte: arteDoBebe(m.semana), numero: String(m.semana) };
+  if (m.tipo === "trimestre") {
+    const ultima = m.trimestre === 1 ? 13 : 27;
+    return { arte: arteDoBebe(ultima), numero: String(ultima) };
+  }
+  if (m.tipo === "mes") return { arte: RECEM_NASCIDO, numero: String(m.meses) };
+  return { arte: RECEM_NASCIDO, numero: null };
+}
+
+function ConteudoDaFesta({
+  festa,
+  nomeDoBebe,
+  aoFechar,
+}: {
+  festa: Festa;
+  nomeDoBebe: string | null;
+  aoFechar: () => void;
+}) {
   const m = festa.principal;
   const bebe = nomeDoBebe ?? "O bebê";
+  const reduzido = useMovimentoReduzido();
+  /* O céu de quando a festa abriu (a mesma hora da tela de trás). */
+  const [ceu] = useState(() => CEUS[faseDeAgora()]);
+  const { arte, numero } = vitrineDo(m);
+
+  /* A chegada: a arte numa mola só, e o toque de sucesso na mão. */
+  const chega = useRef(new Animated.Value(reduzido ? 1 : 0)).current;
+  useEffect(() => {
+    sucesso();
+    if (reduzido) {
+      chega.setValue(1);
+      return;
+    }
+    Animated.spring(chega, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 9,
+      bounciness: 11,
+      delay: 120,
+    }).start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [festa.chaves.join("|")]);
+
   const semana = m.tipo === "semana" ? bebeDaSemana(m.semana) : null;
-  const arte =
-    m.tipo === "semana"
-      ? fruitEmojiForWeek(m.semana)
-      : m.tipo === "trimestre"
-        ? "🎊"
-        : m.tipo === "nascimento"
-          ? "🍼"
-          : "🎉";
   const titulo =
     m.tipo === "semana"
       ? `Semana ${m.semana}`
       : m.tipo === "trimestre"
-        ? `Fim do ${m.trimestre}º trimestre!`
+        ? `Fim do ${m.trimestre}º trimestre`
         : m.tipo === "nascimento"
-          ? "Bem-vindo ao mundo!"
-          : `${bebe} com ${m.meses} ${m.meses === 1 ? "mês" : "meses"}!`;
+          ? "Boas-vindas ao mundo"
+          : `${bebe} com ${m.meses} ${m.meses === 1 ? "mês" : "meses"}`;
   const texto =
     m.tipo === "semana"
-      ? `${semana!.desc} Tamanho de ${semana!.fruit.toLowerCase()} · ${semana!.size}.`
+      ? `${semana!.desc} Do tamanho de ${semana!.fruit.toLowerCase()}, ${semana!.size}.`
       : m.tipo === "trimestre"
-        ? "Uma fase inteira cuidada, um dia de cada vez. A próxima já começou."
+        ? `Uma fase inteira de cuidado ficou para trás. O ${m.trimestre + 1}º trimestre começa agora.`
         : m.tipo === "nascimento"
-          ? `${bebe} chegou. A jornada continua, agora com vocês dois.`
-          : "Mais um mês juntos. Cada dia conta.";
+          ? `${bebe} chegou. Agora a jornada é de vocês dois.`
+          : "Mais um mês de vocês dois juntos.";
+
   return (
     <Modal transparent animationType="fade" visible onRequestClose={aoFechar}>
       <View
@@ -61,7 +127,7 @@ export function FestaDoMarco({
           alignItems: "center",
           justifyContent: "center",
           padding: espaco.xl,
-          backgroundColor: "rgba(30,16,60,0.45)",
+          backgroundColor: veu.tinta(0.55),
         }}
       >
         <View
@@ -69,73 +135,131 @@ export function FestaDoMarco({
           style={{
             width: "100%",
             maxWidth: 360,
-            alignItems: "center",
-            gap: espaco.md,
-            borderRadius: 28,
-            backgroundColor: cor.branco,
-            paddingHorizontal: espaco.xl,
-            paddingTop: espaco.xl,
-            paddingBottom: espaco.lg,
+            borderRadius: canto.painel,
+            ...curva,
+            backgroundColor: cor.cartao,
+            ...sombras.flutuante,
           }}
         >
-          <Text
+          {/* A vitrine: o céu da hora, o número atrás, o bebê na frente. */}
+          <View
+            accessible={false}
+            importantForAccessibility="no-hide-descendants"
+            accessibilityElementsHidden
             style={{
-              ...fonte.forte,
-              fontSize: 13,
-              letterSpacing: 1,
-              textTransform: "uppercase",
-              color: corJornada.roxo,
+              height: VITRINE,
+              borderTopLeftRadius: canto.painel,
+              borderTopRightRadius: canto.painel,
+              ...curva,
+              overflow: "hidden",
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: ceu.chao,
             }}
           >
-            Chegou um novo marco
-          </Text>
-          <View style={{ alignItems: "center", justifyContent: "center", height: 120 }}>
-            <Brilho tamanho={170} tinta="#f5e8ff" />
-            <Text style={{ fontSize: 72, lineHeight: 86 }}>{arte}</Text>
+            <Image
+              source={ceu.arte}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              contentPosition="top"
+            />
+            {numero ? (
+              <Text
+                allowFontScaling={false}
+                style={{
+                  position: "absolute",
+                  top: 8,
+                  ...fonteDoNumero,
+                  fontSize: 180,
+                  lineHeight: 190,
+                  letterSpacing: -8,
+                  fontVariant: ["tabular-nums"],
+                  color: ceu.numero,
+                }}
+              >
+                {numero}
+              </Text>
+            ) : null}
+            <Animated.View
+              style={{
+                marginTop: 34,
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: chega.interpolate({
+                  inputRange: [0, 0.3, 1],
+                  outputRange: [0, 1, 1],
+                  extrapolate: "clamp",
+                }),
+                transform: [
+                  { scale: chega.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] }) },
+                  { translateY: chega.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) },
+                ],
+              }}
+            >
+              <Brilho tamanho={230} />
+              <Image source={arte} style={{ width: 160, height: 160 }} contentFit="contain" />
+            </Animated.View>
           </View>
-          <Text
-            accessibilityRole="header"
-            style={{
-              textAlign: "center",
-              ...fonte.titulo,
-              fontSize: 28,
-              lineHeight: 34,
-              letterSpacing: -0.3,
-              color: cor.texto,
-            }}
-          >
-            {titulo}
-          </Text>
-          <Text
-            style={{
-              textAlign: "center",
-              ...fonte.normal,
-              fontSize: 15,
-              lineHeight: 22,
-              color: cor.textoApagado,
-            }}
-          >
-            {texto}
-          </Text>
+
           <View
             style={{
-              borderRadius: 999,
-              backgroundColor: corJornada.sementinhaFundo,
-              paddingHorizontal: espaco.lg,
-              paddingVertical: espaco.sm,
+              alignItems: "center",
+              gap: espaco.md,
+              paddingHorizontal: espaco.xl,
+              paddingTop: espaco.lg,
+              paddingBottom: espaco.lg,
             }}
           >
-            <Text style={{ ...fonte.titulo, fontSize: 16, color: corJornada.sementinha }}>
-              +{festa.sementinhas} sementinhas 🌱
+            <Sobrelinha tinta={cor.primariaEscura}>Chegou um novo marco</Sobrelinha>
+            <Text
+              accessibilityRole="header"
+              style={{
+                marginTop: -4,
+                textAlign: "center",
+                ...fonte.display,
+                ...escala.titulo1,
+                letterSpacing: -0.2,
+                color: cor.texto,
+              }}
+            >
+              {titulo}
             </Text>
-          </View>
-          <View style={{ alignSelf: "stretch", marginTop: espaco.sm, gap: espaco.sm }}>
-            <BotaoDaAtividade cor={corJornada.roxo} rotulo="Que bom!" aoTocar={aoFechar} />
-            <CompartilharConquista
-              d={cartaoDoMarco(m, nomeDoBebe)}
-              tinta={corJornada.roxo}
-              fundoDoBotao={corJornada.roxoFundo}
-            />
+            <Text
+              style={{
+                textAlign: "center",
+                ...fonte.normal,
+                ...escala.legenda,
+                color: cor.textoCorpo,
+              }}
+            >
+              {texto}
+            </Text>
+            <View
+              accessible
+              accessibilityLabel={`Mais ${festa.sementinhas} sementinhas`}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 6,
+                borderRadius: canto.pilula,
+                backgroundColor: cor.sementinhaFundo,
+                paddingHorizontal: espaco.lg,
+                paddingVertical: espaco.sm,
+              }}
+            >
+              <Sprout size={18} color={cor.sementinha} strokeWidth={2.4} />
+              <Text style={{ ...fonte.titulo, ...escala.chamada, color: cor.sementinha }}>
+                +{festa.sementinhas} sementinhas
+              </Text>
+            </View>
+            <View style={{ alignSelf: "stretch", marginTop: espaco.xs, gap: espaco.sm }}>
+              <Botao rotulo="Que bom!" tamanho="grande" aoTocar={aoFechar} />
+              <CompartilharConquista
+                d={cartaoDoMarco(m, nomeDoBebe)}
+                tinta={cor.primaria}
+                fundoDoBotao={cor.destaque}
+              />
+            </View>
           </View>
         </View>
         <Confete pecas={48} />
