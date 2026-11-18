@@ -28,25 +28,20 @@ import { Vidro } from "~/componentes/vidro";
 import { Brilho } from "~/componentes/jornada/atividade";
 import { CEUS, ceuDaHora, CeuVivo, useCeuDasAbas, type Ceu } from "~/componentes/ceu-vivo";
 import { Painel, RAIO_DENTRO_DO_PAINEL } from "~/componentes/painel";
-import {
-  CeuDoBebe,
-  SaudacaoNoCeu,
-  useAlturaDoCeu,
-} from "~/componentes/jornada/ceu-do-bebe";
+import { CeuDoBebe, SaudacaoNoCeu, useAlturaDoCeu } from "~/componentes/jornada/ceu-do-bebe";
 import { GrupoDeAtalhos } from "~/componentes/jornada/atalhos";
+import { corJornada, corDaAtividade } from "~/componentes/jornada/cores";
 import {
-  corBebe,
-  corGratidao,
-  corJornada,
-  corMeditacao,
-  corMovimento,
-} from "~/componentes/jornada/cores";
-import { ArteDaBolha, useMovimentoReduzido, useParalaxe, type HumorDaArte } from "~/componentes/movimento";
+  ArteDaBolha,
+  useMovimentoReduzido,
+  useParalaxe,
+  type HumorDaArte,
+} from "~/componentes/movimento";
 import { CompartilharASemana, type DadosDoCartao } from "~/componentes/jornada/cartao-da-semana";
 import { Confete } from "~/componentes/jornada/pecas";
 import { parametroDaBancada } from "~/lib/bancada";
 import { arteDoBebe } from "~/componentes/jornada/arte-do-bebe";
-import { clarear, comAlfa } from "~/lib/cor";
+import { clarear, comAlfa, escurecer } from "~/lib/cor";
 import type { ChaveDoCuidado, Cuidado } from "~/lib/jornada/hoje";
 import { cor, curva, escala, espaco, fonte, luz, margem, ouro, sombra } from "~/tema";
 
@@ -90,14 +85,18 @@ export const ARTE: Record<ChaveDoCuidado, number> = {
  */
 export const FICHA: Record<ChaveDoCuidado, string> = {
   aula: corJornada.roxoFundo,
-  movement: corMovimento.forteFundo,
-  meditation: corMeditacao.halo,
-  bonding: corBebe.fundoTopo,
-  gratitude: corGratidao.escolhidaFundo,
+  movement: corDaAtividade.mexer.luz,
+  meditation: corDaAtividade.meditar.luz,
+  bonding: corDaAtividade.carta.luz,
+  gratitude: corDaAtividade.gratidao.luz,
 };
 
-/* O destaque do "próximo cuidado", na cor da atividade — lida de `cores.ts`,
-   e não repetida à mão. */
+/* O destaque do "próximo cuidado", na cor da atividade — lida de `cores.ts`
+   (`corDaAtividade`, a paleta do Amanhecer das atividades), e não repetida à
+   mão: a névoa clara da atividade em cima, a cor de agir no botão. */
+function destaqueDa(p: { luz: string; acao: string }) {
+  return { de: clarear(p.luz, 0.55), ate: p.luz, forte: p.acao, tinta: escurecer(p.acao, 0.3) };
+}
 const DESTAQUE: Record<ChaveDoCuidado, { de: string; ate: string; forte: string; tinta: string }> =
   {
     aula: {
@@ -106,30 +105,10 @@ const DESTAQUE: Record<ChaveDoCuidado, { de: string; ate: string; forte: string;
       forte: corJornada.roxo,
       tinta: corJornada.roxoEscuro,
     },
-    movement: {
-      de: corMovimento.fundoMeio,
-      ate: corMovimento.fundoTopo,
-      forte: corMovimento.forte,
-      tinta: corMovimento.titulo,
-    },
-    meditation: {
-      de: corMeditacao.fundoMeio,
-      ate: corMeditacao.fundoTopo,
-      forte: corMeditacao.forte,
-      tinta: corMeditacao.titulo,
-    },
-    bonding: {
-      de: corBebe.fundoMeio,
-      ate: corBebe.fundoTopo,
-      forte: corBebe.forte,
-      tinta: corBebe.titulo,
-    },
-    gratitude: {
-      de: corGratidao.fundoMeio,
-      ate: corGratidao.fundoTopo,
-      forte: corGratidao.forte,
-      tinta: corGratidao.titulo,
-    },
+    movement: destaqueDa(corDaAtividade.mexer),
+    meditation: destaqueDa(corDaAtividade.meditar),
+    bonding: destaqueDa(corDaAtividade.carta),
+    gratitude: destaqueDa(corDaAtividade.gratidao),
   };
 
 /** A névoa da paleta: o fundo do pós-parto, que ainda tem a folha sobre o céu. */
@@ -446,20 +425,20 @@ export function TelaDeHoje({
                 </View>
 
                 <Entrar key={proximo?.chave ?? "cheio"}>
-                  {proximo ? (
-                    <ProximoCuidado c={proximo} aoAbrir={aoAbrir} />
-                  ) : (
-                    <DiaCheio />
-                  )}
+                  {proximo ? <ProximoCuidado c={proximo} aoAbrir={aoAbrir} /> : <DiaCheio />}
                 </Entrar>
 
                 {/* Os outros cuidados, numa lista só (e não quatro cartões soltos). */}
                 {resto.length ? (
-                  <View style={{ borderRadius: RAIO_DENTRO_DO_PAINEL, paddingVertical: 4, ...MATERIAL }}>
+                  <View
+                    style={{ borderRadius: RAIO_DENTRO_DO_PAINEL, paddingVertical: 4, ...MATERIAL }}
+                  >
                     {resto.map((c, i) => (
                       <View key={c.chave}>
                         {i > 0 ? (
-                          <View style={{ height: FIO, marginLeft: 82, backgroundColor: cor.borda }} />
+                          <View
+                            style={{ height: FIO, marginLeft: 82, backgroundColor: cor.borda }}
+                          />
                         ) : null}
                         <LinhaDoCuidado c={c} aoAbrir={aoAbrir} />
                       </View>
@@ -560,7 +539,10 @@ function BarraQueNasce({
           rola não passa por baixo do relógio do iPhone. */}
       <Animated.View
         pointerEvents="none"
-        style={[{ position: "absolute", top: 0, left: 0, right: 0, height: topo + 64 }, estilos.veu]}
+        style={[
+          { position: "absolute", top: 0, left: 0, right: 0, height: topo + 64 },
+          estilos.veu,
+        ]}
       >
         <LinearGradient
           colors={[ceu.topo, comAlfa(ceu.topo, 0.85), comAlfa(ceu.topo, 0)]}

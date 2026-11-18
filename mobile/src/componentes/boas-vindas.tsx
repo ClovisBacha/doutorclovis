@@ -233,8 +233,8 @@ function Estrelas({ quantas }: { quantas: number }) {
         <Star
           key={i}
           size={15}
-          color={i < quantas ? corCaminho.ouroEscuro : corCaminho.textoClaro80}
-          fill={i < quantas ? corCaminho.ouro : corCaminho.estrelaApagada}
+          color={i < quantas ? corCaminho.ouroEscuro : cor.chevron}
+          fill={i < quantas ? corCaminho.ouro : cor.trilho}
         />
       ))}
     </View>
