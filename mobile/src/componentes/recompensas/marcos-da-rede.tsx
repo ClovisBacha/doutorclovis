@@ -1,15 +1,17 @@
+import { Check, Lock } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
+import { Cartao } from "~/componentes/base";
 import { lerAmigas } from "~/componentes/amigas/economia";
 import { useDiaDaJornada } from "~/componentes/jornada/usarJornada";
-import { corRecompensas } from "~/componentes/recompensas/cores";
 import { lerAIndicacao } from "~/componentes/recompensas/economia-do-cantinho";
+import { Contagem, SecaoComArte } from "~/componentes/recompensas/pecas";
 import { gravarJson, lerJson } from "~/lib/armazem";
 import { ehBancada } from "~/lib/bancada";
 import { api } from "~/lib/comunidade/api";
 import { marcosFeitosAgora, marcosNaTela, type MarcoNaTela } from "~/lib/jornada/marcos-da-rede";
 import { useSessao } from "~/lib/sessao";
-import { cor, espaco, fonte } from "~/tema";
+import { canto, cor, curva, escala, espaco, fonte, sombra } from "~/tema";
 import { COMUNIDADE_NO_APP } from "~/config";
 
 /**
@@ -19,6 +21,10 @@ import { COMUNIDADE_NO_APP } from "~/config";
  * ato social. Os marcos são do app: saem do que o servidor já devolve (as
  * amigas e o recorde da dupla, os convites aceitos, as publicações), e a tela
  * diz sem rodeio que não valem sementinhas.
+ *
+ * Desenho (18/11/2026): uma lista agrupada, e não mais medalhas — não são
+ * troféus, e a lista deixa ler o que cada um quer dizer. O que ainda não
+ * aconteceu tem a arte apagada; o texto fica pleno.
  *
  * Marco ganho fica ganho: o que já foi feito é guardado no aparelho, por conta
  * (`dc-` — sai junto com a conta), e uma dupla desfeita não "desconquista"
@@ -58,86 +64,100 @@ export function MarcosDaRede() {
 
   if (!marcos) return null;
   const ganhos = marcos.filter((m) => m.ganho).length;
-  const linhas: MarcoNaTela[][] = [];
-  for (let i = 0; i < marcos.length; i += 2) linhas.push(marcos.slice(i, i + 2));
 
   return (
-    <View>
-      <Text
-        accessibilityRole="header"
-        style={{ marginBottom: 4, ...fonte.media, fontSize: 16, color: cor.texto }}
-      >
-        👭 Marcos da sua rede · {ganhos} de {marcos.length}
+    <View style={{ gap: espaco.md }}>
+      <SecaoComArte
+        titulo="Marcos da sua rede"
+        direita={<Contagem texto={`${ganhos} de ${marcos.length}`} />}
+      />
+      <Text style={{ ...fonte.normal, ...escala.legenda, color: cor.textoApagado }}>
+        Estes não valem sementinhas. Mostram a rede que você está formando.
       </Text>
-      <Text
-        style={{
-          marginBottom: espaco.md,
-          ...fonte.normal,
-          fontSize: 13,
-          lineHeight: 18,
-          color: cor.textoApagado,
-        }}
-      >
-        Estes não valem sementinhas: são a rede que você está formando.
-      </Text>
-      <View style={{ gap: espaco.md }}>
-        {linhas.map((par, i) => (
-          <View key={i} style={{ flexDirection: "row", gap: espaco.md, alignItems: "stretch" }}>
-            {par.map((m) => (
-              <CartaoDoMarco key={m.chave} m={m} />
-            ))}
-            {par.length === 1 ? <View style={{ flex: 1 }} /> : null}
-          </View>
+      <Cartao estilo={{ padding: 0, gap: 0 }}>
+        {marcos.map((m, i) => (
+          <LinhaDoMarco key={m.chave} m={m} primeira={i === 0} />
         ))}
-      </View>
+      </Cartao>
     </View>
   );
 }
 
-function CartaoDoMarco({ m }: { m: MarcoNaTela }) {
+function LinhaDoMarco({ m, primeira }: { m: MarcoNaTela; primeira: boolean }) {
   return (
     <View
       accessible
       accessibilityLabel={`${m.titulo}. ${m.texto} ${m.ganho ? "Feito" : "Ainda não"}${m.novo ? ", novo" : ""}.`}
       style={{
-        flex: 1,
-        borderRadius: 24,
-        borderWidth: 1,
-        borderColor: m.ganho ? "#f3c6d8" : cor.borda,
-        backgroundColor: m.ganho ? "#fdf0f5" : corRecompensas.secundaria20,
-        padding: espaco.lg,
+        flexDirection: "row",
         alignItems: "center",
-        opacity: m.ganho ? 1 : 0.55,
+        gap: espaco.md,
+        paddingHorizontal: espaco.lg,
+        paddingVertical: espaco.md,
+        borderTopWidth: primeira ? 0 : 1,
+        borderTopColor: cor.divisor,
       }}
     >
-      <Text style={{ fontSize: 30, lineHeight: 36, marginBottom: espaco.sm }}>{m.emoji}</Text>
-      <Text style={{ ...fonte.media, fontSize: 13, textAlign: "center", color: cor.texto }}>
-        {m.titulo}
-      </Text>
-      <Text
-        style={{
-          marginTop: 2,
-          ...fonte.normal,
-          fontSize: 13,
-          lineHeight: 16,
-          textAlign: "center",
-          color: cor.textoApagado,
-        }}
-      >
-        {m.texto}
-      </Text>
-      <Text
-        style={{
-          marginTop: 6,
-          ...fonte.forte,
-          fontSize: 13,
-          letterSpacing: 0.4,
-          textTransform: "uppercase",
-          color: m.ganho ? "#b0306a" : corRecompensas.apagado60,
-        }}
-      >
-        {m.novo ? "Novo 💛" : m.ganho ? "Feito ✓" : "Ainda não"}
-      </Text>
+      <View style={{ width: 48, height: 48 }}>
+        <View
+          style={{
+            width: 48,
+            height: 48,
+            borderRadius: 24,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: m.ganho ? cor.destaque : cor.apagado,
+            borderWidth: 2,
+            borderColor: m.ganho ? cor.primariaSuave : cor.trilho,
+          }}
+        >
+          <Text
+            allowFontScaling={false}
+            style={{ fontSize: 22, lineHeight: 28, opacity: m.ganho ? 1 : 0.3 }}
+          >
+            {m.emoji}
+          </Text>
+        </View>
+        {m.ganho ? null : (
+          <View
+            style={[
+              {
+                position: "absolute",
+                right: -3,
+                bottom: -3,
+                width: 20,
+                height: 20,
+                borderRadius: 10,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: cor.cartao,
+              },
+              sombra,
+            ]}
+          >
+            <Lock size={10} color={cor.textoApagado} strokeWidth={2.4} />
+          </View>
+        )}
+      </View>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={{ ...fonte.forte, ...escala.legenda, color: cor.texto }}>{m.titulo}</Text>
+        <Text style={{ ...fonte.normal, ...escala.nota, color: cor.textoApagado }}>{m.texto}</Text>
+      </View>
+      {m.novo ? (
+        <View
+          style={{
+            borderRadius: canto.pilula,
+            ...curva,
+            backgroundColor: cor.destaque,
+            paddingHorizontal: espaco.sm,
+            paddingVertical: 2,
+          }}
+        >
+          <Text style={{ ...fonte.forte, ...escala.nota, color: cor.textoDestaque }}>Novo</Text>
+        </View>
+      ) : m.ganho ? (
+        <Check size={18} color={cor.primaria} strokeWidth={2.6} />
+      ) : null}
     </View>
   );
 }

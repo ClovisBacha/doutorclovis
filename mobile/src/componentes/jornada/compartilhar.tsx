@@ -1,9 +1,9 @@
 import { LIMITE_DO_TEXTO, VISIBILIDADES, type Visibilidade } from "@/lib/rede-social";
 import { Image } from "expo-image";
 import { useRef, useState, type ReactNode } from "react";
+import { Check, Share as IconeDeCompartilhar } from "lucide-react-native";
 import {
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -11,11 +11,13 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
-import { toque } from "~/componentes/base";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Botao, selecao, toque } from "~/componentes/base";
 import { fonteDaImagem } from "~/componentes/comunidade/imagem";
 import { FolhaDasRegras } from "~/componentes/comunidade/regras";
-import { BotaoDaAtividade } from "~/componentes/jornada/atividade";
+import { Folha } from "~/componentes/jornada/pecas";
 import { ehBancada } from "~/lib/bancada";
 import { api } from "~/lib/comunidade/api";
 import { prepararArquivo } from "~/lib/comunidade/fotos";
@@ -23,7 +25,7 @@ import { ehOfensivo, mensagemDoErro, recadoDaOfensa } from "~/lib/comunidade/reg
 import { marcarFeedSujo } from "~/lib/comunidade/sinal";
 import { useRegrasDaComunidade } from "~/lib/comunidade/usar-regras";
 import { useSessao } from "~/lib/sessao";
-import { ALVO_MINIMO, cor, espaco, fonte } from "~/tema";
+import { ALVO_MINIMO, canto, cor, curva, escala, espaco, fonte, sombra } from "~/tema";
 import { COMUNIDADE_NO_APP } from "~/config";
 
 type Modo = "previa" | "escrevendo" | "publicado";
@@ -45,12 +47,16 @@ type Modo = "previa" | "escrevendo" | "publicado";
  * As regras da Comunidade valem igual (o "Concordo" no primeiro gesto), o
  * filtro de ofensa sai antes do aparelho, e a recusa do servidor mostra o
  * recado como chegou. No Modo Cuidado não há publicar (o servidor recusaria).
+ *
+ * Desenho (18/11/2026): a `Folha` do app (a alça, o título com o X, a área
+ * segura), e não mais uma janela própria com o fundo roxo-escuro; os botões
+ * são o `Botao` do tema, framboesa por padrão (antes, o violeta #7a3fd1).
  */
 export function FolhaDeCompartilhar({
   aberta,
   aoFechar,
   largura,
-  corDoBotao = "#7a3fd1",
+  corDoBotao = cor.primaria,
   legenda,
   children,
 }: {
@@ -76,6 +82,8 @@ export function FolhaDeCompartilhar({
   const [publicando, setPublicando] = useState(false);
   const regras = useRegrasDaComunidade();
   const alvo = useRef<View>(null);
+  const { height: altura } = useWindowDimensions();
+  const topo = useSafeAreaInsets().top;
 
   /* Na web só a bancada publica (com uma foto de exemplo no lugar do cartão). */
   /* Sem a Comunidade (`COMUNIDADE_NO_APP`), o cartão só se compartilha pela
@@ -161,39 +169,51 @@ export function FolhaDeCompartilhar({
   }
 
   const quemVe = VISIBILIDADES.find((v) => v.chave === visibilidade);
+  /* A folha cabe na tela: o cartão tem 9:16, e num iPhone pequeno ele rola
+     dentro dela (o título e o X ficam parados). */
+  const alturaUtil = Math.max(320, altura - topo - 140);
 
   return (
-    <Modal visible={aberta} transparent animationType="slide" onRequestClose={fechar}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
+    <Folha
+      aberta={aberta}
+      aoFechar={fechar}
+      titulo={
+        modo === "previa"
+          ? "Seu cartão"
+          : modo === "escrevendo"
+            ? "Publicar na Comunidade"
+            : "Publicado"
+      }
+    >
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView
           keyboardShouldPersistTaps="handled"
-          style={{ flex: 1, backgroundColor: "rgba(20,10,30,0.7)" }}
-          contentContainerStyle={{
-            flexGrow: 1,
-            alignItems: "center",
-            justifyContent: "center",
-            gap: espaco.lg,
-            padding: espaco.xl,
-          }}
+          showsVerticalScrollIndicator={false}
+          style={{ maxHeight: alturaUtil }}
+          contentContainerStyle={{ alignItems: "center", gap: espaco.lg, paddingBottom: espaco.xs }}
         >
           {modo === "previa" ? (
             <>
-              <View ref={alvo} collapsable={false}>
-                {children}
+              {/* A sombra fica na caixa de FORA: a imagem sai só do cartão. */}
+              <View style={[{ width: largura, borderRadius: canto.cartao }, sombra]}>
+                <View ref={alvo} collapsable={false}>
+                  {children}
+                </View>
               </View>
-              <View style={{ width: largura, gap: espaco.sm }}>
-                <BotaoDaAtividade
-                  cor={corDoBotao}
+              <View style={{ alignSelf: "stretch", gap: espaco.sm }}>
+                <Botao
                   rotulo={Platform.OS === "web" ? "Compartilhar (no iPhone)" : "Compartilhar"}
+                  corFundo={corDoBotao}
+                  tamanho="grande"
+                  icone={<IconeDeCompartilhar size={20} color={cor.branco} strokeWidth={2.4} />}
                   carregando={enviando}
                   aoTocar={() => void compartilhar()}
                 />
                 {podePublicar ? (
-                  <BotaoClaro
-                    rotulo={preparando ? "Preparando o cartão…" : "Publicar na Comunidade"}
+                  <Botao
+                    rotulo="Publicar na Comunidade"
+                    tipo="secundario"
+                    carregando={preparando}
                     aoTocar={() => void prepararParaPublicar()}
                   />
                 ) : null}
@@ -202,37 +222,22 @@ export function FolhaDeCompartilhar({
                     style={{
                       textAlign: "center",
                       ...fonte.media,
-                      fontSize: 13,
-                      color: cor.branco,
+                      ...escala.nota,
+                      color: cor.textoApagado,
                     }}
                   >
-                    Não consegui montar a imagem agora. Tente de novo.
+                    Não deu para montar a imagem agora. Tente de novo.
                   </Text>
                 ) : null}
-                <BotaoDeTexto rotulo="Fechar" aoTocar={fechar} />
               </View>
             </>
           ) : modo === "escrevendo" ? (
-            <View
-              style={{
-                width: largura,
-                gap: espaco.md,
-                borderRadius: 24,
-                backgroundColor: cor.cartao,
-                padding: espaco.lg,
-              }}
-            >
-              <Text
-                accessibilityRole="header"
-                style={{ ...fonte.titulo, fontSize: 18, color: cor.texto }}
-              >
-                Publicar na Comunidade
-              </Text>
+            <View style={{ alignSelf: "stretch", gap: espaco.md }}>
               <View style={{ flexDirection: "row", gap: espaco.md }}>
                 {foto ? (
                   <Image
                     source={fonteDaImagem(foto)}
-                    style={{ width: 72, height: 128, borderRadius: 12 }}
+                    style={{ width: 72, height: 128, borderRadius: canto.icone }}
                     contentFit="cover"
                     accessibilityLabel="O cartão que vai na publicação"
                   />
@@ -247,24 +252,24 @@ export function FolhaDeCompartilhar({
                   maxLength={LIMITE_DO_TEXTO}
                   accessibilityLabel="Legenda da publicação"
                   placeholder="Escreva uma legenda"
-                  placeholderTextColor={cor.textoApagado}
+                  placeholderTextColor={cor.placeholder}
+                  selectionColor={cor.primaria}
                   style={{
                     flex: 1,
                     minHeight: 128,
                     textAlignVertical: "top",
-                    borderRadius: 12,
-                    borderWidth: 1,
-                    borderColor: cor.borda,
-                    backgroundColor: cor.fundo,
-                    padding: espaco.sm,
+                    borderRadius: canto.campo,
+                    ...curva,
+                    backgroundColor: cor.apagado,
+                    padding: espaco.md,
                     ...fonte.normal,
-                    fontSize: 15,
+                    fontSize: 17,
                     color: cor.texto,
                   }}
                 />
               </View>
               <View style={{ gap: espaco.xs }}>
-                <Text style={{ ...fonte.forte, fontSize: 14, color: cor.texto }}>
+                <Text style={{ ...fonte.forte, ...escala.nota, color: cor.textoApagado }}>
                   Quem pode ver
                 </Text>
                 <View accessibilityRole="radiogroup" style={{ flexDirection: "row", gap: 6 }}>
@@ -277,7 +282,7 @@ export function FolhaDeCompartilhar({
                         accessibilityState={{ selected: ativa, checked: ativa }}
                         accessibilityLabel={`${v.rotulo}. ${v.sub}`}
                         onPress={() => {
-                          toque();
+                          selecao();
                           setVisibilidade(v.chave);
                         }}
                         style={{
@@ -285,11 +290,10 @@ export function FolhaDeCompartilhar({
                           minHeight: ALVO_MINIMO,
                           alignItems: "center",
                           justifyContent: "center",
-                          borderRadius: 999,
+                          borderRadius: canto.pilula,
+                          ...curva,
                           paddingHorizontal: 6,
-                          borderWidth: ativa ? 2 : 1,
-                          borderColor: ativa ? cor.primaria : cor.borda,
-                          backgroundColor: ativa ? cor.destaque : cor.cartao,
+                          backgroundColor: ativa ? cor.texto : cor.apagado,
                         }}
                       >
                         <Text
@@ -297,8 +301,8 @@ export function FolhaDeCompartilhar({
                           style={{
                             textAlign: "center",
                             ...fonte.forte,
-                            fontSize: 13,
-                            color: cor.texto,
+                            ...escala.nota,
+                            color: ativa ? cor.branco : cor.texto,
                           }}
                         >
                           {v.rotulo}
@@ -308,7 +312,7 @@ export function FolhaDeCompartilhar({
                   })}
                 </View>
                 {quemVe ? (
-                  <Text style={{ ...fonte.normal, fontSize: 13, color: cor.textoApagado }}>
+                  <Text style={{ ...fonte.normal, ...escala.nota, color: cor.textoApagado }}>
                     {quemVe.sub}
                   </Text>
                 ) : null}
@@ -316,121 +320,61 @@ export function FolhaDeCompartilhar({
               {recado ? (
                 <View
                   style={{
-                    borderRadius: 12,
+                    borderRadius: canto.campo,
+                    ...curva,
                     backgroundColor: cor.atencaoFundo,
                     padding: espaco.md,
                   }}
                 >
-                  <Text
-                    style={{
-                      ...fonte.media,
-                      fontSize: 14,
-                      lineHeight: 20,
-                      color: cor.texto,
-                    }}
-                  >
+                  <Text style={{ ...fonte.media, ...escala.legenda, color: cor.atencaoForte }}>
                     {recado}
                   </Text>
                 </View>
               ) : null}
-              <BotaoDaAtividade
-                cor={corDoBotao}
+              <Botao
                 rotulo="Publicar"
+                corFundo={corDoBotao}
                 carregando={publicando}
                 aoTocar={() => regras.exigir(() => void publicar())}
               />
-              <BotaoDeTexto rotulo="Voltar" escuro aoTocar={() => setModo("previa")} />
+              <Botao rotulo="Voltar" tipo="texto" aoTocar={() => setModo("previa")} />
             </View>
           ) : (
-            <View
-              style={{
-                width: largura,
-                alignItems: "center",
-                gap: espaco.sm,
-                borderRadius: 24,
-                backgroundColor: cor.cartao,
-                padding: espaco.xl,
-              }}
-            >
-              <Text style={{ fontSize: 40 }} accessible={false}>
-                💛
-              </Text>
-              <Text
-                accessibilityRole="header"
-                style={{ ...fonte.titulo, fontSize: 18, color: cor.texto }}
+            <View style={{ alignSelf: "stretch", alignItems: "center", gap: espaco.sm }}>
+              <View
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: cor.sementinhaFundo,
+                }}
               >
-                Publicado na Comunidade
-              </Text>
+                <Check size={28} color={cor.sementinha} strokeWidth={2.6} />
+              </View>
               <Text
                 style={{
                   textAlign: "center",
                   ...fonte.normal,
-                  fontSize: 14,
-                  lineHeight: 20,
+                  ...escala.legenda,
                   color: cor.textoApagado,
                 }}
               >
                 {quemVe ? `${quemVe.rotulo}: ${quemVe.sub.toLowerCase()}.` : ""} Aparece no seu
                 perfil e no feed de quem pode ver.
               </Text>
-              <BotaoDeTexto rotulo="Fechar" escuro aoTocar={fechar} />
+              <Botao
+                rotulo="Fechar"
+                tipo="secundario"
+                estilo={{ alignSelf: "stretch" }}
+                aoTocar={fechar}
+              />
             </View>
           )}
         </ScrollView>
       </KeyboardAvoidingView>
       <FolhaDasRegras {...regras.folha} />
-    </Modal>
-  );
-}
-
-function BotaoClaro({ rotulo, aoTocar }: { rotulo: string; aoTocar: () => void }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={rotulo}
-      onPress={() => {
-        toque();
-        aoTocar();
-      }}
-      style={({ pressed }) => ({
-        minHeight: 52,
-        alignItems: "center",
-        justifyContent: "center",
-        borderRadius: 999,
-        borderWidth: 2,
-        borderColor: "rgba(255,255,255,0.9)",
-        opacity: pressed ? 0.8 : 1,
-      })}
-    >
-      <Text style={{ ...fonte.titulo, fontSize: 16, color: cor.branco }}>{rotulo}</Text>
-    </Pressable>
-  );
-}
-
-function BotaoDeTexto({
-  rotulo,
-  aoTocar,
-  escuro,
-}: {
-  rotulo: string;
-  aoTocar: () => void;
-  escuro?: boolean;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={aoTocar}
-      style={{ minHeight: 44, alignItems: "center", justifyContent: "center" }}
-    >
-      <Text
-        style={{
-          ...fonte.forte,
-          fontSize: 15,
-          color: escuro ? cor.textoApagado : "rgba(255,255,255,0.85)",
-        }}
-      >
-        {rotulo}
-      </Text>
-    </Pressable>
+    </Folha>
   );
 }

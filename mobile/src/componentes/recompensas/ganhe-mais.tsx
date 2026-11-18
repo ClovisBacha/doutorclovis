@@ -1,10 +1,10 @@
-import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useState } from "react";
-import { Linking, Pressable, Share, Text, TextInput, View } from "react-native";
+import { ChevronRight } from "lucide-react-native";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Animated, Easing, Linking, Pressable, Share, Text, View } from "react-native";
 import { BONUS_INFLUENCIADORA } from "@/lib/economia-sementinhas";
 import { linkDeIndicacao, linkDoWhatsApp } from "@/lib/indicacao";
-import { toque } from "~/componentes/base";
-import { corRecompensas } from "~/componentes/recompensas/cores";
+import { Botao, Campo, Cartao, toque } from "~/componentes/base";
+import { useMolaDeToque, useMovimentoReduzido } from "~/componentes/movimento";
 import {
   aplicarOCodigo,
   lerAIndicacao,
@@ -15,23 +15,27 @@ import {
   type Indicacao,
   type Lancamento,
 } from "~/componentes/recompensas/economia-do-cantinho";
-import { CartaoMaterial, vibrar } from "~/componentes/recompensas/pecas";
+import { Broto, vibrar } from "~/componentes/recompensas/pecas";
 import { mensagemDeConviteDoApp } from "~/lib/jornada/amigas";
 import { RECOMPENSA_DA_INDICACAO, RECOMPENSA_DO_DEPOIMENTO } from "~/lib/jornada/recompensas";
 import { useSessao } from "~/lib/sessao";
-import { ALVO_MINIMO, cor, espaco, fonte } from "~/tema";
+import { ALVO_MINIMO, canto, cor, curva, escala, espaco, fonte } from "~/tema";
 
 /**
- * "GANHE MAIS SEMENTINHAS" — a sanfona do Meu Cantinho do site, recolhida por
- * padrão (um bloco só no lugar de quatro cartões empilhados).
+ * "GANHE MAIS SEMENTINHAS" — a sanfona do fim do Meu Cantinho, recolhida por
+ * padrão. Também abre pela pílula do saldo, no alto da tela.
  *
  * O que entra no app: indicar uma amiga, o depoimento e o código de quem a
  * trouxe — e, no fim, o extrato e a frase que traça o limite do produto, que no
- * site moram na Loja de Sementinhas (que o app não tem: lá se compra com
+ * site moram na loja paga de sementinhas (que o app não tem: lá se compra com
  * dinheiro, e no app só a Apple vende).
  *
  * ⚠️ O que NÃO entra: a recompensa por avaliar o app (a Apple proíbe pagar pela
  * nota) e o Instagram (desligado no servidor; no site o cartão se esconde).
+ *
+ * Desenho (18/11/2026): UM cartão do tema, com as partes separadas por fios —
+ * antes eram três cartões dentro de uma sanfona menta, cada um num degradê
+ * Tailwind (rosa, violeta) e com o seu botão de outra cor.
  */
 
 export function GanheMais({
@@ -46,68 +50,204 @@ export function GanheMais({
   avisar: (texto: string) => void;
 }) {
   return (
-    <View
-      style={{
-        borderRadius: 24,
-        borderWidth: 1,
-        borderColor: corRecompensas.esmeralda100,
-        backgroundColor: corRecompensas.esmeralda50_40,
-      }}
-    >
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ expanded: aberta }}
-        accessibilityLabel="Ganhe mais Sementinhas"
-        onPress={() => {
-          toque();
-          aoAlternar();
-        }}
-        style={{
-          minHeight: ALVO_MINIMO + 4,
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          paddingHorizontal: espaco.lg,
-        }}
-      >
-        <Text style={{ ...fonte.forte, fontSize: 14, color: corRecompensas.esmeralda800 }}>
-          🌱 Ganhe mais Sementinhas
-        </Text>
-        <Text
-          style={{
-            ...fonte.forte,
-            fontSize: 16,
-            color: corRecompensas.esmeralda600,
-            transform: [{ rotate: aberta ? "90deg" : "0deg" }],
-          }}
-        >
-          ›
-        </Text>
-      </Pressable>
+    <Cartao estilo={{ padding: 0, gap: 0 }}>
+      <CabecaDaSanfona
+        aberta={aberta}
+        aoAlternar={aoAlternar}
+        rotulo="Ganhe mais sementinhas"
+        icone={
+          <View
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: cor.sementinhaFundo,
+            }}
+          >
+            <Broto tamanho={18} />
+          </View>
+        }
+        sub="Indique amigas e conte como está sendo."
+      />
       {aberta ? (
-        <View style={{ gap: espaco.sm, paddingHorizontal: espaco.md, paddingBottom: espaco.md }}>
+        <View>
           <CartaoDaIndicacao avisar={avisar} />
           <CartaoDoDepoimento avisar={avisar} />
           <CodigoDeQuemIndicou aoGanhar={aoGanhar} avisar={avisar} />
           <Extrato />
           <Text
             style={{
-              marginTop: espaco.xs,
-              paddingHorizontal: espaco.sm,
+              paddingHorizontal: espaco.lg,
+              paddingTop: espaco.md,
+              paddingBottom: espaco.lg,
               ...fonte.normal,
-              fontSize: 13,
-              lineHeight: 19,
+              ...escala.nota,
               textAlign: "center",
-              color: corRecompensas.ardosia600,
+              color: cor.textoApagado,
             }}
           >
-            Sementinhas compram só enfeites do Meu Cantinho. Nenhuma aula depende delas.
+            As sementinhas compram só enfeites do Meu Cantinho. Nenhuma aula depende delas.
           </Text>
         </View>
       ) : null}
+    </Cartao>
+  );
+}
+
+/** A cabeça de uma sanfona: o toque com mola e a seta que gira 90°. */
+function CabecaDaSanfona({
+  aberta,
+  aoAlternar,
+  rotulo,
+  sub,
+  icone,
+  compacta,
+}: {
+  aberta: boolean;
+  aoAlternar: () => void;
+  rotulo: string;
+  sub?: string;
+  icone?: ReactNode;
+  compacta?: boolean;
+}) {
+  const mola = useMolaDeToque(0.98);
+  const reduzido = useMovimentoReduzido();
+  const giro = useRef(new Animated.Value(aberta ? 1 : 0)).current;
+  useEffect(() => {
+    if (reduzido) {
+      giro.setValue(aberta ? 1 : 0);
+      return;
+    }
+    const a = Animated.timing(giro, {
+      toValue: aberta ? 1 : 0,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+    a.start();
+    return () => a.stop();
+  }, [aberta, giro, reduzido]);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ expanded: aberta }}
+      accessibilityLabel={rotulo}
+      onPressIn={mola.aoPressionar}
+      onPressOut={mola.aoSoltar}
+      onPress={() => {
+        toque();
+        aoAlternar();
+      }}
+    >
+      <Animated.View
+        style={{
+          minHeight: compacta ? ALVO_MINIMO : ALVO_MINIMO + 20,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: espaco.md,
+          paddingHorizontal: espaco.lg,
+          paddingVertical: compacta ? espaco.sm : espaco.md,
+          transform: [{ scale: mola.escala }],
+        }}
+      >
+        {icone}
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text
+            style={{
+              ...fonte.forte,
+              ...(compacta ? escala.legenda : escala.manchete),
+              color: cor.texto,
+            }}
+          >
+            {rotulo}
+          </Text>
+          {sub ? (
+            <Text style={{ ...fonte.normal, ...escala.nota, color: cor.textoApagado }}>{sub}</Text>
+          ) : null}
+        </View>
+        <Animated.View
+          style={{
+            transform: [
+              { rotate: giro.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "90deg"] }) },
+            ],
+          }}
+        >
+          <ChevronRight size={18} color={cor.chevron} strokeWidth={2.6} />
+        </Animated.View>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+/** Uma parte da sanfona: o fio em cima, o título (com algo à direita) e o corpo. */
+function Parte({
+  titulo,
+  direita,
+  children,
+}: {
+  titulo: string;
+  direita?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <View
+      style={{
+        borderTopWidth: 1,
+        borderTopColor: cor.divisor,
+        paddingHorizontal: espaco.lg,
+        paddingVertical: espaco.lg,
+        gap: espaco.sm,
+      }}
+    >
+      <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
+        <Text
+          accessibilityRole="header"
+          style={{ flex: 1, ...fonte.forte, ...escala.manchete, color: cor.texto }}
+        >
+          {titulo}
+        </Text>
+        {direita}
+      </View>
+      {children}
     </View>
   );
 }
+
+/** Uma etiqueta pequena (o bônus, o estado do depoimento). */
+function Etiqueta({
+  texto,
+  fundo,
+  tinta,
+  icone,
+}: {
+  texto: string;
+  fundo: string;
+  tinta: string;
+  icone?: ReactNode;
+}) {
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        borderRadius: canto.pilula,
+        ...curva,
+        backgroundColor: fundo,
+        paddingHorizontal: espaco.sm + 2,
+        paddingVertical: 3,
+      }}
+    >
+      {icone}
+      <Text style={{ ...fonte.forte, ...escala.nota, color: tinta }}>{texto}</Text>
+    </View>
+  );
+}
+
+const corpo = { ...fonte.normal, ...escala.legenda, color: cor.textoCorpo } as const;
+const miudo = { ...fonte.normal, ...escala.nota, color: cor.textoApagado } as const;
 
 /* ── Indique uma amiga ──────────────────────────────────────────────────── */
 
@@ -129,105 +269,75 @@ function CartaoDaIndicacao({ avisar }: { avisar: (t: string) => void }) {
     try {
       await Share.share({ message: msg });
     } catch {
-      avisar("Não consegui abrir o compartilhamento.");
+      avisar("Não deu para abrir o compartilhamento.");
     }
   }
 
   return (
-    <LinearGradient
-      colors={[corRecompensas.rosa50, cor.branco, corRecompensas.rubi50]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={{
-        borderRadius: 24,
-        borderWidth: 1,
-        borderColor: corRecompensas.rosa200,
-        padding: 20,
-      }}
+    <Parte
+      titulo="Indique uma amiga"
+      direita={
+        <Etiqueta
+          texto={`+${RECOMPENSA_DA_INDICACAO}`}
+          fundo={cor.sementinhaFundo}
+          tinta={cor.sementinha}
+          icone={<Broto tamanho={13} />}
+        />
+      }
     >
-      <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
-        <Text style={{ fontSize: 24 }}>👭</Text>
-        <Text style={{ flex: 1, ...fonte.titulo, fontSize: 14, color: corRecompensas.rosa700 }}>
-          Indique uma amiga → {RECOMPENSA_DA_INDICACAO} 🌱
-        </Text>
-        {ind.amigas > 0 ? (
-          <View
-            style={{
-              borderRadius: 999,
-              backgroundColor: corRecompensas.rosa100,
-              paddingHorizontal: espaco.md,
-              paddingVertical: 4,
-            }}
-          >
-            <Text style={{ ...fonte.forte, fontSize: 13, color: corRecompensas.rosa700 }}>
-              {ind.amigas} {ind.amigas === 1 ? "amiga" : "amigas"} 💞
-            </Text>
-          </View>
-        ) : null}
-      </View>
-      <Text style={estilo.corpo}>
-        Cada amiga que criar a conta pelo seu link te dá{" "}
-        <Text style={{ ...fonte.forte }}>{RECOMPENSA_DA_INDICACAO} Sementinhas</Text>. Sem limite de
-        amigas 💜
+      <Text style={corpo}>
+        Cada amiga que criar a conta pelo seu link vale {RECOMPENSA_DA_INDICACAO} sementinhas para
+        você. Sem limite de amigas.
       </Text>
+      {ind.amigas > 0 ? (
+        <Text style={miudo}>
+          {ind.amigas === 1
+            ? "Uma amiga já entrou pelo seu convite."
+            : `${ind.amigas} amigas já entraram pelo seu convite.`}
+        </Text>
+      ) : null}
       <View
         style={{
-          marginTop: espaco.md,
+          marginTop: espaco.xs,
           flexDirection: "row",
           alignItems: "center",
           gap: espaco.sm,
-          borderRadius: 999,
-          borderWidth: 1,
-          borderColor: cor.borda,
-          backgroundColor: cor.branco,
+          borderRadius: canto.campo,
+          ...curva,
+          backgroundColor: cor.apagado,
           paddingLeft: espaco.md,
         }}
       >
-        <Text
-          numberOfLines={1}
-          style={{ flex: 1, ...fonte.normal, fontSize: 13, color: cor.textoApagado }}
-        >
+        <Text numberOfLines={1} style={{ flex: 1, ...miudo }}>
           {link}
         </Text>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Compartilhar o convite"
           onPress={() => void compartilhar()}
-          style={{ minHeight: ALVO_MINIMO, justifyContent: "center", paddingHorizontal: espaco.md }}
+          style={({ pressed }) => ({
+            minHeight: ALVO_MINIMO,
+            justifyContent: "center",
+            paddingHorizontal: espaco.md,
+            opacity: pressed ? 0.6 : 1,
+          })}
         >
-          <Text style={{ ...fonte.forte, fontSize: 13, color: corRecompensas.rosa600 }}>
+          <Text style={{ ...fonte.forte, ...escala.legenda, color: cor.primariaEscura }}>
             Compartilhar
           </Text>
         </Pressable>
       </View>
-      <Pressable
-        accessibilityRole="link"
-        onPress={() => {
-          toque();
+      <Botao
+        rotulo="Convidar pelo WhatsApp"
+        estilo={{ marginTop: espaco.xs }}
+        aoTocar={() => {
           /* `https://wa.me`, nunca `whatsapp://` — ver `linkDoWhatsApp`. */
           void Linking.openURL(linkDoWhatsApp(msg)).catch(() =>
-            avisar("Não consegui abrir o WhatsApp."),
+            avisar("Não deu para abrir o WhatsApp."),
           );
         }}
-        style={({ pressed }) => ({ marginTop: espaco.sm, opacity: pressed ? 0.85 : 1 })}
-      >
-        <LinearGradient
-          colors={[corRecompensas.rosa500, corRecompensas.rubi500]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={{
-            minHeight: ALVO_MINIMO,
-            borderRadius: 999,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Text style={{ ...fonte.titulo, fontSize: 14, color: cor.branco }}>
-            Convidar pelo WhatsApp
-          </Text>
-        </LinearGradient>
-      </Pressable>
-    </LinearGradient>
+      />
+    </Parte>
   );
 }
 
@@ -258,7 +368,6 @@ function CartaoDoDepoimento({ avisar }: { avisar: (t: string) => void }) {
 
   async function enviar() {
     if (enviando || curto) return;
-    toque();
     setEnviando(true);
     const r = await mandarDepoimento(texto.trim(), nome.trim());
     setEnviando(false);
@@ -266,7 +375,7 @@ function CartaoDoDepoimento({ avisar }: { avisar: (t: string) => void }) {
       setDep({ texto: texto.trim(), nome: nome.trim() || null, status: "pending" });
       setEditando(false);
       vibrar("sucesso");
-      avisar("Depoimento enviado! O Dr. Clóvis vai revisar 💛");
+      avisar("Depoimento enviado. O Dr. Clóvis vai ler antes de publicar.");
     } else {
       vibrar("erro");
       avisar(r);
@@ -274,146 +383,73 @@ function CartaoDoDepoimento({ avisar }: { avisar: (t: string) => void }) {
   }
 
   const selo =
-    status === "approved"
-      ? {
-          texto: `Publicado ✓ +${RECOMPENSA_DO_DEPOIMENTO} 🌱`,
-          fundo: corRecompensas.esmeralda100,
-          tinta: corRecompensas.esmeralda700,
-        }
-      : status === "pending"
-        ? {
-            texto: "Em análise pelo médico ⏳",
-            fundo: corRecompensas.ambar100,
-            tinta: corRecompensas.ambar700,
-          }
-        : status === "rejected"
-          ? {
-              texto: "Não publicado — pode reescrever",
-              fundo: corRecompensas.rubi100,
-              tinta: corRecompensas.rubi600,
-            }
-          : null;
+    status === "approved" ? (
+      <Etiqueta
+        texto={`Publicado · +${RECOMPENSA_DO_DEPOIMENTO}`}
+        fundo={cor.sementinhaFundo}
+        tinta={cor.sementinha}
+      />
+    ) : status === "pending" ? (
+      <Etiqueta texto="Em análise" fundo={cor.atencaoFundo} tinta={cor.atencaoTexto} />
+    ) : status === "rejected" ? (
+      <Etiqueta texto="Não publicado" fundo={cor.quaseFundo} tinta={cor.atencaoTexto} />
+    ) : null;
 
   return (
-    <LinearGradient
-      colors={[corRecompensas.violeta50, cor.branco, corRecompensas.fucsia50]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={{
-        borderRadius: 24,
-        borderWidth: 1,
-        borderColor: corRecompensas.violeta200,
-        padding: 20,
-      }}
-    >
-      <View
-        style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm, flexWrap: "wrap" }}
-      >
-        <Text style={{ fontSize: 24 }}>💬</Text>
-        <Text
-          style={{
-            flex: 1,
-            ...fonte.titulo,
-            fontSize: 14,
-            color: corRecompensas.violeta700,
-          }}
-        >
-          Deixe seu depoimento
-        </Text>
-        {selo ? (
-          <View
-            style={{
-              borderRadius: 999,
-              backgroundColor: selo.fundo,
-              paddingHorizontal: espaco.md,
-              paddingVertical: 4,
-            }}
-          >
-            <Text style={{ ...fonte.forte, fontSize: 13, color: selo.tinta }}>{selo.texto}</Text>
-          </View>
-        ) : null}
-      </View>
+    <Parte titulo="Conte como está sendo" direita={selo}>
       {formulario ? (
         <>
-          <Text style={estilo.corpo}>
-            Conte como está sendo sua experiência 💜 Se o Dr. Clóvis aprovar, você ganha{" "}
-            <Text style={{ ...fonte.forte }}>{RECOMPENSA_DO_DEPOIMENTO} Sementinhas</Text> e seu
+          <Text style={corpo}>
+            Se o Dr. Clóvis aprovar, você ganha {RECOMPENSA_DO_DEPOIMENTO} sementinhas e o seu
             depoimento pode aparecer no site.
           </Text>
-          <TextInput
+          <Campo
+            rotulo="Seu depoimento"
             value={texto}
             onChangeText={(t) => setTexto(t.slice(0, 600))}
             multiline
-            placeholder="Escreva aqui seu depoimento…"
-            placeholderTextColor={cor.textoApagado}
-            accessibilityLabel="Seu depoimento"
-            style={[estilo.campo, { minHeight: 104, borderRadius: 18, textAlignVertical: "top" }]}
+            placeholder="Escreva aqui"
           />
-          <TextInput
+          <Campo
+            rotulo="Como quer aparecer"
             value={nome}
             onChangeText={(t) => setNome(t.slice(0, 60))}
-            placeholder="Como quer aparecer (ex.: Mariana, mamãe da Alice)"
-            placeholderTextColor={cor.textoApagado}
-            accessibilityLabel="Como quer aparecer"
-            style={[estilo.campo, { borderRadius: 999 }]}
+            placeholder="Mariana, mãe da Alice"
           />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ disabled: enviando || curto }}
-            disabled={enviando || curto}
-            onPress={() => void enviar()}
-            style={({ pressed }) => ({
-              marginTop: espaco.sm,
-              minHeight: ALVO_MINIMO,
-              borderRadius: 999,
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: corRecompensas.violeta700,
-              opacity: enviando || curto ? 0.4 : pressed ? 0.85 : 1,
-            })}
-          >
-            <Text style={{ ...fonte.titulo, fontSize: 14, color: cor.branco }}>
-              {enviando ? "Enviando…" : status ? "Reenviar para análise" : "Enviar depoimento"}
-            </Text>
-          </Pressable>
+          <Botao
+            rotulo={status ? "Enviar de novo" : "Enviar depoimento"}
+            desabilitado={curto}
+            carregando={enviando}
+            aoTocar={() => void enviar()}
+          />
         </>
       ) : (
         <>
+          {status === "rejected" ? (
+            <Text style={corpo}>
+              Este não foi publicado. Você pode reescrever e enviar de novo.
+            </Text>
+          ) : null}
           <View
             style={{
-              marginTop: espaco.md,
-              borderRadius: 18,
-              backgroundColor: corRecompensas.branco70,
+              borderRadius: canto.dentro,
+              ...curva,
+              backgroundColor: cor.apagado,
               padding: espaco.md,
             }}
           >
-            <Text
-              style={{
-                ...fonte.normal,
-                fontStyle: "italic",
-                fontSize: 14,
-                lineHeight: 21,
-                color: cor.texto,
-              }}
-            >
-              “{dep?.texto}”
-            </Text>
+            <Text style={{ ...corpo, fontStyle: "italic", color: cor.texto }}>“{dep?.texto}”</Text>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => {
-              toque();
-              setEditando(true);
-            }}
-            style={{ alignSelf: "flex-start", minHeight: ALVO_MINIMO, justifyContent: "center" }}
-          >
-            <Text style={{ ...fonte.forte, fontSize: 13, color: corRecompensas.violeta600 }}>
-              Editar depoimento
-            </Text>
-          </Pressable>
+          <Botao
+            rotulo="Editar depoimento"
+            tipo="texto"
+            tamanho="compacto"
+            estilo={{ alignSelf: "flex-start", marginLeft: -espaco.md }}
+            aoTocar={() => setEditando(true)}
+          />
         </>
       )}
-    </LinearGradient>
+    </Parte>
   );
 }
 
@@ -438,7 +474,6 @@ function CodigoDeQuemIndicou({
   async function aplicar() {
     const limpo = codigo.trim();
     if (limpo.length < 3 || enviando) return;
-    toque();
     setEnviando(true);
     const r = await aplicarOCodigo(limpo);
     setEnviando(false);
@@ -447,74 +482,49 @@ function CodigoDeQuemIndicou({
       vibrar("sucesso");
       if (r.bonus > 0) {
         aoGanhar(r.bonus);
-        avisar(`${r.bonus} Sementinhas de boas-vindas 🌱`);
+        avisar(`${r.bonus} sementinhas de boas-vindas.`);
       }
     } else if (r.tipo === "ja-tinha") {
       setAplicou(true);
     } else if (r.tipo === "invalido") {
       vibrar("erro");
-      avisar("Não encontrei esse código. Confira com quem te indicou.");
+      avisar("Não achei esse código. Confira com quem te indicou.");
     } else {
       vibrar("erro");
-      avisar("Não foi possível agora. Tente de novo mais tarde.");
+      avisar("Não deu agora. Tente de novo mais tarde.");
     }
   }
 
   return (
-    <CartaoMaterial estilo={{ borderRadius: 24, padding: espaco.lg }}>
-      <Text style={{ ...fonte.forte, fontSize: 14, color: cor.texto }}>
-        Veio pela indicação de alguém?
-      </Text>
-      <Text style={estilo.miudo}>
+    <Parte titulo="Veio por indicação?">
+      <Text style={corpo}>
         Coloque o código da sua médica ou da embaixadora que te trouxe e ganhe{" "}
-        <Text style={{ ...fonte.media, color: cor.texto }}>
-          {BONUS_INFLUENCIADORA} Sementinhas 🌱
-        </Text>
-        .
+        {BONUS_INFLUENCIADORA} sementinhas.
       </Text>
       {/* O consentimento diz o que acontece: o primeiro nome dela passa a
           aparecer numa lista da embaixadora (ver o mesmo aviso no site). */}
-      <Text style={estilo.miudo}>
+      <Text style={miudo}>
         Se for de uma embaixadora, ela passa a ver o seu primeiro nome numa lista, para poder te
         presentear. Nada mais do seu acompanhamento aparece para ela.
       </Text>
-      <View style={{ marginTop: espaco.md, flexDirection: "row", gap: espaco.sm }}>
-        <TextInput
-          value={codigo}
-          onChangeText={setCodigo}
-          onSubmitEditing={() => void aplicar()}
-          placeholder="Ex.: MARIA"
-          placeholderTextColor={cor.textoApagado}
-          accessibilityLabel="Código da médica ou embaixadora"
-          autoCapitalize="characters"
-          autoCorrect={false}
-          returnKeyType="done"
-          style={[
-            estilo.campo,
-            { flex: 1, marginTop: 0, borderRadius: 999, backgroundColor: cor.fundo },
-          ]}
-        />
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ disabled: enviando || codigo.trim().length < 3 }}
-          disabled={enviando || codigo.trim().length < 3}
-          onPress={() => void aplicar()}
-          style={({ pressed }) => ({
-            minHeight: ALVO_MINIMO,
-            borderRadius: 999,
-            paddingHorizontal: espaco.lg,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: corRecompensas.embaixadora,
-            opacity: enviando || codigo.trim().length < 3 ? 0.4 : pressed ? 0.85 : 1,
-          })}
-        >
-          <Text style={{ ...fonte.forte, fontSize: 14, color: cor.branco }}>
-            {enviando ? "…" : "Aplicar"}
-          </Text>
-        </Pressable>
-      </View>
-    </CartaoMaterial>
+      <Campo
+        rotulo="Código"
+        value={codigo}
+        onChangeText={setCodigo}
+        onSubmitEditing={() => void aplicar()}
+        placeholder="MARIA"
+        autoCapitalize="characters"
+        autoCorrect={false}
+        returnKeyType="done"
+      />
+      <Botao
+        rotulo="Aplicar o código"
+        tipo="secundario"
+        desabilitado={codigo.trim().length < 3}
+        carregando={enviando}
+        aoTocar={() => void aplicar()}
+      />
+    </Parte>
   );
 }
 
@@ -536,7 +546,6 @@ function Extrato() {
   const [lista, setLista] = useState<Lancamento[] | null | "lendo">(null);
 
   function alternar() {
-    toque();
     const abrir = !aberto;
     setAberto(abrir);
     if (abrir) {
@@ -546,48 +555,24 @@ function Extrato() {
   }
 
   return (
-    <View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ expanded: aberto }}
-        onPress={alternar}
-        style={({ pressed }) => ({
-          minHeight: ALVO_MINIMO,
-          borderRadius: 18,
-          borderWidth: 1,
-          borderColor: cor.borda,
-          backgroundColor: cor.branco,
-          alignItems: "center",
-          justifyContent: "center",
-          opacity: pressed ? 0.85 : 1,
-        })}
-      >
-        <Text style={{ ...fonte.media, fontSize: 13, color: corRecompensas.ardosia600 }}>
-          {aberto ? "Esconder" : "Ver"} minhas últimas movimentações
-        </Text>
-      </Pressable>
+    <View style={{ borderTopWidth: 1, borderTopColor: cor.divisor }}>
+      <CabecaDaSanfona
+        aberta={aberto}
+        aoAlternar={alternar}
+        rotulo="Últimas movimentações"
+        compacta
+      />
       {aberto ? (
-        <View
-          style={{
-            marginTop: espaco.sm,
-            borderRadius: 18,
-            borderWidth: 1,
-            borderColor: cor.borda,
-            backgroundColor: cor.branco,
-            overflow: "hidden",
-          }}
-        >
+        <View style={{ paddingHorizontal: espaco.lg, paddingBottom: espaco.sm }}>
           {lista === "lendo" ? (
-            <Text style={[estilo.linhaDoExtrato, { color: cor.textoApagado }]}>Lendo…</Text>
+            <Text style={[miudo, { paddingVertical: espaco.sm }]}>Lendo…</Text>
           ) : lista === null ? (
             /* Falha não é lista vazia: "nenhuma movimentação" afirmaria algo. */
-            <Text style={[estilo.linhaDoExtrato, { color: cor.textoApagado }]}>
-              Não consegui ler as movimentações agora.
+            <Text style={[miudo, { paddingVertical: espaco.sm }]}>
+              Não deu para ler as movimentações agora.
             </Text>
           ) : lista.length === 0 ? (
-            <Text style={[estilo.linhaDoExtrato, { color: cor.textoApagado }]}>
-              Nenhuma movimentação ainda.
-            </Text>
+            <Text style={[miudo, { paddingVertical: espaco.sm }]}>Nenhuma movimentação ainda.</Text>
           ) : (
             lista.slice(0, 8).map((l, i) => (
               <View
@@ -596,36 +581,23 @@ function Extrato() {
                   flexDirection: "row",
                   alignItems: "center",
                   gap: espaco.md,
-                  paddingHorizontal: espaco.md,
                   paddingVertical: espaco.sm,
                   borderTopWidth: i === 0 ? 0 : 1,
                   borderTopColor: cor.divisor,
                 }}
               >
-                <Text
-                  numberOfLines={1}
-                  style={{ flex: 1, ...fonte.normal, fontSize: 13, color: cor.texto }}
-                >
+                <Text numberOfLines={1} style={{ flex: 1, ...corpo, color: cor.texto }}>
                   {l.motivo ?? "Movimentação"}
                 </Text>
+                <Text style={{ ...miudo, fontVariant: ["tabular-nums"] }}>{diaMes(l.quando)}</Text>
                 <Text
                   style={{
-                    ...fonte.normal,
-                    fontSize: 13,
-                    color: cor.textoApagado,
-                    fontVariant: ["tabular-nums"],
-                  }}
-                >
-                  {diaMes(l.quando)}
-                </Text>
-                <Text
-                  style={{
-                    minWidth: 36,
+                    minWidth: 40,
                     textAlign: "right",
                     ...fonte.forte,
-                    fontSize: 13,
+                    ...escala.legenda,
                     fontVariant: ["tabular-nums"],
-                    color: l.quantidade >= 0 ? corRecompensas.esmeralda600 : cor.textoApagado,
+                    color: l.quantidade >= 0 ? cor.sementinha : cor.textoApagado,
                   }}
                 >
                   {l.quantidade >= 0 ? "+" : ""}
@@ -639,38 +611,3 @@ function Extrato() {
     </View>
   );
 }
-
-const estilo = {
-  corpo: {
-    marginTop: espaco.sm,
-    ...fonte.normal,
-    fontSize: 14,
-    lineHeight: 22,
-    color: cor.texto,
-  },
-  miudo: {
-    marginTop: espaco.xs,
-    ...fonte.normal,
-    fontSize: 13,
-    lineHeight: 18,
-    color: cor.textoApagado,
-  },
-  campo: {
-    marginTop: espaco.md,
-    minHeight: ALVO_MINIMO,
-    borderWidth: 1,
-    borderColor: cor.borda,
-    backgroundColor: cor.branco,
-    paddingHorizontal: espaco.lg,
-    paddingVertical: espaco.sm,
-    ...fonte.normal,
-    fontSize: 14,
-    color: cor.texto,
-  },
-  linhaDoExtrato: {
-    paddingHorizontal: espaco.md,
-    paddingVertical: espaco.md,
-    ...fonte.normal,
-    fontSize: 13,
-  },
-} as const;

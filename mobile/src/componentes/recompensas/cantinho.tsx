@@ -1,7 +1,16 @@
 import { Image } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Check, Lock, Sparkles, Trophy } from "lucide-react-native";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
+import { Animated, FlatList, Pressable, ScrollView, Text, View } from "react-native";
 import { ARTE_DO_CONJUNTO, ARTE_DO_ITEM } from "@/components/arte-do-cantinho";
 import {
   CANTINHO_COMPLETION_MIN,
@@ -13,11 +22,10 @@ import {
 } from "@/lib/cantinho";
 import { CONJUNTO_POR_ID } from "@/lib/conjuntos";
 import { SKIN_KEY } from "@/lib/trilha-skins";
-import { faltamTrofeus, trofeusExigidos } from "@/lib/trofeus";
-import { NaoConsegueLer, toque } from "~/componentes/base";
-import { Confete } from "~/componentes/jornada/pecas";
+import { faltamTrofeus } from "@/lib/trofeus";
+import { Botao, Cartao, NaoConsegueLer, TituloDaSecao, selecao } from "~/componentes/base";
+import { useMovimentoReduzido } from "~/componentes/movimento";
 import { useJornada } from "~/componentes/jornada/usarJornada";
-import { corRecompensas } from "~/componentes/recompensas/cores";
 import {
   comprarItem,
   equiparOCenario,
@@ -27,11 +35,11 @@ import {
 } from "~/componentes/recompensas/economia-do-cantinho";
 import { GanheMais } from "~/componentes/recompensas/ganhe-mais";
 import {
-  Botao3D,
+  Broto,
+  Contagem,
   Esqueleto,
-  pares,
+  PilulaDeAcao,
   SilencioDoCuidado,
-  sombraDeCartao,
   vibrar,
 } from "~/componentes/recompensas/pecas";
 import {
@@ -43,59 +51,54 @@ import {
 } from "~/lib/jornada/enfeites";
 import { quandoAbre, semanaDaLoja, type ItemPorFase } from "~/lib/jornada/loja-por-fase";
 import { gravarChave } from "~/lib/jornada/loja";
-import { cor, espaco, fonte } from "~/tema";
+import { canto, cor, curva, escala, espaco, fonte, luz, margem, ouro, sombra } from "~/tema";
 
 /**
- * O MEU CANTINHO — a lojinha de sementinhas do site (`CantinhoTab`, em
- * src/components/cantinho-tab.tsx), no mesmo desenho: o cartão verde com o
- * saldo, "Ganhe mais Sementinhas", os conjuntos, as fichas de categoria e a
- * grade de enfeites em escada de preço.
+ * O MEU CANTINHO — a lojinha de sementinhas (o `CantinhoTab` do site, em
+ * src/components/cantinho-tab.tsx), redesenhada em 18/11/2026: a VITRINE
+ * primeiro. Logo abaixo do topo vêm as fichas de categoria e a grade (três
+ * colunas, cada enfeite num pedestal); depois dela, quando chegam os
+ * próximos, os conjuntos e, por último, "Ganhe mais sementinhas". O saldo
+ * mora no topo da tela (a pílula do cabeçalho), e não num cartão por aba.
+ *
+ * ⚠️ DESEMPENHO: a grade é uma `FlatList` virtualizada (o catálogo tem ~110
+ * itens; antes montava todos de uma vez, cada um com degradê e duas sombras),
+ * o ladrilho é `memo` e recebe um `aoAgir(id)` estável — um toque em "Usar"
+ * não recalcula a prateleira inteira. A leitura do Cantinho mora na tela das
+ * Recompensas (`useLeituraDoCantinho`): trocar de aba não relê nem pisca.
  *
  * O que é diferente do site, e por quê:
  *  · Sem nenhuma porta de compra com dinheiro (a pílula do saldo abre o
- *    "Ganhe mais", e não a Loja de Sementinhas paga). Do Premium, só a parte
- *    que a LOJA POR FASE vende por sementinhas, abrindo com a gestação — ver
- *    `itensDaLoja` e `~/lib/jornada/loja-por-fase`.
+ *    "Ganhe mais", e não a loja paga do site). Dos itens pagos do site, só a
+ *    parte que a LOJA POR FASE vende por sementinhas, abrindo com a gestação
+ *    — ver `itensDaLoja` e `~/lib/jornada/loja-por-fase`.
  *  · Sem o "Céu do app": ele veste a tela inicial do SITE.
- *  · Os botões têm desenho de 30 px e alvo de 44 pt (`Botao3D`).
  *
- * O cantinho em si mora no Caminho: o que ela compra aqui aparece lá.
+ * O cantinho em si mora na trilha: o que ela compra aqui aparece lá.
  */
-export function AbaDoCantinho({
-  saldo,
-  cuidado,
-  aoLerSaldo,
-  aoMudarSaldo,
-  aoVerCaminho,
-  avisar,
-}: {
-  /** O saldo da tela (dono: Recompensas), para as duas abas concordarem. */
-  saldo: number | null;
-  cuidado: boolean;
-  /** O saldo que a leitura do Cantinho trouxe — vale se a tela ainda não tem um. */
-  aoLerSaldo: (n: number) => void;
-  /** O saldo depois de uma compra ou de um bônus: este vale sempre. */
-  aoMudarSaldo: (n: number) => void;
-  aoVerCaminho: () => void;
-  avisar: (texto: string) => void;
-}) {
-  /* Abre a jornada dela: a pele das bolinhas mora no blob (`dc-path-skin`), e a
-     semana dela decide o que a loja por fase já abriu. */
-  const { dia, loja } = useJornada();
-  const skinAtiva =
-    typeof loja.blob[SKIN_KEY] === "string" ? (loja.blob[SKIN_KEY] as string) : null;
 
+/* ── A leitura (mora na tela das Recompensas) ──────────────────────────── */
+
+export type LeituraDoCantinho = {
+  leitura: CantinhoOk | null | "carregando";
+  owned: string[];
+  setOwned: (f: (o: string[]) => string[]) => void;
+  equipado: string | null;
+  setEquipado: (id: string | null) => void;
+  colecao: { tem: number; total: number };
+  setColecao: (f: (c: { tem: number; total: number }) => { tem: number; total: number }) => void;
+  trofeus: number;
+  /** `null` = o banco ainda sem a loja por fase (ou leitura falha): a vitrine de antes. */
+  porFase: Map<string, ItemPorFase> | null;
+  ler: () => void;
+};
+
+export function useLeituraDoCantinho(aoLerSaldo: (n: number) => void): LeituraDoCantinho {
   const [leitura, setLeitura] = useState<CantinhoOk | null | "carregando">("carregando");
   const [owned, setOwned] = useState<string[]>([]);
   const [equipado, setEquipado] = useState<string | null>(null);
   const [colecao, setColecao] = useState({ tem: 0, total: CANTINHO_COMPLETION_MIN });
   const [trofeus, setTrofeus] = useState(0);
-  const [cat, setCat] = useState<CantinhoType | "all">("all");
-  const [comprando, setComprando] = useState<string | null>(null);
-  const [ganheAberto, setGanheAberto] = useState(false);
-  const [festa, setFesta] = useState(0);
-  /* `null` = o banco ainda sem a loja por fase (ou leitura falha): a vitrine
-     de antes, sem nenhum item que ela não conseguiria comprar. */
   const [porFase, setPorFase] = useState<Map<string, ItemPorFase> | null>(null);
 
   const ler = useCallback(() => {
@@ -114,6 +117,84 @@ export function AbaDoCantinho({
     ler();
     void lerALojaPorFase().then(setPorFase);
   }, [ler]);
+
+  return {
+    leitura,
+    owned,
+    setOwned,
+    equipado,
+    setEquipado,
+    colecao,
+    setColecao,
+    trofeus,
+    porFase,
+    ler,
+  };
+}
+
+/* ── A aba ─────────────────────────────────────────────────────────────── */
+
+/** O ladrilho tem altura fixa: é o que deixa a lista saber onde cada fileira está. */
+const ALTURA_DO_LADRILHO = 190;
+const VAO = espaco.md;
+const COLUNAS = 3;
+
+type EstadoDoLadrilho =
+  | "comprar"
+  | "longe"
+  | "fase"
+  | "trofeus"
+  | "coroa"
+  | "usar"
+  | "em-uso"
+  | "tem"
+  | "coroa-tem";
+
+export function AbaDoCantinho({
+  cantinho,
+  saldo,
+  cuidado,
+  aoMudarSaldo,
+  aoVerTrilha,
+  avisar,
+  ganheAberto,
+  aoAlternarGanhe,
+  aoFesta,
+  refDaLista,
+  largura,
+  fim,
+}: {
+  cantinho: LeituraDoCantinho;
+  /** O saldo da tela (dono: Recompensas), para as duas abas concordarem. */
+  saldo: number | null;
+  cuidado: boolean;
+  /** O saldo depois de uma compra ou de um bônus: este vale sempre. */
+  aoMudarSaldo: (n: number) => void;
+  aoVerTrilha: () => void;
+  avisar: (texto: string) => void;
+  ganheAberto: boolean;
+  aoAlternarGanhe: () => void;
+  /** O confete da compra que fecha um conjunto: a tela o desenha, fora da rolagem. */
+  aoFesta: () => void;
+  refDaLista: RefObject<FlatList<CantinhoItem> | null>;
+  /** A largura da página (a tela inteira). */
+  largura: number;
+  /** O espaço embaixo da rolagem. */
+  fim: number;
+}) {
+  /* A jornada dela: a pele das bolinhas mora no blob (`dc-path-skin`), e a
+     semana dela decide o que a loja por fase já abriu. */
+  const { dia, loja } = useJornada();
+  const skinAtiva =
+    typeof loja.blob[SKIN_KEY] === "string" ? (loja.blob[SKIN_KEY] as string) : null;
+  const { leitura, owned, setOwned, equipado, setEquipado, colecao, setColecao, trofeus, porFase } =
+    cantinho;
+
+  const [cat, setCat] = useState<CantinhoType | "all">("all");
+  const [comprando, setComprando] = useState<string | null>(null);
+  /* O ladrilho que acabou de ser comprado dá um pulo (o `n` reinicia o pulo). */
+  const [pulo, setPulo] = useState<{ id: string; n: number } | null>(null);
+  const alturaDaCabeca = useRef(0);
 
   const semana = semanaDaLoja({
     semanaDaGestacao: dia.modo === "gestacao" ? dia.semana : null,
@@ -138,25 +219,108 @@ export function AbaDoCantinho({
     () => (cat === "all" ? itens : itens.filter((i) => i.type === cat)),
     [itens, cat],
   );
+  const possui = useMemo(() => new Set(owned), [owned]);
+
+  const largDoLadrilho = Math.floor((largura - margem.tela * 2 - VAO * (COLUNAS - 1)) / COLUNAS);
+
+  /* A ação do ladrilho lê o estado MAIS NOVO por uma referência: o
+     `aoAgir(id)` que desce para a grade nunca muda, e o `memo` do ladrilho
+     segura. */
+  const agir = useRef<(id: string) => void>(() => {});
+  agir.current = (id: string) => {
+    const item = itens.find((i) => i.id === id);
+    if (!item) return;
+    if (!possui.has(id)) {
+      void comprar(item);
+      return;
+    }
+    if (item.type === "trilha") usarBolinhas(skinAtiva === id ? null : id);
+    else if (item.type === "fundo") void usarCenario(equipado === id ? null : id);
+  };
+  const aoAgir = useCallback((id: string) => agir.current(id), []);
+
+  const renderItem = useCallback(
+    ({ item: i }: { item: CantinhoItem }) => {
+      const tem = possui.has(i.id);
+      const emBreve =
+        situacaoNaLoja(i, owned, fase) === "em-breve"
+          ? quandoAbre(porFase?.get(i.id)?.semana ?? 0)
+          : null;
+      const { estado, nota } = estadoDoLadrilho(i, {
+        tem,
+        emBreve,
+        saldo,
+        trofeus,
+        colecao,
+        emUso: i.type === "trilha" ? skinAtiva === i.id : equipado === i.id,
+      });
+      return (
+        <Ladrilho
+          item={i}
+          largura={largDoLadrilho}
+          estado={estado}
+          nota={nota}
+          comprando={comprando === i.id}
+          pulo={pulo?.id === i.id ? pulo.n : 0}
+          aoAgir={aoAgir}
+        />
+      );
+    },
+    [
+      possui,
+      owned,
+      fase,
+      porFase,
+      saldo,
+      trofeus,
+      colecao,
+      skinAtiva,
+      equipado,
+      largDoLadrilho,
+      comprando,
+      pulo,
+      aoAgir,
+    ],
+  );
+
+  const getItemLayout = useCallback(
+    (_: ArrayLike<CantinhoItem> | null | undefined, indice: number) => ({
+      length: ALTURA_DO_LADRILHO + VAO,
+      offset: margem.tela + alturaDaCabeca.current + (ALTURA_DO_LADRILHO + VAO) * indice,
+      index: indice,
+    }),
+    [],
+  );
 
   /* Modo Cuidado: a prateleira inteira se cala, não só o saldo (o servidor já
      devolve nada possuído; a tela não mostra o catálogo à venda). */
   if (cuidado || (leitura && leitura !== "carregando" && leitura.careMode)) {
-    return <SilencioDoCuidado />;
+    return (
+      <Pagina fim={fim}>
+        <SilencioDoCuidado />
+      </Pagina>
+    );
   }
-  if (leitura === "carregando") return <Esqueleto rotulo="Carregando o Meu Cantinho" />;
+  if (leitura === "carregando") {
+    return (
+      <Pagina fim={fim}>
+        <Esqueleto rotulo="Carregando o Meu Cantinho" />
+      </Pagina>
+    );
+  }
   /* A falha vem ANTES da vitrine: com o saldo em zero por falha, todo preço
-     viraria "faltam N 🌱" e todo item dela viraria comprável de novo. */
+     viraria "faltam N" e todo item dela viraria comprável de novo. */
   if (!leitura) {
     return (
-      <NaoConsegueLer
-        sossego="As suas Sementinhas e os seus itens continuam lá — isso aqui é a nossa conexão."
-        aoTentar={ler}
-      />
+      <Pagina fim={fim}>
+        <NaoConsegueLer
+          sossego="As suas sementinhas e os seus enfeites continuam guardados."
+          aoTentar={cantinho.ler}
+        />
+      </Pagina>
     );
   }
 
-  const possui = new Set(owned);
   const enfeitesDela = itens.filter(
     (i) => possui.has(i.id) && i.type !== "fundo" && i.type !== "tema",
   );
@@ -164,7 +328,7 @@ export function AbaDoCantinho({
   async function comprar(item: CantinhoItem) {
     if (comprando) return;
     if (saldo != null && saldo < item.price) {
-      avisar("Sementinhas insuficientes 🌱");
+      avisar(`Faltam ${item.price - saldo} sementinhas para ${item.name}.`);
       return;
     }
     setComprando(item.id);
@@ -172,7 +336,7 @@ export function AbaDoCantinho({
     setComprando(null);
     if (!r) {
       vibrar("erro");
-      avisar("Não consegui comprar agora — tente de novo em instantes.");
+      avisar("Não deu para comprar agora. Tente de novo daqui a pouco.");
       return;
     }
     if (r.ok) {
@@ -184,23 +348,24 @@ export function AbaDoCantinho({
         isCantinhoCollectionComplete(comEle) && !comEle.includes(CANTINHO_COMPLETIONIST_ID)
           ? [...comEle, CANTINHO_COMPLETIONIST_ID]
           : comEle;
-      setOwned(prox);
+      setOwned(() => prox);
       setColecao((c) => ({ ...c, tem: cantinhoCategoriasCompletas(prox) }));
       vibrar("sucesso");
+      setPulo((p) => ({ id: item.id, n: (p?.n ?? 0) + 1 }));
       if (r.conjuntosNovos?.length) {
         const nomes = r.conjuntosNovos
           .map((id) => CONJUNTO_POR_ID[id]?.nome)
           .filter(Boolean)
           .join(" · ");
-        setFesta((n) => n + 1);
-        avisar(`Conjunto completo: ${nomes}! +${r.bonusNovo ?? 0} 🌱`);
+        aoFesta();
+        avisar(`Conjunto completo: ${nomes}. +${r.bonusNovo ?? 0} sementinhas`);
       } else {
-        avisar("Adicionado ao seu cantinho! 💛");
+        avisar(`${item.name} já está na sua trilha.`);
       }
       return;
     }
     vibrar("erro");
-    avisar(r.error || "Não foi possível comprar");
+    avisar(r.error || "Não deu para comprar agora.");
     /* Só a recusa por saldo traz o saldo de verdade; nas outras o servidor
        devolve 0 por padrão, e zero sobre uma falha é uma afirmação falsa. */
     if (r.motivo === "saldo_insuficiente" && typeof r.balance === "number") aoMudarSaldo(r.balance);
@@ -212,7 +377,7 @@ export function AbaDoCantinho({
      sincroniza entre aparelhos — no site e no app, a mesma chave. */
   function usarBolinhas(id: string | null) {
     gravarChave(SKIN_KEY, id);
-    avisar(id ? "Bolinhas trocadas! 🌱" : "Bolinhas de volta ao normal");
+    avisar(id ? "Bolinhas trocadas na trilha." : "As bolinhas voltaram ao normal.");
   }
 
   async function usarCenario(id: string | null) {
@@ -222,530 +387,573 @@ export function AbaDoCantinho({
     if (!ok) {
       setEquipado(antes);
       vibrar("erro");
-      avisar("Não foi possível trocar o cenário");
+      avisar("Não deu para trocar o cenário agora.");
       return;
     }
-    avisar(id ? "Cenário aplicado! 🌄" : "Cenário removido");
+    avisar(id ? "Cenário trocado na trilha." : "A trilha voltou ao cenário de sempre.");
   }
 
-  return (
-    <View style={{ gap: espaco.xl }}>
-      {festa > 0 ? <Confete key={festa} /> : null}
-
-      {/* Cabeçalho + saldo */}
-      <LinearGradient
-        colors={[corRecompensas.esmeralda50, corRecompensas.lima50]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 6,
-          borderRadius: 28,
-          borderWidth: 1,
-          borderColor: corRecompensas.esmeralda200,
-          padding: 20,
-        }}
-      >
-        <View style={{ flex: 1 }}>
-          <Text style={{ ...fonte.media, fontSize: 15, color: corRecompensas.esmeralda700 }}>
-            Meu Cantinho
+  const cabeca = (
+    <View
+      onLayout={(e) => {
+        alturaDaCabeca.current = e.nativeEvent.layout.height;
+      }}
+      style={{ gap: espaco.md, paddingBottom: espaco.md }}
+    >
+      {/* Quem ainda não comprou nada: de onde vêm as sementinhas, e onde o
+          que ela compra aparece. */}
+      {enfeitesDela.length === 0 ? (
+        <View style={{ gap: espaco.xs }}>
+          <Text style={{ ...fonte.normal, ...escala.legenda, color: cor.textoCorpo }}>
+            Você ganha sementinhas nas aulas e nas atividades do dia. O que comprar aqui aparece na
+            sua trilha.
           </Text>
-          <Text
-            style={{
-              marginTop: 2,
-              ...fonte.normal,
-              fontSize: 14,
-              lineHeight: 19,
-              /* O peso mais leve do app (500) é mais largo que o 400 do site:
-                 sem este aperto a frase quebra num iPhone de 393 pt. */
-              letterSpacing: -0.2,
-              color: corRecompensas.esmeralda800_80,
+          <Botao
+            rotulo="Ver a minha trilha"
+            tipo="texto"
+            tamanho="compacto"
+            aoTocar={aoVerTrilha}
+            estilo={{ alignSelf: "flex-start", marginLeft: -espaco.md }}
+          />
+        </View>
+      ) : null}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={{ marginHorizontal: -margem.tela }}
+        contentContainerStyle={{ gap: espaco.sm, paddingHorizontal: margem.tela }}
+        accessibilityRole="tablist"
+      >
+        {[{ key: "all" as const, label: "Tudo" }, ...categorias].map((c) => (
+          <FichaDaCategoria
+            key={c.key}
+            rotulo={c.label}
+            ativa={cat === c.key}
+            aoTocar={() => {
+              selecao();
+              setCat(c.key);
             }}
-          >
-            Um cantinho que cresce com você.
+          />
+        ))}
+      </ScrollView>
+    </View>
+  );
+
+  const pe = (
+    <View style={{ gap: espaco.xxl, paddingTop: espaco.sm }}>
+      {/* A loja por fase: quando chega o próximo lote de enfeites. Uma linha
+          calma, e não uma caixa de alerta: é uma boa notícia. */}
+      {proximaFase != null ? (
+        <View style={{ flexDirection: "row", alignItems: "flex-start", gap: espaco.sm }}>
+          <View style={{ paddingTop: 2 }}>
+            <Sparkles size={16} color={cor.textoApagado} strokeWidth={2.2} />
+          </View>
+          <Text style={{ flex: 1, ...fonte.normal, ...escala.legenda, color: cor.textoApagado }}>
+            Enfeites novos chegam a cada fase. Os próximos chegam{" "}
+            {quandoAbre(proximaFase).toLowerCase()}.
           </Text>
         </View>
-        {/* O saldo é botão: é onde ela toca querendo saber como se ganha. No
-            site abre a Loja de Sementinhas (com pacotes pagos); aqui abre o
-            "Ganhe mais", logo abaixo. */}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={
-            saldo == null
-              ? "Ver como ganhar Sementinhas"
-              : `${saldo} Sementinhas. Ver como ganhar mais`
-          }
-          onPress={() => {
-            toque();
-            setGanheAberto(true);
-          }}
-          hitSlop={6}
-          style={({ pressed }) => ({
-            minHeight: 40,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 6,
-            borderRadius: 999,
-            backgroundColor: corRecompensas.branco70,
-            paddingHorizontal: espaco.md,
-            opacity: pressed ? 0.85 : 1,
-          })}
-        >
-          <Text style={{ fontSize: 18 }}>🌱</Text>
-          <Text
-            style={{
-              ...fonte.titulo,
-              fontSize: 16,
-              color: corRecompensas.esmeralda600,
-              fontVariant: ["tabular-nums"],
-            }}
-          >
-            {saldo ?? "—"}
-          </Text>
-          <Text style={{ ...fonte.forte, fontSize: 13, color: corRecompensas.esmeralda500 }}>
-            +
-          </Text>
-        </Pressable>
-      </LinearGradient>
+      ) : null}
 
-      {/* Quem ainda não comprou nada: o convite, e o caminho até a trilha. */}
-      {enfeitesDela.length === 0 ? (
-        <View style={{ gap: espaco.sm, paddingHorizontal: 4 }}>
-          <Text
-            style={{
-              ...fonte.normal,
-              fontSize: 14,
-              lineHeight: 20,
-              color: cor.textoApagado,
-            }}
+      {/* OS CONJUNTOS — os completos primeiro, e a contagem é "3 de 4", que é
+          estado, nunca "falta 1!", que é dívida. Só os que dá para fechar aqui:
+          todo conjunto tem um item pago no site, então para quem nunca comprou
+          lá (e sem a loja por fase) a seção não aparece. */}
+      {conjuntos.length > 0 ? (
+        <View style={{ gap: espaco.md }}>
+          <TituloDaSecao
+            direita={
+              <Contagem
+                texto={`${conjuntos.filter((p) => p.completo).length} de ${conjuntos.length}`}
+              />
+            }
           >
-            Ganhe Sementinhas cuidando de você e traga vida pro seu Caminho — uma plantinha de cada
-            vez. 💛
+            Conjuntos
+          </TituloDaSecao>
+          <Text style={{ ...fonte.normal, ...escala.legenda, color: cor.textoApagado }}>
+            Feche um conjunto e ganhe sementinhas a mais.
           </Text>
-          <View style={{ alignSelf: "flex-start" }}>
-            <Botao3D tipo="cheio" rotulo="Ver o meu Caminho →" aoTocar={aoVerCaminho} />
-          </View>
+          <Cartao estilo={{ padding: 0, gap: 0 }}>
+            {conjuntos.map((p, i) => (
+              <LinhaDoConjunto
+                key={p.conjunto.id}
+                arte={ARTE_DO_CONJUNTO[p.conjunto.id]}
+                emoji={p.conjunto.emoji}
+                nome={p.conjunto.nome}
+                descricao={p.conjunto.descricao}
+                tem={p.tem}
+                total={p.total}
+                completo={p.completo}
+                primeira={i === 0}
+              />
+            ))}
+          </Cartao>
         </View>
       ) : null}
 
       <GanheMais
         aberta={ganheAberto}
-        aoAlternar={() => setGanheAberto((v) => !v)}
+        aoAlternar={aoAlternarGanhe}
         aoGanhar={(n) => {
           if (saldo != null) aoMudarSaldo(saldo + n);
         }}
         avisar={avisar}
       />
-
-      {/* OS CONJUNTOS — os completos primeiro, e a contagem é "3 de 4", que é
-          estado, nunca "falta 1!", que é dívida. Só os que dá para fechar aqui:
-          todo conjunto tem um item premium, então para quem nunca comprou no
-          site a fileira não aparece. */}
-      {conjuntos.length > 0 ? (
-        <View>
-          <Text style={estilo.rotuloDeSecao}>CONJUNTOS</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: espaco.sm, paddingBottom: 4 }}
-          >
-            {conjuntos.map((p) => (
-              <View
-                key={p.conjunto.id}
-                accessible
-                accessibilityLabel={`${p.conjunto.nome}: ${p.completo ? "completo" : `${p.tem} de ${p.total}`}`}
-                style={{
-                  minWidth: 152,
-                  maxWidth: 260,
-                  borderRadius: 16,
-                  borderWidth: 1,
-                  borderColor: p.completo ? corRecompensas.esmeralda300 : cor.borda,
-                  backgroundColor: p.completo
-                    ? corRecompensas.esmeralda50
-                    : corRecompensas.secundaria20,
-                  paddingHorizontal: espaco.md,
-                  paddingVertical: 10,
-                }}
-              >
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  {ARTE_DO_CONJUNTO[p.conjunto.id] ? (
-                    <Image
-                      source={ARTE_DO_CONJUNTO[p.conjunto.id] as never}
-                      style={{ width: 36, height: 36 }}
-                      contentFit="contain"
-                    />
-                  ) : (
-                    <Text style={{ fontSize: 18 }}>{p.conjunto.emoji}</Text>
-                  )}
-                  <Text style={{ ...fonte.titulo, fontSize: 13, color: cor.texto }}>
-                    {p.conjunto.nome}
-                  </Text>
-                </View>
-                <Text
-                  style={{
-                    marginTop: 2,
-                    ...fonte.normal,
-                    fontSize: 13,
-                    lineHeight: 18,
-                    color: cor.textoApagado,
-                  }}
-                >
-                  {p.conjunto.descricao}
-                </Text>
-                <Text
-                  style={{
-                    marginTop: 6,
-                    ...fonte.forte,
-                    fontSize: 13,
-                    color: p.completo ? corRecompensas.esmeralda600 : cor.textoApagado,
-                  }}
-                >
-                  {p.completo ? "completo ✓" : `${p.tem} de ${p.total}`}
-                </Text>
-              </View>
-            ))}
-          </ScrollView>
-        </View>
-      ) : null}
-
-      {/* A loja por fase: quando chega o próximo lote de enfeites. */}
-      {proximaFase != null ? (
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: espaco.md,
-            borderRadius: 16,
-            backgroundColor: corRecompensas.ambar50,
-            borderWidth: 1,
-            borderColor: corRecompensas.ambar200,
-            paddingHorizontal: espaco.lg,
-            paddingVertical: espaco.md,
-          }}
-        >
-          <Text style={{ fontSize: 22 }}>🌱</Text>
-          <Text
-            style={{
-              flex: 1,
-              ...fonte.media,
-              fontSize: 14,
-              lineHeight: 19,
-              color: corRecompensas.ambar800,
-            }}
-          >
-            A cada fase da gestação chegam enfeites novos. Os próximos chegam{" "}
-            <Text style={{ ...fonte.titulo }}>{quandoAbre(proximaFase).toLowerCase()}</Text>.
-          </Text>
-        </View>
-      ) : null}
-
-      {/* A loja */}
-      <View>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: espaco.sm, paddingBottom: espaco.md }}
-          accessibilityRole="tablist"
-        >
-          {[{ key: "all" as const, label: "Tudo" }, ...categorias].map((c) => {
-            const ativa = cat === c.key;
-            return (
-              <Pressable
-                key={c.key}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: ativa }}
-                onPress={() => {
-                  toque();
-                  setCat(c.key);
-                }}
-                hitSlop={{ top: 6, bottom: 6 }}
-                style={{
-                  minHeight: 32,
-                  justifyContent: "center",
-                  borderRadius: 999,
-                  paddingHorizontal: espaco.lg,
-                  backgroundColor: ativa ? corRecompensas.esmeralda100 : "transparent",
-                }}
-              >
-                <Text
-                  style={{
-                    ...fonte.media,
-                    fontSize: 13,
-                    color: ativa ? corRecompensas.esmeralda700 : corRecompensas.texto60,
-                  }}
-                >
-                  {c.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-        <View style={{ gap: espaco.md }}>
-          {pares(daCategoria).map((par) => (
-            <View
-              key={par.map((i) => i.id).join("+")}
-              style={{ flexDirection: "row", gap: espaco.md }}
-            >
-              {par.map((i) => (
-                <Ladrilho
-                  key={i.id}
-                  item={i}
-                  emBreve={
-                    situacaoNaLoja(i, owned, fase) === "em-breve"
-                      ? quandoAbre(porFase?.get(i.id)?.semana ?? 0)
-                      : null
-                  }
-                  tem={possui.has(i.id)}
-                  saldo={saldo}
-                  trofeus={trofeus}
-                  colecao={colecao}
-                  emUso={i.type === "trilha" ? skinAtiva === i.id : equipado === i.id}
-                  comprando={comprando === i.id}
-                  aoComprar={() => void comprar(i)}
-                  aoUsar={() =>
-                    i.type === "trilha"
-                      ? usarBolinhas(skinAtiva === i.id ? null : i.id)
-                      : void usarCenario(equipado === i.id ? null : i.id)
-                  }
-                />
-              ))}
-              {par.length === 1 ? <View style={{ flex: 1 }} /> : null}
-            </View>
-          ))}
-        </View>
-      </View>
     </View>
+  );
+
+  return (
+    <FlatList
+      ref={refDaLista}
+      data={daCategoria}
+      keyExtractor={(i) => i.id}
+      numColumns={COLUNAS}
+      renderItem={renderItem}
+      getItemLayout={getItemLayout}
+      initialNumToRender={8}
+      maxToRenderPerBatch={6}
+      windowSize={5}
+      removeClippedSubviews
+      columnWrapperStyle={{ gap: VAO, marginBottom: VAO }}
+      contentContainerStyle={{ padding: margem.tela, paddingBottom: fim }}
+      ListHeaderComponent={cabeca}
+      ListFooterComponent={pe}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="interactive"
+      automaticallyAdjustKeyboardInsets
+    />
   );
 }
 
-/** Um enfeite da prateleira: objeto com corpo (sombra de cartão), não só contorno. */
-function Ladrilho({
+/** A página sem a grade (o silêncio, o esqueleto, a falha): rola sozinha. */
+function Pagina({ children, fim }: { children: ReactNode; fim: number }) {
+  return (
+    <ScrollView
+      contentContainerStyle={{ padding: margem.tela, paddingBottom: fim }}
+      showsVerticalScrollIndicator={false}
+    >
+      {children}
+    </ScrollView>
+  );
+}
+
+/**
+ * O que o ladrilho mostra, numa regra só (puro): o estado (que pílula, ou
+ * nenhuma) e a nota de baixo ("faltam 12", "3º trimestre"). O saldo
+ * desconhecido (`null`) não tranca nada: quem decide é o servidor.
+ */
+function estadoDoLadrilho(
+  i: CantinhoItem,
+  o: {
+    tem: boolean;
+    emBreve: string | null;
+    saldo: number | null;
+    trofeus: number;
+    colecao: { tem: number; total: number };
+    emUso: boolean;
+  },
+): { estado: EstadoDoLadrilho; nota: string | null } {
+  const coroa = i.id === CANTINHO_COMPLETIONIST_ID;
+  if (o.tem) {
+    if (coroa) return { estado: "coroa-tem", nota: null };
+    if (i.type === "trilha" || i.type === "fundo")
+      return { estado: o.emUso ? "em-uso" : "usar", nota: null };
+    return { estado: "tem", nota: null };
+  }
+  if (o.emBreve != null) return { estado: "fase", nota: curtoDoQuando(o.emBreve) };
+  if (coroa) return { estado: "coroa", nota: `${o.colecao.tem} de ${o.colecao.total}` };
+  const faltam = faltamTrofeus(i.id, o.trofeus);
+  if (faltam > 0) return { estado: "trofeus", nota: `faltam ${faltam}` };
+  if (o.saldo != null && o.saldo < i.price)
+    return { estado: "longe", nota: `faltam ${i.price - o.saldo}` };
+  return { estado: "comprar", nota: null };
+}
+
+/** "No 3º trimestre" → "3º trimestre": cabe numa linha do ladrilho. */
+function curtoDoQuando(q: string): string {
+  const s = q.replace(/^(No|Na)\s+/, "");
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/* ── O ladrilho ────────────────────────────────────────────────────────── */
+
+/**
+ * Um enfeite da prateleira: o pedestal (o mesmo atrás do emoji e da peça
+ * 3D, para os dois estilos de arte conversarem), o nome e UMA ação. Comprar é
+ * a pílula cheia; usar é a tingida; o que já está em uso ou no cantinho é só
+ * um visto, sem pílula — estado não tem cara de botão.
+ */
+const Ladrilho = memo(function Ladrilho({
   item: i,
-  emBreve,
-  tem,
-  saldo,
-  trofeus,
-  colecao,
-  emUso,
+  largura,
+  estado,
+  nota,
   comprando,
-  aoComprar,
-  aoUsar,
+  pulo,
+  aoAgir,
 }: {
   item: CantinhoItem;
-  /** Item da PRÓXIMA fase da loja: o quando abre ("No 3º trimestre"). */
-  emBreve: string | null;
-  tem: boolean;
-  saldo: number | null;
-  trofeus: number;
-  colecao: { tem: number; total: number };
-  emUso: boolean;
+  largura: number;
+  estado: EstadoDoLadrilho;
+  nota: string | null;
   comprando: boolean;
-  aoComprar: () => void;
-  aoUsar: () => void;
+  /** Muda a cada compra deste item: o ladrilho dá um pulo. */
+  pulo: number;
+  aoAgir: (id: string) => void;
 }) {
-  const coroa = i.id === CANTINHO_COMPLETIONIST_ID;
-  const coroaTrancada = coroa && !tem;
-  /* O troféu diz QUANDO a prateleira abre; ela continua pagando em sementinhas. */
-  const exigidos = trofeusExigidos(i.id);
-  const faltamTrof = tem ? 0 : faltamTrofeus(i.id, trofeus);
-  /* Saldo desconhecido (`null`) não tranca nada: o servidor é quem decide. */
-  const naoAlcanca = !tem && saldo != null && saldo < i.price;
-  const trancadoPelaFase = !tem && emBreve != null;
-  const apagado = coroaTrancada || faltamTrof > 0 || trancadoPelaFase;
-  const arte = ARTE_DO_ITEM[i.id];
+  const reduzido = useMovimentoReduzido();
+  const escalaDoPulo = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!pulo || reduzido) return;
+    const a = Animated.sequence([
+      Animated.spring(escalaDoPulo, {
+        toValue: 1.06,
+        useNativeDriver: true,
+        speed: 40,
+        bounciness: 0,
+      }),
+      Animated.spring(escalaDoPulo, {
+        toValue: 1,
+        useNativeDriver: true,
+        speed: 14,
+        bounciness: 12,
+      }),
+    ]);
+    a.start();
+    return () => a.stop();
+  }, [pulo, reduzido, escalaDoPulo]);
 
-  const conteudo = (
-    <>
-      {coroa ? <Selo texto="COLEÇÃO" fundo={corRecompensas.ambar200} lado="direita" /> : null}
-      {trancadoPelaFase ? (
-        <Selo texto="EM BREVE" fundo={corRecompensas.ambar200} lado="direita" />
-      ) : null}
-      {exigidos > 0 && !tem ? (
-        <Selo
-          texto={`${faltamTrof > 0 ? "🔒" : "✓"} ${exigidos} 🏆`}
-          fundo={corRecompensas.ambar200_85}
-          lado="esquerda"
+  const arte = ARTE_DO_ITEM[i.id];
+  const coroa = estado === "coroa" || estado === "coroa-tem";
+  const trancado = estado === "fase" || estado === "coroa" || estado === "trofeus";
+  const agir = () => aoAgir(i.id);
+
+  let acao: ReactNode;
+  switch (estado) {
+    case "comprar":
+      acao = (
+        <PilulaDeAcao
+          tom="cheia"
+          texto={String(i.price)}
+          icone={<Broto tamanho={14} tinta={cor.branco} />}
+          acessivel={`Comprar ${i.name} por ${i.price} sementinhas`}
+          carregando={comprando}
+          aoTocar={agir}
         />
-      ) : null}
-      {/* A caixa da arte tem a altura do site: 40 para o emoji (`text-4xl`) e
-          56 para a peça 3D. Com selo no canto, ela desce um pouco — no site o
-          selo cobre a ponta da arte. */}
-      <View
-        style={{
-          height: arte ? 56 : 40,
-          marginTop: coroa || trancadoPelaFase || (exigidos > 0 && !tem) ? 12 : 0,
-          justifyContent: "center",
-          opacity: apagado ? 0.4 : 1,
-        }}
-      >
+      );
+      break;
+    case "usar":
+      acao = (
+        <PilulaDeAcao tom="tingida" texto="Usar" acessivel={`Usar ${i.name}`} aoTocar={agir} />
+      );
+      break;
+    case "em-uso":
+      acao = (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${i.name}: em uso. Tocar para tirar`}
+          onPress={agir}
+          hitSlop={{ top: 6, bottom: 6, left: 8, right: 8 }}
+        >
+          <Visto texto="Em uso" tinta={cor.sementinha} />
+        </Pressable>
+      );
+      break;
+    case "tem":
+      acao = <Visto texto="No cantinho" tinta={cor.textoApagado} />;
+      break;
+    case "coroa-tem":
+      acao = <Visto texto="Conquistada" tinta={cor.atencaoTexto} />;
+      break;
+    case "longe":
+      acao = (
+        <PilulaDeAcao
+          tom="apagada"
+          texto={String(i.price)}
+          icone={<Broto tamanho={14} tinta={cor.textoApagado} />}
+          acessivel={`${i.name}, ${i.price} sementinhas. ${nota ?? ""}`}
+        />
+      );
+      break;
+    case "coroa":
+      /* A Coroa não se compra: abre sozinha com um enfeite de cada tipo. */
+      acao = (
+        <PilulaDeAcao
+          tom="apagada"
+          texto={nota ?? ""}
+          icone={<Lock size={12} color={cor.textoApagado} strokeWidth={2.4} />}
+          acessivel={`${i.name}: abre com um enfeite de cada tipo. Você tem ${nota ?? "0"}`}
+        />
+      );
+      break;
+    default:
+      /* Trancado (a fase que ainda não chegou, os troféus): o preço vem com o
+         cadeado, e a nota diz quando abre. */
+      acao = (
+        <PilulaDeAcao
+          tom="apagada"
+          texto={String(i.price)}
+          icone={<Lock size={12} color={cor.textoApagado} strokeWidth={2.4} />}
+          acessivel={
+            estado === "fase"
+              ? `${i.name}: chega ${(nota ?? "").toLowerCase()}, por ${i.price} sementinhas`
+              : `${i.name}: ${nota} troféus para abrir, ${i.price} sementinhas`
+          }
+        />
+      );
+  }
+
+  return (
+    <Animated.View
+      style={[
+        {
+          width: largura,
+          height: ALTURA_DO_LADRILHO,
+          alignItems: "center",
+          paddingTop: espaco.md,
+          paddingHorizontal: 6,
+          borderRadius: canto.dentro,
+          ...curva,
+          backgroundColor: luz.cartao,
+          borderWidth: 1,
+          borderColor: cor.branco,
+        },
+        sombra,
+        { transform: [{ scale: escalaDoPulo }] },
+      ]}
+    >
+      <Pedestal coroa={coroa} trancado={trancado}>
         {arte ? (
-          <Image source={arte as never} style={{ width: 56, height: 56 }} contentFit="contain" />
+          <Image
+            source={arte as never}
+            recyclingKey={i.id}
+            style={{ width: 44, height: 44 }}
+            contentFit="contain"
+          />
         ) : (
-          <Text style={{ fontSize: 36, lineHeight: 42 }}>{i.emoji}</Text>
+          <Text allowFontScaling={false} style={{ fontSize: 32, lineHeight: 40 }}>
+            {i.emoji}
+          </Text>
         )}
-      </View>
+      </Pedestal>
       <Text
         numberOfLines={2}
         style={{
           marginTop: espaco.sm,
+          height: 36,
           ...fonte.media,
-          fontSize: 13,
-          lineHeight: 17,
+          ...escala.nota,
           textAlign: "center",
           color: cor.texto,
         }}
       >
         {i.name}
       </Text>
-      <View style={{ marginTop: espaco.sm, alignItems: "center" }}>
-        {tem ? (
-          i.type === "trilha" || i.type === "fundo" ? (
-            <Botao3D
-              tipo={emUso ? "cheio" : "claro"}
-              rotulo={emUso ? "Em uso ✓" : "Usar"}
-              acessivel={emUso ? `${i.name}: em uso. Tocar para tirar` : `Usar ${i.name}`}
-              aoTocar={aoUsar}
-            />
-          ) : (
-            <Botao3D tipo="claro" rotulo={coroa ? "Conquistado! 👑" : "No cantinho ✓"} />
-          )
-        ) : trancadoPelaFase ? (
-          <>
-            <Botao3D
-              tipo="selo"
-              fundo={corRecompensas.ambar100}
-              tinta={corRecompensas.ambar700}
-              rotulo={`🔒 ${emBreve}`}
-              acessivel={`${i.name}: chega ${emBreve!.toLowerCase()}, por ${i.price} Sementinhas`}
-            />
-            <Text style={estilo.legendaAmbar}>🌱 {i.price}</Text>
-          </>
-        ) : coroaTrancada ? (
-          <>
-            <Botao3D
-              tipo="selo"
-              fundo={corRecompensas.ambar100}
-              tinta={corRecompensas.ambar700}
-              rotulo={`🔒 ${colecao.tem}/${colecao.total} categorias`}
-            />
-            <Text style={estilo.legendaAmbar}>Um enfeite de cada tipo</Text>
-          </>
-        ) : faltamTrof > 0 ? (
-          <>
-            <Botao3D
-              tipo="selo"
-              fundo={corRecompensas.ambar100}
-              tinta={corRecompensas.ambar700}
-              rotulo={`🔒 faltam ${faltamTrof} 🏆`}
-            />
-            <Text style={estilo.legendaAmbar}>1 troféu por dia de 5 estrelas</Text>
-          </>
-        ) : naoAlcanca ? (
-          <>
-            <Botao3D
-              tipo="selo"
-              fundo={corRecompensas.ardosia100}
-              tinta={corRecompensas.ardosia400}
-              rotulo={`🌱 ${i.price}`}
-              acessivel={`${i.name}, ${i.price} Sementinhas`}
-            />
-            {/* Quantas faltam: a diferença entre "amanhã eu compro" e "isso não
-                é pra mim", sem ela fazer a conta de cabeça. */}
-            <Text
-              style={{
-                marginTop: 4,
-                ...fonte.media,
-                fontSize: 13,
-                color: corRecompensas.ardosia400,
-              }}
-            >
-              faltam {i.price - (saldo ?? 0)} 🌱
-            </Text>
-          </>
-        ) : (
-          <Botao3D
-            tipo="cheio"
-            rotulo={comprando ? "🌱 …" : `🌱 ${i.price}`}
-            acessivel={`Comprar ${i.name} por ${i.price} Sementinhas`}
-            desligado={comprando}
-            aoTocar={aoComprar}
-          />
-        )}
+      <View style={{ marginTop: 6, height: 32, alignSelf: "stretch", justifyContent: "center" }}>
+        {acao}
       </View>
-    </>
+      <View
+        style={{ marginTop: 4, height: 18, flexDirection: "row", alignItems: "center", gap: 3 }}
+      >
+        {nota && estado === "trofeus" ? (
+          <Trophy size={12} color={cor.textoApagado} strokeWidth={2.4} />
+        ) : null}
+        {nota ? (
+          <Text
+            numberOfLines={1}
+            style={{ ...fonte.media, ...escala.nota, color: cor.textoApagado }}
+          >
+            {estado === "coroa" ? "um de cada tipo" : nota}
+          </Text>
+        ) : null}
+      </View>
+    </Animated.View>
   );
+});
 
-  const caixa = {
-    flex: 1,
-    alignItems: "center" as const,
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: espaco.lg,
-    ...sombraDeCartao,
-  };
-  return coroa ? (
-    <LinearGradient
-      colors={[corRecompensas.ambar50, cor.branco]}
-      style={[caixa, { borderColor: corRecompensas.ambar300 }]}
-    >
-      {conteudo}
-    </LinearGradient>
-  ) : (
-    <View style={[caixa, { borderColor: cor.borda, backgroundColor: cor.cartao }]}>{conteudo}</View>
-  );
-}
-
-function Selo({
-  texto,
-  fundo,
-  lado,
+/** O pedestal: um círculo só atrás de toda arte, emoji ou 3D. */
+function Pedestal({
+  children,
+  coroa,
+  trancado,
 }: {
-  texto: string;
-  fundo: string;
-  lado: "esquerda" | "direita";
+  children: ReactNode;
+  coroa: boolean;
+  trancado: boolean;
 }) {
   return (
-    <View
-      style={{
-        position: "absolute",
-        top: espaco.sm,
-        ...(lado === "esquerda" ? { left: espaco.sm } : { right: espaco.sm }),
-        borderRadius: 999,
-        backgroundColor: fundo,
-        paddingHorizontal: espaco.sm,
-        paddingVertical: 2,
-        zIndex: 1,
-      }}
-    >
-      <Text
+    <View style={{ width: 64, height: 64 }}>
+      <View
         style={{
-          ...fonte.forte,
-          fontSize: 13,
-          letterSpacing: 0.4,
-          color: corRecompensas.ambar800,
+          width: 64,
+          height: 64,
+          borderRadius: 32,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: coroa ? cor.atencaoClaro : cor.apagado,
+          borderWidth: coroa ? 2 : 0,
+          borderColor: ouro.medio,
         }}
       >
-        {texto}
-      </Text>
+        <View style={{ opacity: trancado ? 0.35 : 1 }}>{children}</View>
+      </View>
+      {trancado ? (
+        <View
+          style={[
+            {
+              position: "absolute",
+              right: -2,
+              bottom: -2,
+              width: 24,
+              height: 24,
+              borderRadius: 12,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: cor.cartao,
+            },
+            sombra,
+          ]}
+        >
+          <Lock size={12} color={cor.textoApagado} strokeWidth={2.4} />
+        </View>
+      ) : null}
     </View>
   );
 }
 
-const estilo = {
-  rotuloDeSecao: {
-    marginBottom: espaco.sm,
-    ...fonte.forte,
-    fontSize: 13,
-    letterSpacing: 1,
-    color: cor.textoApagado,
-  },
-  legendaAmbar: {
-    marginTop: 4,
-    ...fonte.media,
-    fontSize: 13,
-    textAlign: "center" as const,
-    color: corRecompensas.ambar700_70,
-  },
-} as const;
+/** O estado sem pílula: o visto e a palavra. */
+function Visto({ texto, tinta }: { texto: string; tinta: string }) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 }}>
+      <Check size={14} color={tinta} strokeWidth={2.6} />
+      <Text style={{ ...fonte.forte, ...escala.nota, color: tinta }}>{texto}</Text>
+    </View>
+  );
+}
+
+/** A ficha de categoria: a escolhida é cheia (ameixa); as outras, apagadas. */
+function FichaDaCategoria({
+  rotulo,
+  ativa,
+  aoTocar,
+}: {
+  rotulo: string;
+  ativa: boolean;
+  aoTocar: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="tab"
+      accessibilityState={{ selected: ativa }}
+      accessibilityLabel={rotulo}
+      onPress={aoTocar}
+      hitSlop={{ top: 4, bottom: 4 }}
+      style={({ pressed }) => ({
+        minHeight: 36,
+        justifyContent: "center",
+        borderRadius: canto.pilula,
+        ...curva,
+        paddingHorizontal: espaco.lg,
+        backgroundColor: ativa ? cor.texto : cor.apagado,
+        transform: [{ scale: pressed ? 0.96 : 1 }],
+      })}
+    >
+      <Text
+        style={{
+          ...fonte.forte,
+          ...escala.legenda,
+          color: ativa ? cor.branco : cor.texto,
+        }}
+      >
+        {rotulo}
+      </Text>
+    </Pressable>
+  );
+}
+
+/** Um conjunto: a arte, o nome, a descrição e a barra de peças (4 segmentos). */
+function LinhaDoConjunto({
+  arte,
+  emoji,
+  nome,
+  descricao,
+  tem,
+  total,
+  completo,
+  primeira,
+}: {
+  arte: unknown;
+  emoji: string;
+  nome: string;
+  descricao: string;
+  tem: number;
+  total: number;
+  completo: boolean;
+  primeira: boolean;
+}) {
+  return (
+    <View
+      accessible
+      accessibilityLabel={`${nome}: ${completo ? "completo" : `${tem} de ${total}`}. ${descricao}`}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: espaco.md,
+        paddingHorizontal: espaco.lg,
+        paddingVertical: espaco.md,
+        borderTopWidth: primeira ? 0 : 1,
+        borderTopColor: cor.divisor,
+      }}
+    >
+      <View
+        style={{
+          width: 56,
+          height: 56,
+          borderRadius: 28,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: completo ? cor.sementinhaFundo : cor.apagado,
+        }}
+      >
+        {arte ? (
+          <Image source={arte as never} style={{ width: 44, height: 44 }} contentFit="contain" />
+        ) : (
+          <Text allowFontScaling={false} style={{ fontSize: 28, lineHeight: 34 }}>
+            {emoji}
+          </Text>
+        )}
+      </View>
+      <View style={{ flex: 1, gap: 4 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.xs }}>
+          <Text
+            numberOfLines={1}
+            style={{ flexShrink: 1, ...fonte.forte, ...escala.legenda, color: cor.texto }}
+          >
+            {nome}
+          </Text>
+          {completo ? <Check size={16} color={cor.sementinha} strokeWidth={2.8} /> : null}
+        </View>
+        <Text
+          numberOfLines={2}
+          style={{ ...fonte.normal, ...escala.nota, color: cor.textoApagado }}
+        >
+          {descricao}
+        </Text>
+        <View style={{ flexDirection: "row", gap: 4, marginTop: 2 }}>
+          {Array.from({ length: total }, (_, k) => (
+            <View
+              key={k}
+              style={{
+                flex: 1,
+                height: 4,
+                borderRadius: 2,
+                backgroundColor: k < tem ? cor.sementinha : cor.trilho,
+              }}
+            />
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+}
