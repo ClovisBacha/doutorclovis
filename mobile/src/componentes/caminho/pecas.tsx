@@ -15,7 +15,7 @@ import Svg, {
   Stop,
 } from "react-native-svg";
 import { corCaminho } from "~/componentes/caminho/cores";
-import { useMovimentoReduzido } from "~/componentes/movimento";
+import { useMovimentoReduzido, lacoQueDescansa } from "~/componentes/movimento";
 import { degradeDaMoeda, type Tom } from "~/lib/jornada/caminho";
 
 /**
@@ -273,7 +273,11 @@ export function EstrelasDoDia({
 
 /* ── Movimentos do nó de hoje ───────────────────────────────────────────── */
 
-/** `.dc-chest`: a bolinha de hoje pulsa (1 → 1,12) até o dia fechar. */
+/**
+ * `.dc-chest`: a bolinha de hoje pulsa (1 → 1,12) três vezes quando a trilha
+ * aparece, e descansa (17/11/2026: o pulso sem fim custava ~5% de processador
+ * com a trilha parada).
+ */
 export function Pulsar({ ativo, children }: { ativo: boolean; children: ReactNode }) {
   const reduzido = useMovimentoReduzido();
   const v = useRef(new Animated.Value(0)).current;
@@ -282,7 +286,7 @@ export function Pulsar({ ativo, children }: { ativo: boolean; children: ReactNod
       v.setValue(0);
       return;
     }
-    const laco = Animated.loop(
+    const laco = lacoQueDescansa(
       Animated.sequence([
         Animated.timing(v, {
           toValue: 1,
@@ -297,6 +301,7 @@ export function Pulsar({ ativo, children }: { ativo: boolean; children: ReactNod
           useNativeDriver: true,
         }),
       ]),
+      3,
     );
     laco.start();
     return () => laco.stop();
@@ -312,13 +317,18 @@ export function Pulsar({ ativo, children }: { ativo: boolean; children: ReactNod
   );
 }
 
-/** `.duo-bubble`: o balão de hoje boia (0 → −6 px, 1,8 s). */
+/**
+ * `.duo-bubble`: o balão de hoje boia (0 → −6 px, 1,8 s) três vezes quando a
+ * trilha aparece, e descansa. Boiando a cada 9 s ainda custava ~10% de
+ * processador parado: cada quadro animado faz o vidro da barra e do placar se
+ * redesenhar.
+ */
 export function Boiar({ children }: { children: ReactNode }) {
   const reduzido = useMovimentoReduzido();
   const v = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (reduzido) return;
-    const laco = Animated.loop(
+    const laco = lacoQueDescansa(
       Animated.sequence([
         Animated.timing(v, {
           toValue: 1,
@@ -333,6 +343,7 @@ export function Boiar({ children }: { children: ReactNode }) {
           useNativeDriver: true,
         }),
       ]),
+      3,
     );
     laco.start();
     return () => laco.stop();
@@ -363,13 +374,14 @@ export function ChamaDaSequencia({ acesa, tamanho = 26 }: { acesa: boolean; tama
   const v = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (!acesa || reduzido) return;
-    const laco = Animated.loop(
+    const laco = lacoQueDescansa(
       Animated.timing(v, {
         toValue: 36,
         duration: 3000,
         easing: Easing.linear,
         useNativeDriver: true,
       }),
+      2,
     );
     laco.start();
     return () => laco.stop();

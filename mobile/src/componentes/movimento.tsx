@@ -2,7 +2,7 @@ import { DeviceMotion } from "expo-sensors";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Flame } from "lucide-react-native";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   AccessibilityInfo,
   Animated,
@@ -16,6 +16,10 @@ import {
   type ViewStyle,
 } from "react-native";
 import * as Haptics from "expo-haptics";
+/* O foco da tela, como o roteador o calcula (já considera a tela de cima: uma
+   aba coberta por uma tela empilhada está fora de foco). Fora de um navegador,
+   `undefined`. */
+import { IsFocusedContext } from "expo-router/build/react-navigation/core/useIsFocused";
 import { parametroDaBancada } from "~/lib/bancada";
 
 /**
@@ -26,6 +30,13 @@ import { parametroDaBancada } from "~/lib/bancada";
  *   Nada gira sem motivo.
  * - "Reduzir movimento" do iOS desliga tudo aqui: a tela fica parada e
  *   completa, nunca vazia (useMovimentoReduzido).
+ * - E o que NÃO ESTÁ À VISTA para (17/11/2026): uma aba escondida ou coberta
+ *   por outra tela não anima nada. O Instruments mostrou a thread principal
+ *   ocupada aplicando propriedades de animação a cada quadro — dezenas de
+ *   laços rodando ao mesmo tempo, quase todos em telas que ninguém via (o app
+ *   gastava ~47% de processador parado). Por isso `useMovimentoReduzido`
+ *   também responde "parado" quando a tela está fora de foco: todo laço daqui
+ *   já o consulta, e para sozinho.
  * - Só o motor nativo (useNativeDriver): opacidade e transform, nunca layout.
  * - A bolha viva é a ARTE dela (fundo transparente, nítida), animada aqui:
  *   flutua e balança de leve. Até 16/11/2026 era um vídeo
@@ -40,7 +51,19 @@ function toque() {
   void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 }
 
+/**
+ * O movimento parado: com "reduzir movimento" do iOS, OU com a tela fora de
+ * foco (aba escondida, tela coberta por outra). Volta sozinho quando a tela
+ * volta à vista.
+ */
 export function useMovimentoReduzido(): boolean {
+  const sistema = useReduzirMovimentoDoSistema();
+  const foco = useContext(IsFocusedContext);
+  return sistema || foco === false;
+}
+
+/** Só o "reduzir movimento" do iOS. */
+function useReduzirMovimentoDoSistema(): boolean {
   const [reduzido, setReduzido] = useState(false);
   useEffect(() => {
     let vivo = true;
@@ -54,6 +77,73 @@ export function useMovimentoReduzido(): boolean {
     };
   }, []);
   return reduzido;
+}
+
+/* ── O fôlego: o enfeite respira ao chegar e descansa ─────────────────── */
+
+/**
+ * O FÔLEGO (17/11/2026, "está um pouco travado o aplicativo [...] precisa
+ * destravar, deixar mais clean", o dono). Medido no `top` e no Instruments:
+ * laço que nunca para custa a cada quadro, para sempre — a thread principal
+ * aplicando propriedades, e o servidor de desenho recompondo a tela e o vidro
+ * por cima dela. Parado na aba do bebê, o app gastava de 30% a 47% de
+ * processador.
+ *
+ * A regra agora:
+ * - ENFEITE (a bolha, a arte que flutua, as estrelas, a chama) dá algumas
+ *   voltas quando a tela aparece e DESCANSA na pose de repouso
+ *   (`lacoQueDescansa`, `vaivemQueDescansa`). Volta a respirar quando a tela
+ *   volta à vista: o foco religa os laços (`useMovimentoReduzido`).
+ * - O que CHAMA o toque (o nó de hoje, o balão "começar", o prêmio a
+ *   resgatar) pulsa em RAJADAS, com descanso entre elas (`rajada`).
+ * - Laço eterno, só o que tem função: a respiração guiada, o cronômetro.
+ */
+export const VOLTAS_DO_ENFEITE = 3;
+
+/** O laço que dá `voltas` e para (a animação termina na pose de repouso). */
+export function lacoQueDescansa(
+  anim: Animated.CompositeAnimation,
+  voltas: number = VOLTAS_DO_ENFEITE,
+): Animated.CompositeAnimation {
+  return Animated.loop(anim, { iterations: voltas });
+}
+
+/** `voltas` seguidas, um descanso parado, e de novo — enquanto a tela estiver à vista. */
+export function rajada(
+  anim: Animated.CompositeAnimation,
+  voltas: number,
+  descansoMs: number,
+): Animated.CompositeAnimation {
+  return Animated.loop(
+    Animated.sequence([Animated.loop(anim, { iterations: voltas }), Animated.delay(descansoMs)]),
+  );
+}
+
+/**
+ * O vaivém que descansa NO MEIO: 0,5 → 1 → 0 → 0,5 com a curva de uma onda (a
+ * velocidade não para no meio do caminho), `voltas` vezes, e um balanço curto
+ * até o repouso. ⚠️ O valor nasce em 0,5 (o laço volta a ele a cada volta), e
+ * quem o usa desenha o repouso em 0,5.
+ */
+export function vaivemQueDescansa(
+  v: Animated.Value,
+  periodo: number,
+  voltas: number = VOLTAS_DO_ENFEITE,
+): Animated.CompositeAnimation {
+  const ir = (para: number, ms: number, curva: (t: number) => number) =>
+    Animated.timing(v, { toValue: para, duration: ms, easing: curva, useNativeDriver: true });
+  return Animated.sequence([
+    Animated.loop(
+      Animated.sequence([
+        ir(1, periodo / 4, Easing.out(Easing.sin)),
+        ir(0, periodo / 2, Easing.inOut(Easing.sin)),
+        ir(0.5, periodo / 4, Easing.in(Easing.sin)),
+      ]),
+      { iterations: voltas },
+    ),
+    ir(0.6, periodo / 8, Easing.out(Easing.sin)),
+    ir(0.5, periodo / 5, Easing.inOut(Easing.sin)),
+  ]);
 }
 
 /* ── A bolha viva ─────────────────────────────────────────────────────── */
@@ -116,19 +206,16 @@ export function BolhaViva({
   moldura?: boolean;
 }) {
   const reduzido = useMovimentoReduzido();
-  const v = useRef(new Animated.Value(0)).current;
+  /* O repouso é 0,5: a bolha reta, na altura do meio. */
+  const v = useRef(new Animated.Value(0.5)).current;
   useEffect(() => {
     if (reduzido) return;
-    const passo = (para: number) =>
-      Animated.timing(v, {
-        toValue: para,
-        duration: 2600,
-        easing: Easing.inOut(Easing.sin),
-        useNativeDriver: true,
-      });
-    const laco = Animated.loop(Animated.sequence([passo(1), passo(0)]));
+    const laco = vaivemQueDescansa(v, 3600);
     laco.start();
-    return () => laco.stop();
+    return () => {
+      laco.stop();
+      v.setValue(0.5);
+    };
   }, [reduzido, v]);
   return (
     <View
@@ -136,23 +223,26 @@ export function BolhaViva({
       pointerEvents="none"
       style={{ width: tamanho, height: tamanho, alignItems: "center", justifyContent: "center" }}
     >
-      <Flutuar desligado={reduzido} amplitude={Math.max(3, tamanho * 0.035)} periodo={3600}>
-        <Animated.View
-          style={{
-            transform: [
-              {
-                rotate: v.interpolate({ inputRange: [0, 1], outputRange: ["-3deg", "3deg"] }),
-              },
-            ],
-          }}
-        >
-          <Image
-            source={ARTES[humor]}
-            style={{ width: tamanho * 0.94, height: tamanho * 0.94 }}
-            contentFit="contain"
-          />
-        </Animated.View>
-      </Flutuar>
+      {/* Um laço só: o mesmo valor sobe e desce a bolha e a balança. */}
+      <Animated.View
+        style={{
+          transform: [
+            {
+              translateY: v.interpolate({
+                inputRange: [0, 1],
+                outputRange: [Math.max(3, tamanho * 0.035), -Math.max(3, tamanho * 0.035)],
+              }),
+            },
+            { rotate: v.interpolate({ inputRange: [0, 1], outputRange: ["-3deg", "3deg"] }) },
+          ],
+        }}
+      >
+        <Image
+          source={ARTES[humor]}
+          style={{ width: tamanho * 0.94, height: tamanho * 0.94 }}
+          contentFit="contain"
+        />
+      </Animated.View>
       <EnfeiteDoHumor humor={humor} tamanho={tamanho} v={v} parado={reduzido} />
     </View>
   );
@@ -173,13 +263,14 @@ function EnfeiteDoHumor({
   const gira = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (parado || humor !== "estrelas") return;
-    const laco = Animated.loop(
+    const laco = lacoQueDescansa(
       Animated.timing(gira, {
         toValue: 1,
         duration: 7000,
         easing: Easing.linear,
         useNativeDriver: true,
       }),
+      2,
     );
     laco.start();
     return () => laco.stop();
@@ -301,27 +392,16 @@ export function Flutuar({
   desligado?: boolean;
 }) {
   const reduzido = useMovimentoReduzido();
-  const v = useRef(new Animated.Value(0)).current;
+  /* O repouso é 0,5 (a arte na altura do meio): ver `vaivemQueDescansa`. */
+  const v = useRef(new Animated.Value(0.5)).current;
   useEffect(() => {
     if (reduzido || desligado) return;
-    const laco = Animated.loop(
-      Animated.sequence([
-        Animated.timing(v, {
-          toValue: 1,
-          duration: periodo / 2,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(v, {
-          toValue: 0,
-          duration: periodo / 2,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
+    const laco = vaivemQueDescansa(v, periodo);
     laco.start();
-    return () => laco.stop();
+    return () => {
+      laco.stop();
+      v.setValue(0.5);
+    };
   }, [desligado, periodo, reduzido, v]);
   return (
     <Animated.View
@@ -377,7 +457,9 @@ function ligarSensor() {
   if (assinatura) return;
   let base: { b: number; g: number } | null = null;
   let suave = { x: 0, y: 0 };
-  DeviceMotion.setUpdateInterval(60);
+  /* 30 leituras por segundo: o valor vai direto para a tela, então a leitura
+     é o passo do movimento. */
+  DeviceMotion.setUpdateInterval(33);
   assinatura = DeviceMotion.addListener(({ rotation }) => {
     if (!rotation) return;
     /* A posição em que ela segura o celular vira o "reto": o cartão inclina
@@ -431,58 +513,79 @@ function assinarInclinacao(o: Ouvinte): () => void {
  * vivo. Com "reduzir movimento", os dois ficam em zero. Tudo no fio nativo
  * (`useNativeDriver`), para andar junto da rolagem sem engasgar.
  */
-export function useParalaxe(): { x: Animated.Value; y: Animated.Value } {
+export function useParalaxe(): Paralaxe {
   const reduzido = useMovimentoReduzido();
-  const x = useRef(new Animated.Value(0)).current;
-  const y = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (reduzido) return;
-    let deriva: Animated.CompositeAnimation | null = null;
-    const ate = (v: Animated.Value, para: number, ms: number) =>
-      Animated.timing(v, {
-        toValue: para,
-        duration: ms,
-        easing: Easing.inOut(Easing.sin),
-        useNativeDriver: true,
-      });
-    const derivar = () => {
-      deriva = Animated.parallel([
-        Animated.loop(Animated.sequence([ate(x, 0.7, 3400), ate(x, -0.7, 6800), ate(x, 0, 3400)])),
-        Animated.loop(Animated.sequence([ate(y, -0.5, 2600), ate(y, 0.5, 5200), ate(y, 0, 2600)])),
-      ]);
-      deriva.start();
-    };
-    if (Platform.OS === "web") {
-      /* Na bancada as fotos precisam sair iguais: parado. `&mover=1` liga a deriva. */
-      if (parametroDaBancada("mover") === "1") derivar();
-      return () => deriva?.stop();
-    }
-    let vivo = true;
-    let soltar: (() => void) | null = null;
-    const seguir = (v: Animated.Value, para: number) =>
-      Animated.timing(v, {
-        toValue: para,
-        duration: 90,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }).start();
-    void DeviceMotion.isAvailableAsync()
-      .then((ok) => {
-        if (!vivo) return;
-        if (!ok) return derivar();
-        soltar = assinarInclinacao((frente, lado) => {
-          seguir(x, lado);
-          seguir(y, frente);
-        });
-      })
-      .catch(() => vivo && derivar());
+    usuariosDaParalaxe += 1;
+    if (usuariosDaParalaxe === 1) pararParalaxe = ligarParalaxe();
     return () => {
-      vivo = false;
-      soltar?.();
-      deriva?.stop();
+      usuariosDaParalaxe -= 1;
+      if (usuariosDaParalaxe === 0) {
+        pararParalaxe?.();
+        pararParalaxe = null;
+      }
     };
-  }, [reduzido, x, y]);
-  return { x, y };
+  }, [reduzido]);
+  return PARALAXE;
+}
+
+/* UMA paralaxe para o app inteiro (17/11/2026): antes cada tela que a usava
+   criava os seus dois laços de deriva — quatro telas, oito laços. Agora os
+   valores são os mesmos para todas, e só há um laço (ou uma escuta do sensor)
+   enquanto houver alguém à vista usando. */
+type Paralaxe = { x: Animated.Value; y: Animated.Value };
+const PARALAXE: Paralaxe = { x: new Animated.Value(0), y: new Animated.Value(0) };
+let usuariosDaParalaxe = 0;
+let pararParalaxe: (() => void) | null = null;
+
+function ligarParalaxe(): () => void {
+  const { x, y } = PARALAXE;
+  let deriva: Animated.CompositeAnimation | null = null;
+  const ate = (v: Animated.Value, para: number, ms: number) =>
+    Animated.timing(v, {
+      toValue: para,
+      duration: ms,
+      easing: Easing.inOut(Easing.sin),
+      useNativeDriver: true,
+    });
+  const derivar = () => {
+    deriva = Animated.parallel([
+      Animated.loop(Animated.sequence([ate(x, 0.7, 3400), ate(x, -0.7, 6800), ate(x, 0, 3400)])),
+      Animated.loop(Animated.sequence([ate(y, -0.5, 2600), ate(y, 0.5, 5200), ate(y, 0, 2600)])),
+    ]);
+    deriva.start();
+  };
+  if (Platform.OS === "web") {
+    /* Na bancada as fotos precisam sair iguais: parado. `&mover=1` liga a deriva. */
+    if (parametroDaBancada("mover") === "1") derivar();
+    return () => deriva?.stop();
+  }
+  let vivo = true;
+  let soltar: (() => void) | null = null;
+  /* Sem sensor (o simulador), a tela fica PARADA: a deriva movia o céu, o
+     número e o bebê a cada quadro, e tudo o que estava em cima (o vidro, os
+     painéis) era redesenhado sem parar — era metade do travamento medido. */
+  let ultimo = { x: 0, y: 0 };
+  void DeviceMotion.isAvailableAsync()
+    .then((ok) => {
+      if (!vivo || !ok) return;
+      /* O sensor já vem suavizado (`ligarSensor`). O valor vai direto (sem uma
+         animação nova a cada leitura), e só quando a mudança APARECE: o tremor
+         da mão parada não redesenha a tela 30 vezes por segundo. */
+      soltar = assinarInclinacao((frente, lado) => {
+        if (Math.abs(lado - ultimo.x) < 0.04 && Math.abs(frente - ultimo.y) < 0.04) return;
+        ultimo = { x: lado, y: frente };
+        x.setValue(lado);
+        y.setValue(frente);
+      });
+    })
+    .catch(() => {});
+  return () => {
+    vivo = false;
+    soltar?.();
+    deriva?.stop();
+  };
 }
 
 /**

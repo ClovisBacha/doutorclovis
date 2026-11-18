@@ -1,162 +1,341 @@
-import {
-  BookOpen,
-  HeartHandshake,
-  Siren,
-  Sparkles,
-  Sprout,
-  type LucideIcon,
-} from "lucide-react-native";
-import { SOS_NO_APP } from "~/config";
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
+import { ChevronLeft } from "lucide-react-native";
+import { createContext, useContext, useState, type ReactNode } from "react";
 import {
   Animated,
-  Easing,
+  Pressable,
   StyleSheet,
   Text,
-  useWindowDimensions,
+  TextInput,
   View,
   type StyleProp,
+  type TextInputProps,
+  type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { T } from "~/componentes/base";
+import { toque } from "~/componentes/base";
 import { CEUS, CeuVivo, faseDeAgora, type Ceu } from "~/componentes/ceu-vivo";
-import { useMovimentoReduzido } from "~/componentes/movimento";
-import { cor, espaco, fonte, raio, sombra } from "~/tema";
+import { useMolaDeToque } from "~/componentes/movimento";
 import { Vidro } from "~/componentes/vidro";
+import { gravarJson } from "~/lib/armazem";
+import { ALVO_MINIMO, aperto, cor, curva, espaco, fonte, raio, veu } from "~/tema";
 
 /**
- * A CARA DA ENTRADA — login, cadastro e "esqueci a senha".
+ * A CARA DA ENTRADA — boas-vindas, entrar, cadastro e "esqueci a senha".
  *
- * É a primeira tela de quem baixa o app, e ela abre no MESMO céu vivo da tela
- * do bebê (16/11/2026): o céu da hora em que ela abriu, na tela inteira — de
- * manhã o amanhecer com nuvens, à noite as estrelas piscando e a estrela
- * cadente. Por cima, as bolhas translúcidas que sobem e descem devagar (a
- * bolha é o personagem do app) e o formulário numa folha branca.
+ * 17/11/2026, o dono: "esse fundo branco aí no cadastro do e-mail [...] não
+ * gosto disso. Gostaria que tivesse já um caminho que nem a gente está
+ * fazendo do Marca Ponto [...] de slides para você entrar no aplicativo."
  *
- * Tudo decorativo: fora da acessibilidade, sem toque, só opacidade e
- * transform no motor nativo. Com "Reduzir movimento", a mesma cena, parada.
+ * Não há mais folha branca: a entrada escreve DIRETO sobre o céu vivo da hora
+ * (o mesmo das abas), com um VÉU de ameixa-noite que escurece o pé da tela —
+ * ou a tela inteira, nos formulários —, e o texto é branco sobre ele. Os
+ * campos são de vidro escuro, como no Marca Ponto.
+ *
+ * ⚠️ A entrada não sabe se quem volta está no Modo Cuidado (luto): o céu e a
+ * bolha, sim; o bebê, nunca (`vidro-e-luz.test.ts`).
  */
 
 /* ── O fundo ──────────────────────────────────────────────────────────── */
 
-/** O céu sob a entrada: quem escreve direto no fundo lê a tinta dele. */
+/** O céu sob a entrada (a fase da hora em que ela abriu). */
 const CeuDaEntrada = createContext<Ceu>(CEUS.amanhecer);
 export const useCeuDaEntrada = () => useContext(CeuDaEntrada);
 
-type Bolha = { x: number; y: number; d: number; periodo: number; sobe: number };
+/** A chave que diz que este aparelho já entrou numa conta (não é dado dela). */
+export const CHAVE_JA_ENTROU = "me-ja-entrou";
 
-/* Posições em fração da tela; tamanhos em pt. Poucas e perto das bordas, para
-   não disputar com o formulário no meio. */
-const BOLHAS: Bolha[] = [
-  { x: -0.1, y: 0.05, d: 130, periodo: 7000, sobe: 14 },
-  { x: 0.86, y: 0.44, d: 48, periodo: 5200, sobe: 12 },
-  { x: 0.03, y: 0.4, d: 40, periodo: 4800, sobe: 16 },
-  { x: -0.08, y: 0.74, d: 110, periodo: 7600, sobe: 20 },
-  { x: 0.74, y: 0.84, d: 130, periodo: 8200, sobe: 16 },
-];
+/** Quem já entrou neste aparelho volta direto para "entrar", sem os slides. */
+export function marcarQueJaEntrou() {
+  void gravarJson(CHAVE_JA_ENTROU, true);
+}
 
-export function FundoDaEntrada({ children }: { children: ReactNode }) {
+export function FundoDaEntrada({
+  children,
+  veu: forca = "baixo",
+}: {
+  children: ReactNode;
+  /** "baixo": o pé da tela escurece (os slides). "inteiro": os formulários. */
+  veu?: "baixo" | "inteiro";
+}) {
   /* A hora é a de quando a tela abriu: o céu não troca no meio do login. */
   const [fase] = useState(faseDeAgora);
   const ceu = CEUS[fase];
   return (
     <View style={{ flex: 1, backgroundColor: ceu.chao }}>
       <CeuVivo fase={fase} />
-      {/* overflow: as bolhas das bordas saem da tela de propósito, e sem o
-          corte a web ganha rolagem lateral. */}
-      <View
-        style={[StyleSheet.absoluteFill, { overflow: "hidden" }]}
+      <LinearGradient
         pointerEvents="none"
-        accessible={false}
-      >
-        {BOLHAS.map((b, i) => (
-          <BolhaQueFlutua key={i} bolha={b} />
-        ))}
-      </View>
+        colors={
+          forca === "inteiro"
+            ? [veu.tinta(0.55), veu.tinta(0.66), veu.tinta(0.9)]
+            : [veu.tinta(0), veu.tinta(0), veu.tinta(0.78), veu.tinta(0.95)]
+        }
+        locations={forca === "inteiro" ? [0, 0.45, 1] : [0, 0.3, 0.6, 1]}
+        style={StyleSheet.absoluteFill}
+      />
       <CeuDaEntrada.Provider value={ceu}>{children}</CeuDaEntrada.Provider>
     </View>
   );
 }
 
-function useLaco(periodo: number, atraso = 0) {
-  const reduzido = useMovimentoReduzido();
-  const v = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    if (reduzido) return;
-    const meia = periodo / 2;
-    const laco = Animated.loop(
-      Animated.sequence([
-        Animated.timing(v, {
-          toValue: 1,
-          duration: meia,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(v, {
-          toValue: 0,
-          duration: meia,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    const t = setTimeout(() => laco.start(), atraso);
-    return () => {
-      clearTimeout(t);
-      laco.stop();
-    };
-  }, [atraso, periodo, reduzido, v]);
-  return v;
-}
+/* ── A letra sobre o véu ──────────────────────────────────────────────── */
 
-function BolhaQueFlutua({ bolha }: { bolha: Bolha }) {
-  const { width, height } = useWindowDimensions();
-  const v = useLaco(bolha.periodo, (bolha.periodo % 1300) * 0.5);
+export function TituloNoVeu({
+  children,
+  centro,
+  tamanho = 34,
+}: {
+  children: ReactNode;
+  centro?: boolean;
+  tamanho?: number;
+}) {
   return (
-    <Animated.View
+    <Text
+      accessibilityRole="header"
       style={{
-        position: "absolute",
-        left: bolha.x * width,
-        top: bolha.y * height,
-        width: bolha.d,
-        height: bolha.d,
-        borderRadius: bolha.d / 2,
-        backgroundColor: "rgba(255,255,255,0.16)",
-        borderWidth: 1,
-        borderColor: "rgba(255,255,255,0.65)",
-        transform: [
-          {
-            translateY: v.interpolate({
-              inputRange: [0, 1],
-              outputRange: [bolha.sobe, -bolha.sobe],
-            }),
-          },
-          { translateX: v.interpolate({ inputRange: [0, 1], outputRange: [-4, 4] }) },
-          { scale: v.interpolate({ inputRange: [0, 1], outputRange: [1, 1.04] }) },
-        ],
+        ...fonte.titulo,
+        fontSize: tamanho,
+        lineHeight: Math.round(tamanho * 1.12),
+        letterSpacing: aperto.titulo,
+        color: cor.branco,
+        textAlign: centro ? "center" : "left",
       }}
     >
-      {/* O brilho no alto, que faz o círculo ler como bolha de sabão. */}
-      <View
-        style={{
-          position: "absolute",
-          top: bolha.d * 0.16,
-          left: bolha.d * 0.2,
-          width: bolha.d * 0.22,
-          height: bolha.d * 0.12,
-          borderRadius: bolha.d,
-          backgroundColor: cor.branco,
-          opacity: 0.85,
-          transform: [{ rotate: "-30deg" }],
-        }}
-      />
-    </Animated.View>
+      {children}
+    </Text>
   );
 }
 
-/* ── A folha branca do formulário ─────────────────────────────────────── */
+export function TextoNoVeu({
+  children,
+  centro,
+  pequeno,
+  estilo,
+}: {
+  children: ReactNode;
+  centro?: boolean;
+  pequeno?: boolean;
+  estilo?: StyleProp<TextStyle>;
+}) {
+  return (
+    <Text
+      style={[
+        {
+          ...fonte.normal,
+          fontSize: pequeno ? 14 : 17,
+          lineHeight: pequeno ? 20 : 24,
+          color: veu.textoNoVeu,
+          textAlign: centro ? "center" : "left",
+        },
+        estilo,
+      ]}
+    >
+      {children}
+    </Text>
+  );
+}
 
-export function FolhaDaEntrada({
+/** O erro sobre o véu: lido na hora pelo leitor de tela. */
+export function ErroNoVeu({ children }: { children: ReactNode }) {
+  return (
+    <Text
+      accessibilityRole="alert"
+      accessibilityLiveRegion="polite"
+      style={{ ...fonte.media, fontSize: 15, lineHeight: 21, color: veu.erroNoVeu }}
+    >
+      {children}
+    </Text>
+  );
+}
+
+/* ── Os controles sobre o véu ─────────────────────────────────────────── */
+
+/** Campo de vidro escuro. Letra de 17: abaixo de 16 o iOS dá zoom ao focar. */
+export function CampoNoVeu({
+  rotulo,
+  dica,
+  ...props
+}: TextInputProps & { rotulo: string; dica?: string }) {
+  const [foco, setFoco] = useState(false);
+  return (
+    <View style={{ gap: 6 }}>
+      <Text style={{ ...fonte.forte, fontSize: 14, color: veu.textoNoVeu }}>{rotulo}</Text>
+      <TextInput
+        accessibilityLabel={rotulo}
+        accessibilityHint={dica}
+        placeholderTextColor={veu.placeholder}
+        keyboardAppearance="dark"
+        selectionColor={veu.linkNoVeu}
+        cursorColor={veu.linkNoVeu}
+        {...props}
+        onFocus={(e) => {
+          setFoco(true);
+          props.onFocus?.(e);
+        }}
+        onBlur={(e) => {
+          setFoco(false);
+          props.onBlur?.(e);
+        }}
+        style={[
+          {
+            minHeight: 54,
+            borderRadius: raio.md,
+            ...curva,
+            borderWidth: 1,
+            borderColor: foco ? veu.campoFoco : veu.campoBorda,
+            backgroundColor: veu.campo,
+            paddingHorizontal: espaco.lg,
+            paddingVertical: espaco.md,
+            ...fonte.normal,
+            fontSize: 17,
+            color: cor.branco,
+          },
+          props.style,
+        ]}
+      />
+      {dica ? <TextoNoVeu pequeno>{dica}</TextoNoVeu> : null}
+    </View>
+  );
+}
+
+/** Um link sobre o véu (rosa claro), com o alvo de 44 pt. */
+export function LinkNoVeu({
+  rotulo,
+  aoTocar,
+  centro = true,
+  apagado,
+}: {
+  rotulo: string;
+  aoTocar: () => void;
+  centro?: boolean;
+  /** Branco de apoio, em vez do rosa (o link de menos peso). */
+  apagado?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={rotulo}
+      hitSlop={6}
+      onPress={() => {
+        toque();
+        aoTocar();
+      }}
+      style={({ pressed }) => ({
+        minHeight: ALVO_MINIMO,
+        justifyContent: "center",
+        alignSelf: centro ? "center" : "flex-start",
+        paddingHorizontal: espaco.sm,
+        opacity: pressed ? 0.6 : 1,
+      })}
+    >
+      <Text
+        style={{
+          ...fonte.forte,
+          fontSize: 16,
+          color: apagado ? veu.textoNoVeu : veu.linkNoVeu,
+          textAlign: "center",
+        }}
+      >
+        {rotulo}
+      </Text>
+    </Pressable>
+  );
+}
+
+/** O botão de vidro claro sobre o véu (a outra escolha, ao lado do cheio). */
+export function BotaoDeVidroNoVeu({
+  rotulo,
+  aoTocar,
+  icone,
+}: {
+  rotulo: string;
+  aoTocar: () => void;
+  icone?: ReactNode;
+}) {
+  const { escala, aoPressionar, aoSoltar } = useMolaDeToque(0.96);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={rotulo}
+      onPressIn={aoPressionar}
+      onPressOut={aoSoltar}
+      onPress={() => {
+        toque();
+        aoTocar();
+      }}
+    >
+      <Animated.View
+        style={{
+          minHeight: 54,
+          borderRadius: raio.pilula,
+          ...curva,
+          borderWidth: 1,
+          borderColor: "rgba(255,255,255,0.42)",
+          backgroundColor: "rgba(255,255,255,0.14)",
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: espaco.sm,
+          paddingHorizontal: espaco.xl,
+          transform: [{ scale: escala }],
+        }}
+      >
+        {icone}
+        <Text style={{ ...fonte.forte, fontSize: 17, color: cor.branco }}>{rotulo}</Text>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+/** "──── ou ────", sobre o véu. */
+export function DivisorDaEntrada({ texto }: { texto: string }) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
+      <View
+        style={{ flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: veu.campoBorda }}
+      />
+      <TextoNoVeu pequeno>{texto}</TextoNoVeu>
+      <View
+        style={{ flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: veu.campoBorda }}
+      />
+    </View>
+  );
+}
+
+/** O voltar dos formulários: um botão de vidro solto no alto (Liquid Glass). */
+export function VoltarNoVeu({ aoTocar }: { aoTocar?: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Voltar"
+      hitSlop={8}
+      onPress={() => {
+        toque();
+        if (aoTocar) aoTocar();
+        else if (router.canGoBack()) router.back();
+        else router.replace("/entrar");
+      }}
+      style={{ alignSelf: "flex-start" }}
+    >
+      <Vidro
+        interativo
+        estilo={{
+          width: ALVO_MINIMO,
+          height: ALVO_MINIMO,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <ChevronLeft size={24} color={cor.texto} strokeWidth={2.4} />
+      </Vidro>
+    </Pressable>
+  );
+}
+
+/** O conteúdo de um formulário sobre o véu: uma coluna legível no meio. */
+export function ColunaDaEntrada({
   children,
   estilo,
 }: {
@@ -164,106 +343,8 @@ export function FolhaDaEntrada({
   estilo?: StyleProp<ViewStyle>;
 }) {
   return (
-    <View
-      style={[
-        {
-          backgroundColor: cor.cartao,
-          borderRadius: raio.lg,
-          padding: espaco.lg,
-          gap: espaco.md,
-          borderWidth: 1,
-          borderColor: cor.borda,
-          ...sombra,
-          shadowOpacity: 0.12,
-          shadowRadius: 24,
-          shadowOffset: { width: 0, height: 10 },
-        },
-        estilo,
-      ]}
-    >
+    <View style={[{ width: "100%", maxWidth: 480, alignSelf: "center", gap: espaco.md }, estilo]}>
       {children}
-    </View>
-  );
-}
-
-/** "──── ou com o seu e-mail ────" */
-export function DivisorDaEntrada({ texto }: { texto: string }) {
-  return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
-      <View style={{ flex: 1, height: 1, backgroundColor: cor.borda }} />
-      <T tipo="apagado" estilo={{ fontSize: 13 }}>
-        {texto}
-      </T>
-      <View style={{ flex: 1, height: 1, backgroundColor: cor.borda }} />
-    </View>
-  );
-}
-
-/* ── O que o app faz, uma frase de cada vez ───────────────────────────── */
-
-/* Nenhuma fala do bebê: a tela de entrada não sabe se quem volta está no
-   Modo Cuidado. */
-const FRASES: { icone: LucideIcon; texto: string }[] = [
-  { icone: BookOpen, texto: "Uma aula curtinha por dia" },
-  { icone: Sparkles, texto: "Estrelas e conquistas a cada passo" },
-  { icone: HeartHandshake, texto: "Amigas jogando junto com você" },
-  SOS_NO_APP
-    ? { icone: Siren, texto: "SOS que funciona até sem internet" }
-    : { icone: Sprout, texto: "Sementinhas para cada passo da trilha" },
-];
-
-export function FrasesQueGiram() {
-  const reduzido = useMovimentoReduzido();
-  const [i, setI] = useState(0);
-  const v = useRef(new Animated.Value(1)).current;
-  useEffect(() => {
-    if (reduzido) return;
-    const id = setInterval(() => {
-      Animated.timing(v, {
-        toValue: 0,
-        duration: 220,
-        easing: Easing.in(Easing.quad),
-        useNativeDriver: true,
-      }).start(() => {
-        setI((n) => (n + 1) % FRASES.length);
-        Animated.timing(v, {
-          toValue: 1,
-          duration: 320,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }).start();
-      });
-    }, 3000);
-    return () => clearInterval(id);
-  }, [reduzido, v]);
-  const { icone: Icone, texto } = FRASES[i];
-  return (
-    <View
-      accessible
-      accessibilityLabel={FRASES.map((f) => f.texto).join(". ")}
-      style={{ alignItems: "center" }}
-    >
-      <Animated.View
-        style={{
-          opacity: v,
-          transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [6, 0] }) }],
-        }}
-      >
-        {/* Uma pílula de vidro sobre as bolhas do degradê (16/11/2026). */}
-        <Vidro
-          flutua={false}
-          estilo={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: espaco.sm,
-            paddingHorizontal: espaco.md,
-            paddingVertical: espaco.sm,
-          }}
-        >
-          <Icone size={16} color={cor.primaria} />
-          <Text style={{ ...fonte.forte, fontSize: 14, color: cor.textoDestaque }}>{texto}</Text>
-        </Vidro>
-      </Animated.View>
     </View>
   );
 }

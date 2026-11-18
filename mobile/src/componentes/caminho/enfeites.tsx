@@ -29,6 +29,7 @@ import {
   type Parada,
 } from "~/lib/jornada/enfeites";
 import { cor, espaco, fonte } from "~/tema";
+import { lacoQueDescansa } from "~/componentes/movimento";
 
 /**
  * O QUE ELA COMPROU NO CANTINHO, NA TRILHA — as peças nativas do site
@@ -71,7 +72,7 @@ function useLaco(pontos: readonly number[], duracaoMs: number, atrasoMs: number,
         }),
       );
     }
-    const laco = Animated.loop(Animated.sequence(trechos));
+    const laco = lacoQueDescansa(Animated.sequence(trechos));
     const t = setTimeout(() => laco.start(), atrasoMs);
     return () => {
       clearTimeout(t);

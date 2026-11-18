@@ -188,3 +188,28 @@ export const luz = {
   /** O cartão: branco, com um tico do fundo passando. */
   cartao: "rgba(255,255,255,0.86)",
 } as const;
+
+/**
+ * O VÉU DA ENTRADA (17/11/2026, o dono: "esse fundo branco aí no cadastro do
+ * e-mail [...] não gosto disso"). A entrada não tem mais folha branca: escreve
+ * direto sobre o céu da hora, com um véu de ameixa-noite que escurece o pé da
+ * tela (ou a tela inteira, nos formulários). Sobre o véu o texto é branco; os
+ * campos são de vidro escuro. As cores com texto estão na catraca de contraste
+ * (`vidro-e-luz.test.ts`), medidas contra o fundo do véu.
+ */
+export const veu = {
+  /** O fundo do véu (a cor cheia do pé da tela). */
+  fundoDoVeu: "#140d33",
+  /** O véu como cor com transparência, para o degradê. */
+  tinta: (alfa: number) => `rgba(20,13,51,${alfa})`,
+  /** O texto de apoio sobre o véu. */
+  textoNoVeu: "#ddd6f7",
+  /** O link sobre o véu (um rosa claro da framboesa). */
+  linkNoVeu: "#ffc6da",
+  /** O erro sobre o véu (o vermelho do app não se lê no escuro). */
+  erroNoVeu: "#ffbfcf",
+  campo: "rgba(255,255,255,0.1)",
+  campoBorda: "rgba(255,255,255,0.3)",
+  campoFoco: "rgba(255,255,255,0.85)",
+  placeholder: "rgba(255,255,255,0.58)",
+} as const;

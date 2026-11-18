@@ -7,6 +7,7 @@ import {
   Easing,
   Platform,
   Pressable,
+  StyleSheet,
   Text,
   useWindowDimensions,
   View,
@@ -19,7 +20,6 @@ import { sombraDoTexto, type Ceu } from "~/componentes/ceu-vivo";
 import { arteDoBebe } from "~/componentes/jornada/arte-do-bebe";
 import { Brilho } from "~/componentes/jornada/atividade";
 import { Flutuar, useMovimentoReduzido } from "~/componentes/movimento";
-import { Vidro } from "~/componentes/vidro";
 import { bebeDaSemana } from "~/lib/bebe-da-semana";
 import { ALVO_MINIMO, aperto, cor, espaco, fonte, fonteDoNumero } from "~/tema";
 
@@ -701,9 +701,9 @@ function ReguaDoTempo({
 }
 
 /**
- * A etiqueta sobre o céu ("faltam 109 dias", "30 cm"): uma pílula de VIDRO
- * em cima da arte — a arte passa através dela —, com o ícone de traço fino no
- * lugar do emoji.
+ * A etiqueta sobre o céu ("faltam 109 dias", "30 cm"): uma pílula clara sobre
+ * a arte, com o ícone de traço fino no lugar do emoji. (Era vidro; sobre o céu
+ * que se mexe, o desfoque era refeito a cada quadro — 17/11/2026.)
  */
 export function Selo({
   children,
@@ -715,20 +715,22 @@ export function Selo({
   cor?: string;
 }) {
   return (
-    <Vidro
-      flutua={false}
-      tinta="rgba(255,255,255,0.5)"
-      estilo={{
+    <View
+      style={{
         flexDirection: "row",
         alignItems: "center",
         gap: 6,
         paddingHorizontal: 13,
         paddingVertical: 7,
+        borderRadius: 999,
+        backgroundColor: "rgba(255,255,255,0.82)",
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: "rgba(255,255,255,0.95)",
         boxShadow: "0px 6px 16px -8px rgba(40,24,90,0.5)",
       }}
     >
       {icone}
       <Text style={{ ...fonte.forte, fontSize: 13, color: tinta }}>{children}</Text>
-    </Vidro>
+    </View>
   );
 }

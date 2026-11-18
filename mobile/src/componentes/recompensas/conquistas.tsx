@@ -6,7 +6,7 @@ import { type ConquistaDef } from "@/lib/conquistas";
 import { NaoConsegueLer, toque } from "~/componentes/base";
 import { Confete } from "~/componentes/jornada/pecas";
 import type { LeituraDasConquistas } from "~/componentes/jornada/economia";
-import { useMovimentoReduzido } from "~/componentes/movimento";
+import { useMovimentoReduzido, rajada } from "~/componentes/movimento";
 import { corRecompensas, quadroDaRaridade } from "~/componentes/recompensas/cores";
 import { MarcosDaRede } from "~/componentes/recompensas/marcos-da-rede";
 import {
@@ -454,7 +454,7 @@ function CartaoDaConquista({
       pulso.setValue(1);
       return;
     }
-    const laco = Animated.loop(
+    const laco = rajada(
       Animated.sequence([
         Animated.timing(pulso, {
           toValue: 0.72,
@@ -469,6 +469,8 @@ function CartaoDaConquista({
           useNativeDriver: true,
         }),
       ]),
+      2,
+      6000,
     );
     laco.start();
     return () => laco.stop();

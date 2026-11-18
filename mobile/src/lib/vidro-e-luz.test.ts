@@ -99,6 +99,10 @@ describe("o vidro e a luz", () => {
       ["o texto apagado na névoa", cor("textoApagado"), cor("fundo")],
       ["o texto apagado no cartão", cor("textoApagado"), cor("cartao")],
       ["a etiqueta de destaque", cor("textoDestaque"), cor("destaque")],
+      /* A entrada escreve sobre o véu de ameixa-noite (17/11/2026). */
+      ["o texto de apoio no véu da entrada", cor("textoNoVeu"), cor("fundoDoVeu")],
+      ["o link no véu da entrada", cor("linkNoVeu"), cor("fundoDoVeu")],
+      ["o erro no véu da entrada", cor("erroNoVeu"), cor("fundoDoVeu")],
     ];
     const fracos = pares
       .map(([onde, a, b]) => ({ onde, razao: Math.round(contraste(a, b) * 100) / 100 }))
@@ -130,8 +134,9 @@ describe("o vidro e a luz", () => {
     /* A entrada não sabe se quem volta está no Modo Cuidado: o céu, sim; o bebê, nunca. */
     for (const arquivo of [
       join("componentes", "entrada.tsx"),
-      join("componentes", "marca.tsx"),
+      join("componentes", "boas-vindas.tsx"),
       join("app", "(entrada)", "entrar.tsx"),
+      join("app", "(entrada)", "email.tsx"),
       join("app", "(entrada)", "cadastro.tsx"),
       join("app", "(entrada)", "esqueci.tsx"),
     ])
@@ -144,7 +149,7 @@ describe("o vidro e a luz", () => {
       });
     /* A rolagem da entrada vai até a borda de baixo: presa na área segura, a
        folha branca aparecia cortada numa linha reta sobre o céu. */
-    for (const arquivo of ["entrar.tsx", "cadastro.tsx", "esqueci.tsx"])
+    for (const arquivo of ["entrar.tsx", "email.tsx", "cadastro.tsx", "esqueci.tsx"])
       expect({
         arquivo,
         cortada: /<Tela bordas=\{\["top", "bottom"\]\}/.test(de(join("app", "(entrada)", arquivo))),

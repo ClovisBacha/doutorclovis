@@ -1,27 +1,41 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import { KeyboardAvoidingView, Platform } from "react-native";
-import { Botao, Campo, Cartao, Linha, T, Tela } from "~/componentes/base";
+import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Botao } from "~/componentes/base";
 import { CaixaDeMarcar } from "~/componentes/caixa";
-import { FolhaDaEntrada, FundoDaEntrada } from "~/componentes/entrada";
-import { CabecalhoDaMarca } from "~/componentes/marca";
+import {
+  CampoNoVeu,
+  ColunaDaEntrada,
+  ErroNoVeu,
+  FundoDaEntrada,
+  LinkNoVeu,
+  TextoNoVeu,
+  TituloNoVeu,
+  VoltarNoVeu,
+} from "~/componentes/entrada";
+import { BolhaViva, Entrada } from "~/componentes/movimento";
 import { SITE } from "~/config";
 import { metadadosDoAceite } from "~/lib/juridico/aceite";
 import { TEXTO_DO_CONSENTIMENTO_DE_SAUDE, TEXTO_DOS_TERMOS } from "~/lib/juridico/textos-do-aceite";
 import { supabase } from "~/servidor/supabase";
-import { cor, espaco } from "~/tema";
+import { espaco } from "~/tema";
 
 /**
  * O cadastro pede o ACEITE de forma explícita, e não "ao criar a conta você
- * concorda": a Comunidade tem conteúdo de outras gestantes, e a Apple exige
- * (1.2) que a pessoa concorde com as regras — tolerância zero com conteúdo
- * ofensivo — ANTES de poder publicar.
+ * concorda": a Apple exige (1.2) que a pessoa concorde com as regras ANTES de
+ * poder publicar, e o dado de saúde tem a sua caixa separada e destacada
+ * (LGPD, art. 11, I).
  *
  * Desde a fase 4 os Termos e a Privacidade são os do APP (telas próprias,
- * `lib/juridico`), o aceite grava a VERSÃO (`metadadosDoAceite`), e o dado de
- * saúde tem a sua caixa separada e destacada (LGPD, art. 11, I).
+ * `lib/juridico`), e o aceite grava a VERSÃO (`metadadosDoAceite`).
+ *
+ * 17/11/2026: sem a folha branca — sobre o céu, com o véu inteiro e os
+ * campos de vidro escuro (o dono: "esse fundo branco aí no cadastro do
+ * e-mail [...] não gosto disso").
  */
 export default function Cadastro() {
+  const fora = useSafeAreaInsets();
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
@@ -72,93 +86,137 @@ export default function Cadastro() {
     setEnviado(true);
   }
 
+  const rolagem = {
+    flexGrow: 1,
+    paddingTop: fora.top + espaco.sm,
+    paddingBottom: fora.bottom + espaco.xl,
+    paddingHorizontal: espaco.xl,
+  } as const;
+
   if (enviado) {
     return (
-      <FundoDaEntrada>
-        <Tela bordas={["top"]} fundo="transparent">
-          <CabecalhoDaMarca compacto />
-          <Cartao>
-            <T tipo="subtitulo">Falta um passo</T>
-            <T>
+      <FundoDaEntrada veu="inteiro">
+        <ScrollView contentContainerStyle={rolagem}>
+          <ColunaDaEntrada estilo={{ flex: 1, justifyContent: "center", gap: espaco.lg }}>
+            <View style={{ alignItems: "center" }}>
+              <BolhaViva humor="comemorando" tamanho={150} />
+            </View>
+            <TituloNoVeu centro>Falta um passo</TituloNoVeu>
+            <TextoNoVeu centro>
               Mandamos um link para {email.trim()}. Abra o e-mail, toque no link para confirmar e
               volte aqui para entrar.
-            </T>
-            <T tipo="apagado">Não chegou? Olhe a caixa de spam ou promoções.</T>
-          </Cartao>
-          <Botao rotulo="Já confirmei — entrar" aoTocar={() => router.replace("/entrar")} />
-        </Tela>
+            </TextoNoVeu>
+            <TextoNoVeu centro pequeno>
+              Não chegou? Olhe a caixa de spam ou promoções.
+            </TextoNoVeu>
+            <Botao
+              rotulo="Já confirmei — entrar"
+              aoTocar={() => router.replace("/email")}
+              estilo={{ minHeight: 56, marginTop: espaco.sm }}
+            />
+          </ColunaDaEntrada>
+        </ScrollView>
       </FundoDaEntrada>
     );
   }
 
   return (
-    <FundoDaEntrada>
+    <FundoDaEntrada veu="inteiro">
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <Tela bordas={["top"]} fundo="transparent">
-          <CabecalhoDaMarca compacto subtitulo="Crie sua conta." />
-          <FolhaDaEntrada estilo={{ marginTop: espaco.sm }}>
-            <Campo
-              rotulo="Seu nome"
-              value={nome}
-              onChangeText={setNome}
-              autoComplete="name"
-              textContentType="name"
-              placeholder="Como quer ser chamada"
-            />
-            <Campo
-              rotulo="E-mail"
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              autoComplete="email"
-              textContentType="emailAddress"
-            />
-            <Campo
-              rotulo="Senha"
-              value={senha}
-              onChangeText={setSenha}
-              secureTextEntry
-              autoComplete="new-password"
-              textContentType="newPassword"
-              dica="Pelo menos 8 caracteres."
-            />
-            <CaixaDeMarcar
-              marcada={maior}
-              aoTocar={() => setMaior((v) => !v)}
-              rotulo="Tenho 18 anos ou mais."
-            />
-            <CaixaDeMarcar
-              marcada={aceite}
-              aoTocar={() => setAceite((v) => !v)}
-              rotulo={TEXTO_DOS_TERMOS}
-            />
-            <CaixaDeMarcar
-              marcada={saude}
-              aoTocar={() => setSaude((v) => !v)}
-              rotulo={TEXTO_DO_CONSENTIMENTO_DE_SAUDE}
-              destaque
-            />
-            <Linha estilo={{ flexWrap: "wrap" }}>
-              <Botao rotulo="Ler os Termos" tipo="texto" aoTocar={() => router.push("/termos")} />
-              <Botao
-                rotulo="Ler a Privacidade"
-                tipo="texto"
-                aoTocar={() => router.push("/privacidade")}
-              />
-            </Linha>
-            {erro ? (
-              <T tipo="apagado" cor={cor.urgente}>
-                {erro}
-              </T>
-            ) : null}
-            <Botao rotulo="Criar conta" aoTocar={criar} carregando={carregando} />
-            <Botao rotulo="Já tenho conta" tipo="texto" aoTocar={() => router.back()} />
-          </FolhaDaEntrada>
-        </Tela>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={rolagem}>
+          <ColunaDaEntrada>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "flex-start",
+                justifyContent: "space-between",
+              }}
+            >
+              <VoltarNoVeu />
+              <BolhaViva humor="feliz" tamanho={92} />
+            </View>
+            <Entrada>
+              <View style={{ gap: 6, marginBottom: espaco.sm }}>
+                <TituloNoVeu>Criar sua conta</TituloNoVeu>
+                <TextoNoVeu>Leva um minuto. Depois, a gente monta a sua trilha.</TextoNoVeu>
+              </View>
+            </Entrada>
+            <Entrada atraso={80}>
+              <View style={{ gap: espaco.md }}>
+                <CampoNoVeu
+                  rotulo="Seu nome"
+                  value={nome}
+                  onChangeText={setNome}
+                  autoComplete="name"
+                  textContentType="name"
+                  placeholder="Como quer ser chamada"
+                />
+                <CampoNoVeu
+                  rotulo="E-mail"
+                  value={email}
+                  onChangeText={setEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  autoComplete="email"
+                  textContentType="emailAddress"
+                  placeholder="voce@email.com"
+                />
+                <CampoNoVeu
+                  rotulo="Senha"
+                  value={senha}
+                  onChangeText={setSenha}
+                  secureTextEntry
+                  autoComplete="new-password"
+                  textContentType="newPassword"
+                  dica="Pelo menos 8 caracteres."
+                />
+                <View style={{ gap: espaco.sm, marginTop: espaco.sm }}>
+                  <CaixaDeMarcar
+                    noVeu
+                    marcada={maior}
+                    aoTocar={() => setMaior((v) => !v)}
+                    rotulo="Tenho 18 anos ou mais."
+                  />
+                  <CaixaDeMarcar
+                    noVeu
+                    marcada={aceite}
+                    aoTocar={() => setAceite((v) => !v)}
+                    rotulo={TEXTO_DOS_TERMOS}
+                  />
+                  <CaixaDeMarcar
+                    noVeu
+                    marcada={saude}
+                    aoTocar={() => setSaude((v) => !v)}
+                    rotulo={TEXTO_DO_CONSENTIMENTO_DE_SAUDE}
+                    destaque
+                  />
+                </View>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center" }}>
+                  <LinkNoVeu rotulo="Ler os Termos" aoTocar={() => router.push("/termos")} />
+                  <LinkNoVeu
+                    rotulo="Ler a Privacidade"
+                    aoTocar={() => router.push("/privacidade")}
+                  />
+                </View>
+                {erro ? <ErroNoVeu>{erro}</ErroNoVeu> : null}
+                <Botao
+                  rotulo="Criar conta"
+                  aoTocar={criar}
+                  carregando={carregando}
+                  estilo={{ minHeight: 56 }}
+                />
+                <LinkNoVeu
+                  rotulo="Já tenho conta"
+                  apagado
+                  aoTocar={() => router.replace("/email")}
+                />
+              </View>
+            </Entrada>
+          </ColunaDaEntrada>
+        </ScrollView>
       </KeyboardAvoidingView>
     </FundoDaEntrada>
   );

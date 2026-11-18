@@ -40,7 +40,7 @@ import {
   FundoEAr,
   type ArrumarEnfeite,
 } from "~/componentes/caminho/enfeites";
-import { useMovimentoReduzido } from "~/componentes/movimento";
+import { useMovimentoReduzido, lacoQueDescansa } from "~/componentes/movimento";
 import { Vidro } from "~/componentes/vidro";
 import { parametroDaBancada } from "~/lib/bancada";
 import {
@@ -1333,7 +1333,7 @@ function BotaoDaLoja({
   const v = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (reduzido) return;
-    const laco = Animated.loop(
+    const laco = lacoQueDescansa(
       Animated.sequence([
         Animated.timing(v, {
           toValue: 1,

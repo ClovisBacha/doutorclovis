@@ -1,13 +1,26 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import { Botao, Campo, Cartao, T, Tela } from "~/componentes/base";
-import { FolhaDaEntrada, FundoDaEntrada } from "~/componentes/entrada";
-import { CabecalhoDaMarca } from "~/componentes/marca";
+import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Botao } from "~/componentes/base";
+import {
+  CampoNoVeu,
+  ColunaDaEntrada,
+  ErroNoVeu,
+  FundoDaEntrada,
+  LinkNoVeu,
+  TextoNoVeu,
+  TituloNoVeu,
+  VoltarNoVeu,
+} from "~/componentes/entrada";
+import { BolhaViva, Entrada } from "~/componentes/movimento";
 import { SITE } from "~/config";
 import { supabase } from "~/servidor/supabase";
-import { cor } from "~/tema";
+import { espaco } from "~/tema";
 
+/** "Esqueci a senha", sobre o céu e o véu (17/11/2026: sem a folha branca). */
 export default function Esqueci() {
+  const fora = useSafeAreaInsets();
   const [email, setEmail] = useState("");
   const [carregando, setCarregando] = useState(false);
   const [enviado, setEnviado] = useState(false);
@@ -28,42 +41,76 @@ export default function Esqueci() {
   }
 
   return (
-    <FundoDaEntrada>
-      <Tela bordas={["top"]} fundo="transparent">
-        <CabecalhoDaMarca compacto subtitulo="Vamos criar uma senha nova." />
-        {enviado ? (
-          <Cartao>
-            <T tipo="subtitulo">Confira seu e-mail</T>
-            <T>
-              Se houver conta com {email.trim()}, chega um link para definir a senha. Depois, volte
-              aqui e entre.
-            </T>
-          </Cartao>
-        ) : (
-          <FolhaDaEntrada>
-            <Campo
-              rotulo="E-mail da conta"
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              autoComplete="email"
-            />
-            {erro ? (
-              <T tipo="apagado" cor={cor.urgente}>
-                {erro}
-              </T>
-            ) : null}
-            <Botao rotulo="Enviar link" aoTocar={enviar} carregando={carregando} />
-          </FolhaDaEntrada>
-        )}
-        {/* Fora da folha, sobre o céu: um botão branco se lê em qualquer hora. */}
-        <Botao
-          rotulo="Voltar para entrar"
-          tipo="secundario"
-          aoTocar={() => router.replace("/entrar")}
-        />
-      </Tela>
+    <FundoDaEntrada veu="inteiro">
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{
+            flexGrow: 1,
+            paddingTop: fora.top + espaco.sm,
+            paddingBottom: fora.bottom + espaco.xl,
+            paddingHorizontal: espaco.xl,
+          }}
+        >
+          <ColunaDaEntrada estilo={{ flex: 1 }}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "flex-start",
+                justifyContent: "space-between",
+              }}
+            >
+              <VoltarNoVeu />
+              <BolhaViva humor={enviado ? "comemorando" : "estudiosa"} tamanho={92} />
+            </View>
+            <Entrada>
+              <View style={{ gap: 6, marginBottom: espaco.sm }}>
+                <TituloNoVeu>{enviado ? "Confira seu e-mail" : "Criar uma senha nova"}</TituloNoVeu>
+                <TextoNoVeu>
+                  {enviado
+                    ? `Se houver conta com ${email.trim()}, chega um link para definir a senha. Depois, volte aqui e entre.`
+                    : "Digite o e-mail da sua conta. Mandamos um link para você escolher uma senha nova."}
+                </TextoNoVeu>
+              </View>
+            </Entrada>
+            {enviado ? (
+              <Botao
+                rotulo="Voltar para entrar"
+                aoTocar={() => router.replace("/email")}
+                estilo={{ minHeight: 56, marginTop: espaco.sm }}
+              />
+            ) : (
+              <Entrada atraso={80}>
+                <View style={{ gap: espaco.md }}>
+                  <CampoNoVeu
+                    rotulo="E-mail da conta"
+                    value={email}
+                    onChangeText={setEmail}
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                    autoComplete="email"
+                    textContentType="emailAddress"
+                    returnKeyType="send"
+                    placeholder="voce@email.com"
+                    onSubmitEditing={enviar}
+                  />
+                  {erro ? <ErroNoVeu>{erro}</ErroNoVeu> : null}
+                  <Botao
+                    rotulo="Enviar link"
+                    aoTocar={enviar}
+                    carregando={carregando}
+                    estilo={{ minHeight: 56, marginTop: espaco.sm }}
+                  />
+                  <LinkNoVeu rotulo="Lembrei a senha" apagado aoTocar={() => router.back()} />
+                </View>
+              </Entrada>
+            )}
+          </ColunaDaEntrada>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </FundoDaEntrada>
   );
 }

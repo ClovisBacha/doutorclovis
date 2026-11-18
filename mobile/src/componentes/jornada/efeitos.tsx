@@ -9,7 +9,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { corJornada } from "~/componentes/jornada/cores";
-import { useMovimentoReduzido } from "~/componentes/movimento";
+import { useMovimentoReduzido, lacoQueDescansa, rajada } from "~/componentes/movimento";
 
 /**
  * OS EFEITOS DA GAMIFICAÇÃO — a Jornada responde a cada coisa que ela faz.
@@ -262,7 +262,7 @@ export function ChamaViva({
   useEffect(() => {
     if (!acesa || reduzido) return;
     const onda = (v: Animated.Value, ms: number) =>
-      Animated.loop(
+      lacoQueDescansa(
         Animated.sequence([
           Animated.timing(v, {
             toValue: 1,
@@ -324,7 +324,7 @@ export function Halo({
   const v = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (!ativo || reduzido) return;
-    const laco = Animated.loop(
+    const laco = lacoQueDescansa(
       Animated.sequence([
         Animated.timing(v, {
           toValue: 1,
@@ -368,7 +368,7 @@ export function Pulinho({
   const v = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (reduzido) return;
-    const laco = Animated.loop(
+    const laco = rajada(
       Animated.sequence([
         Animated.timing(v, {
           toValue: 1,
@@ -384,6 +384,8 @@ export function Pulinho({
         }),
         Animated.delay(900),
       ]),
+      2,
+      6000,
     );
     laco.start();
     return () => laco.stop();
@@ -469,13 +471,14 @@ export function Constelacao({
         Animated.spring(c, { toValue: 1, useNativeDriver: true, speed: 10, bounciness: 14 }),
       ),
     ).start();
-    const laco = Animated.loop(
+    const laco = lacoQueDescansa(
       Animated.timing(giro, {
         toValue: 1,
         duration: 9000,
         easing: Easing.linear,
         useNativeDriver: true,
       }),
+      1,
     );
     laco.start();
     return () => laco.stop();

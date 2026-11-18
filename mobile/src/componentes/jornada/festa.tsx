@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef, useState, type ReactNode } from "react";
 import { Animated, Easing, StyleSheet, Text, View, type TextStyle } from "react-native";
 import Svg, { Defs, Path, RadialGradient, Stop } from "react-native-svg";
-import { useMovimentoReduzido } from "~/componentes/movimento";
+import { useMovimentoReduzido, lacoQueDescansa } from "~/componentes/movimento";
 import { cor, curva, fonte, fonteDoNumero, luz, sombra } from "~/tema";
 
 /**
@@ -35,13 +35,14 @@ export const Raios = memo(function Raios({
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-    const laco = Animated.loop(
+    const laco = lacoQueDescansa(
       Animated.timing(gira, {
         toValue: 1,
         duration: 24000,
         easing: Easing.linear,
         useNativeDriver: true,
       }),
+      1,
     );
     laco.start();
     return () => laco.stop();

@@ -3,7 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { createContext, memo, useContext, useEffect, useRef, useState } from "react";
 import { Animated, AppState, Easing, StyleSheet, useWindowDimensions, View } from "react-native";
 import Svg, { Circle, Defs, Ellipse, RadialGradient, Stop } from "react-native-svg";
-import { useMovimentoReduzido } from "~/componentes/movimento";
+import { useMovimentoReduzido, vaivemQueDescansa } from "~/componentes/movimento";
 import { parametroDaBancada } from "~/lib/bancada";
 
 /**
@@ -188,25 +188,21 @@ export const CeuVivo = memo(function CeuVivo({
         />
         {fase === "noite" ? (
           <>
-            {ESTRELAS.map((e, i) => (
-              <Estrela key={i} x={e[0]} y={e[1]} t={e[2]} i={i} />
-            ))}
+            {/* Um terço das estrelas parado; dois terços piscam ao chegar e
+                descansam acesos (ver `CamadaDeEstrelas`). */}
+            <EstrelasParadas qual={1} />
+            <CamadaDeEstrelas qual={0} periodo={3200} atraso={0} />
+            <CamadaDeEstrelas qual={2} periodo={4300} atraso={900} />
+            <CamadaDeVagalumes qual={0} tom="#e3d4ff" periodo={5200} atraso={300} />
             <EstrelaCadente />
-            {VAGALUMES.map((e, i) => (
-              <Vagalume key={i} x={e[0]} y={e[1]} i={i} tom="#e3d4ff" />
-            ))}
           </>
         ) : null}
         {fase === "amanhecer" ? (
           <>
-            {ESTRELAS.slice(0, 6).map((e, i) => (
-              <Estrela key={i} x={e[0]} y={e[1] * 0.7} t={e[2] * 0.8} i={i} fraca />
-            ))}
+            <CamadaDeEstrelas qual={0} periodo={3000} atraso={0} fraca />
             <Nuvem y={0.2} largura={230} segundos={95} fase={0.15} forca={0.5} />
             <Nuvem y={0.43} largura={300} segundos={130} fase={0.6} forca={0.42} />
-            {VAGALUMES.slice(0, 5).map((e, i) => (
-              <Vagalume key={i} x={e[0]} y={e[1] - 0.06} i={i} tom="#ffffff" />
-            ))}
+            <CamadaDeVagalumes qual={0} tom="#ffffff" periodo={5200} atraso={600} />
           </>
         ) : null}
         {fase === "dia" ? (
@@ -216,7 +212,6 @@ export const CeuVivo = memo(function CeuVivo({
                 texto é branco, e nuvem branca atrás dele o apagaria. */}
             <Nuvem y={0.21} largura={250} segundos={80} fase={0.05} forca={0.8} />
             <Nuvem y={0.4} largura={330} segundos={115} fase={0.5} forca={0.7} />
-            <Nuvem y={0.6} largura={210} segundos={70} fase={0.8} forca={0.6} />
           </>
         ) : null}
         {fase === "tarde" ? (
@@ -233,25 +228,22 @@ export const CeuVivo = memo(function CeuVivo({
 
 /* ── As peças vivas ───────────────────────────────────────────────────── */
 
-/** Vai e volta entre 0 e 1, sem parar (parado com "reduzir movimento"). */
+/**
+ * Vai e volta entre 0 e 1 algumas vezes quando o céu aparece, e descansa em
+ * 0,5 (`vaivemQueDescansa`: um laço eterno aqui custava a cada quadro, para
+ * sempre). Parado em 0,5 com "reduzir movimento" ou com a tela fora de vista.
+ */
 function useVaivem(periodo: number, atraso = 0): Animated.Value {
   const reduzido = useMovimentoReduzido();
-  const v = useRef(new Animated.Value(reduzido ? 0.6 : 0)).current;
+  const v = useRef(new Animated.Value(0.5)).current;
   useEffect(() => {
     if (reduzido) return;
-    const meia = periodo / 2;
-    const passo = (para: number) =>
-      Animated.timing(v, {
-        toValue: para,
-        duration: meia,
-        easing: Easing.inOut(Easing.sin),
-        useNativeDriver: true,
-      });
-    const laco = Animated.loop(Animated.sequence([passo(1), passo(0)]));
+    const laco = vaivemQueDescansa(v, periodo);
     const t = setTimeout(() => laco.start(), atraso);
     return () => {
       clearTimeout(t);
       laco.stop();
+      v.setValue(0.5);
     };
   }, [atraso, periodo, reduzido, v]);
   return v;
@@ -277,39 +269,77 @@ const ESTRELAS: readonly (readonly [number, number, number])[] = [
   [0.22, 0.45, 1.6],
 ];
 
-function Estrela({
-  x,
-  y,
-  t,
-  i,
+/** Estrelas sem animação nenhuma (uma em cada três da lista): custo zero. */
+function EstrelasParadas({ qual }: { qual: number }) {
+  const { width, height } = useWindowDimensions();
+  return (
+    <View style={[StyleSheet.absoluteFill, { opacity: 0.75 }]}>
+      {ESTRELAS.filter((_, i) => i % 3 === qual).map(([x, y, t], i) => (
+        <View
+          key={i}
+          style={{
+            position: "absolute",
+            left: x * width,
+            top: y * height,
+            width: t,
+            height: t,
+            borderRadius: t,
+            backgroundColor: "#ffffff",
+          }}
+        />
+      ))}
+    </View>
+  );
+}
+
+/**
+ * Uma camada de estrelas: um valor só, e CADA ESTRELA pisca na sua vista
+ * pequena. ⚠️ Não ponha a opacidade numa vista que cobre a tela inteira: o iOS
+ * desenha a vista inteira fora da tela a cada quadro para aplicar a
+ * opacidade ao grupo — medido em 17/11/2026, as duas camadas assim custavam
+ * ~15% de processador do servidor de desenho, com o app parado. A camada
+ * `qual` leva uma em cada três estrelas da lista. Sem sombra de brilho (a
+ * sombra borrada é cara de desenhar): o ponto e um halo claro.
+ */
+function CamadaDeEstrelas({
+  qual,
+  periodo,
+  atraso,
   fraca,
 }: {
-  x: number;
-  y: number;
-  t: number;
-  i: number;
+  qual: number;
+  periodo: number;
+  atraso: number;
   fraca?: boolean;
 }) {
   const { width, height } = useWindowDimensions();
-  const v = useVaivem(1700 + (i % 5) * 520, (i * 370) % 2600);
+  const v = useVaivem(periodo, atraso);
+  const opacity = v.interpolate({
+    inputRange: [0, 1],
+    outputRange: fraca ? [0.12, 0.55] : [0.3, 1],
+  });
   return (
-    <Animated.View
-      style={{
-        position: "absolute",
-        left: x * width,
-        top: y * height,
-        width: t,
-        height: t,
-        borderRadius: t,
-        backgroundColor: "#ffffff",
-        boxShadow: `0px 0px ${t * 2.5}px rgba(255,255,255,0.9)`,
-        opacity: v.interpolate({
-          inputRange: [0, 1],
-          outputRange: fraca ? [0.12, 0.55] : [0.25, 1],
-        }),
-        transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1.3] }) }],
-      }}
-    />
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      {ESTRELAS.filter((_, i) => i % 3 === qual).map(([x, y, t], i) => (
+        <Animated.View
+          key={i}
+          style={{
+            position: "absolute",
+            left: x * width - t,
+            top: (fraca ? y * 0.7 : y) * height - t,
+            width: t * 3,
+            height: t * 3,
+            borderRadius: t * 1.5,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "rgba(255,255,255,0.16)",
+            opacity,
+          }}
+        >
+          <View style={{ width: t, height: t, borderRadius: t, backgroundColor: "#ffffff" }} />
+        </Animated.View>
+      ))}
+    </View>
   );
 }
 
@@ -320,21 +350,26 @@ function EstrelaCadente() {
   const v = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (reduzido) return;
-    const laco = Animated.loop(
-      Animated.sequence([
-        Animated.delay(5200),
-        Animated.timing(v, {
-          toValue: 1,
-          duration: 1100,
-          easing: Easing.in(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(v, { toValue: 0, duration: 0, useNativeDriver: true }),
-        Animated.delay(6800),
-      ]),
-    );
-    laco.start();
-    return () => laco.stop();
+    /* Disparada de tempos em tempos (a cada 12 s), e não um laço com espera:
+       entre uma passagem e outra não há animação nenhuma rodando. */
+    let anim: Animated.CompositeAnimation | null = null;
+    const passar = () => {
+      v.setValue(0);
+      anim = Animated.timing(v, {
+        toValue: 1,
+        duration: 1100,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      });
+      anim.start(() => v.setValue(0));
+    };
+    const primeira = setTimeout(passar, 5200);
+    const relogio = setInterval(passar, 12000);
+    return () => {
+      clearTimeout(primeira);
+      clearInterval(relogio);
+      anim?.stop();
+    };
   }, [reduzido, v]);
   if (reduzido) return null;
   return (
@@ -375,57 +410,82 @@ const VAGALUMES: readonly (readonly [number, number])[] = [
   [0.68, 0.82],
 ];
 
-/** Um ponto de luz que sobe e desce devagar, acendendo e apagando. */
-function Vagalume({ x, y, i, tom }: { x: number; y: number; i: number; tom: string }) {
+/**
+ * Uma camada de vaga-lumes: um valor só, e cada vaga-lume sobe e desce na sua
+ * vista pequena (a camada `qual` leva um em cada dois da lista). Como nas
+ * estrelas: nunca a opacidade numa vista do tamanho da tela.
+ */
+function CamadaDeVagalumes({
+  qual,
+  tom,
+  periodo,
+  atraso,
+}: {
+  qual: number;
+  tom: string;
+  periodo: number;
+  atraso: number;
+}) {
   const { width, height } = useWindowDimensions();
-  const v = useVaivem(4200 + (i % 4) * 900, (i * 610) % 3000);
-  const t = 3 + (i % 3);
+  const v = useVaivem(periodo, atraso);
+  const opacity = v.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.15, 0.85, 0.25] });
+  const transform = [
+    { translateY: v.interpolate({ inputRange: [0, 1], outputRange: [10, -16] }) },
+    { translateX: v.interpolate({ inputRange: [0, 1], outputRange: [-5, 6] }) },
+  ];
   return (
-    <Animated.View
-      style={{
-        position: "absolute",
-        left: x * width,
-        top: y * height,
-        width: t,
-        height: t,
-        borderRadius: t,
-        backgroundColor: tom,
-        boxShadow: `0px 0px ${t * 3}px ${tom}`,
-        opacity: v.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.1, 0.85, 0.2] }),
-        transform: [
-          { translateY: v.interpolate({ inputRange: [0, 1], outputRange: [10, -16] }) },
-          { translateX: v.interpolate({ inputRange: [0, 1], outputRange: [-5, 6] }) },
-        ],
-      }}
-    />
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      {VAGALUMES.filter((_, i) => i % 2 === qual).map(([x, y], i) => {
+        const t = 3 + ((i + qual) % 3);
+        return (
+          <Animated.View
+            key={i}
+            style={{
+              position: "absolute",
+              left: x * width - t,
+              top: y * height - t,
+              width: t * 3,
+              height: t * 3,
+              borderRadius: t * 1.5,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "rgba(227,212,255,0.22)",
+              opacity,
+              transform,
+            }}
+          >
+            <View style={{ width: t, height: t, borderRadius: t, backgroundColor: tom }} />
+          </Animated.View>
+        );
+      })}
+    </View>
   );
 }
 
 /** O brilho do sol, respirando. */
 function Halo({ x, y, raio, tom }: { x: number; y: number; raio: number; tom: string }) {
   const { width, height } = useWindowDimensions();
-  const v = useVaivem(5200);
+  /* Parado: a arte já tem o sol com raios; o halo só aquece em volta. */
   return (
-    <Animated.View
+    <View
       style={{
         position: "absolute",
         left: x * width - raio,
         top: y * height - raio,
-        opacity: v.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0.85] }),
-        transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.16] }) }],
       }}
     >
       <Svg width={raio * 2} height={raio * 2}>
         <Defs>
+          {/* A força (0,7) vai no degradê, e não numa opacidade da vista. */}
           <RadialGradient id={`halo-${tom.slice(1)}`} cx="50%" cy="50%" r="50%">
-            <Stop offset="0" stopColor={tom} stopOpacity={0.9} />
-            <Stop offset="0.45" stopColor={tom} stopOpacity={0.28} />
+            <Stop offset="0" stopColor={tom} stopOpacity={0.63} />
+            <Stop offset="0.45" stopColor={tom} stopOpacity={0.2} />
             <Stop offset="1" stopColor={tom} stopOpacity={0} />
           </RadialGradient>
         </Defs>
         <Circle cx={raio} cy={raio} r={raio} fill={`url(#halo-${tom.slice(1)})`} />
       </Svg>
-    </Animated.View>
+    </View>
   );
 }
 
@@ -451,18 +511,22 @@ function Nuvem({
   const { width, height } = useWindowDimensions();
   const reduzido = useMovimentoReduzido();
   const v = useRef(new Animated.Value(0)).current;
+  /* Aonde a nuvem já foi (soma a cada vez que a tela aparece). */
+  const andou = useRef(0);
   useEffect(() => {
     if (reduzido) return;
-    const laco = Animated.loop(
-      Animated.timing(v, {
-        toValue: 1,
-        duration: segundos * 1000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }),
-    );
-    laco.start();
-    return () => laco.stop();
+    /* A nuvem DESLIZA um trecho quando o céu aparece e assenta devagar — e não
+       um laço eterno (17/11/2026: tudo o que se mexe sem parar custa a cada
+       quadro, para sempre; e nuvem parada é nuvem de verdade). */
+    andou.current += 0.2;
+    const anim = Animated.timing(v, {
+      toValue: andou.current,
+      duration: segundos * 280,
+      easing: Easing.out(Easing.sin),
+      useNativeDriver: true,
+    });
+    anim.start();
+    return () => anim.stop();
   }, [reduzido, segundos, v]);
   const altura = largura * 0.36;
   const id = `nuvem-${Math.round(y * 100)}-${largura}`;
@@ -472,7 +536,6 @@ function Nuvem({
         position: "absolute",
         left: -largura,
         top: y * height,
-        opacity: forca,
         transform: [
           {
             translateX: Animated.modulo(Animated.add(v, fase), 1).interpolate({
@@ -486,8 +549,11 @@ function Nuvem({
       <Svg width={largura} height={altura}>
         <Defs>
           <RadialGradient id={id} cx="50%" cy="50%" r="50%">
-            <Stop offset="0" stopColor={tom} stopOpacity={0.95} />
-            <Stop offset="0.6" stopColor={tom} stopOpacity={0.4} />
+            {/* A força vai no próprio degradê, e não numa opacidade da vista:
+                vista com opacidade e filhos é desenhada fora da tela a cada
+                quadro em que se move. */}
+            <Stop offset="0" stopColor={tom} stopOpacity={0.95 * forca} />
+            <Stop offset="0.6" stopColor={tom} stopOpacity={0.4 * forca} />
             <Stop offset="1" stopColor={tom} stopOpacity={0} />
           </RadialGradient>
         </Defs>

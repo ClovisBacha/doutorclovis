@@ -15,7 +15,12 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import { toque } from "~/componentes/base";
-import { BolhaViva, type HumorDaBolha } from "~/componentes/movimento";
+import {
+  BolhaViva,
+  rajada,
+  useMovimentoReduzido,
+  type HumorDaBolha,
+} from "~/componentes/movimento";
 import { BotaoVoltar, PilulaSos } from "~/componentes/cabecalho";
 import { Estouro } from "~/componentes/jornada/efeitos";
 import { CORES_DO_CONFETE, corJornada } from "~/componentes/jornada/cores";
@@ -182,10 +187,12 @@ export function Pulsando({
   ativo?: boolean;
   estilo?: StyleProp<ViewStyle>;
 }) {
+  /* Parado com "reduzir movimento" e fora de vista, como todo laço do app. */
+  const reduzido = useMovimentoReduzido();
   const v = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    if (!ativo) return;
-    const laco = Animated.loop(
+    if (!ativo || reduzido) return;
+    const laco = rajada(
       Animated.sequence([
         Animated.timing(v, {
           toValue: 1,
@@ -200,10 +207,12 @@ export function Pulsando({
           useNativeDriver: true,
         }),
       ]),
+      2,
+      6000,
     );
     laco.start();
     return () => laco.stop();
-  }, [ativo, v]);
+  }, [ativo, v, reduzido]);
   return (
     <Animated.View
       style={[
