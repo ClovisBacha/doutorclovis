@@ -160,7 +160,7 @@ export default function BoasVindas() {
     },
     {
       vitrine: <VitrineDaAula largura={width} />,
-      titulo: "Uma aula de 2 minutos por dia",
+      titulo: "Uma aula curta por dia",
       texto: "Perguntas rápidas sobre a semana em que você está. Cada acerto vale sementinhas.",
       acoes: <Botao rotulo="Continuar" aoTocar={() => ir(2)} estilo={{ minHeight: 56 }} />,
     },
