@@ -36,16 +36,6 @@ export const corDaRaridade: Record<
   epico: { anel: "#d4a017", fundo: "#fffbeb", texto: "#92400e", rotulo: "Épica" },
 };
 
-export const CORES_DO_CONFETE = [
-  cor.jogo,
-  "#8b5cf6",
-  "#f59e0b",
-  "#ec4899",
-  "#22c55e",
-  "#38bdf8",
-  "#f97316",
-] as const;
-
 /**
  * AS ATIVIDADES NO AMANHECER (18/11/2026, a vistoria: "quatro marcas de cor
  * quebram a sensação de produto único"). Antes cada atividade era pintada com

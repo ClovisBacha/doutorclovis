@@ -134,6 +134,15 @@ export function emojiDaFrutaNoApp(semana: number): string | null {
   return EMOJI_DA_FRUTA_NO_APP[babyForWeek(semana).fruit] ?? null;
 }
 
+/**
+ * A FIGURINHA da semana (o álbum, a tela da semana, a abertura da aula, o
+ * cartão do marco): a fruta fiel, ou um brilho quando não há emoji fiel — e
+ * nunca a fruta errada do site (18/11/2026).
+ */
+export function figurinhaDaSemana(semana: number): string {
+  return emojiDaFrutaNoApp(semana) ?? "✨";
+}
+
 export function bebeDaSemana(semana: number) {
   const b = babyForWeek(semana);
   const troca = Object.values(DESCRICAO_NO_APP).find((t) => t.site === b.desc);

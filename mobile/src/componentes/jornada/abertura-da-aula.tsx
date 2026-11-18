@@ -2,12 +2,12 @@ import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef } from "react";
 import { Animated, Easing, Platform, Pressable, View } from "react-native";
-import { fruitEmojiForWeek } from "@/lib/gestacao";
 import { Emoji, Moeda3D } from "~/componentes/caminho/pecas";
 import { useMovimentoReduzido } from "~/componentes/movimento";
 import { coresDaSemana } from "~/lib/jornada/caminho";
 import { comAlfa } from "~/lib/cor";
 import { cor, escala, fonte } from "~/tema";
+import { figurinhaDaSemana } from "~/lib/bebe-da-semana";
 
 /**
  * A ABERTURA DA AULA — 1,5 s na cor da semana antes da lição, o `QuizIntro`
@@ -170,7 +170,7 @@ export function AberturaDaAula({
             <Animated.View pointerEvents="none" style={estiloDoAnel(anel2, 0.3)} />
             <Animated.View style={{ transform: [{ scale: escalaDaMoeda }, { rotate: giro }] }}>
               <Moeda3D tamanho={112} tom={tom} labio={10} claro={0.45} escuro={0.8} meio={0.6}>
-                <Emoji tamanho={50}>{fruitEmojiForWeek(semana)}</Emoji>
+                <Emoji tamanho={50}>{figurinhaDaSemana(semana)}</Emoji>
               </Moeda3D>
             </Animated.View>
           </View>

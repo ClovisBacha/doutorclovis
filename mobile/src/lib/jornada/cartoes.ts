@@ -7,8 +7,7 @@
  * Sem react-native aqui: é testado pelo bun.
  */
 
-import { fruitEmojiForWeek } from "@/lib/gestacao";
-import { bebeDaSemana } from "~/lib/bebe-da-semana";
+import { bebeDaSemana, emojiDaFrutaNoApp, figurinhaDaSemana } from "~/lib/bebe-da-semana";
 import { RARIDADES, type ConquistaDef } from "@/lib/conquistas";
 import type { DadosDoCartaoDeConquista } from "~/componentes/jornada/cartao-de-conquista";
 import { descricaoNoApp } from "~/lib/jornada/conquistas";
@@ -32,7 +31,7 @@ export function cartaoDoMarco(m: Marco, nomeDoBebe: string | null): DadosDoCarta
     return {
       eyebrow: "Novo marco",
       titulo: `Semana ${m.semana}!`,
-      arte: fruitEmojiForWeek(m.semana),
+      arte: figurinhaDaSemana(m.semana),
       /* O número e a unidade não se separam na quebra de linha ("30 cm"). */
       detalhe: `${quem ?? "O bebê"} tem o tamanho de ${b.fruit.toLowerCase()} · ${b.size.replace(" ", "\u00a0")}`,
       fundo: "aurora",
@@ -43,7 +42,7 @@ export function cartaoDoMarco(m: Marco, nomeDoBebe: string | null): DadosDoCarta
       eyebrow: "Novo marco",
       titulo: `Fim do ${m.trimestre}º trimestre!`,
       arte: "🎊",
-      detalhe: "Uma fase inteira cuidada, um dia de cada vez.",
+      detalhe: "Três meses inteiros de aulas, cuidados e estrelas.",
       fundo: "aurora",
     };
   }
@@ -70,9 +69,7 @@ export function cartaoDaChama(dias: number, posParto: boolean): DadosDoCartaoDeC
     eyebrow: "Minha chama",
     titulo: `${dias} ${dias === 1 ? "dia seguido" : "dias seguidos"}`,
     arte: "🔥",
-    detalhe: posParto
-      ? "Cuidando de nós no 4º trimestre, um dia de cada vez."
-      : "Cuidando de nós, um dia de cada vez.",
+    detalhe: posParto ? "Cuidando de nós dois no 4º trimestre." : "Cuidando de nós dois, todo dia.",
     fundo: "chama",
   };
 }
@@ -95,7 +92,8 @@ export function legendaDoCartao(d: DadosDoCartaoDeConquista): string {
 
 /** A do cartão da semana (Stories): a semana e a fruta. */
 export function legendaDaSemana(semana: number): string {
-  return `Semana ${semana} ${fruitEmojiForWeek(semana)}`;
+  const fruta = emojiDaFrutaNoApp(semana);
+  return fruta ? `Semana ${semana} ${fruta}` : `Semana ${semana}`;
 }
 
 /** A do cartão da chegada: o nome sem artigo (o artigo supõe o sexo). */

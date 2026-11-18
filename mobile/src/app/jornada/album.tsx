@@ -2,7 +2,6 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useRef, useState, type ReactNode } from "react";
 import { Text, View, useWindowDimensions } from "react-native";
-import { fruitEmojiForWeek } from "@/lib/gestacao";
 import {
   Botao,
   Carregando,
@@ -29,6 +28,7 @@ import {
   semanaDeVida,
 } from "~/lib/jornada/pos-parto";
 import { canto, cor, curva, escala, espaco, fonte, margem, sombra } from "~/tema";
+import { figurinhaDaSemana } from "~/lib/bebe-da-semana";
 
 /**
  * O ÁLBUM DE VOCÊS — as figurinhas do 4º trimestre (uma por semana de vida) e
@@ -132,7 +132,7 @@ export default function AlbumDeVoces() {
                 <Figurinha
                   key={s}
                   numero={s}
-                  arte={fruitEmojiForWeek(s)}
+                  arte={figurinhaDaSemana(s)}
                   lado={lado}
                   estado={tem ? "ganha" : chegou ? "vao" : "futura"}
                   rotulo={`Semana ${s} da gestação${tem ? ", figurinha guardada" : chegou ? ", sem figurinha" : ", ainda não chegou"}`}

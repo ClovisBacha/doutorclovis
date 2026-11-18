@@ -18,11 +18,6 @@ export const cor = {
   primariaEscura: "#a8164f",
   primariaSuave: "#f3a5c3",
   rosaMarca: "#ffe1ec",
-  // A entrada (login/cadastro): o degradê do amanhecer, as bolhas que flutuam
-  // atrás e o "vidro" das pílulas sobre o degradê.
-  entradaPessego: "#ffe4d6",
-  entradaLilas: "#e3d9fb",
-  entradaVidro: "rgba(255,255,255,0.82)",
   apagado: "#f4f0fa",
   textoApagado: "#6b6384",
   /** O texto de exemplo dentro de um campo vazio (não é valor: mais claro). */
@@ -103,7 +98,9 @@ export const ouro = { claro: "#ffe08a", medio: "#fbbf24", escuro: "#f0a51c" } as
  * A LETRA (16/11/2026, pedido do dono: "está com muita cara de feito no
  * Claude [...] precisamos de efeito Apple"). A do sistema — SF Pro no iPhone —
  * no lugar da Nunito, um degrau mais leve que ela (o SF é mais encorpado).
- * Para voltar à Nunito, `LETRA_DO_SISTEMA = false`: a raiz volta a carregá-la.
+ * A Nunito saiu do pacote em 18/11/2026: voltar a ela pede reinstalar
+ * `@expo-google-fonts/nunito` e carregá-la na raiz, além de
+ * `LETRA_DO_SISTEMA = false`.
  *
  * Use espalhando no estilo (`...fonte.forte`): a letra do sistema precisa do
  * `fontWeight` junto, e a Nunito traz o peso no nome.

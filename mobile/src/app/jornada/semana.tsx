@@ -12,8 +12,7 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
-import { fruitEmojiForWeek } from "@/lib/gestacao";
-import { bebeDaSemana } from "~/lib/bebe-da-semana";
+import { bebeDaSemana, figurinhaDaSemana } from "~/lib/bebe-da-semana";
 import { Botao, Cartao, Carregando, Sobrelinha, T, Tela, toque, Tocavel } from "~/componentes/base";
 import { AnelPequeno } from "~/componentes/caminho/pecas";
 import { rota } from "~/componentes/jornada/bancada";
@@ -29,8 +28,7 @@ import {
   quandoAbre,
   SEMANA_MINIMA,
 } from "~/lib/jornada/dia";
-import { carregarAulaDoDia } from "~/lib/jornada/aulas-do-app";
-import { tituloCurtoDaAula } from "~/lib/jornada/aula";
+import { tituloDaAulaDoApp } from "~/lib/jornada/aulas-do-app";
 import { estadoAtual, gravarChave } from "~/lib/jornada/loja";
 import { CHAVE_FIGURINHAS, listaDeNumeros, type Blob } from "~/lib/jornada/momentos";
 import { estadoDoNo } from "~/lib/jornada/trilha";
@@ -69,12 +67,9 @@ export default function Semana() {
       .filter((s) => s >= SEMANA_MINIMA && (atual == null || s <= atual))
       .flatMap((s) => diasDaSemana(s))
       .filter((D) => D >= D_MINIMO);
-    void Promise.all(
-      dias.map(async (D) => {
-        const q = await carregarAulaDoDia(D);
-        return [D, q ? tituloCurtoDaAula(q.teach) : null] as const;
-      }),
-    ).then((pares) => {
+    /* O assunto pelo índice pequeno das aulas DO APP, e não pelo banco do
+       site (18/11/2026). */
+    void Promise.resolve(dias.map((D) => [D, tituloDaAulaDoApp(D)] as const)).then((pares) => {
       if (!vivo) return;
       const novos: Record<number, string> = {};
       for (const [D, t] of pares) if (t) novos[D] = t;
@@ -319,7 +314,7 @@ const PaginaDaSemana = memo(function PaginaDaSemana({
       <Cartao estilo={{ flexDirection: "row", alignItems: "center", gap: espaco.md }}>
         <Descolar ativo={figurinha && descolar}>
           <Text style={{ fontSize: 44, lineHeight: 52, opacity: figurinha ? 1 : 0.35 }}>
-            {fruitEmojiForWeek(semana)}
+            {figurinhaDaSemana(semana)}
           </Text>
         </Descolar>
         <View style={{ flex: 1, gap: 2 }}>
@@ -370,7 +365,7 @@ function CabecalhoDaSemana({
           ...sombra,
         }}
       >
-        <Text style={{ fontSize: 22, lineHeight: 26 }}>{fruitEmojiForWeek(semana)}</Text>
+        <Text style={{ fontSize: 22, lineHeight: 26 }}>{figurinhaDaSemana(semana)}</Text>
       </View>
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
         <Text
@@ -599,7 +594,7 @@ function MemoriaDaSemana({
       ) : null}
       <Cartao estilo={{ flexDirection: "row", alignItems: "center", gap: espaco.md }}>
         <Text style={{ fontSize: 44, lineHeight: 52, opacity: figurinha ? 1 : 0.35 }}>
-          {fruitEmojiForWeek(semana)}
+          {figurinhaDaSemana(semana)}
         </Text>
         <View style={{ flex: 1, gap: 2 }}>
           <Text style={{ ...fonte.forte, ...escala.manchete, color: cor.texto }}>
