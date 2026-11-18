@@ -1,6 +1,8 @@
+import { Check } from "lucide-react-native";
+import type { ReactNode } from "react";
 import { Text, View } from "react-native";
 import { T } from "~/componentes/base";
-import { corJornada } from "~/componentes/jornada/cores";
+import { ChamaDaSequencia, IconeSementinha, TrofeuParado } from "~/componentes/caminho/pecas";
 import { CompartilharConquista } from "~/componentes/jornada/cartao-de-conquista";
 import { Folha } from "~/componentes/jornada/pecas";
 import { CHAMA_PARA_COMPARTILHAR, cartaoDaChama } from "~/lib/jornada/cartoes";
@@ -8,15 +10,18 @@ import { BolhaViva } from "~/componentes/movimento";
 import { itensDaLoja } from "~/lib/jornada/enfeites";
 import { explicacaoDaChama } from "~/lib/jornada/trilha";
 import { escadaDosTrofeus } from "~/lib/jornada/trofeus";
-import { cor, espaco, fonte, raio } from "~/tema";
+import { canto, cor, curva, escala, espaco, fonte } from "~/tema";
 
 export type FolhaDoPlacar = null | "sementes" | "chama" | "trofeus";
 
 /**
- * As três folhas que explicam os números da faixa do Caminho — a chama (com o
+ * As três folhas que explicam os números do placar da trilha — a chama (com o
  * perdão), as sementinhas (o que rende quanto) e os troféus: número sem
  * explicação é número que ninguém persegue. (O placar de pílulas que as abria
  * no pós-parto saiu com a tela nova do 4º trimestre.)
+ *
+ * Os títulos vão sem emoji (18/11/2026): a arte do placar abre cada folha, ao
+ * lado da primeira frase.
  */
 export function FolhasDoPlacar({
   aberta,
@@ -35,33 +40,41 @@ export function FolhasDoPlacar({
 }) {
   return (
     <>
-      <Folha aberta={aberta === "chama"} aoFechar={aoFechar} titulo="🔥 A sua chama">
+      <Folha aberta={aberta === "chama"} aoFechar={aoFechar} titulo="A sua chama">
         {chama > 0 ? (
           <View style={{ alignItems: "center" }}>
             <BolhaViva humor="chama" tamanho={120} />
           </View>
         ) : null}
-        {explicacaoDaChama(chama, perdoes).map((l, i) => (
-          <T key={i} tipo={i === 0 ? "rotulo" : "corpo"}>
-            {l}
-          </T>
-        ))}
+        {explicacaoDaChama(chama, perdoes).map((l, i) =>
+          i === 0 ? (
+            <ComArte key={i} arte={<ChamaDaSequencia acesa={chama > 0} tamanho={32} />}>
+              <T tipo="rotulo">{l}</T>
+            </ComArte>
+          ) : (
+            <T key={i} tipo="corpo">
+              {l}
+            </T>
+          ),
+        )}
         {chama >= CHAMA_PARA_COMPARTILHAR ? (
           <CompartilharConquista
             d={cartaoDaChama(chama, pos)}
-            tinta="#c2410c"
-            fundoDoBotao="#ffedd5"
+            tinta={cor.atencao}
+            fundoDoBotao={cor.atencaoFundo}
           />
         ) : null}
       </Folha>
 
-      <Folha aberta={aberta === "sementes"} aoFechar={aoFechar} titulo="🌱 Sementinhas">
+      <Folha aberta={aberta === "sementes"} aoFechar={aoFechar} titulo="Sementinhas">
         {pos ? (
           <>
-            <T>
-              No pós-parto, os momentos do dia são só seus: eles acendem a chama, sem somar
-              sementinhas. O calendário continua rendendo:
-            </T>
+            <ComArte arte={<IconeSementinha cor={cor.sementinha} tamanho={30} />}>
+              <T>
+                No pós-parto, os momentos do dia são só seus: eles acendem a chama, sem somar
+                sementinhas. O calendário continua rendendo:
+              </T>
+            </ComArte>
             <View style={{ gap: 6 }}>
               <LinhaDeGanho rotulo="O nascimento" valor="+100" />
               <LinhaDeGanho rotulo="Cada mês do bebê" valor="+25" />
@@ -70,9 +83,11 @@ export function FolhasDoPlacar({
           </>
         ) : (
           <>
-            <T>Você ganha sementinhas cuidando de você e aprendendo, todo dia:</T>
+            <ComArte arte={<IconeSementinha cor={cor.sementinha} tamanho={30} />}>
+              <T>Você ganha sementinhas cuidando de você e aprendendo, todo dia:</T>
+            </ComArte>
             <View style={{ gap: 6 }}>
-              <LinhaDeGanho rotulo="Abrir a jornada no dia" valor="+5" />
+              <LinhaDeGanho rotulo="Abrir a trilha no dia" valor="+5" />
               <LinhaDeGanho rotulo="A aula de hoje" valor="+5, e +3 por acerto" />
               <LinhaDeGanho rotulo="Mexer, meditar, a carta e a gratidão" valor="+5 cada" />
               <LinhaDeGanho rotulo="Fechar as cinco estrelas do dia" valor="+20" />
@@ -87,11 +102,13 @@ export function FolhasDoPlacar({
         {pos ? null : <T tipo="apagado">Os momentos valem no dia em que acontecem.</T>}
       </Folha>
 
-      <Folha aberta={aberta === "trofeus"} aoFechar={aoFechar} titulo="🏆 Troféus">
-        <T>
-          Cada dia em que você faz as quatro atividades — mexer o corpo, meditar, o momento com o
-          bebê e a gratidão — vira um troféu.
-        </T>
+      <Folha aberta={aberta === "trofeus"} aoFechar={aoFechar} titulo="Troféus">
+        <ComArte arte={<TrofeuParado largura={34} />}>
+          <T>
+            Cada dia em que você faz as quatro atividades vira um troféu: mexer o corpo, meditar, o
+            momento com o bebê e a gratidão.
+          </T>
+        </ComArte>
         <T tipo="apagado">
           {trofeus == null
             ? "Não conseguimos carregar a sua contagem agora."
@@ -117,24 +134,30 @@ function EscadaDosTrofeus({ trofeus }: { trofeus: number }) {
           style={{ flexDirection: "row", alignItems: "flex-start", gap: espaco.md }}
         >
           <View
+            accessible
+            accessibilityLabel={`${d.trofeus} troféus${d.feito ? ", alcançado" : ""}`}
             style={{
-              minWidth: 52,
-              borderRadius: 999,
+              minWidth: 56,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 4,
+              borderRadius: canto.pilula,
               paddingHorizontal: espaco.sm,
               paddingVertical: 4,
-              alignItems: "center",
-              backgroundColor: d.feito ? corJornada.trofeuFundo : cor.apagado,
+              backgroundColor: d.feito ? cor.jogoFundo : cor.apagado,
             }}
           >
+            {d.feito ? <Check size={13} color={cor.jogo} strokeWidth={3} /> : null}
             <Text
               style={{
                 ...fonte.titulo,
-                fontSize: 13,
-                color: d.feito ? corJornada.trofeu : cor.textoApagado,
+                ...escala.nota,
+                fontVariant: ["tabular-nums"],
+                color: d.feito ? cor.jogo : cor.textoApagado,
               }}
             >
-              {d.feito ? "✓ " : ""}
-              {d.trofeus} 🏆
+              {d.trofeus}
             </Text>
           </View>
           <View style={{ flex: 1, paddingTop: 3 }}>
@@ -147,7 +170,7 @@ function EscadaDosTrofeus({ trofeus }: { trofeus: number }) {
         </View>
       ))}
       {proximo ? (
-        <T tipo="rotulo" cor={corJornada.trofeu}>
+        <T tipo="rotulo" cor={cor.jogo}>
           {proximo.faltam === 1
             ? "Falta 1 dia completo para o próximo."
             : `Faltam ${proximo.faltam} dias completos para o próximo.`}
@@ -160,6 +183,16 @@ function EscadaDosTrofeus({ trofeus }: { trofeus: number }) {
 /** O que a lojinha do app vende (sem a loja por fase): é onde o troféu destrava a Borboleta. */
 const ITENS_DA_LOJA_DO_APP = new Set(itensDaLoja([]).map((i) => i.id));
 
+/** A arte do placar ao lado da primeira frase de uma folha (no lugar do emoji no título). */
+function ComArte({ arte, children }: { arte: ReactNode; children: ReactNode }) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.md }}>
+      <View style={{ width: 36, alignItems: "center" }}>{arte}</View>
+      <View style={{ flex: 1 }}>{children}</View>
+    </View>
+  );
+}
+
 function LinhaDeGanho({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
     <View
@@ -170,11 +203,12 @@ function LinhaDeGanho({ rotulo, valor }: { rotulo: string; valor: string }) {
         paddingVertical: 8,
         paddingHorizontal: espaco.md,
         backgroundColor: cor.cartao,
-        borderRadius: raio.sm,
+        borderRadius: canto.campo,
+        ...curva,
       }}
     >
-      <Text style={{ flex: 1, ...fonte.media, fontSize: 15, color: cor.texto }}>{rotulo}</Text>
-      <Text style={{ ...fonte.forte, fontSize: 15, color: corJornada.sementinha }}>{valor}</Text>
+      <Text style={{ flex: 1, ...fonte.media, ...escala.legenda, color: cor.texto }}>{rotulo}</Text>
+      <Text style={{ ...fonte.forte, ...escala.legenda, color: cor.sementinha }}>{valor}</Text>
     </View>
   );
 }

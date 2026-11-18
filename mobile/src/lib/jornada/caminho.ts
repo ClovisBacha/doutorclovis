@@ -273,15 +273,71 @@ export function comBranco(t: Tom, p: number, qual: "main" | "lip" = "main"): str
   return labParaHex(misturar(qual === "main" ? t.mainLab : t.lipLab, p, BRANCO));
 }
 
-/** A cor da faixa da fase — por TRIMESTRE, pela semana em que a fase começa. */
-export function corDaFaixa(semanaInicial: number): string {
-  if (semanaInicial <= 13) return "#f6339a"; // pink-500
-  if (semanaInicial <= 27) return "#fe9a00"; // amber-500
-  if (semanaInicial <= 40) return "#8e51ff"; // violet-500
-  return "#fe9a00";
+/**
+ * O TRIMESTRE de uma fase, pela semana em que ela começa: é ele que dá a cor
+ * da ficha da fase (a tela traduz em cor do tema).
+ */
+export function trimestreDaFase(semanaInicial: number): 1 | 2 | 3 {
+  if (semanaInicial <= 13) return 1;
+  if (semanaInicial <= 27) return 2;
+  return 3;
 }
 
-/** O lábio da faixa: o mesmo lábio da SEMANA em que a fase começa. */
-export function labioDaFaixa(semanaInicial: number): string {
-  return coresDaSemana(semanaInicial).lip;
+/* ── O traço que liga os nós ────────────────────────────────────────────── */
+
+/** Um nó da trilha: `x` em % da largura, `y` em px dentro do bloco. */
+export type PontoDaTrilha = { x: number; y: number; D: number };
+
+/**
+ * ONDE O CAMINHO CONTINUA (18/11/2026, a vistoria: "os nós são bolas soltas
+ * sobre o céu, sem nada que os ligue"). Para cada bloco de semana, o primeiro
+ * nó da PRÓXIMA semana, em coordenadas deste bloco (passando por cima da
+ * faixa de fase que houver no meio). É o bloco de cima que desenha a ponte:
+ * o de baixo vem depois na lista e fica por cima dela — a barra e o nó
+ * cobrem a ponta do traço, e o traço "passa por baixo" deles.
+ */
+export function ligacoesDaTrilha(blocos: readonly Bloco[]): (PontoDaTrilha | null)[] {
+  return blocos.map((b, i) => {
+    if (b.tipo !== "semana") return null;
+    let dy = b.altura;
+    for (let j = i + 1; j < blocos.length; j++) {
+      const n = blocos[j]!;
+      if (n.tipo === "semana") {
+        const d = n.dias[0]!;
+        return { x: d.x, y: dy + d.y, D: d.D };
+      }
+      dy += n.altura;
+    }
+    return null;
+  });
+}
+
+/**
+ * O traço de um bloco, em dois pedaços: o que já foi andado (até hoje) e o que
+ * vem. Cúbicas de tangente vertical entre os centros (`C x1,meio x2,meio
+ * x2,y2`): a curva sai de um nó para baixo e chega no outro de cima, como uma
+ * estrada. `largura` em px (os nós guardam `x` em %).
+ */
+export function tracadoDoBloco(
+  nos: readonly PontoDaTrilha[],
+  proximo: PontoDaTrilha | null,
+  hojeD: number,
+  largura: number,
+): { andado: string; porVir: string } {
+  const pontos = proximo ? [...nos, proximo] : [...nos];
+  const px = (x: number) => Math.round((x / 100) * largura * 10) / 10;
+  let andado = "";
+  let porVir = "";
+  for (let i = 1; i < pontos.length; i++) {
+    const a = pontos[i - 1]!;
+    const b = pontos[i]!;
+    const meio = Math.round(((a.y + b.y) / 2) * 10) / 10;
+    const curva = `C ${px(a.x)} ${meio} ${px(b.x)} ${meio} ${px(b.x)} ${b.y}`;
+    if (b.D <= hojeD) {
+      andado += `${andado ? "" : `M ${px(a.x)} ${a.y} `}${curva} `;
+    } else {
+      porVir += `${porVir ? "" : `M ${px(a.x)} ${a.y} `}${curva} `;
+    }
+  }
+  return { andado: andado.trim(), porVir: porVir.trim() };
 }

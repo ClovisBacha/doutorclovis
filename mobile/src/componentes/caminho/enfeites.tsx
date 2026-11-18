@@ -13,8 +13,8 @@ import {
 import Svg, { Circle, Defs, RadialGradient, Stop } from "react-native-svg";
 import { CANTINHO_BY_ID, escalaDaArvore, faseDoDiaNoite, type CantinhoType } from "@/lib/cantinho";
 import { climasAtivos, particulasDe, type Particula } from "@/lib/clima-do-cantinho";
-import { Pencil } from "lucide-react-native";
-import { toque, useFolgaDaBarra } from "~/componentes/base";
+import { MoveDiagonal2, Pencil, Undo2, X } from "lucide-react-native";
+import { Botao, toque, Tocavel, useFolgaDaBarra } from "~/componentes/base";
 import { Vidro } from "~/componentes/vidro";
 import { corCaminho } from "~/componentes/caminho/cores";
 import {
@@ -28,8 +28,8 @@ import {
   type EnfeitePosto,
   type Parada,
 } from "~/lib/jornada/enfeites";
-import { cor, espaco, fonte } from "~/tema";
-import { lacoQueDescansa } from "~/componentes/movimento";
+import { ALVO_MINIMO, canto, cor, curva, escala, espaco, fonte, sombras } from "~/tema";
+import { lacoQueDescansa, VOLTAS_DO_ENFEITE } from "~/componentes/movimento";
 
 /**
  * O QUE ELA COMPROU NO CANTINHO, NA TRILHA — as peças nativas do site
@@ -286,7 +286,7 @@ export function EnfeiteNaTrilha({
             right: -16,
             top: -16,
             bottom: -16,
-            borderRadius: 16,
+            borderRadius: canto.campo,
             borderWidth: 2,
             borderStyle: "dashed",
             borderColor: corCaminho.selecaoAro,
@@ -355,7 +355,7 @@ export function EnfeiteNaTrilha({
             hitSlop={6}
             style={[estilo.controle, { left: -24, top: -24, backgroundColor: corCaminho.tirar }]}
           >
-            <Text style={estilo.controleTexto}>✕</Text>
+            <X size={16} color={cor.branco} strokeWidth={3} />
           </Pressable>
           <View
             {...alca.panHandlers}
@@ -374,7 +374,7 @@ export function EnfeiteNaTrilha({
               { right: -24, bottom: -24, backgroundColor: corCaminho.redimensionar },
             ]}
           >
-            <Text style={estilo.controleTexto}>⤢</Text>
+            <MoveDiagonal2 size={16} color={cor.branco} strokeWidth={2.6} />
           </View>
         </>
       ) : null}
@@ -398,6 +398,7 @@ export function FundoEAr({
   paradas,
   climas,
   rolagem,
+  passoDoCenario,
   alturaDoTopo,
   alturaDaLista,
   alturaDaTrilha,
@@ -406,7 +407,10 @@ export function FundoEAr({
 }: {
   paradas: readonly Parada[] | null;
   climas: readonly string[];
+  /** A rolagem no fio nativo: o cenário desce com o começo da trilha. */
   rolagem: Animated.Value;
+  /** Em que passo (de 120 px) a rolagem PAROU: é aí que o cenário troca de cor. */
+  passoDoCenario: number;
   alturaDoTopo: number;
   alturaDaLista: number;
   alturaDaTrilha: number;
@@ -438,7 +442,7 @@ export function FundoEAr({
         {paradas && paradas.length > 0 ? (
           <Cenario
             paradas={paradas}
-            rolagem={rolagem}
+            passo={passoDoCenario}
             alturaDoTopo={alturaDoTopo}
             alturaDaLista={alturaDaLista}
             alturaDaTrilha={alturaDaTrilha}
@@ -457,31 +461,24 @@ const PASSO_DO_CENARIO = 120;
 
 /**
  * O papel de parede: a fatia do degradê que está à vista, a 55% (o
- * `opacity-55` do site). A cor anda com a rolagem em passos de 120 px — o
- * degradê inteiro tem a gestação toda, então a diferença entre dois passos é
- * menor que um tom.
+ * `opacity-55` do site). A cor anda em passos de 120 px, e só quando a rolagem
+ * PARA (18/11/2026: ela ouvia cada quadro da rolagem no JS) — o degradê
+ * inteiro tem a gestação toda, então a diferença entre dois passos é menor
+ * que um tom.
  */
 function Cenario({
   paradas,
-  rolagem,
+  passo,
   alturaDoTopo,
   alturaDaLista,
   alturaDaTrilha,
 }: {
   paradas: readonly Parada[];
-  rolagem: Animated.Value;
+  passo: number;
   alturaDoTopo: number;
   alturaDaLista: number;
   alturaDaTrilha: number;
 }) {
-  const [passo, setPasso] = useState(0);
-  useEffect(() => {
-    const id = rolagem.addListener(({ value }) => {
-      const n = Math.round(value / PASSO_DO_CENARIO);
-      setPasso((p) => (p === n ? p : n));
-    });
-    return () => rolagem.removeListener(id);
-  }, [rolagem]);
   const topo = Math.max(0, passo * PASSO_DO_CENARIO - alturaDoTopo) + Y_INICIAL_DO_SITE;
   const total = Math.max(1, alturaDaTrilha);
   const { cores, posicoes } = fatiaDoDegrade(paradas, topo / total, (topo + alturaDaLista) / total);
@@ -536,9 +533,18 @@ function ParticulaNoAr({
   parado: boolean;
 }) {
   const v = useRef(new Animated.Value(0)).current;
+  /* Como todo enfeite (18/11/2026): algumas voltas quando a trilha aparece, e
+     a partícula pousa — parada, à vista, como com "reduzir movimento". Volta
+     a cair quando a tela volta ao foco (`parado` vai e vem). */
+  const [pousou, setPousou] = useState(false);
   useEffect(() => {
-    if (parado) return;
+    setPousou(false);
+  }, [parado]);
+  const quieta = parado || pousou;
+  useEffect(() => {
+    if (quieta) return;
     let vivo = true;
+    let voltas = 0;
     const dur = q.duracao * 1000;
     /* O atraso do site é NEGATIVO: a chuva já está caindo quando a tela abre.
        Aqui isso é começar a primeira volta do meio. */
@@ -551,7 +557,10 @@ function ParticulaNoAr({
         easing: Easing.linear,
         useNativeDriver: true,
       }).start(({ finished }) => {
-        if (finished && vivo) volta(0);
+        if (!finished || !vivo) return;
+        voltas += 1;
+        if (voltas >= VOLTAS_DO_ENFEITE) setPousou(true);
+        else volta(0);
       });
     };
     volta(inicio);
@@ -559,7 +568,7 @@ function ParticulaNoAr({
       vivo = false;
       v.stopAnimation();
     };
-  }, [parado, q, v]);
+  }, [quieta, q, v]);
 
   const tamanho = q.tamanho * 16;
   const base = {
@@ -569,7 +578,7 @@ function ParticulaNoAr({
     fontSize: tamanho,
     lineHeight: tamanho * 1.15,
   };
-  if (parado) {
+  if (quieta) {
     /* PARA, não some: quem pediu menos movimento continua vendo o que comprou,
        espalhado e imóvel (`--dc-parada` do site). */
     return (
@@ -619,39 +628,34 @@ function ParticulaNoAr({
    O modo Arrumar: o lápis e a barra de baixo
    ══════════════════════════════════════════════════════════════════════════ */
 
-/** O lápis — do lado oposto ao da loja, como no site. Um botão de vidro solto sobre a trilha. */
+/**
+ * O lápis do Arrumar: um botão de vidro de 44 ao lado do placar (antes
+ * flutuava no pé, junto da cestinha, no canto onde o polegar mora).
+ */
 export function BotaoDeArrumar({ aoTocar }: { aoTocar: () => void }) {
-  const folga = useFolgaDaBarra();
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="Arrumar os enfeites da trilha"
-      onPress={() => {
-        toque();
-        aoTocar();
-      }}
-      style={({ pressed }) => ({
-        position: "absolute",
-        left: espaco.lg,
-        bottom: espaco.lg + folga,
-        transform: [{ scale: pressed ? 0.96 : 1 }],
-      })}
-    >
+    <Tocavel rotulo="Arrumar os enfeites da trilha" aoTocar={aoTocar} profundidade={0.92}>
       <Vidro
         interativo
         tinta="rgba(255,255,255,0.72)"
-        estilo={{ width: 48, height: 48, alignItems: "center", justifyContent: "center" }}
+        estilo={{
+          width: ALVO_MINIMO,
+          height: ALVO_MINIMO,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
       >
-        <Pencil size={20} color={cor.primariaEscura} strokeWidth={2.2} />
+        <Pencil size={19} color={cor.primaria} strokeWidth={2.2} />
       </Vidro>
-    </Pressable>
+    </Tocavel>
   );
 }
 
 /**
  * A barra do modo Arrumar: como se faz, quantos enfeites há, o Desfazer (um
  * passo — não existe "apagar tudo": um toque sem querer nunca leva embora o
- * que ela montou), o "Pronto ✓" e a bandeja com o que ela tem.
+ * que ela montou), o Pronto e a bandeja com o que ela tem. Flutua acima da
+ * barra de abas, de vidro como ela.
  */
 export function BarraDeArrumar({
   quantos,
@@ -668,125 +672,80 @@ export function BarraDeArrumar({
   bandeja: readonly string[];
   aoPor: (id: string) => void;
 }) {
-  /* Com a barra de abas flutuando embaixo, a de arrumar flutua acima dela. */
   const folga = useFolgaDaBarra();
   return (
     <View
+      pointerEvents="box-none"
       style={{
         position: "absolute",
-        left: folga ? 12 : 0,
-        right: folga ? 12 : 0,
-        bottom: folga ? folga + espaco.sm : 0,
-        ...(folga
-          ? { borderRadius: 22, borderWidth: 1, borderColor: corCaminho.barraBorda }
-          : { borderTopWidth: 1 }),
-        borderTopColor: corCaminho.barraBorda,
-        backgroundColor: corCaminho.barraFundo,
-        paddingHorizontal: espaco.md,
-        paddingTop: espaco.sm,
-        paddingBottom: espaco.sm,
-        shadowColor: corCaminho.sombra,
-        shadowOpacity: 0.12,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: -6 },
+        left: espaco.md,
+        right: espaco.md,
+        bottom: (folga || espaco.lg) + espaco.sm,
       }}
     >
-      <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
-        <Text
-          style={{
-            flex: 1,
-            ...fonte.normal,
-            fontSize: 13,
-            lineHeight: 17,
-            color: cor.textoApagado,
-          }}
-        >
-          Arraste pra mover ·{" "}
-          <Text style={{ ...fonte.forte, color: corCaminho.barraTamanho }}>⤢</Text> pra mudar o
-          tamanho · <Text style={{ ...fonte.forte, color: corCaminho.barraTirar }}>✕</Text> pra
-          tirar{" "}
+      <Vidro
+        forma={canto.cartao}
+        tinta="rgba(255,255,255,0.8)"
+        estilo={{ paddingHorizontal: espaco.md, paddingTop: espaco.md, paddingBottom: espaco.sm }}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
+          <Text style={{ flex: 1, ...fonte.forte, ...escala.manchete, color: cor.texto }}>
+            Arrumar a trilha
+          </Text>
+          <Botao
+            rotulo="Desfazer"
+            tipo="secundario"
+            tamanho="compacto"
+            desabilitado={!podeDesfazer}
+            icone={
+              <Undo2
+                size={16}
+                color={podeDesfazer ? cor.primariaEscura : cor.textoApagado}
+                strokeWidth={2.4}
+              />
+            }
+            aoTocar={aoDesfazer}
+          />
+          <Botao rotulo="Pronto" tamanho="compacto" aoTocar={aoTerminar} />
+        </View>
+        <Text style={{ marginTop: 6, ...fonte.normal, ...escala.nota, color: cor.textoApagado }}>
+          Arraste para mudar de lugar. O canto muda o tamanho.{" "}
           <Text style={{ fontVariant: ["tabular-nums"] }}>
-            ({quantos}/{DECOR_MAX})
+            {quantos} de {DECOR_MAX} enfeites.
           </Text>
         </Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Desfazer a última mudança"
-          accessibilityState={{ disabled: !podeDesfazer }}
-          disabled={!podeDesfazer}
-          onPress={() => {
-            toque();
-            aoDesfazer();
-          }}
-          style={({ pressed }) => ({
-            minHeight: 40,
-            justifyContent: "center",
-            borderRadius: 999,
-            paddingHorizontal: espaco.md,
-            backgroundColor: corCaminho.desfazerFundo,
-            borderWidth: 1,
-            borderColor: corCaminho.desfazerAro,
-            opacity: !podeDesfazer ? 0.4 : pressed ? 0.8 : 1,
-          })}
-          hitSlop={2}
-        >
-          <Text style={{ ...fonte.forte, fontSize: 13, color: corCaminho.desfazerTexto }}>
-            ↩︎ Desfazer
-          </Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => {
-            toque();
-            aoTerminar();
-          }}
-          style={({ pressed }) => ({
-            minHeight: 40,
-            justifyContent: "center",
-            borderRadius: 999,
-            paddingHorizontal: espaco.lg,
-            backgroundColor: corCaminho.pronto,
-            opacity: pressed ? 0.85 : 1,
-          })}
-          hitSlop={2}
-        >
-          <Text style={{ ...fonte.titulo, fontSize: 14, color: cor.branco }}>Pronto ✓</Text>
-        </Pressable>
-      </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: espaco.sm, paddingTop: espaco.sm, paddingBottom: 4 }}
-      >
-        {bandeja.map((id) => {
-          const item = CANTINHO_BY_ID[id];
-          if (!item) return null;
-          return (
-            <Pressable
-              key={id}
-              accessibilityRole="button"
-              accessibilityLabel={`Colocar ${item.name} na trilha`}
-              onPress={() => {
-                toque();
-                aoPor(id);
-              }}
-              style={({ pressed }) => ({
-                width: 48,
-                height: 48,
-                borderRadius: 16,
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: corCaminho.bandejaFundo,
-                borderWidth: 1,
-                borderColor: corCaminho.bandejaAro,
-                transform: [{ scale: pressed ? 0.94 : 1 }],
-              })}
-            >
-              <Text style={{ fontSize: 24 }}>{item.emoji}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+        {bandeja.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: espaco.sm, paddingTop: espaco.md, paddingBottom: 4 }}
+          >
+            {bandeja.map((id) => {
+              const item = CANTINHO_BY_ID[id];
+              if (!item) return null;
+              return (
+                <Tocavel
+                  key={id}
+                  rotulo={`Pôr ${item.name} na trilha`}
+                  aoTocar={() => aoPor(id)}
+                  profundidade={0.92}
+                  estilo={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: canto.campo,
+                    ...curva,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: cor.apagado,
+                  }}
+                >
+                  <Text style={{ fontSize: 26, lineHeight: 31 }}>{item.emoji}</Text>
+                </Tocavel>
+              );
+            })}
+          </ScrollView>
+        ) : null}
+      </Vidro>
     </View>
   );
 }
@@ -799,11 +758,9 @@ const estilo = {
     borderRadius: 16,
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    shadowColor: "#000000",
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
+    borderWidth: 2,
+    borderColor: cor.branco,
+    ...sombras.flutuante,
     zIndex: 6,
   },
-  controleTexto: { ...fonte.forte, fontSize: 14, color: cor.branco },
 };

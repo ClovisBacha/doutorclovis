@@ -19,6 +19,7 @@ import {
 } from "@/lib/cantinho";
 import { CONJUNTOS, conjuntosOrdenados, type ProgressoDoConjunto } from "@/lib/conjuntos";
 import { ehClima } from "@/lib/clima-do-cantinho";
+import { ALTURA } from "~/lib/jornada/caminho";
 import { situacaoNaVitrine, type ItemPorFase } from "~/lib/jornada/loja-por-fase";
 
 export const CHAVE_DECOR = "dc-path-decor";
@@ -142,6 +143,8 @@ export function semearNovos(
   possuidos: readonly string[],
   alturaDaTrilha: number,
   yDeHoje: number,
+  /** Onde começa cada bloco de SEMANA (em y do site): o enfeite novo não nasce atrás da barra. */
+  iniciosDasSemanas: readonly number[] = [],
 ): { decoracao: Decoracao | null; esperando: number } {
   const base = atual ?? { v: 1 as const, items: [], seen: [] };
   const novos = bandeja(possuidos).filter((id) => !base.seen.includes(id));
@@ -161,7 +164,10 @@ export function semearNovos(
       v: 1,
       items: [
         ...base.items,
-        ...semearPertoDeHoje(cabem, yDeHoje, alturaDaTrilha, base.items.length),
+        ...semearPertoDeHoje(cabem, yDeHoje, alturaDaTrilha, base.items.length).map((p) => ({
+          ...p,
+          y: desviarDaBarra(p.y, iniciosDasSemanas),
+        })),
       ],
       seen: [...base.seen, ...cabem],
     },
@@ -209,6 +215,8 @@ export type EnfeiteNoBloco = { p: EnfeitePosto; y: number };
 export function enfeitesPorBloco(
   enfeites: readonly EnfeitePosto[],
   alturas: readonly number[],
+  /** Quais blocos são de SEMANA: neles, o enfeite que cairia atrás da barra desce para baixo dela. */
+  ehSemana?: readonly boolean[],
 ): EnfeiteNoBloco[][] {
   const fora: EnfeiteNoBloco[][] = alturas.map(() => []);
   if (alturas.length === 0) return fora;
@@ -226,8 +234,45 @@ export function enfeitesPorBloco(
       if (inicios[m] <= p.y) lo = m;
       else hi = m - 1;
     }
-    fora[lo].push({ p, y: p.y - inicios[lo] });
+    const y = p.y - inicios[lo];
+    fora[lo].push({ p, y: ehSemana?.[lo] ? foraDaFaixaDaBarra(y) : y });
   }
+  return fora;
+}
+
+/**
+ * A FAIXA DA BARRA (18/11/2026, a vistoria: o gatinho aparecia cortado atrás
+ * da barra da semana 25, só as orelhas por cima). O alto de cada bloco de
+ * semana é da barra: um enfeite que cai ali (0 ≤ y < `ALTURA.semana` + 8)
+ * desce para logo abaixo dela — o item que ela comprou nunca fica escondido.
+ */
+export const FIM_DA_FAIXA_DA_BARRA = ALTURA.semana + 8;
+export const ABAIXO_DA_BARRA = ALTURA.semana + 20;
+
+function foraDaFaixaDaBarra(yNoBloco: number): number {
+  return yNoBloco >= 0 && yNoBloco < FIM_DA_FAIXA_DA_BARRA ? ABAIXO_DA_BARRA : yNoBloco;
+}
+
+/** O mesmo desvio, em y do site, dados os começos dos blocos de semana. */
+export function desviarDaBarra(ySite: number, iniciosDasSemanas: readonly number[]): number {
+  for (const inicio of iniciosDasSemanas) {
+    const y = ySite - inicio;
+    if (y >= 0 && y < FIM_DA_FAIXA_DA_BARRA) return inicio + ABAIXO_DA_BARRA;
+  }
+  return ySite;
+}
+
+/** Os começos dos blocos de semana, em y do site (o primeiro bloco começa em `Y_INICIAL_DO_SITE`). */
+export function iniciosDasSemanas(
+  alturas: readonly number[],
+  ehSemana: readonly boolean[],
+): number[] {
+  const fora: number[] = [];
+  let soma = Y_INICIAL_DO_SITE;
+  alturas.forEach((h, i) => {
+    if (ehSemana[i]) fora.push(soma);
+    soma += h;
+  });
   return fora;
 }
 

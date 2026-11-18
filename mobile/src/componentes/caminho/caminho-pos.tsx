@@ -1,34 +1,36 @@
-import { LinearGradient } from "expo-linear-gradient";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, Modal, Pressable, Text, View, type LayoutChangeEvent } from "react-native";
+import { Baby, Check, Circle, Sticker } from "lucide-react-native";
+import { memo, useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { FlatList, Text, View } from "react-native";
 import { useAviso } from "~/componentes/aviso";
-import { toque, useFolgaDaBarra } from "~/componentes/base";
-import { Vidro } from "~/componentes/vidro";
+import { Sobrelinha, toque, useFolgaDaBarra } from "~/componentes/base";
+import {
+  BarraDaSemana,
+  FaixaDaFase,
+  NoDaTrilha,
+  tonsDaSemana,
+  TracadoDoBloco,
+} from "~/componentes/caminho/blocos";
 import { corCaminho } from "~/componentes/caminho/cores";
+import { ChamaDaSequencia, Emoji } from "~/componentes/caminho/pecas";
 import {
-  AnelDeTarefas,
-  Boiar,
-  ChamaDaSequencia,
-  Emoji,
-  IconeCadeado,
-  Moeda3D,
-  Pulsar,
-} from "~/componentes/caminho/pecas";
-import { BotaoDaAtividade } from "~/componentes/jornada/atividade";
-import { parametroDaBancada } from "~/lib/bancada";
+  DegradeDoTopo,
+  PilulaDeHoje,
+  useAbrirEmHoje,
+  useEstavel,
+} from "~/componentes/caminho/rolagem";
+import { CEUS, useCeuDasAbas } from "~/componentes/ceu-vivo";
+import { Folha } from "~/componentes/jornada/pecas";
+import { useMovimentoReduzido } from "~/componentes/movimento";
+import { Vidro } from "~/componentes/vidro";
 import {
-  comBranco,
+  ligacoesDaTrilha,
   montarCaminho,
-  tomFuturo,
-  tomPerdido,
   TOM_TRAVADO,
   type Bloco,
-  type Fase,
+  type PontoDaTrilha,
 } from "~/lib/jornada/caminho";
 import { flagsDoDia, type Blob } from "~/lib/jornada/momentos";
 import {
-  corDaFaixaDoPos,
-  coresDaSemanaDoPos,
   diasDoPosFechados,
   estadoDoNoDoPos,
   FASES_DO_POS,
@@ -36,18 +38,21 @@ import {
   figurinhasDoPos,
   nestaSemanaDoPos,
   TAREFAS_DO_POS,
+  type EstadoDoNoDoPos,
 } from "~/lib/jornada/pos-parto";
-import { ALVO_MINIMO, cor, espaco, fonte } from "~/tema";
+import { ALVO_MINIMO, canto, cor, curva, escala, espaco, fonte, luz, margem } from "~/tema";
 
 /**
  * A TRILHA DO 4º TRIMESTRE — as 12 semanas de vida em três fases ("Chegando
  * em casa", "Criando ritmo", "Descobertas"), uma barra por semana com a
  * figurinha dela e um nó por dia, em zigue-zague: o `PosPartoJourney` do site
- * com as peças da trilha da gestação (a moeda 3D, o anel, o balão).
+ * com as MESMAS peças da trilha da gestação (18/11/2026: o mesmo acabamento —
+ * o placar e o cabeçalho flutuando, o traço que liga os nós, o nó de hoje com
+ * o anel e o halo, as barras e as fases do tema, a folha de baixo do app).
  *
  * Mais simples que o Caminho da gestação, de propósito: sem enfeites nem loja
- * (o site também não os punha aqui). Hoje leva de volta à tela Hoje, onde as
- * três tarefas moram; um dia que passou abre o que foi feito e o texto da
+ * (o site também não os punha aqui). Hoje leva de volta à tela do bebê, onde
+ * as três tarefas moram; um dia que passou abre o que foi feito e o texto da
  * semana; um dia que vem diz quando abre.
  */
 export function TrilhaDoPosParto({
@@ -57,6 +62,7 @@ export function TrilhaDoPosParto({
   figurinhas,
   formou,
   aoAbrirHoje,
+  cabecalho,
 }: {
   /** O D de hoje na trilha (7–90). */
   hojeD: number;
@@ -66,6 +72,8 @@ export function TrilhaDoPosParto({
   figurinhas: number;
   formou: boolean;
   aoAbrirHoje: () => void;
+  /** O cabeçalho da aba (o título e o perfil): flutua junto com o placar. */
+  cabecalho?: ReactNode;
 }) {
   const blocos = useMemo(() => montarCaminho(FASES_DO_POS, hojeD), [hojeD]);
   const deslocamentos = useMemo(() => {
@@ -81,99 +89,180 @@ export function TrilhaDoPosParto({
   const yDeHoje =
     indiceDeHoje >= 0
       ? (() => {
-          const b = blocos[indiceDeHoje];
+          const b = blocos[indiceDeHoje]!;
           return (
-            deslocamentos[indiceDeHoje] + (b.tipo === "semana" ? b.dias.find((d) => d.hoje)!.y : 0)
+            deslocamentos[indiceDeHoje]! + (b.tipo === "semana" ? b.dias.find((d) => d.hoje)!.y : 0)
           );
         })()
       : 0;
-  const comFigurinha = useMemo(() => figurinhasDoPos(blob), [blob]);
-  const semanaDeHoje = Math.max(1, Math.min(12, Math.floor(hojeD / 7)));
+  const proximos = useMemo(() => ligacoesDaTrilha(blocos), [blocos]);
+
+  /* O blob lido uma vez por semana; a que não mudou guarda o mesmo objeto. */
+  const antes = useRef<Map<number, ResumoDoPos>>(new Map());
+  const resumos = useMemo(() => {
+    const comFigurinha = new Set(figurinhasDoPos(blob));
+    const fora = new Map<number, ResumoDoPos>();
+    for (const b of blocos) {
+      if (b.tipo !== "semana") continue;
+      const estados = b.dias.map((d) => estadoDoNoDoPos(blob, d.D, hojeD));
+      const novo = { estados, figurinha: comFigurinha.has(b.semana) };
+      const velho = antes.current.get(b.semana);
+      fora.set(b.semana, velho && mesmoResumoDoPos(velho, novo) ? velho : novo);
+    }
+    antes.current = fora;
+    return fora;
+  }, [blob, blocos, hojeD]);
+
+  const reduzido = useMovimentoReduzido();
+  const folga = useFolgaDaBarra();
+  const {
+    lista,
+    caixa,
+    alturaDaCamada,
+    espacador,
+    pronto,
+    aoMedirCaixa,
+    aoMedirCamada,
+    contentOffset,
+    indiceInicial,
+    aVista,
+    aoMedirALista,
+    longe,
+    aoParar,
+    irParaHoje,
+  } = useAbrirEmHoje<Bloco>({ yDeHoje, indiceDeHoje, folga, reduzido });
+  const largura = caixa?.largura ?? 0;
+
   const { avisar, aviso } = useAviso();
   const [diaAberto, setDiaAberto] = useState<number | null>(null);
-
-  /* Abre centrada em hoje (na bancada, `&topo=1` deixa no alto). */
-  const lista = useRef<FlatList<Bloco>>(null);
-  const [alturaDaLista, setAlturaDaLista] = useState<number | null>(null);
-  const [alturaDoTopo, setAlturaDoTopo] = useState<number | null>(null);
-  /* A barra de abas flutua por cima da lista: o fim e "o meio" contam com ela. */
-  const folga = useFolgaDaBarra();
-  const rolou = useRef(parametroDaBancada("topo") === "1");
-  /* Como na trilha da gestação: no iPhone a lista refaz a rolagem inicial
-     depois desta, então a centralização vale de novo a cada medida, até ela
-     tocar na tela ou passarem dois segundos. */
-  const centrar = useCallback(() => {
-    if (rolou.current || alturaDoTopo == null || alturaDaLista == null || indiceDeHoje < 0) return;
-    lista.current?.scrollToOffset({
-      offset: Math.max(0, alturaDoTopo + yDeHoje - (alturaDaLista - folga) / 2),
-      animated: false,
-    });
-  }, [alturaDoTopo, alturaDaLista, folga, indiceDeHoje, yDeHoje]);
-  useEffect(() => {
-    const t = setTimeout(centrar, 60);
-    return () => clearTimeout(t);
-  }, [centrar]);
-  useEffect(() => {
-    const t = setTimeout(() => {
-      rolou.current = true;
-    }, 2000);
-    return () => clearTimeout(t);
-  }, []);
+  const abrirHoje = useEstavel(aoAbrirHoje);
+  const tocarNoDia = useCallback(
+    (D: number) => {
+      if (D > hojeD) {
+        const emDias = D - hojeD;
+        avisar(emDias === 1 ? "Esse dia abre amanhã." : `Esse dia abre em ${emDias} dias.`);
+        return;
+      }
+      toque();
+      if (D === hojeD) abrirHoje();
+      else setDiaAberto(D);
+    },
+    [hojeD, avisar, abrirHoje],
+  );
 
   const renderItem = useCallback(
-    ({ item }: { item: Bloco }) =>
+    ({ item, index }: { item: Bloco; index: number }) =>
       item.tipo === "fase" ? (
-        <FaixaDaFaseDoPos fase={item.fase} travada={item.travada} altura={item.altura} />
+        <FaixaDaFase
+          nome={item.fase.name}
+          sub={`Fase ${item.fase.n} · semanas ${item.fase.from}–${item.fase.to} de vida`}
+          emoji={item.fase.emoji}
+          corDaFase={corDaFaseDoPos(item.fase.from)}
+          travada={item.travada}
+          altura={item.altura}
+        />
       ) : (
         <SemanaDoPos
           bloco={item}
+          resumo={resumos.get(item.semana)!}
+          proximo={proximos[index] ?? null}
+          largura={largura}
           hojeD={hojeD}
-          blob={blob}
-          comFigurinha={comFigurinha.includes(item.semana)}
           formou={formou}
-          aoAbrirDia={(D) => (D === hojeD ? aoAbrirHoje() : setDiaAberto(D))}
-          avisar={avisar}
+          tocarNoDia={tocarNoDia}
+          parado={reduzido}
         />
       ),
-    [hojeD, blob, comFigurinha, formou, aoAbrirHoje, avisar],
+    [resumos, proximos, largura, hojeD, formou, tocarNoDia, reduzido],
   );
+  const getItemLayout = useCallback(
+    (_: unknown, i: number) => ({
+      length: blocos[i]!.altura,
+      offset: espacador + deslocamentos[i]!,
+      index: i,
+    }),
+    [blocos, espacador, deslocamentos],
+  );
+  const cabecalhoDaLista = useMemo(() => <View style={{ height: espacador }} />, [espacador]);
+  const peDaLista = useMemo(() => <View style={{ height: folga + espaco.xxl }} />, [folga]);
+
+  const dasAbas = useCeuDasAbas();
+  const corDoTopo = dasAbas ? CEUS[dasAbas.fase].topo : luz.base;
+  const semanaDeHoje = Math.max(1, Math.min(12, Math.floor(hojeD / 7)));
 
   return (
-    <View style={{ flex: 1 }}>
-      <FaixaDoTopoDoPos chama={chama} semana={semanaDeHoje} figurinhas={figurinhas} />
-      <FlatList
-        ref={lista}
-        onContentSizeChange={centrar}
-        onScrollBeginDrag={() => {
-          rolou.current = true;
-        }}
-        data={blocos}
-        keyExtractor={(b) => (b.tipo === "fase" ? `f${b.fase.n}` : `s${b.semana}`)}
-        renderItem={renderItem}
-        getItemLayout={(_, i) => ({
-          length: blocos[i].altura,
-          offset: (alturaDoTopo ?? 0) + deslocamentos[i],
-          index: i,
-        })}
-        initialNumToRender={4}
-        windowSize={7}
-        extraData={alturaDoTopo}
-        onLayout={(e: LayoutChangeEvent) => setAlturaDaLista(e.nativeEvent.layout.height)}
-        onScrollToIndexFailed={() => {}}
-        showsVerticalScrollIndicator={false}
-        ListHeaderComponent={
-          <View
-            onLayout={(e) => setAlturaDoTopo(e.nativeEvent.layout.height)}
-            style={{ paddingHorizontal: 20, paddingTop: espaco.lg, paddingBottom: espaco.sm }}
-          >
-            <Text style={{ ...fonte.media, fontSize: 14, color: cor.textoApagado }}>
-              {formou
-                ? "As 12 semanas estão completas. O caminho fica guardado aqui para sempre 💝"
-                : "Cada dia com as três tarefas ganha o ✓, e cada semana, a sua figurinha."}
-            </Text>
+    <View style={{ flex: 1 }} onLayout={aoMedirCaixa}>
+      {pronto ? (
+        <FlatList
+          ref={lista}
+          style={{ opacity: aVista ? 1 : 0 }}
+          data={blocos}
+          keyExtractor={chaveDoBloco}
+          renderItem={renderItem}
+          getItemLayout={getItemLayout}
+          contentOffset={contentOffset}
+          initialScrollIndex={indiceInicial}
+          initialNumToRender={3}
+          maxToRenderPerBatch={2}
+          updateCellsBatchingPeriod={50}
+          windowSize={5}
+          onLayout={aoMedirALista}
+          onScrollEndDrag={aoParar}
+          onMomentumScrollEnd={aoParar}
+          onScrollToIndexFailed={nada}
+          showsVerticalScrollIndicator={false}
+          ListHeaderComponent={cabecalhoDaLista}
+          ListFooterComponent={peDaLista}
+        />
+      ) : null}
+      {alturaDaCamada != null ? (
+        <DegradeDoTopo cor={corDoTopo} altura={alturaDaCamada + 24} />
+      ) : null}
+      <View
+        pointerEvents="box-none"
+        onLayout={aoMedirCamada}
+        style={{ position: "absolute", top: 0, left: 0, right: 0, paddingTop: 4 }}
+      >
+        {cabecalho ? (
+          <View style={{ paddingHorizontal: margem.tela, paddingBottom: espaco.xs }}>
+            {cabecalho}
           </View>
-        }
-        ListFooterComponent={<View style={{ height: 60 + folga }} />}
+        ) : null}
+        <View style={{ paddingHorizontal: margem.tela - 4 }}>
+          <FaixaDoTopoDoPos
+            chama={chama}
+            semana={semanaDeHoje}
+            figurinhas={figurinhas}
+            parado={reduzido}
+          />
+        </View>
+      </View>
+      {formou && alturaDaCamada != null ? (
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            top: alturaDaCamada + espaco.xs,
+            left: margem.tela - 4,
+            right: margem.tela - 4,
+          }}
+        >
+          <Vidro
+            tinta="rgba(255,255,255,0.72)"
+            forma={canto.cartao}
+            estilo={{ paddingHorizontal: espaco.lg, paddingVertical: espaco.md }}
+          >
+            <Text style={{ ...fonte.media, ...escala.legenda, color: cor.texto }}>
+              As 12 semanas estão completas. A trilha fica guardada aqui.
+            </Text>
+          </Vidro>
+        </View>
+      ) : null}
+      <PilulaDeHoje
+        visivel={longe.visivel && aVista && !formou}
+        acima={longe.acima}
+        baixo={folga + espaco.md}
+        aoTocar={irParaHoje}
       />
       {aviso}
       <FolhaDoDiaDoPos D={diaAberto} blob={blob} aoFechar={() => setDiaAberto(null)} />
@@ -181,437 +270,204 @@ export function TrilhaDoPosParto({
   );
 }
 
-function FaixaDoTopoDoPos({
+type ResumoDoPos = { estados: readonly EstadoDoNoDoPos[]; figurinha: boolean };
+
+function mesmoResumoDoPos(a: ResumoDoPos, b: ResumoDoPos): boolean {
+  return (
+    a.figurinha === b.figurinha &&
+    a.estados.every((e, i) => {
+      const o = b.estados[i]!;
+      if (e.tipo !== o.tipo) return false;
+      if (e.tipo === "futuro" || o.tipo === "futuro") return true;
+      return e.tarefas === o.tarefas && e.fechado === o.fechado;
+    })
+  );
+}
+
+const chaveDoBloco = (b: Bloco) => (b.tipo === "fase" ? `f${b.fase.n}` : `s${b.semana}`);
+const nada = () => {};
+
+/** A cor da ficha de cada fase do 4º trimestre, no tema: céu, violeta e verde. */
+function corDaFaseDoPos(semanaInicial: number): string {
+  if (semanaInicial <= 4) return cor.chutes;
+  if (semanaInicial <= 8) return cor.jogo;
+  return cor.ok;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O placar do 4º trimestre
+   ══════════════════════════════════════════════════════════════════════════ */
+
+const FaixaDoTopoDoPos = memo(function FaixaDoTopoDoPos({
   chama,
   semana,
   figurinhas,
+  parado,
 }: {
   chama: number;
   semana: number;
   figurinhas: number;
+  parado: boolean;
 }) {
   const acesa = chama > 0;
-  /* Uma cápsula de vidro, como o placar da trilha da gestação (16/11/2026). */
+  /* Uma cápsula de vidro, como o placar da trilha da gestação. */
   return (
-    <View style={{ paddingHorizontal: 12, paddingTop: 4, paddingBottom: 4 }}>
-      <Vidro
-        tinta="rgba(255,255,255,0.72)"
-        estilo={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-around",
-          paddingHorizontal: espaco.md,
-          paddingVertical: 4,
-        }}
+    <Vidro
+      tinta="rgba(255,255,255,0.72)"
+      estilo={{
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-around",
+        paddingHorizontal: espaco.sm,
+        paddingVertical: 4,
+      }}
+    >
+      <View
+        accessible
+        accessibilityLabel={`${chama} ${chama === 1 ? "dia seguido" : "dias seguidos"}`}
+        style={estilo.item}
       >
-        <View
-          accessible
-          accessibilityLabel={`${chama} ${chama === 1 ? "dia seguido" : "dias seguidos"}`}
-          style={{ flexDirection: "row", alignItems: "center", gap: 6, minHeight: ALVO_MINIMO }}
+        <ChamaDaSequencia acesa={acesa} parado={parado} />
+        <Text
+          style={[
+            estilo.numero,
+            { color: acesa ? corCaminho.chamaAcesa : corCaminho.numeroApagado },
+          ]}
         >
-          <ChamaDaSequencia acesa={acesa} />
-          <Text
-            style={[
-              estilo.numero,
-              { color: acesa ? corCaminho.chamaAcesa : corCaminho.numeroApagado },
-            ]}
-          >
-            {chama}
-          </Text>
-          <Text style={estilo.rotulo}>{chama === 1 ? "dia" : "dias"}</Text>
-        </View>
-        <View style={{ width: 1, height: 24, backgroundColor: corCaminho.divisor }} />
-        <View
-          accessible
-          accessibilityLabel={`Semana ${semana} de vida`}
-          style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
-        >
-          <Emoji tamanho={20}>👶</Emoji>
-          <Text style={[estilo.numero, { color: "#0ea5e9" }]}>S{semana}</Text>
-          <Text style={estilo.rotulo}>de vida</Text>
-        </View>
-        <View style={{ width: 1, height: 24, backgroundColor: corCaminho.divisor }} />
-        <View
-          accessible
-          accessibilityLabel={`${figurinhas} figurinhas no álbum`}
-          style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
-        >
-          <Emoji tamanho={20}>🏅</Emoji>
-          <Text style={[estilo.numero, { color: corCaminho.trofeus }]}>{figurinhas}</Text>
-        </View>
-      </Vidro>
-    </View>
-  );
-}
-
-function FaixaDaFaseDoPos({
-  fase,
-  travada,
-  altura,
-}: {
-  fase: Fase;
-  travada: boolean;
-  altura: number;
-}) {
-  const fundo = travada ? corCaminho.faixaTravada : corDaFaixaDoPos(fase.from);
-  const labio = travada ? corCaminho.faixaTravadaLabio : coresDaSemanaDoPos(fase.from).lip;
-  return (
-    <View style={{ height: altura, paddingHorizontal: espaco.lg, paddingTop: 8 }}>
-      <View>
-        <View
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            top: 4,
-            bottom: -4,
-            borderRadius: 24,
-            backgroundColor: labio,
-          }}
-        />
-        <View
-          accessibilityRole="header"
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            borderRadius: 24,
-            backgroundColor: fundo,
-            paddingHorizontal: 20,
-            paddingVertical: espaco.lg,
-          }}
-        >
-          <View style={{ flex: 1 }}>
-            <Text
-              style={{
-                ...fonte.forte,
-                fontSize: 13,
-                letterSpacing: 0.8,
-                textTransform: "uppercase",
-                color: corCaminho.textoClaro80,
-              }}
-            >
-              Fase {fase.n} · Semanas {fase.from}–{fase.to} de vida
-            </Text>
-            <Text style={{ marginTop: 2, ...fonte.titulo, fontSize: 20, color: cor.branco }}>
-              {fase.name}
-            </Text>
-          </View>
-          {travada ? (
-            <View style={{ opacity: 0.5 }}>
-              <IconeCadeado cor={corCaminho.cadeado} />
-            </View>
-          ) : (
-            <Emoji tamanho={36}>{fase.emoji}</Emoji>
-          )}
-        </View>
+          {chama}
+        </Text>
+        <Text style={estilo.rotulo}>{chama === 1 ? "dia" : "dias"}</Text>
       </View>
-    </View>
+      <Divisor />
+      <View accessible accessibilityLabel={`Semana ${semana} de vida`} style={estilo.item}>
+        <Baby size={21} color={cor.chutes} strokeWidth={2.2} />
+        <Text style={[estilo.numero, { color: cor.chutes }]}>{semana}ª</Text>
+        <Text style={estilo.rotulo}>semana</Text>
+      </View>
+      <Divisor />
+      <View accessible accessibilityLabel={`${figurinhas} figurinhas no álbum`} style={estilo.item}>
+        <Sticker size={21} color={corCaminho.trofeus} strokeWidth={2.2} />
+        <Text style={[estilo.numero, { color: corCaminho.trofeus }]}>{figurinhas}</Text>
+      </View>
+    </Vidro>
   );
+});
+
+function Divisor() {
+  return <View style={{ width: 1, height: 24, backgroundColor: corCaminho.divisor }} />;
 }
 
-function SemanaDoPos({
+/* ══════════════════════════════════════════════════════════════════════════
+   Uma semana de vida: o traço, a barra e os sete dias
+   ══════════════════════════════════════════════════════════════════════════ */
+
+const SemanaDoPos = memo(function SemanaDoPos({
   bloco,
+  resumo,
+  proximo,
+  largura,
   hojeD,
-  blob,
-  comFigurinha,
   formou,
-  aoAbrirDia,
-  avisar,
+  tocarNoDia,
+  parado,
 }: {
   bloco: Extract<Bloco, { tipo: "semana" }>;
+  resumo: ResumoDoPos;
+  proximo: PontoDaTrilha | null;
+  largura: number;
   hojeD: number;
-  blob: Blob;
-  comFigurinha: boolean;
   formou: boolean;
-  aoAbrirDia: (D: number) => void;
-  avisar: (texto: string) => void;
+  tocarNoDia: (D: number) => void;
+  parado: boolean;
 }) {
   const inicio = bloco.semana * 7;
   const porVir = inicio > hojeD;
   const atual = hojeD >= inicio && hojeD <= inicio + 6;
-  const tom = porVir ? TOM_TRAVADO : coresDaSemanaDoPos(bloco.semana);
-  const dias = bloco.dias.map((d) => {
-    const e = estadoDoNoDoPos(blob, d.D, hojeD);
-    return { feito: e.tipo !== "futuro" && e.fechado, hoje: d.D === hojeD, futuro: d.D > hojeD };
-  });
+  const tons = tonsDaSemana(bloco.semana, true);
+  const dias = resumo.estados.map((e, i) => ({
+    feito: e.tipo !== "futuro" && e.fechado,
+    hoje: bloco.dias[i]!.D === hojeD,
+    futuro: e.tipo === "futuro",
+  }));
   const nFeitos = dias.filter((d) => d.feito).length;
+  const titulo = `Semana ${bloco.semana} de vida`;
   return (
     <View style={{ height: bloco.altura }}>
-      <View style={{ position: "absolute", left: 12, right: 12, top: 8 }}>
-        <LinearGradient
-          colors={["transparent", comBranco(tom, 0.55), "transparent"]}
-          start={{ x: 0, y: 0.5 }}
-          end={{ x: 1, y: 0.5 }}
-          style={{ height: 1 }}
-        />
-        <View style={{ marginTop: 6 }}>
-          {atual ? null : (
-            <View
-              style={{
-                position: "absolute",
-                left: 0,
-                right: 0,
-                top: 3,
-                bottom: -3,
-                borderRadius: 24,
-                backgroundColor: comBranco(tom, 0.22, "lip"),
-              }}
-            />
-          )}
-          <LinearGradient
-            colors={[comBranco(tom, 0.18), comBranco(tom, 0.07)]}
-            start={{ x: 0, y: 0.3 }}
-            end={{ x: 1, y: 0.7 }}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: espaco.md,
-              borderRadius: 24,
-              paddingHorizontal: espaco.md,
-              paddingVertical: 10,
-              borderWidth: 1,
-              borderColor: comBranco(tom, 0.3),
-            }}
-          >
-            <View
-              accessible
-              accessibilityLabel={
-                comFigurinha
-                  ? `Figurinha da semana ${bloco.semana} de vida conquistada`
-                  : `Figurinha da semana ${bloco.semana} de vida ainda não conquistada`
-              }
-            >
-              <Moeda3D tamanho={44} tom={tom} labio={4} claro={0.45} escuro={0.8} meio={0.62}>
-                <View style={{ opacity: comFigurinha ? 1 : 0.35 }}>
-                  <Emoji tamanho={22}>{figurinhaDoPos(bloco.semana)}</Emoji>
-                </View>
-              </Moeda3D>
-            </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                <Text
-                  numberOfLines={1}
-                  style={{ ...fonte.titulo, fontSize: 15, color: corCaminho.textoForte }}
-                >
-                  Semana {bloco.semana} de vida
-                </Text>
-                {atual && !formou ? (
-                  <View
-                    style={{
-                      borderRadius: 999,
-                      paddingHorizontal: 6,
-                      paddingVertical: 1,
-                      backgroundColor: tom.main,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        ...fonte.titulo,
-                        fontSize: 9,
-                        letterSpacing: 0.6,
-                        textTransform: "uppercase",
-                        color: cor.branco,
-                      }}
-                    >
-                      agora
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-              <Text
-                numberOfLines={1}
-                style={{ ...fonte.media, fontSize: 13, color: corCaminho.textoMedio }}
-              >
-                {nFeitos} de 7 dias
-              </Text>
-            </View>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }} accessible={false}>
-              {dias.map((d, i) => (
-                <View key={i} style={{ width: 6, height: 6 }}>
-                  <View
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: 3,
-                      backgroundColor: d.feito
-                        ? tom.main
-                        : d.futuro
-                          ? corCaminho.pontoFuturo
-                          : comBranco(tom, 0.26),
-                    }}
-                  />
-                  {d.hoje ? (
-                    <View
-                      style={{
-                        position: "absolute",
-                        left: -3.5,
-                        top: -3.5,
-                        width: 13,
-                        height: 13,
-                        borderRadius: 6.5,
-                        borderWidth: 2,
-                        borderColor: tom.main,
-                      }}
-                    />
-                  ) : null}
-                </View>
-              ))}
-            </View>
-          </LinearGradient>
-        </View>
-      </View>
-      {bloco.dias.map((d) => (
-        <NoDoDiaDoPos
-          key={d.D}
-          D={d.D}
-          x={d.x}
-          y={d.y}
-          semana={bloco.semana}
-          hojeD={hojeD}
-          blob={blob}
-          formou={formou}
-          aoAbrir={() => aoAbrirDia(d.D)}
-          avisar={avisar}
-        />
-      ))}
-    </View>
-  );
-}
-
-function NoDoDiaDoPos({
-  D,
-  x,
-  y,
-  semana,
-  hojeD,
-  blob,
-  formou,
-  aoAbrir,
-  avisar,
-}: {
-  D: number;
-  x: number;
-  y: number;
-  semana: number;
-  hojeD: number;
-  blob: Blob;
-  formou: boolean;
-  aoAbrir: () => void;
-  avisar: (texto: string) => void;
-}) {
-  const e = estadoDoNoDoPos(blob, D, hojeD);
-  const hoje = e.tipo === "hoje" && !formou;
-  const fechado = e.tipo !== "futuro" && e.fechado;
-  const tarefas = e.tipo === "futuro" ? 0 : e.tarefas;
-  const cheia = coresDaSemanaDoPos(semana);
-  const tom = fechado || hoje ? cheia : e.tipo === "futuro" ? tomFuturo(cheia) : tomPerdido(cheia);
-  const tamanho = hoje ? 84 : 64;
-  const emDias = D - hojeD;
-  const rotulo =
-    `Dia ${(D % 7) + 1} da semana ${semana} de vida` +
-    (hoje
-      ? `, hoje — ${tarefas} de ${TAREFAS_DO_POS.length} tarefas`
-      : fechado
-        ? ", completo"
-        : e.tipo === "futuro"
-          ? `, abre em ${emDias} ${emDias === 1 ? "dia" : "dias"}`
-          : "");
-  return (
-    <View
-      pointerEvents="box-none"
-      style={{
-        position: "absolute",
-        left: `${x}%`,
-        top: y - tamanho / 2,
-        width: 0,
-        alignItems: "center",
-      }}
-    >
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={rotulo}
-        accessibilityState={{ disabled: e.tipo === "futuro", selected: hoje }}
-        onPress={() => {
-          if (e.tipo === "futuro") {
-            avisar(
-              `🔒 Esse dia abre ${emDias === 1 ? "amanhã" : `em ${emDias} dias`} — um passo de cada vez 💛`,
-            );
-            return;
-          }
-          toque();
-          aoAbrir();
-        }}
-        style={{ width: tamanho + 24, alignItems: "center" }}
+      <TracadoDoBloco
+        nos={bloco.dias}
+        proximo={proximo}
+        hojeD={hojeD}
+        largura={largura}
+        altura={bloco.altura}
+      />
+      <View
+        pointerEvents="box-none"
+        style={{ position: "absolute", left: margem.tela, right: margem.tela, top: 8 }}
       >
-        {hoje ? (
-          <View
-            pointerEvents="none"
-            style={{
-              position: "absolute",
-              top: -44,
-              width: 280,
-              left: (tamanho + 24 - 280) / 2,
-              zIndex: 2,
-              alignItems: "center",
-            }}
-          >
-            <Boiar>
-              <View
-                style={{
-                  borderRadius: 20,
-                  backgroundColor: cor.branco,
-                  paddingHorizontal: espaco.md,
-                  paddingVertical: 4,
-                  shadowColor: corCaminho.sombra,
-                  shadowOpacity: 0.12,
-                  shadowRadius: 10,
-                  shadowOffset: { width: 0, height: 3 },
-                }}
-              >
-                <Text
-                  numberOfLines={1}
-                  style={{
-                    ...fonte.titulo,
-                    fontSize: 13,
-                    letterSpacing: 0.4,
-                    textTransform: "uppercase",
-                    color: "#0ea5e9",
-                  }}
-                >
-                  {fechado ? "Dia completo ✓" : "Desafio de hoje 🎁"}
-                </Text>
-              </View>
-            </Boiar>
-          </View>
-        ) : null}
-        <View style={{ width: tamanho, height: tamanho }}>
-          {hoje ? (
-            <AnelDeTarefas
-              tamanho={tamanho}
-              feitos={tarefas}
-              total={TAREFAS_DO_POS.length}
-              cor={cheia.main}
-            />
-          ) : null}
-          <Pulsar ativo={hoje && !fechado}>
-            <Moeda3D tamanho={tamanho} tom={tom}>
-              {hoje && !fechado ? (
-                <Emoji tamanho={30}>🎁</Emoji>
-              ) : fechado ? (
-                <Text style={{ ...fonte.titulo, fontSize: hoje ? 30 : 24, color: cor.branco }}>
-                  ✓
-                </Text>
-              ) : null}
-            </Moeda3D>
-          </Pulsar>
-        </View>
-      </Pressable>
+        <BarraDaSemana
+          titulo={titulo}
+          sub={`${nFeitos} de 7 dias`}
+          estado={atual ? "atual" : porVir ? "futura" : "passada"}
+          agora={atual && !formou}
+          tom={porVir ? TOM_TRAVADO : tons.cheia}
+          dias={dias}
+          figurinha={resumo.figurinha}
+          rotulo={`${titulo}. ${nFeitos} de 7 dias. ${
+            resumo.figurinha ? "Figurinha conquistada" : "Figurinha ainda não conquistada"
+          }`}
+          moeda={
+            <View style={{ opacity: resumo.figurinha ? 1 : 0.35 }}>
+              <Emoji tamanho={22}>{figurinhaDoPos(bloco.semana)}</Emoji>
+            </View>
+          }
+        />
+      </View>
+      {bloco.dias.map((d, i) => {
+        const e = resumo.estados[i]!;
+        const hoje = e.tipo === "hoje" && !formou;
+        const fechado = e.tipo !== "futuro" && e.fechado;
+        const tarefas = e.tipo === "futuro" ? 0 : e.tarefas;
+        const tom = fechado || hoje ? tons.cheia : e.tipo === "futuro" ? tons.futuro : tons.perdido;
+        return (
+          <NoDaTrilha
+            key={d.D}
+            D={d.D}
+            x={d.x}
+            y={d.y}
+            tamanho={hoje ? 84 : 64}
+            tom={tom}
+            hoje={hoje}
+            fechado={fechado}
+            futuro={e.tipo === "futuro"}
+            anel={hoje ? ANEIS[tarefas] : null}
+            balao={hoje ? (fechado ? "Dia completo" : tarefas > 0 ? "Continuar" : "Começar") : null}
+            rotulo={
+              `Dia ${(d.D % 7) + 1} da semana ${bloco.semana} de vida` +
+              (hoje
+                ? `, hoje: ${tarefas} de ${TAREFAS_DO_POS.length} tarefas`
+                : fechado
+                  ? ", dia completo"
+                  : e.tipo === "futuro"
+                    ? ", ainda não abriu"
+                    : "")
+            }
+            aoTocar={tocarNoDia}
+            parado={parado}
+          />
+        );
+      })}
     </View>
   );
-}
+});
 
-/** Um dia que passou: o que foi feito e o texto da semana. */
+/* O anel de hoje com a mesma identidade para a mesma conta (o nó é `memo`). */
+const ANEIS = [0, 1, 2, 3].map((feitos) => ({ feitos, total: TAREFAS_DO_POS.length }));
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Um dia que passou
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** Um dia que passou: o que foi feito e o texto da semana, na folha de baixo do app. */
 function FolhaDoDiaDoPos({
   D,
   blob,
@@ -621,85 +477,113 @@ function FolhaDoDiaDoPos({
   blob: Blob;
   aoFechar: () => void;
 }) {
-  if (D == null) return <Modal visible={false} transparent />;
-  const semana = Math.max(1, Math.min(12, Math.floor(D / 7)));
-  const flags = flagsDoDia(blob, D, true);
+  /* A folha guarda o último dia aberto enquanto desce, para não se esvaziar no meio. */
+  const [ultimo, setUltimo] = useState<number | null>(D);
+  if (D != null && D !== ultimo) setUltimo(D);
+  const dia = D ?? ultimo;
+  const semana = dia == null ? 1 : Math.max(1, Math.min(12, Math.floor(dia / 7)));
+  const flags = dia == null ? {} : flagsDoDia(blob, dia, true);
+  const fechado = dia != null && diasDoPosFechados(blob).includes(dia);
   const linhas: { chave: string; texto: string }[] = [
     { chave: "humor", texto: "Como você estava" },
     { chave: "desafio", texto: "O desafio do dia" },
     { chave: "leitura", texto: "A leitura da semana" },
   ];
-  const fechado = diasDoPosFechados(blob).includes(D);
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={aoFechar}>
-      <Pressable
-        accessibilityLabel="Fechar"
-        onPress={aoFechar}
-        style={{ flex: 1, backgroundColor: "rgba(20,10,30,0.3)" }}
-      />
-      <View
-        style={{
-          borderTopLeftRadius: 28,
-          borderTopRightRadius: 28,
-          backgroundColor: cor.branco,
-          padding: espaco.xl,
-          paddingBottom: espaco.xxl,
-          gap: espaco.md,
-        }}
-      >
-        <View
-          style={{
-            alignSelf: "center",
-            width: 48,
-            height: 5,
-            borderRadius: 3,
-            backgroundColor: "#e5dde2",
-          }}
-        />
-        <Text
-          style={{
-            ...fonte.titulo,
-            fontSize: 12,
-            letterSpacing: 1.2,
-            textTransform: "uppercase",
-            color: "#0369a1",
-          }}
-        >
-          Semana {semana} de vida · dia {(D % 7) + 1}
-        </Text>
-        <Text
-          accessibilityRole="header"
-          style={{ ...fonte.titulo, fontSize: 22, color: cor.texto }}
-        >
-          {fechado ? `Dia completo ${figurinhaDoPos(semana)}` : "Esse dia ficou pela metade"}
-        </Text>
-        <View style={{ gap: espaco.sm }}>
-          {linhas.map((l) => (
-            <Text
-              key={l.chave}
-              style={{
-                ...fonte.media,
-                fontSize: 15,
-                color: flags[l.chave] || fechado ? "#047857" : cor.textoApagado,
-              }}
-            >
-              {flags[l.chave] || fechado ? "✓" : "○"} {l.texto}
+    <Folha
+      aberta={D != null}
+      aoFechar={aoFechar}
+      titulo={fechado ? "Dia completo" : "Esse dia ficou pela metade"}
+    >
+      {dia != null ? (
+        <>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
+            <Emoji tamanho={22}>{figurinhaDoPos(semana)}</Emoji>
+            <Sobrelinha tinta={cor.chutes}>
+              Semana {semana} de vida · dia {(dia % 7) + 1}
+            </Sobrelinha>
+          </View>
+          <View
+            style={{
+              borderRadius: canto.dentro,
+              ...curva,
+              backgroundColor: cor.cartao,
+              paddingVertical: 4,
+            }}
+          >
+            {linhas.map((l, i) => {
+              const feito = !!flags[l.chave] || fechado;
+              return (
+                <View
+                  key={l.chave}
+                  accessible
+                  accessibilityLabel={`${l.texto}: ${feito ? "feito" : "não feito"}`}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: espaco.md,
+                    minHeight: ALVO_MINIMO,
+                    paddingHorizontal: espaco.lg,
+                    borderTopWidth: i === 0 ? 0 : 1,
+                    borderTopColor: cor.divisor,
+                  }}
+                >
+                  {feito ? (
+                    <View
+                      style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: 11,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        backgroundColor: cor.ok,
+                      }}
+                    >
+                      <Check size={13} color={cor.branco} strokeWidth={3.4} />
+                    </View>
+                  ) : (
+                    <Circle size={22} color={cor.chevron} strokeWidth={2} />
+                  )}
+                  <Text
+                    style={{
+                      ...fonte.media,
+                      ...escala.chamada,
+                      color: feito ? cor.texto : cor.textoApagado,
+                    }}
+                  >
+                    {l.texto}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+          <View
+            style={{
+              borderRadius: canto.dentro,
+              ...curva,
+              backgroundColor: cor.chutesFundo,
+              padding: espaco.lg,
+              gap: 4,
+            }}
+          >
+            <Sobrelinha tinta={cor.chutes}>Nessa semana</Sobrelinha>
+            <Text style={{ ...fonte.normal, ...escala.chamada, color: cor.textoCorpo }}>
+              {nestaSemanaDoPos(semana)}
             </Text>
-          ))}
-        </View>
-        <View style={{ borderRadius: 18, backgroundColor: "#effaff", padding: espaco.lg, gap: 4 }}>
-          <Text style={{ ...fonte.titulo, fontSize: 13, color: "#0369a1" }}>Nessa semana</Text>
-          <Text style={{ ...fonte.media, fontSize: 15, lineHeight: 22, color: "#0c3a5a" }}>
-            {nestaSemanaDoPos(semana)}
-          </Text>
-        </View>
-        <BotaoDaAtividade cor="#0284c7" rotulo="Fechar" aoTocar={aoFechar} />
-      </View>
-    </Modal>
+          </View>
+        </>
+      ) : null}
+    </Folha>
   );
 }
 
 const estilo = {
-  numero: { ...fonte.titulo, fontSize: 18, lineHeight: 24 },
-  rotulo: { ...fonte.normal, fontSize: 13, color: cor.textoApagado },
-} as const;
+  item: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 5,
+    minHeight: ALVO_MINIMO,
+  },
+  numero: { ...fonte.titulo, ...escala.manchete },
+  rotulo: { ...fonte.normal, ...escala.nota, color: cor.textoApagado },
+};
