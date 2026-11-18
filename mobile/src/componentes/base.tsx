@@ -419,6 +419,9 @@ export function Tocavel({
   estilo,
   profundidade = 0.97,
   desabilitado,
+  folga,
+  aberto,
+  marcado,
 }: {
   children: ReactNode;
   aoTocar: () => void;
@@ -427,6 +430,12 @@ export function Tocavel({
   estilo?: StyleProp<ViewStyle>;
   profundidade?: number;
   desabilitado?: boolean;
+  /** O alvo de toque a mais em volta (para o que é menor que 44 pt). */
+  folga?: number;
+  /** Uma sanfona: aberta ou fechada, para o leitor de tela. */
+  aberto?: boolean;
+  /** Uma escolha (rádio, caixa, aba): marcada ou não. */
+  marcado?: boolean;
 }) {
   const mola = useMolaDeToque(profundidade);
   const [fora, dentro] = separarLayout(estilo);
@@ -434,8 +443,13 @@ export function Tocavel({
     <Pressable
       accessibilityRole={papel}
       accessibilityLabel={rotulo}
-      accessibilityState={{ disabled: !!desabilitado }}
+      accessibilityState={{
+        disabled: !!desabilitado,
+        ...(aberto === undefined ? null : { expanded: aberto }),
+        ...(marcado === undefined ? null : { selected: marcado, checked: marcado }),
+      }}
       disabled={desabilitado}
+      hitSlop={folga}
       onPressIn={mola.aoPressionar}
       onPressOut={mola.aoSoltar}
       onPress={() => {
