@@ -2,7 +2,7 @@ import { memo, useEffect, useRef, useState, type ReactNode } from "react";
 import { Animated, Easing, StyleSheet, Text, View, type TextStyle } from "react-native";
 import Svg, { Defs, Path, RadialGradient, Stop } from "react-native-svg";
 import { useMovimentoReduzido, lacoQueDescansa } from "~/componentes/movimento";
-import { cor, curva, fonte, fonteDoNumero, luz, sombra } from "~/tema";
+import { cor, curva, escala, fonte, fonteDoNumero, luz, ouro, sombra } from "~/tema";
 
 /**
  * AS PEÇAS DA FESTA do fim de cada atividade (16/11/2026, a revisão do ciclo
@@ -17,12 +17,15 @@ import { cor, curva, fonte, fonteDoNumero, luz, sombra } from "~/tema";
  */
 export const Raios = memo(function Raios({
   tamanho,
-  tom = "#ffcf6e",
+  tom = ouro.claro,
   forca = 0.55,
+  atraso = 0,
 }: {
   tamanho: number;
   tom?: string;
   forca?: number;
+  /** Em ms: na festa do fim, os raios abrem logo depois de a bolha chegar. */
+  atraso?: number;
 }) {
   const reduzido = useMovimentoReduzido();
   const gira = useRef(new Animated.Value(0)).current;
@@ -32,6 +35,7 @@ export const Raios = memo(function Raios({
     Animated.timing(chega, {
       toValue: 1,
       duration: 700,
+      delay: atraso,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
@@ -46,7 +50,7 @@ export const Raios = memo(function Raios({
     );
     laco.start();
     return () => laco.stop();
-  }, [reduzido, gira, chega]);
+  }, [reduzido, gira, chega, atraso]);
   const c = tamanho / 2;
   const raios = 14;
   const abre = Math.PI / raios / 1.6;
@@ -95,7 +99,13 @@ export const Raios = memo(function Raios({
   );
 });
 
-/** Um número que conta de 0 até o valor, depressa (uma vez; parado com "reduzir movimento"). */
+/**
+ * O número do ganho. Até 25, ele chega PRONTO, num pulo de mola no fio nativo
+ * (contar de 0 a 17 é ruído, e o pulo é o "ganhei"). Acima disso, conta em no
+ * máximo 12 passos — antes era um `setState` por quadro durante um segundo,
+ * no ápice da festa, junto com o confete e as sementes. Com "reduzir
+ * movimento", o valor final, parado.
+ */
 export function NumeroQueConta({
   valor,
   prefixo = "",
@@ -108,34 +118,59 @@ export function NumeroQueConta({
   estilo?: object;
 }) {
   const reduzido = useMovimentoReduzido();
-  const [agora, setAgora] = useState(reduzido ? valor : 0);
+  const pula = valor <= PULO_ATE;
+  const [agora, setAgora] = useState(reduzido || pula ? valor : 0);
+  const v = useRef(new Animated.Value(reduzido ? 1 : 0)).current;
   useEffect(() => {
     if (reduzido) {
       setAgora(valor);
+      v.setValue(1);
       return;
     }
-    const v = new Animated.Value(0);
-    const id = v.addListener(({ value }) => setAgora(Math.round(value)));
-    const anim = Animated.timing(v, {
-      toValue: valor,
-      duration: Math.min(1100, 260 + valor * 40),
-      delay: atraso,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
+    if (pula) {
+      setAgora(valor);
+      v.setValue(0);
+      const anim = Animated.spring(v, {
+        toValue: 1,
+        delay: atraso,
+        speed: 14,
+        bounciness: 14,
+        useNativeDriver: true,
+      });
+      anim.start();
+      return () => anim.stop();
+    }
+    v.setValue(1);
+    setAgora(0);
+    const duracao = Math.min(1100, 260 + valor * 30);
+    const relogios = Array.from({ length: PASSOS }, (_, i) => {
+      const t = (i + 1) / PASSOS;
+      const n = i + 1 === PASSOS ? valor : Math.round(valor * (1 - (1 - t) ** 3));
+      return setTimeout(() => setAgora(n), atraso + duracao * t);
     });
-    anim.start();
-    return () => {
-      anim.stop();
-      v.removeListener(id);
-    };
-  }, [valor, atraso, reduzido]);
+    return () => relogios.forEach(clearTimeout);
+  }, [valor, atraso, reduzido, pula, v]);
   return (
-    <Text allowFontScaling={false} style={estilo}>
+    <Animated.Text
+      allowFontScaling={false}
+      style={[
+        estilo,
+        pula && !reduzido
+          ? {
+              opacity: v.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 1, 1] }),
+              transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }) }],
+            }
+          : null,
+      ]}
+    >
       {prefixo}
       {agora}
-    </Text>
+    </Animated.Text>
   );
 }
+
+const PULO_ATE = 25;
+const PASSOS = 12;
 
 /**
  * Uma pedra do placar da festa ("+17 sementinhas", "4 de 5 acertos"): material
@@ -163,7 +198,7 @@ export function PedraDoPlacar({
     if (reduzido) return;
     Animated.spring(v, {
       toValue: 1,
-      delay: 250 + ordem * 140,
+      delay: 350 + ordem * 140,
       useNativeDriver: true,
       speed: 12,
       bounciness: 9,
@@ -193,7 +228,7 @@ export function PedraDoPlacar({
           ...curva,
           backgroundColor: luz.cartao,
           borderWidth: StyleSheet.hairlineWidth,
-          borderColor: "rgba(255,255,255,0.95)",
+          borderColor: cor.branco,
           ...sombra,
         }}
       >
@@ -203,7 +238,7 @@ export function PedraDoPlacar({
         </View>
         <Text
           numberOfLines={1}
-          style={{ ...fonte.media, fontSize: 13, color: cor.textoApagado, textAlign: "center" }}
+          style={{ ...fonte.media, ...escala.nota, color: cor.textoApagado, textAlign: "center" }}
         >
           {rotulo}
         </Text>

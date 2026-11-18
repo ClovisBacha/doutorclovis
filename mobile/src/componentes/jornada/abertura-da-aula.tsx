@@ -1,17 +1,18 @@
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef } from "react";
-import { Animated, Easing, Platform, Pressable, Text, View } from "react-native";
+import { Animated, Easing, Platform, Pressable, View } from "react-native";
 import { fruitEmojiForWeek } from "@/lib/gestacao";
 import { Emoji, Moeda3D } from "~/componentes/caminho/pecas";
 import { useMovimentoReduzido } from "~/componentes/movimento";
-import { comBranco, coresDaSemana } from "~/lib/jornada/caminho";
-import { cor, fonte } from "~/tema";
+import { coresDaSemana } from "~/lib/jornada/caminho";
+import { comAlfa } from "~/lib/cor";
+import { cor, escala, fonte } from "~/tema";
 
 /**
  * A ABERTURA DA AULA — 1,5 s na cor da semana antes da lição, o `QuizIntro`
  * do site: a moeda salta, dois anéis se abrem, "Semana 24 · Aula de hoje" e
- * "2 minutinhos por Helena 💛" sobem, e a tela se desfaz. Um toque pula.
+ * "2 minutinhos por Helena" sobem, e a tela se desfaz. Um toque pula.
  *
  * É o "agora é a aula" que a trilha do site dava (o Duolingo faz o mesmo): o
  * banco de aulas desce por baixo dela, e a lição aparece pronta.
@@ -19,6 +20,11 @@ import { cor, fonte } from "~/tema";
  * Na moeda, a fruta da SEMANA, e não o emoji que gira pelo dia da semana: as
  * aulas não seguem esse ritmo, e um 🥗 numa aula sobre o TOTG diria outra coisa.
  * Com "Reduzir movimento", nada salta nem pulsa — a tela aparece e se vai.
+ *
+ * 18/11/2026 (a vistoria): o degradê ia do pálido à cor, e o branco no meio
+ * dava 2,2:1. Agora vai da cor da semana ao lábio dela (o branco no lábio dá
+ * 5,8:1 ou mais, semanas 4 a 42). Saiu o "toque para começar" — a tela some
+ * sozinha, e o toque só pula — e o emoji do título.
  */
 
 const SAI_EM = 1250;
@@ -27,10 +33,13 @@ const TERMINA_EM = 1500;
 export function AberturaDaAula({
   semana,
   nomeDoBebe,
+  aoComecarASair,
   aoTerminar,
 }: {
   semana: number;
   nomeDoBebe: string | null;
+  /** A cortina começou a se desfazer: a lição embaixo já pode entrar. */
+  aoComecarASair?: () => void;
   aoTerminar: () => void;
 }) {
   const reduzido = useMovimentoReduzido();
@@ -53,6 +62,7 @@ export function AberturaDaAula({
   const sair = (duracao: number) => {
     if (saindo.current) return;
     saindo.current = true;
+    aoComecarASair?.();
     Animated.timing(tela, {
       toValue: 0,
       duration: duracao,
@@ -111,7 +121,7 @@ export function AberturaDaAula({
   }, []);
 
   /* A moeda: de 20 % a 118 % (com o giro de −14° a 4°) e assenta em 100 %. */
-  const escala = moeda.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0.2, 1.18, 1] });
+  const escalaDaMoeda = moeda.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0.2, 1.18, 1] });
   const giro = moeda.interpolate({
     inputRange: [0, 0.6, 1],
     outputRange: ["-14deg", "4deg", "0deg"],
@@ -122,7 +132,7 @@ export function AberturaDaAula({
     height: 128,
     borderRadius: 64,
     borderWidth: 4,
-    borderColor: `rgba(255,255,255,${alfa})`,
+    borderColor: comAlfa(cor.branco, alfa),
     opacity: v.interpolate({ inputRange: [0, 1], outputRange: [reduzido ? 0 : 0.75, 0] }),
     transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.5, 2.1] }) }],
   });
@@ -145,19 +155,20 @@ export function AberturaDaAula({
     >
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Abrindo a aula de hoje. Toque para começar"
+        accessibilityLabel={`Semana ${semana}. Abrindo a aula de hoje`}
+        accessibilityHint="Toque para pular"
         onPress={() => sair(180)}
         style={{ flex: 1 }}
       >
         <LinearGradient
-          colors={[comBranco(tom, 0.3), comBranco(tom, 0.72), tom.main]}
-          locations={[0, 0.45, 1]}
+          colors={[tom.main, tom.lip]}
+          locations={[0, 0.8]}
           style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 }}
         >
           <View style={{ alignItems: "center", justifyContent: "center", width: 140, height: 140 }}>
             <Animated.View pointerEvents="none" style={estiloDoAnel(anel1, 0.5)} />
             <Animated.View pointerEvents="none" style={estiloDoAnel(anel2, 0.3)} />
-            <Animated.View style={{ transform: [{ scale: escala }, { rotate: giro }] }}>
+            <Animated.View style={{ transform: [{ scale: escalaDaMoeda }, { rotate: giro }] }}>
               <Moeda3D tamanho={112} tom={tom} labio={10} claro={0.45} escuro={0.8} meio={0.6}>
                 <Emoji tamanho={50}>{fruitEmojiForWeek(semana)}</Emoji>
               </Moeda3D>
@@ -167,11 +178,11 @@ export function AberturaDaAula({
             style={[
               {
                 marginTop: 32,
-                ...fonte.titulo,
-                fontSize: 12,
-                letterSpacing: 3.6,
+                ...fonte.forte,
+                ...escala.nota,
+                letterSpacing: 1.6,
                 textTransform: "uppercase",
-                color: "rgba(255,255,255,0.85)",
+                color: comAlfa(cor.branco, 0.92),
               },
               subindo(texto),
             ]}
@@ -181,24 +192,19 @@ export function AberturaDaAula({
           <Animated.Text
             style={[
               {
-                marginTop: 8,
-                maxWidth: 260,
+                marginTop: 10,
+                maxWidth: 280,
                 textAlign: "center",
-                ...fonte.titulo,
-                fontSize: 26,
-                lineHeight: 32,
+                ...fonte.display,
+                ...escala.titulo1,
+                letterSpacing: -0.2,
                 color: cor.branco,
               },
               subindo(sub),
             ]}
           >
-            {nomeDoBebe ? `2 minutinhos por ${nomeDoBebe} 💛` : "2 minutinhos pelo bebê 💛"}
+            {nomeDoBebe ? `2 minutinhos por ${nomeDoBebe}` : "2 minutinhos pelo bebê"}
           </Animated.Text>
-          <Animated.View style={[{ marginTop: 12 }, subindo(sub)]}>
-            <Text style={{ ...fonte.forte, fontSize: 13, color: "rgba(255,255,255,0.75)" }}>
-              toque para começar
-            </Text>
-          </Animated.View>
         </LinearGradient>
       </Pressable>
     </Animated.View>

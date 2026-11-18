@@ -1,9 +1,19 @@
 import * as Haptics from "expo-haptics";
+import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
 import { Sprout, Target } from "lucide-react-native";
-import { Modal, Platform, Pressable, Text, useWindowDimensions, View } from "react-native";
+import {
+  Animated,
+  Modal,
+  Platform,
+  Pressable,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Botao, Cartao, Carregando, T } from "~/componentes/base";
+import { Botao, Cartao, sucesso, T } from "~/componentes/base";
+import { Entrada, useMovimentoReduzido } from "~/componentes/movimento";
 import { pagarAula, pagarDiaFechado, pagarMomento } from "~/componentes/jornada/economia";
 import { corJornada } from "~/componentes/jornada/cores";
 import { marcarLivre } from "~/componentes/jornada/livres";
@@ -12,9 +22,10 @@ import { NumeroQueConta, numeroDaPedra, PedraDoPlacar, Raios } from "~/component
 import { BolhaComBalao, BotaoDaAtividade, Brilho } from "~/componentes/jornada/atividade";
 import { Bolha, Confete, Estrela, Estrelas, voltarParaJornada } from "~/componentes/jornada/pecas";
 import { TrofeuSeConstruindo } from "~/componentes/caminho/pecas";
-import { contarMomentos, flagsDoDia, type Momento } from "~/lib/jornada/momentos";
+import { contarMomentos, feito, flagsDoDia, type Momento } from "~/lib/jornada/momentos";
 import { marcar, useLoja } from "~/lib/jornada/loja";
-import { aperto, cor, espaco, fonte, raio } from "~/tema";
+import { comAlfa } from "~/lib/cor";
+import { cor, escala, espaco, fonte, veu } from "~/tema";
 
 /**
  * O FIM DE UM MOMENTO — marca, paga, e celebra quando fecha o dia.
@@ -70,14 +81,25 @@ function fraseDoGanho(d: Desfecho): { texto: string; ok: boolean } | null {
   if (d.ganhou == null) {
     return {
       texto:
-        "O seu momento ficou guardado. Não conseguimos confirmar as sementinhas agora — a jornada tenta de novo quando você voltar.",
+        "Seu momento ficou guardado. As sementinhas ainda não foram confirmadas, e o app tenta de novo quando você voltar.",
       ok: false,
     };
   }
-  if (d.ganhou > 0) return { texto: `+${d.ganhou} sementinhas 🌱`, ok: true };
-  return { texto: "Este momento já estava contado hoje.", ok: true };
+  if (d.ganhou > 0) return { texto: `+${d.ganhou} sementinhas`, ok: true };
+  return { texto: "Este momento já tinha sido contado hoje.", ok: true };
 }
 
+/**
+ * A FESTA DO FIM (18/11/2026, a vistoria: "o herói é tímido", o placar pulava
+ * e as estrelas pareciam nota). Uma coreografia só, do primeiro quadro:
+ *   0 ms a bolha chega numa mola (0,4 → 1) · 120 os raios abrem · 220 o título
+ *   · ~300 o toque de sucesso · 350 e 490 as pedras do placar · 700 a estrela
+ *   deste momento acende.
+ * O placar fica no lugar desde o começo: a pedra das sementinhas espera com
+ * "+…" e só mostra NÚMERO quando o servidor confirmou o crédito. As estrelas
+ * têm nome ("Momentos de hoje") e ficam longe dos acertos, para não lerem
+ * como nota.
+ */
 export function FimDoMomento({
   titulo,
   fala,
@@ -91,6 +113,8 @@ export function FimDoMomento({
   confete,
   balao,
   acertos,
+  momento,
+  cor: corDoBotao,
 }: {
   titulo: string;
   fala?: string;
@@ -110,20 +134,56 @@ export function FimDoMomento({
   balao?: string;
   /** Só a aula: quantas acertou de quantas (vira uma pedra do placar). */
   acertos?: { feitos: number; total: number };
+  /**
+   * O momento que esta tela fecha. Com ele, a fileira de estrelas abre com as
+   * de ANTES e só a deste momento acende — mesmo que a tela monte antes ou
+   * depois de o momento ser marcado.
+   */
+  momento?: Momento;
+  /** A cor do botão final (a da atividade); sem ela, o roxo do jogo. */
+  cor?: string;
 }) {
   const loja = useLoja();
-  const feitos = D != null && !pos ? contarMomentos(flagsDoDia(loja.blob, D)) : 0;
+  const reduzido = useMovimentoReduzido();
+  const flags = D != null && !pos ? flagsDoDia(loja.blob, D) : null;
+  const feitos = flags ? contarMomentos(flags) : 0;
   const ganho = desfecho ? fraseDoGanho(desfecho) : null;
   const festa = !!desfecho?.fechou && !cuidado;
-  const [mostrarConfete, setConfete] = useState(false);
-  /* A estrela de agora acende NA FRENTE dela: a tela abre com uma a menos e,
-     meio segundo depois, a nova estoura. */
-  const alvo = festa ? 5 : feitos;
-  const [estrelasVisiveis, setEstrelasVisiveis] = useState(Math.max(0, alvo - 1));
+
+  /* As estrelas: o ponto de partida fica preso na montagem (as de antes). */
+  const [inicial] = useState(() => {
+    if (!flags) return 0;
+    if (momento) return Math.max(0, feitos - (feito(flags, momento) ? 1 : 0));
+    return Math.max(0, feitos - 1);
+  });
+  const alvo = festa ? 5 : Math.max(inicial, feitos);
+  const [estrelasVisiveis, setEstrelasVisiveis] = useState(inicial);
   useEffect(() => {
-    const t = setTimeout(() => setEstrelasVisiveis(alvo), 550);
+    const t = setTimeout(() => setEstrelasVisiveis(alvo), 700);
     return () => clearTimeout(t);
   }, [alvo]);
+
+  /* A chegada da bolha e o toque de sucesso (não no Modo Cuidado, que não
+     festeja desempenho, nem na aula sem acerto). */
+  const chegada = useRef(new Animated.Value(reduzido ? 1 : 0)).current;
+  useEffect(() => {
+    if (!reduzido) {
+      Animated.spring(chegada, {
+        toValue: 1,
+        speed: 10,
+        bounciness: 12,
+        useNativeDriver: true,
+      }).start();
+    }
+    const comemora = !cuidado && (acertos ? acertos.feitos > 0 : true);
+    const t = comemora ? setTimeout(sucesso, 300) : null;
+    return () => {
+      if (t) clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const [mostrarConfete, setConfete] = useState(false);
   const jaFestejou = useRef(false);
   /* O dia fechou agora: o troféu se constrói por cima da festa, uma vez. */
   const [trofeu, setTrofeu] = useState(false);
@@ -135,57 +195,86 @@ export function FimDoMomento({
     }
   }, [festa, confete, cuidado]);
 
-  /* A festa ocupa a tela: o herói no meio, o botão firme no pé. A Tela de
-     cada atividade rola, então a altura vem da janela. */
-  const { height } = useWindowDimensions();
+  /* A festa ocupa a tela: o herói no meio, o botão firme no pé. A altura vem
+     da janela, porque quem a mostra rola. */
+  const janela = useWindowDimensions();
   const area = useSafeAreaInsets();
-  const altura = height - area.top - area.bottom - espaco.lg * 2;
+  const altura = janela.height - area.top - area.bottom - espaco.lg * 2;
+  /* O confete cai da borda de CIMA da tela, e não de dentro do conteúdo: a
+     camada dele se mede na janela e se estica até as bordas. */
+  const raiz = useRef<View>(null);
+  const [origem, setOrigem] = useState<{ x: number; y: number } | null>(null);
+
   const ganhouConfirmado = !!ganho?.ok && !!desfecho?.ganhou && desfecho.ganhou > 0;
-  /* As estrelas do dia não viram pedra: a fileira delas, que estoura, já diz. */
-  const comPlacar = ganhouConfirmado || !!acertos;
+  /* Há pagamento a esperar (fora do luto, do pós-parto e sem dia). */
+  const pagavel = !cuidado && !pos && D != null && !desfecho?.semPagamento;
+  const bonus = festa && desfecho?.bonus && desfecho.bonus > 0 ? desfecho.bonus : null;
+  const comPlacar = pagavel || !!acertos || !!bonus;
+
+  const heroi = festa ? (
+    /* No aparelho, a bolha da festa traz as cinco estrelas em órbita; na web,
+       a constelação é desenhada em volta da arte parada. */
+    Platform.OS === "web" ? (
+      <Constelacao tamanho={170} estrela={(i) => <Estrela key={i} acesa tamanho={30} />}>
+        <Bolha humor="comemorando" tamanho={170} />
+      </Constelacao>
+    ) : (
+      <Bolha humor="estrelas" tamanho={210} />
+    )
+  ) : (
+    (arte ?? (
+      <View style={{ alignItems: "center", justifyContent: "center" }}>
+        <Brilho tamanho={250} />
+        <Bolha humor={cuidado ? "feliz" : "comemorando"} tamanho={210} />
+      </View>
+    ))
+  );
 
   return (
-    <View style={{ minHeight: altura }}>
+    <View
+      ref={raiz}
+      onLayout={() =>
+        raiz.current?.measureInWindow((x, y) => setOrigem((o) => (o?.y === y ? o : { x, y })))
+      }
+      style={{ flexGrow: 1, minHeight: altura }}
+    >
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: espaco.md }}>
-        <View style={{ alignItems: "center", justifyContent: "center", minHeight: 230 }}>
-          {/* O sol de raios atrás da bolha: o "você conseguiu" (não no Modo Cuidado,
-              que não festeja desempenho). */}
-          {cuidado ? null : <Raios tamanho={340} forca={festa ? 0.75 : 0.55} />}
-          {festa ? (
-            /* No aparelho, a bolha da festa traz as cinco estrelas em órbita;
-               na web, a constelação é desenhada em volta da arte parada. */
-            Platform.OS === "web" ? (
-              <Constelacao tamanho={170} estrela={(i) => <Estrela key={i} acesa tamanho={30} />}>
-                <Bolha humor="comemorando" tamanho={170} />
-              </Constelacao>
-            ) : (
-              <Bolha humor="estrelas" tamanho={210} />
-            )
-          ) : (
-            (arte ?? (
-              <View style={{ alignItems: "center", justifyContent: "center" }}>
-                <Brilho tamanho={250} />
-                <Bolha humor={cuidado ? "feliz" : "comemorando"} tamanho={210} />
-              </View>
-            ))
-          )}
+        <View style={{ alignItems: "center", justifyContent: "center", minHeight: 236 }}>
+          {/* O sol de raios atrás da bolha: o "você conseguiu" (não no Modo
+              Cuidado, que não festeja desempenho). */}
+          {cuidado ? null : <Raios tamanho={340} forca={festa ? 0.75 : 0.55} atraso={120} />}
+          <Animated.View
+            style={{
+              opacity: chegada.interpolate({
+                inputRange: [0, 0.3],
+                outputRange: [0, 1],
+                extrapolate: "clamp",
+              }),
+              transform: [
+                { scale: chegada.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }) },
+              ],
+            }}
+          >
+            {heroi}
+          </Animated.View>
         </View>
-        <Text
-          accessibilityRole="header"
-          style={{
-            textAlign: "center",
-            ...fonte.titulo,
-            fontSize: 34,
-            lineHeight: 40,
-            letterSpacing: aperto.titulo,
-            color: cor.texto,
-          }}
-        >
-          {festa ? "Cinco estrelas!" : titulo}
-        </Text>
+        <Entrada atraso={220} deslocamento={12}>
+          <Text
+            accessibilityRole="header"
+            style={{
+              textAlign: "center",
+              ...fonte.display,
+              ...escala.grande,
+              letterSpacing: -0.3,
+              color: cor.texto,
+            }}
+          >
+            {festa ? "Cinco estrelas!" : titulo}
+          </Text>
+        </Entrada>
         {festa ? (
           <T tipo="corpo" centro cor={cor.textoApagado}>
-            Você fechou os cinco momentos de hoje. Isso é cuidado de verdade.
+            Você fez os cinco momentos de hoje.
           </T>
         ) : fala ? (
           <T tipo="corpo" centro cor={cor.textoApagado}>
@@ -197,14 +286,14 @@ export function FimDoMomento({
         ) : null}
 
         {/* O PLACAR: o que ela levou deste momento, em pedras que entram uma
-            depois da outra. As sementinhas só aparecem CONFIRMADAS pelo
-            servidor — nunca um número que não chegou. */}
+            depois da outra, todas no lugar desde o primeiro quadro. As
+            sementinhas só viram NÚMERO quando o servidor confirmou o crédito. */}
         {comPlacar ? (
           <View
             style={{
               flexDirection: "row",
               justifyContent: "center",
-              gap: 12,
+              gap: espaco.md,
               alignSelf: "stretch",
               marginTop: 6,
             }}
@@ -214,14 +303,29 @@ export function FimDoMomento({
                 ordem={0}
                 rotulo="sementinhas"
                 acessivel={`${desfecho!.ganhou} sementinhas ganhas`}
-                icone={<Sprout size={22} color={corJornada.sementinha} strokeWidth={2.4} />}
+                icone={<Sprout size={22} color={cor.sementinha} strokeWidth={2.4} />}
               >
                 <NumeroQueConta
                   valor={desfecho!.ganhou!}
                   prefixo="+"
-                  estilo={numeroDaPedra(corJornada.sementinha)}
+                  estilo={numeroDaPedra(cor.sementinha)}
                 />
                 <SementesSubindo quantidade={desfecho!.ganhou!} disparo={desfecho!.ganhou!} />
+              </PedraDoPlacar>
+            ) : pagavel ? (
+              <PedraDoPlacar
+                ordem={0}
+                rotulo="sementinhas"
+                acessivel={
+                  desfecho == null
+                    ? "Somando as sementinhas"
+                    : "Nenhuma sementinha confirmada agora"
+                }
+                icone={<Sprout size={22} color={cor.textoApagado} strokeWidth={2.4} />}
+              >
+                <Text allowFontScaling={false} style={numeroDaPedra(cor.textoApagado)}>
+                  {desfecho == null ? "+…" : "—"}
+                </Text>
               </PedraDoPlacar>
             ) : null}
             {acertos ? (
@@ -236,19 +340,48 @@ export function FimDoMomento({
                 </Text>
               </PedraDoPlacar>
             ) : null}
+            {bonus ? (
+              <PedraDoPlacar
+                ordem={2}
+                rotulo="bônus do dia"
+                acessivel={`${bonus} sementinhas de bônus pelo dia completo`}
+                icone={<Estrela acesa tamanho={20} />}
+              >
+                <NumeroQueConta valor={bonus} prefixo="+" estilo={numeroDaPedra(cor.sementinha)} />
+              </PedraDoPlacar>
+            ) : null}
           </View>
         ) : null}
-        {D != null && !pos && !cuidado ? <Estrelas feitos={estrelasVisiveis} tamanho={38} /> : null}
+        {flags && !cuidado ? (
+          <View style={{ alignItems: "center", gap: espaco.sm, marginTop: espaco.xl }}>
+            <Text
+              importantForAccessibility="no"
+              accessibilityElementsHidden
+              style={{
+                ...fonte.forte,
+                ...escala.nota,
+                letterSpacing: 0.3,
+                color: cor.textoApagado,
+              }}
+            >
+              Momentos de hoje
+            </Text>
+            <Estrelas
+              feitos={estrelasVisiveis}
+              tamanho={28}
+              rotuloAcessivel={`${alvo} de 5 momentos de hoje`}
+            />
+          </View>
+        ) : null}
       </View>
 
       <View style={{ gap: espaco.md, marginTop: espaco.lg }}>
         {extra}
-        {desfecho == null && !cuidado ? <Carregando texto="Somando as suas sementinhas…" /> : null}
-        {/* O que NÃO virou pedra do placar: o "não conseguimos confirmar" e o
-            "já estava contado" — ditos por inteiro, nunca escondidos. */}
+        {/* O que NÃO virou número no placar: o "não conseguimos confirmar" e o
+            "já estava contado", ditos por inteiro, nunca escondidos. */}
         {ganho && !ganhouConfirmado ? (
-          <Cartao fundo={ganho.ok ? corJornada.sementinhaFundo : cor.atencaoFundo}>
-            <T tipo="rotulo" cor={ganho.ok ? corJornada.sementinha : cor.atencao} centro>
+          <Cartao fundo={ganho.ok ? cor.sementinhaFundo : cor.atencaoFundo}>
+            <T tipo="rotulo" cor={ganho.ok ? cor.sementinha : cor.atencao} centro>
               {ganho.texto}
             </T>
             {!ganho.ok && aoTentarPagar ? (
@@ -256,34 +389,27 @@ export function FimDoMomento({
             ) : null}
           </Cartao>
         ) : null}
-        {festa && desfecho ? (
-          <View
-            style={{
-              borderRadius: raio.lg,
-              padding: espaco.lg,
-              backgroundColor: corJornada.trofeuFundo,
-              borderWidth: 1,
-              borderColor: "#fcd34d",
-              gap: 4,
-            }}
-          >
-            <T tipo="rotulo" cor={corJornada.trofeu} centro>
-              {desfecho.bonus && desfecho.bonus > 0
-                ? `Bônus das cinco estrelas: +${desfecho.bonus} 🌱`
-                : "Dia completo ⭐"}
-            </T>
-            <T tipo="apagado" centro>
-              Cada dia de cinco estrelas vira um troféu 🏆
-            </T>
-          </View>
-        ) : null}
         <BotaoDaAtividade
-          cor={corJornada.roxo}
-          rotulo="Voltar para a jornada"
+          cor={corDoBotao ?? corJornada.roxo}
+          rotulo="Continuar"
           aoTocar={voltarParaJornada}
         />
       </View>
-      {mostrarConfete ? <Confete pecas={confete === "grande" && !festa ? 72 : 36} /> : null}
+      {mostrarConfete && origem ? (
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            left: -origem.x,
+            top: -origem.y,
+            width: janela.width,
+            height: janela.height,
+            zIndex: 10,
+          }}
+        >
+          <Confete pecas={confete === "grande" && !festa ? 72 : 36} altura={janela.height + 40} />
+        </View>
+      ) : null}
       {trofeu ? <TrofeuConquistado aoFechar={() => setTrofeu(false)} /> : null}
     </View>
   );
@@ -302,41 +428,44 @@ function TrofeuConquistado({ aoFechar }: { aoFechar: () => void }) {
     aoFechar();
   };
   return (
-    <Modal transparent animationType="fade" visible onRequestClose={fechar}>
+    <Modal transparent animationType="fade" visible statusBarTranslucent onRequestClose={fechar}>
+      {/* Sobre o véu escuro, o relógio e a bateria em branco. */}
+      <StatusBar style="light" animated />
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Troféu conquistado. Tocar para continuar"
+        accessibilityLabel="Troféu conquistado. Toque para continuar"
         onPress={fechar}
         style={{
           flex: 1,
           alignItems: "center",
           justifyContent: "center",
           gap: espaco.lg,
+          paddingHorizontal: espaco.xl,
           /* Escuro o bastante para a festa de trás não disputar com o troféu. */
-          backgroundColor: "rgba(30,16,40,0.86)",
+          backgroundColor: veu.tinta(0.86),
         }}
       >
         <TrofeuSeConstruindo largura={200} aoTerminar={() => setTimeout(fechar, 600)} />
         <Text
           style={{
             textAlign: "center",
-            ...fonte.titulo,
-            fontSize: 26,
-            lineHeight: 32,
+            ...fonte.display,
+            ...escala.titulo1,
+            letterSpacing: -0.2,
             color: cor.branco,
           }}
         >
-          Troféu conquistado!
+          Troféu conquistado
         </Text>
         <Text
           style={{
             textAlign: "center",
             ...fonte.media,
-            fontSize: 15,
-            color: "rgba(255,255,255,0.85)",
+            ...escala.legenda,
+            color: comAlfa(cor.branco, 0.85),
           }}
         >
-          Um dia inteiro cuidado 🏆
+          Mais um troféu no seu placar.
         </Text>
       </Pressable>
     </Modal>
