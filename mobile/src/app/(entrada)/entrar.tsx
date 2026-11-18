@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Animated,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -12,7 +13,7 @@ import {
   type NativeSyntheticEvent,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Botao, toque } from "~/componentes/base";
+import { Botao, selecao, toque } from "~/componentes/base";
 import {
   VitrineDaAula,
   VitrineDaBolha,
@@ -35,14 +36,16 @@ import { Vidro } from "~/componentes/vidro";
 import { appleDisponivel, entrarComApple } from "~/lib/apple";
 import { lerJson } from "~/lib/armazem";
 import { parametroDaBancada } from "~/lib/bancada";
-import { cor, espaco, fonte, raio } from "~/tema";
+import { cor, escala, espaco, fonte } from "~/tema";
 
 /**
  * AS BOAS-VINDAS (17/11/2026, o dono: "um caminho que nem a gente está
  * fazendo do Marca Ponto, de slides para você entrar no aplicativo").
  *
  * Como no Marca Ponto: o produto ANTES de pedir qualquer coisa. Cinco slides
- * que deslizam com o dedo (ou com "Continuar"), sobre o céu vivo da hora:
+ * que deslizam com o dedo (ou com "Continuar"), sobre o céu vivo da hora. A
+ * vitrine anda mais devagar que o slide (a profundidade das apresentações da
+ * Apple); com "reduzir movimento", ela só esmaece.
  *
  *   0. a bolha e o nome — "Começar" ou "Já tenho conta";
  *   1. a aula do dia · 2. a trilha que vira jogo · 3. as amigas;
@@ -62,7 +65,7 @@ const FIM = TOTAL - 1;
 type Modo = "nova" | "voltou";
 
 export default function BoasVindas() {
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const fora = useSafeAreaInsets();
   const reduzido = useMovimentoReduzido();
   const x = useRef(new Animated.Value(0)).current;
@@ -74,11 +77,16 @@ export default function BoasVindas() {
   /* `null` enquanto lê se este aparelho já entrou (uma leitura local, rápida):
      sem isso, quem volta veria o primeiro slide piscar antes do último. */
   const [modo, setModo] = useState<Modo | null>(null);
-  const [comApple, setComApple] = useState(false);
+  /* No iPhone a Apple está sempre lá (iOS 13 ou mais): o botão nasce no lugar
+     e só sai se a resposta for não. Começar sem ele empurrava o resto da tela
+     uns 70 pt para baixo no meio da entrada. */
+  const [comApple, setComApple] = useState(Platform.OS === "ios");
   const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
-    void appleDisponivel().then(setComApple);
+    void appleDisponivel().then((ok) => {
+      if (!ok) setComApple(false);
+    });
     let vivo = true;
     void lerJson(CHAVE_JA_ENTROU, false).then((ja) => {
       if (!vivo) return;
@@ -96,6 +104,18 @@ export default function BoasVindas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* A web (a bancada) não conhece `contentOffset`: lá a lista vai ao slide
+     pedido depois de montar. No iPhone é a mesma posição, sem efeito. */
+  const pronto = modo !== null;
+  useEffect(() => {
+    if (!pronto || !inicio.current) return;
+    const id = requestAnimationFrame(() =>
+      lista.current?.scrollTo({ x: inicio.current * width, animated: false }),
+    );
+    return () => cancelAnimationFrame(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pronto]);
+
   function ir(n: number) {
     const alvo = Math.max(0, Math.min(FIM, n));
     setPagina(alvo);
@@ -103,7 +123,9 @@ export default function BoasVindas() {
   }
 
   function aoParar(e: NativeSyntheticEvent<NativeScrollEvent>) {
-    setPagina(Math.round(e.nativeEvent.contentOffset.x / width));
+    const nova = Math.round(e.nativeEvent.contentOffset.x / width);
+    if (nova !== pagina) selecao();
+    setPagina(nova);
   }
 
   async function apple() {
@@ -122,7 +144,7 @@ export default function BoasVindas() {
     {
       vitrine: <VitrineDaBolha largura={width} />,
       titulo: "Mãe Esperta",
-      texto: "Sua gestação, um dia de cada vez — com aulas curtinhas, jogo e amigas.",
+      texto: "Aprenda sobre a sua gravidez jogando.",
       acoes: (
         <>
           <Botao rotulo="Começar" aoTocar={() => ir(1)} estilo={{ minHeight: 56 }} />
@@ -139,27 +161,27 @@ export default function BoasVindas() {
     {
       vitrine: <VitrineDaAula largura={width} />,
       titulo: "Uma aula de 2 minutos por dia",
-      texto: "Perguntas curtinhas sobre a sua fase, no seu ritmo. Cada acerto vira sementinhas.",
+      texto: "Perguntas rápidas sobre a semana em que você está. Cada acerto vale sementinhas.",
       acoes: <Botao rotulo="Continuar" aoTocar={() => ir(2)} estilo={{ minHeight: 56 }} />,
     },
     {
       vitrine: <VitrineDaTrilha largura={width} />,
-      titulo: "Uma trilha que vira jogo",
-      texto: "Cada dia é um passo: estrelas, conquistas e uma chama que cresce quando você volta.",
+      titulo: "Cada dia é um passo na trilha",
+      texto: "Faça a aula e ganhe estrelas. Volte amanhã e a chama cresce.",
       acoes: <Botao rotulo="Continuar" aoTocar={() => ir(3)} estilo={{ minHeight: 56 }} />,
     },
     {
       vitrine: <VitrineDasAmigas largura={width} />,
-      titulo: "Juntas é melhor",
-      texto: "Chame uma amiga e formem uma dupla: quando as duas aparecem no dia, as duas ganham.",
+      titulo: "Jogue junto com uma amiga",
+      texto: "Formem uma dupla. Quando as duas fecham o dia, cada uma ganha sementinhas.",
       acoes: <Botao rotulo="Continuar" aoTocar={() => ir(4)} estilo={{ minHeight: 56 }} />,
     },
     {
       vitrine: <VitrineDoFim largura={width} ativa={pagina === FIM} />,
-      titulo: voltou ? "Que bom te ver de novo" : "Pronta para começar?",
+      titulo: voltou ? "Que bom te ver de novo" : "Crie a sua conta",
       texto: voltou
-        ? "Entre para continuar a sua trilha de onde parou."
-        : "Crie a sua conta em segundos. Depois, a gente monta a sua trilha.",
+        ? "Entre e continue a trilha de onde parou."
+        : "Leva um minuto. Depois, é só dizer em que semana você está.",
       acoes: (
         <>
           {erro ? <ErroNoVeu>{erro}</ErroNoVeu> : null}
@@ -173,7 +195,7 @@ export default function BoasVindas() {
                   : AppleAuthentication.AppleAuthenticationButtonType.CONTINUE
               }
               buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
-              cornerRadius={raio.pilula}
+              cornerRadius={28}
               style={{ height: 56 }}
               onPress={apple}
             />
@@ -185,7 +207,7 @@ export default function BoasVindas() {
                 aoTocar={() => router.push("/email")}
                 estilo={{ minHeight: 56 }}
               />
-              <LinkNoVeu rotulo="Criar uma conta nova" aoTocar={() => router.push("/cadastro")} />
+              <LinkNoVeu rotulo="Criar uma conta" aoTocar={() => router.push("/cadastro")} />
             </>
           ) : (
             <>
@@ -226,8 +248,11 @@ export default function BoasVindas() {
               /* O leitor de tela lê só o slide à vista. */
               accessibilityElementsHidden={pagina !== i}
               importantForAccessibility={pagina === i ? "auto" : "no-hide-descendants"}
+              /* A altura é a da tela: a lista deitada não estica os filhos na
+                 altura, e o pé (título, texto, botões) ficava no meio. */
               style={{
                 width,
+                height,
                 paddingTop: fora.top + 64,
                 paddingBottom: fora.bottom + espaco.md,
               }}
@@ -243,28 +268,30 @@ export default function BoasVindas() {
                     outputRange: [0, 1, 0],
                     extrapolate: "clamp",
                   }),
-                  transform: [
-                    {
-                      translateX: x.interpolate({
-                        inputRange: perto,
-                        outputRange: [-width * 0.32, 0, width * 0.32],
-                        extrapolate: "clamp",
-                      }),
-                    },
-                    {
-                      scale: x.interpolate({
-                        inputRange: perto,
-                        outputRange: [0.86, 1, 0.86],
-                        extrapolate: "clamp",
-                      }),
-                    },
-                  ],
+                  transform: reduzido
+                    ? []
+                    : [
+                        {
+                          translateX: x.interpolate({
+                            inputRange: perto,
+                            outputRange: [-width * 0.35, 0, width * 0.35],
+                            extrapolate: "clamp",
+                          }),
+                        },
+                        {
+                          scale: x.interpolate({
+                            inputRange: perto,
+                            outputRange: [0.86, 1, 0.86],
+                            extrapolate: "clamp",
+                          }),
+                        },
+                      ],
                 }}
               >
                 {s.vitrine}
               </Animated.View>
               <ColunaDaEntrada estilo={{ paddingHorizontal: espaco.xl, gap: espaco.sm }}>
-                <TituloNoVeu centro tamanho={i === 0 ? 44 : 32}>
+                <TituloNoVeu centro nivel={i === 0 ? "grande" : "titulo1"}>
                   {s.titulo}
                 </TituloNoVeu>
                 <TextoNoVeu centro>{s.texto}</TextoNoVeu>
@@ -327,17 +354,17 @@ function BarraDoAlto({
             key={k}
             style={{
               flex: 1,
-              height: 5,
-              borderRadius: 3,
+              height: 4,
+              borderRadius: 2,
               overflow: "hidden",
-              backgroundColor: "rgba(255,255,255,0.3)",
+              backgroundColor: "rgba(255,255,255,0.24)",
             }}
           >
             <Animated.View
               style={{
                 height: "100%",
                 width: "100%",
-                borderRadius: 3,
+                borderRadius: 2,
                 backgroundColor: cor.branco,
                 transform: [
                   {
@@ -376,7 +403,7 @@ function BarraDoAlto({
               interativo
               estilo={{ minHeight: 44, paddingHorizontal: 18, justifyContent: "center" }}
             >
-              <Text style={{ ...fonte.forte, fontSize: 15, color: cor.texto }}>Pular</Text>
+              <Text style={{ ...fonte.forte, ...escala.legenda, color: cor.texto }}>Pular</Text>
             </Vidro>
           </Pressable>
         </Animated.View>

@@ -3,8 +3,22 @@ import { Check, Flame, Gift, Heart, Sprout, Star, Trophy } from "lucide-react-na
 import type { ReactNode } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { corCaminho } from "~/componentes/caminho/cores";
+import { Moeda3D } from "~/componentes/caminho/pecas";
 import { ArteDaBolha, BolhaViva, Flutuar } from "~/componentes/movimento";
-import { cor, curva, espaco, fonte, fonteDoNumero, sombra, sombraFlutuante } from "~/tema";
+import { coresDaSemana } from "~/lib/jornada/caminho";
+import {
+  canto,
+  cor,
+  curva,
+  escala,
+  espaco,
+  fonte,
+  fonteDoNumero,
+  luz,
+  ouro,
+  sombra,
+  sombraFlutuante,
+} from "~/tema";
 
 /**
  * AS VITRINES DOS SLIDES DE BOAS-VINDAS (17/11/2026): o produto antes de
@@ -32,14 +46,14 @@ function Etiqueta({ icone, texto, tinta }: { icone: ReactNode; texto: string; ti
         gap: 6,
         paddingHorizontal: 14,
         paddingVertical: 9,
-        borderRadius: 999,
+        borderRadius: canto.pilula,
         ...curva,
         backgroundColor: "rgba(255,255,255,0.94)",
         boxShadow: "0px 10px 24px -10px rgba(10,6,40,0.55)",
       }}
     >
       {icone}
-      <Text style={{ ...fonteDoNumero, fontSize: 16, color: tinta }}>{texto}</Text>
+      <Text style={{ ...fonteDoNumero, ...escala.chamada, color: tinta }}>{texto}</Text>
     </View>
   );
 }
@@ -61,9 +75,9 @@ export function VitrineDaBolha({ largura }: { largura: number }) {
         <View style={{ position: "absolute", left: 0, top: 6 }}>
           <Flutuar amplitude={4} periodo={3600}>
             <Etiqueta
-              icone={<Flame size={17} color={corCaminho.chamaAcesa} fill="#ffb84d" />}
+              icone={<Flame size={17} color={corCaminho.chamaAcesa} fill={ouro.medio} />}
               texto="15 dias"
-              tinta="#b45309"
+              tinta={cor.atencao}
             />
           </Flutuar>
         </View>
@@ -117,7 +131,7 @@ export function VitrineDaAula({ largura }: { largura: number }) {
         >
           {/* O alto da aula: o passo e a barra que enche. */}
           <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
-            <Text style={{ ...fonte.forte, fontSize: 13, color: cor.textoApagado }}>
+            <Text style={{ ...fonte.forte, ...escala.nota, color: cor.textoApagado }}>
               Pergunta 2 de 5
             </Text>
             <View
@@ -139,10 +153,8 @@ export function VitrineDaAula({ largura }: { largura: number }) {
           </View>
           <Text
             style={{
-              ...fonte.titulo,
-              fontSize: 21,
-              lineHeight: 26,
-              letterSpacing: -0.3,
+              ...fonte.forte,
+              ...escala.titulo3,
               color: cor.texto,
               paddingRight: 64,
             }}
@@ -158,19 +170,19 @@ export function VitrineDaAula({ largura }: { largura: number }) {
                 gap: espaco.md,
                 minHeight: 50,
                 paddingHorizontal: espaco.md,
-                borderRadius: 18,
+                borderRadius: canto.campo,
                 ...curva,
                 borderWidth: o.certa ? 2 : 1,
                 borderColor: o.certa ? cor.sementinha : cor.borda,
-                backgroundColor: o.certa ? "#ecfdf3" : cor.branco,
+                backgroundColor: o.certa ? cor.acertoFundo : cor.branco,
               }}
             >
-              <Text style={{ fontSize: 20 }}>{o.emoji}</Text>
+              <Text style={{ fontSize: escala.titulo3.fontSize }}>{o.emoji}</Text>
               <Text
                 style={{
                   ...fonte.forte,
+                  ...escala.chamada,
                   flex: 1,
-                  fontSize: 16,
                   color: o.certa ? cor.sementinha : cor.texto,
                 }}
               >
@@ -211,56 +223,8 @@ export function VitrineDaAula({ largura }: { largura: number }) {
 
 /* ── 2. A trilha ──────────────────────────────────────────────────────── */
 
-/** Um nó da trilha em relevo: o disco, o lábio de baixo e o brilho no alto. */
-function No({
-  tamanho,
-  verde,
-  children,
-}: {
-  tamanho: number;
-  verde: boolean;
-  children?: ReactNode;
-}) {
-  const [claro, meio, labio] = verde
-    ? ["#4ee0a8", "#14b884", "#0b8f66"]
-    : ["#f3f7fb", "#dfe8f1", "#b9c7d6"];
-  return (
-    <View style={{ width: tamanho, height: tamanho + 8 }}>
-      <View
-        style={{
-          position: "absolute",
-          top: 8,
-          width: tamanho,
-          height: tamanho,
-          borderRadius: tamanho / 2,
-          backgroundColor: labio,
-        }}
-      />
-      <LinearGradient
-        colors={[claro, meio]}
-        style={{
-          width: tamanho,
-          height: tamanho,
-          borderRadius: tamanho / 2,
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <View
-          style={{
-            position: "absolute",
-            top: tamanho * 0.1,
-            width: tamanho * 0.44,
-            height: tamanho * 0.16,
-            borderRadius: tamanho,
-            backgroundColor: "rgba(255,255,255,0.45)",
-          }}
-        />
-        {children}
-      </LinearGradient>
-    </View>
-  );
-}
+/* Os nós da trilha são as moedas de verdade dela, na cor de uma semana. */
+const TOM_DA_VITRINE = coresDaSemana(28);
 
 function Estrelas({ quantas }: { quantas: number }) {
   return (
@@ -269,8 +233,8 @@ function Estrelas({ quantas }: { quantas: number }) {
         <Star
           key={i}
           size={15}
-          color={i < quantas ? corCaminho.ouroEscuro : "rgba(255,255,255,0.7)"}
-          fill={i < quantas ? corCaminho.ouro : "rgba(255,255,255,0.35)"}
+          color={i < quantas ? corCaminho.ouroEscuro : corCaminho.textoClaro80}
+          fill={i < quantas ? corCaminho.ouro : corCaminho.estrelaApagada}
         />
       ))}
     </View>
@@ -282,21 +246,23 @@ export function VitrineDaTrilha({ largura }: { largura: number }) {
   return (
     <View style={{ width: largura, alignItems: "center", justifyContent: "center", gap: 6 }}>
       <Etiqueta
-        icone={<Flame size={17} color={corCaminho.chamaAcesa} fill="#ffb84d" />}
+        icone={<Flame size={17} color={corCaminho.chamaAcesa} fill={ouro.medio} />}
         texto="15 dias seguidos"
-        tinta="#b45309"
+        tinta={cor.atencao}
       />
       <View style={{ width: 250, height: 330 }}>
         <View style={{ position: "absolute", left: 20, top: 18, alignItems: "center" }}>
-          <No tamanho={no} verde>
+          <Moeda3D tamanho={no} tom={TOM_DA_VITRINE}>
             <Check size={34} color={cor.branco} strokeWidth={3.4} />
-          </No>
+          </Moeda3D>
+          <View style={{ height: 8 }} />
           <Estrelas quantas={5} />
         </View>
         <View style={{ position: "absolute", right: 14, top: 106, alignItems: "center" }}>
-          <No tamanho={no} verde>
+          <Moeda3D tamanho={no} tom={TOM_DA_VITRINE}>
             <Check size={34} color={cor.branco} strokeWidth={3.4} />
-          </No>
+          </Moeda3D>
+          <View style={{ height: 8 }} />
           <Estrelas quantas={4} />
         </View>
         {/* Hoje: maior, com o anel e o balão. */}
@@ -318,7 +284,7 @@ export function VitrineDaTrilha({ largura }: { largura: number }) {
                 numberOfLines={1}
                 style={{
                   ...fonte.titulo,
-                  fontSize: 13,
+                  ...escala.nota,
                   letterSpacing: 0.4,
                   color: corCaminho.balaoTexto,
                 }}
@@ -335,9 +301,10 @@ export function VitrineDaTrilha({ largura }: { largura: number }) {
               borderColor: "rgba(255,255,255,0.75)",
             }}
           >
-            <No tamanho={no + 14} verde>
+            <Moeda3D tamanho={no + 14} tom={TOM_DA_VITRINE}>
               <Gift size={36} color={cor.branco} strokeWidth={2.2} />
-            </No>
+            </Moeda3D>
+            <View style={{ height: 7 }} />
           </View>
         </View>
         <View style={{ position: "absolute", right: 6, bottom: 8 }}>
@@ -369,7 +336,9 @@ function Rosto({ letra, fundo, tinta }: { letra: string; fundo: string; tinta: s
         ...sombra,
       }}
     >
-      <Text style={{ ...fonte.titulo, fontSize: 34, color: tinta }}>{letra}</Text>
+      <Text style={{ ...fonte.titulo, fontSize: escala.grande.fontSize, color: tinta }}>
+        {letra}
+      </Text>
     </View>
   );
 }
@@ -396,31 +365,36 @@ export function VitrineDasAmigas({ largura }: { largura: number }) {
             ...sombraFlutuante,
           }}
         >
-          <Text style={{ ...fonte.titulo, fontSize: 21, color: cor.texto }}>Você + Ana</Text>
+          <Text
+            style={{ ...fonte.display, ...escala.titulo2, letterSpacing: -0.2, color: cor.texto }}
+          >
+            Você + Ana
+          </Text>
           <View
             style={{
               flexDirection: "row",
               alignItems: "center",
               gap: 6,
-              backgroundColor: "#fff3e0",
-              borderRadius: 999,
+              backgroundColor: cor.quaseFundo,
+              borderRadius: canto.pilula,
               paddingHorizontal: 14,
               paddingVertical: 7,
             }}
           >
-            <Flame size={16} color={corCaminho.chamaAcesa} fill="#ffb84d" />
-            <Text style={{ ...fonte.forte, fontSize: 15, color: "#9a4a00" }}>6 dias juntas</Text>
+            <Flame size={16} color={corCaminho.chamaAcesa} fill={ouro.medio} />
+            <Text style={{ ...fonte.forte, ...escala.legenda, color: cor.atencaoTexto }}>
+              6 dias juntas
+            </Text>
           </View>
           <Text
             style={{
               ...fonte.normal,
-              fontSize: 15,
-              lineHeight: 21,
+              ...escala.legenda,
               color: cor.textoApagado,
               textAlign: "center",
             }}
           >
-            +10 🌱 para cada uma, a cada dia juntas
+            Cada uma ganha 10 sementinhas por dia juntas
           </Text>
         </View>
         {/* Os dois rostos por cima do cartão, com o coração no meio. */}
@@ -432,7 +406,7 @@ export function VitrineDasAmigas({ largura }: { largura: number }) {
             alignItems: "center",
           }}
         >
-          <Rosto letra="V" fundo="#ffd3e2" tinta={cor.primariaEscura} />
+          <Rosto letra="V" fundo={luz.rose} tinta={cor.primariaEscura} />
           <View
             style={{
               width: 36,
@@ -449,7 +423,7 @@ export function VitrineDasAmigas({ largura }: { largura: number }) {
           >
             <Heart size={16} color={cor.branco} fill={cor.branco} />
           </View>
-          <Rosto letra="A" fundo="#dcd2fb" tinta="#4c2a9e" />
+          <Rosto letra="A" fundo={luz.lilas} tinta={cor.agenda} />
         </View>
         <View style={{ position: "absolute", right: -30, top: -6 }}>
           <ArteDaBolha humor="apaixonado" tamanho={86} />

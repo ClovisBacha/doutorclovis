@@ -1,9 +1,22 @@
 import { dueDateFromLmp } from "@/lib/gestacao";
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, View } from "react-native";
+import { useRef, useState, type ReactNode } from "react";
+import { View } from "react-native";
+import { Botao, sucesso } from "~/componentes/base";
+import {
+  CampoNoVeu,
+  ErroNoVeu,
+  EscolhaNoVeu,
+  FundoDaEntrada,
+  LinkNoVeu,
+  MolduraDoPasso,
+  SegmentosDoPasso,
+  TextoNoVeu,
+  TituloNoVeu,
+  TopoDoPasso,
+} from "~/componentes/entrada";
 import { BolhaViva } from "~/componentes/movimento";
-import { Botao, Campo, Cartao, Linha, T, Tela, toque } from "~/componentes/base";
+import { RevelacaoDoBebe } from "~/componentes/revelacao-do-bebe";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { gravarPerfil } from "~/lib/gravar-perfil";
 import { abrirLoja, gravarChave } from "~/lib/jornada/loja";
@@ -22,41 +35,60 @@ import {
 import { ligarPeloCodigo } from "~/componentes/amigas/economia";
 import { codigoLimpo, fraseDaIndicacao, type ResultadoDaIndicacao } from "~/lib/jornada/amigas";
 import { RECOMPENSA_DA_INDICACAO } from "~/lib/jornada/recompensas";
+import {
+  ordemDoRitual,
+  PASSO_DO_CONTATO,
+  PASSO_DO_MEDICO,
+  revelaOBebe,
+  semanaDaRevelacao,
+  type ModoDaData,
+} from "~/lib/ritual";
 import { useSessao } from "~/lib/sessao";
-import { ALVO_MINIMO, cor, espaco, raio } from "~/tema";
+import { canto, curva, espaco } from "~/tema";
 import { COMUNIDADE_NO_APP, SOS_NO_APP } from "~/config";
 
-type Modo = "dum" | "us" | "nasceu";
+type Modo = ModoDaData;
 /** O nome, a data, o bebê, o contato, o médico e a rede (o último só no cadastro). */
 const PASSOS = 6;
 const PASSO_DA_REDE = 5;
-/** O contato de emergência: só com o SOS no app (`SOS_NO_APP`). */
-const PASSO_DO_CONTATO = 3;
-const seguinte = (p: number) => (p + 1 === PASSO_DO_CONTATO && !SOS_NO_APP ? p + 2 : p + 1);
-const anterior = (p: number) => (p - 1 === PASSO_DO_CONTATO && !SOS_NO_APP ? p - 2 : p - 1);
+
+type Campo = "nome" | "data" | "semanas" | "dias" | "celular" | "email" | "codigo";
+type Erro = { texto: string; vez: number; campo?: Campo };
 
 /**
  * O ritual de boas-vindas: o mínimo para o app acompanhar a gestação, em
- * passos curtos. Só o passo da data é obrigatório — o resto pode ser pulado e
+ * passos curtos. Só o passo da data é obrigatório; o resto pode ser pulado e
  * completado no Perfil.
  *
- * O último é o da REDE (fase 3): "Uma amiga te chamou?" — o código dela liga
+ * O último é o da REDE (fase 3): "Uma amiga te chamou?" O código dela liga
  * as duas (`attributeReferral`: a amizade, o seguir mútuo e as sementinhas de
  * quem convidou). Antes, quem entrava pelo app nunca virava amiga de quem a
  * convidou: só o link do site levava o código. Corrigindo a data (`?editar=1`)
  * não há passo da rede.
+ *
+ * 18/11/2026 (a vistoria: "ninguém o tinha revisto"): o ritual sai da página
+ * clara e fica no MESMO céu da entrada, com a moldura de passo dela (os
+ * tracinhos, o voltar de vidro, o passo novo deslizando da direita e o botão
+ * preso acima do teclado). Com o SOS desligado, o contato e o médico saem
+ * (`ordemDoRitual`). No fim do primeiro ritual, a REVELAÇÃO do bebê da semana
+ * (`revelaOBebe`), e só então a primeira aba.
+ *
+ * Bancada: /ritual?bancada=1 · `&passo=N` abre num passo · `&revelar=24`
+ * abre na revelação.
  */
 export default function Ritual() {
   const { sessao, perfil, recarregarPerfil } = useSessao();
-  /* `?editar=1`: aberto do Perfil (ou da Jornada) para corrigir a data —
+  /* `?editar=1`: aberto do Perfil (ou da Jornada) para corrigir a data:
      começa no passo da data, já preenchido, e ao salvar volta de onde veio. */
   const editar = useLocalSearchParams<{ editar?: string }>().editar === "1";
   const total = editar ? PASSO_DA_REDE : PASSOS;
+  const ordem = ordemDoRitual(total, SOS_NO_APP);
   const inicial = editar ? 1 : Number(parametroDaBancada("passo") ?? 0);
-  const [passo, setPasso] = useState(
-    Number.isFinite(inicial) ? Math.min(Math.max(inicial, 0), total - 1) : 0,
+  const [passo, setPasso] = useState(() =>
+    Number.isFinite(inicial) && ordem.includes(inicial) ? inicial : ordem[0]!,
   );
-  /* Nunca o começo do e-mail: é o nome que a Comunidade mostra (nome-do-cadastro.ts). */
+  const [direcao, setDirecao] = useState<1 | -1>(1);
+  /* Nunca o começo do e-mail: é o nome que as amigas veem (nome-do-cadastro.ts). */
   const [nome, setNome] = useState(
     nomeParaSugerir({
       doPerfil: perfil?.display_name,
@@ -90,26 +122,60 @@ export default function Ritual() {
   const [codigo, setCodigo] = useState("");
   const [indicacao, setIndicacao] = useState<ResultadoDaIndicacao | null>(null);
   const [ligando, setLigando] = useState(false);
-  const [erro, setErro] = useState<string | null>(null);
+  const [erro, setErro] = useState<Erro | null>(null);
   const [salvando, setSalvando] = useState(false);
+  /* A semana que o fim do primeiro ritual revela (`null` enquanto não chega lá). */
+  const [revelacao, setRevelacao] = useState<number | null>(() => {
+    const r = Number(parametroDaBancada("revelar"));
+    return Number.isInteger(r) && r > 0 ? r : null;
+  });
+  const vezes = useRef(0);
 
-  function conferirData(): string | null {
+  const indice = Math.max(0, ordem.indexOf(passo));
+  const ultimo = indice === ordem.length - 1;
+
+  function errar(texto: string, campo?: Campo) {
+    vezes.current += 1;
+    setErro({ texto, campo, vez: vezes.current });
+  }
+
+  function irPara(p: number | undefined, dir: 1 | -1) {
+    if (p === undefined) return;
+    setErro(null);
+    setDirecao(dir);
+    setPasso(p);
+  }
+
+  function conferirData(): Erro["campo"] | null {
     const ymd = paraYmd(data);
     if (modo === "dum") {
       const r = recusaDaDum(ymd);
-      return r ? RECADO_DA_DATA[r] : null;
+      if (r) errar(RECADO_DA_DATA[r], "data");
+      return r ? "data" : null;
     }
     if (modo === "us") {
       const s = Number(semanasUs);
-      if (!Number.isInteger(s) || s < 4 || s > 42)
-        return "Quantas semanas o ultrassom mostrou? Um número de 4 a 42.";
+      if (!Number.isInteger(s) || s < 4 || s > 42) {
+        errar("Quantas semanas o ultrassom mostrou? Um número de 4 a 42.", "semanas");
+        return "semanas";
+      }
       const d = diasUs ? Number(diasUs) : 0;
-      if (!Number.isInteger(d) || d < 0 || d > 6) return "Os dias vão de 0 a 6.";
+      if (!Number.isInteger(d) || d < 0 || d > 6) {
+        errar("Os dias vão de 0 a 6.", "dias");
+        return "dias";
+      }
       const r = recusaDoUltrassom(ymd, s);
-      return r ? RECADO_DA_DATA[r] : null;
+      if (r) errar(RECADO_DA_DATA[r], "data");
+      return r ? "data" : null;
     }
-    if (!ymd) return RECADO_DA_DATA.formato;
-    if (new Date(ymd + "T00:00:00").getTime() > Date.now()) return RECADO_DA_DATA.futuro;
+    if (!ymd) {
+      errar(RECADO_DA_DATA.formato, "data");
+      return "data";
+    }
+    if (new Date(ymd + "T00:00:00").getTime() > Date.now()) {
+      errar(RECADO_DA_DATA.futuro, "data");
+      return "data";
+    }
     return null;
   }
 
@@ -117,13 +183,14 @@ export default function Ritual() {
   async function ligar(): Promise<ResultadoDaIndicacao | null> {
     setErro(null);
     if (codigoLimpo(codigo).length < 3) {
-      setErro("Esse código parece curto. Confira as letras com ela.");
+      errar("Esse código parece curto. Confira as letras com ela.", "codigo");
       return null;
     }
     setLigando(true);
     const r = await ligarPeloCodigo(codigo);
     setLigando(false);
     setIndicacao(r);
+    if (r === "ligou") sucesso();
     return r;
   }
 
@@ -134,15 +201,13 @@ export default function Ritual() {
       !ehBancada() &&
       precisaDeNome({ digitado: nome, doPerfil: perfil?.display_name, email: sessao?.user.email })
     )
-      return setErro("Conte como você gostaria de ser chamada: é o nome que as amigas veem.");
-    if (passo === 1) {
-      const e = conferirData();
-      if (e) return setErro(e);
-    }
-    if (passo === 4) {
+      return errar("Escreva como você quer ser chamada. É o nome que as amigas veem.", "nome");
+    if (passo === 1 && conferirData()) return;
+    if (passo === PASSO_DO_MEDICO) {
       if (medicoCelular.trim() && !celularE164(medicoCelular))
-        return setErro("Confira o celular: DDD e número.");
-      if (medicoEmail.trim() && !emailValido(medicoEmail)) return setErro("Confira o e-mail.");
+        return errar("Confira o celular: DDD e número.", "celular");
+      if (medicoEmail.trim() && !emailValido(medicoEmail))
+        return errar("Confira o e-mail.", "email");
     }
     /* Digitou o código e foi direto em "Começar": tenta ligar antes. Se não
        achou, fica para ela conferir (o segundo toque segue sem). */
@@ -150,16 +215,30 @@ export default function Ritual() {
       const r = await ligar();
       if (r !== "ligou" && r !== "depois") return;
     }
-    if (passo < total - 1) setPasso(seguinte(passo));
+    if (!ultimo) irPara(ordem[indice + 1], 1);
     else void salvar();
   }
 
+  function abrirAsAbas() {
+    router.replace(ehBancada() ? "/jornada?bancada=1" : "/jornada");
+  }
+
   async function salvar() {
-    if (ehBancada()) return router.replace("/jornada?bancada=1");
+    const ymd = paraYmd(data);
+    /* O primeiro ritual termina revelando o bebê da semana (nunca corrigindo
+       a data, nunca depois do parto, nunca no Modo Cuidado). */
+    const semana = revelaOBebe({ editar, modo, cuidado: perfil?.care_mode === true })
+      ? semanaDaRevelacao({
+          modo,
+          ymd,
+          semanasUs: Number(semanasUs),
+          diasUs: diasUs ? Number(diasUs) : 0,
+        })
+      : null;
+    if (ehBancada()) return semana != null ? setRevelacao(semana) : abrirAsAbas();
     const uid = sessao?.user.id;
     if (!uid) return router.replace("/entrar");
     setSalvando(true);
-    const ymd = paraYmd(data);
     const payload: Record<string, unknown> = {};
     if (nome.trim()) payload.display_name = nome.trim();
     if (bebe.trim()) payload.baby_name = bebe.trim();
@@ -200,14 +279,14 @@ export default function Ritual() {
     const r = await gravarPerfil(uid, payload);
     if (!r.ok) {
       setSalvando(false);
-      setErro(
-        "Não conseguimos salvar agora. Confira a internet e tente de novo — nada foi perdido nesta tela.",
+      errar(
+        "Não conseguimos salvar agora. Confira a internet e tente de novo. O que você escreveu continua aqui.",
       );
       return;
     }
     /* A jornada fica de acordo com o perfil ANTES de ele ser relido: o
        nascimento que o site guardou no blob (`dc-path-birth`) não pode voltar
-       a valer depois que ela o corrigiu aqui — nem o site, enquanto existir,
+       a valer depois que ela o corrigiu aqui, nem o site, enquanto existir,
        pode continuar achando que ela está grávida. */
     if (modo === "nasceu" && ymd) {
       await abrirLoja(uid);
@@ -222,77 +301,106 @@ export default function Ritual() {
     setSalvando(false);
     await recarregarPerfil();
     if (editar && router.canGoBack()) router.back();
-    else router.replace("/jornada");
+    else if (semana != null) setRevelacao(semana);
+    else abrirAsAbas();
   }
 
-  return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <Tela bordas={["top", "bottom"]}>
-        <Linha estilo={{ gap: 6 }}>
-          {Array.from({ length: total }, (_, i) => (
-            <View
-              key={i}
-              style={{
-                flex: 1,
-                height: 6,
-                borderRadius: 3,
-                backgroundColor: i <= passo ? cor.primaria : cor.borda,
-              }}
-            />
-          ))}
-        </Linha>
-        <View style={{ alignItems: "center", marginTop: espaco.md }}>
-          {/* A chave troca o vídeo quando o humor muda (o player é por humor). */}
-          <BolhaViva
-            key={passo === total - 1 ? "comemorando" : "feliz"}
-            humor={passo === total - 1 ? "comemorando" : "feliz"}
-            tamanho={116}
-          />
-        </View>
+  if (revelacao != null)
+    return (
+      <FundoDaEntrada veu="inteiro">
+        <RevelacaoDoBebe semana={revelacao} aoTerminar={abrirAsAbas} />
+      </FundoDaEntrada>
+    );
 
+  const erroEm = (campo: Campo) => (erro?.campo === campo ? erro : null);
+  const campoComErro = (campo: Campo) => ({
+    erro: erroEm(campo)?.texto,
+    tremer: erroEm(campo)?.vez,
+  });
+  /* No primeiro passo do primeiro ritual não há para onde voltar; corrigindo
+     a data, o primeiro voltar fecha a tela. */
+  const voltar =
+    indice > 0
+      ? () => irPara(ordem[indice - 1], -1)
+      : editar && router.canGoBack()
+        ? () => router.back()
+        : undefined;
+
+  return (
+    <FundoDaEntrada veu="inteiro">
+      <MolduraDoPasso
+        chave={passo}
+        direcao={direcao}
+        topo={
+          <>
+            <TopoDoPasso aoVoltar={voltar} semVoltar={!voltar}>
+              <SegmentosDoPasso total={ordem.length} atual={indice} />
+            </TopoDoPasso>
+            <BolhaViva humor={ultimo ? "comemorando" : "feliz"} tamanho={72} />
+          </>
+        }
+        pe={
+          <>
+            {erro && !erro.campo ? <ErroNoVeu>{erro.texto}</ErroNoVeu> : null}
+            <Botao
+              rotulo={ultimo ? "Começar" : "Continuar"}
+              tamanho="grande"
+              aoTocar={() => void avancar()}
+              carregando={salvando || (passo === PASSO_DA_REDE && ligando)}
+              estilo={{ minHeight: 56 }}
+            />
+            {passo >= 2 ? (
+              <LinkNoVeu
+                rotulo="Pular por agora"
+                apagado
+                aoTocar={() => (ultimo ? void salvar() : irPara(ordem[indice + 1], 1))}
+              />
+            ) : null}
+          </>
+        }
+      >
         {passo === 0 ? (
           <>
-            <T tipo="titulo" centro>
-              Que bom ter você aqui
-            </T>
-            <T tipo="apagado" centro>
-              Vamos deixar o app com a sua cara. Leva um minuto.
-            </T>
-            <Campo
-              rotulo="Como você gostaria de ser chamada?"
+            <Cabeca titulo="Como você quer ser chamada?">
+              É o nome que as suas amigas veem no app.
+            </Cabeca>
+            <CampoNoVeu
+              rotulo="Seu nome"
               value={nome}
               onChangeText={setNome}
+              autoFocus={!nome}
               autoComplete="name"
+              textContentType="givenName"
+              autoCapitalize="words"
+              returnKeyType="next"
+              onSubmitEditing={() => void avancar()}
+              placeholder="Ex.: Marina"
+              {...campoComErro("nome")}
             />
           </>
         ) : null}
 
         {passo === 1 ? (
           <>
-            <T tipo="titulo" centro>
-              Em que fase você está?
-            </T>
+            <Cabeca titulo="Em que fase você está?" />
             <View style={{ gap: espaco.sm }}>
-              <Escolha
+              <EscolhaNoVeu
                 rotulo="Sei a data da última menstruação"
-                marcado={modo === "dum"}
+                marcada={modo === "dum"}
                 aoTocar={() => setModo("dum")}
               />
-              <Escolha
+              <EscolhaNoVeu
                 rotulo="Tenho a data de um ultrassom"
-                marcado={modo === "us"}
+                marcada={modo === "us"}
                 aoTocar={() => setModo("us")}
               />
-              <Escolha
+              <EscolhaNoVeu
                 rotulo="Meu bebê já nasceu"
-                marcado={modo === "nasceu"}
+                marcada={modo === "nasceu"}
                 aoTocar={() => setModo("nasceu")}
               />
             </View>
-            <Campo
+            <CampoNoVeu
               rotulo={
                 modo === "dum"
                   ? "Primeiro dia da última menstruação"
@@ -305,129 +413,125 @@ export default function Ritual() {
               placeholder="dd/mm/aaaa"
               keyboardType="number-pad"
               maxLength={10}
+              dica={modo === "us" ? undefined : "Dá para corrigir depois, no Perfil."}
+              {...campoComErro("data")}
             />
             {modo === "us" ? (
-              <Linha>
-                <View style={{ flex: 1 }}>
-                  <Campo
-                    rotulo="Semanas"
-                    value={semanasUs}
-                    onChangeText={(t) => setSemanasUs(t.replace(/\D/g, "").slice(0, 2))}
-                    keyboardType="number-pad"
-                    placeholder="12"
-                  />
+              <>
+                <View style={{ flexDirection: "row", gap: espaco.md }}>
+                  <View style={{ flex: 1 }}>
+                    <CampoNoVeu
+                      rotulo="Semanas"
+                      value={semanasUs}
+                      onChangeText={(t) => setSemanasUs(t.replace(/\D/g, "").slice(0, 2))}
+                      keyboardType="number-pad"
+                      placeholder="12"
+                      {...campoComErro("semanas")}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <CampoNoVeu
+                      rotulo="Dias"
+                      value={diasUs}
+                      onChangeText={(t) => setDiasUs(t.replace(/\D/g, "").slice(0, 1))}
+                      keyboardType="number-pad"
+                      placeholder="0"
+                      {...campoComErro("dias")}
+                    />
+                  </View>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Campo
-                    rotulo="Dias"
-                    value={diasUs}
-                    onChangeText={(t) => setDiasUs(t.replace(/\D/g, "").slice(0, 1))}
-                    keyboardType="number-pad"
-                    placeholder="0"
-                  />
-                </View>
-              </Linha>
+                <TextoNoVeu nivel="legenda">
+                  Use as semanas e os dias que estão no laudo.
+                </TextoNoVeu>
+              </>
             ) : null}
-            <T tipo="apagado" estilo={{ fontSize: 13 }}>
-              {modo === "us"
-                ? "Quando existe, o ultrassom é a referência mais precisa da idade gestacional."
-                : "Você pode corrigir depois, no Perfil."}
-            </T>
           </>
         ) : null}
 
         {passo === 2 ? (
           <>
-            <T tipo="titulo" centro>
-              {modo === "nasceu" ? "Como se chama o bebê?" : "O bebê já tem nome?"}
-            </T>
-            <T tipo="apagado" centro>
+            <Cabeca titulo={modo === "nasceu" ? "Como se chama o bebê?" : "O bebê já tem nome?"}>
               Pode deixar em branco se ainda não decidiram.
-            </T>
-            <Campo
+            </Cabeca>
+            <CampoNoVeu
               rotulo="Nome do bebê"
               value={bebe}
               onChangeText={setBebe}
+              autoFocus={!bebe}
               autoCapitalize="words"
+              returnKeyType="next"
+              onSubmitEditing={() => void avancar()}
             />
           </>
         ) : null}
 
         {passo === PASSO_DO_CONTATO && SOS_NO_APP ? (
           <>
-            <T tipo="titulo" centro>
-              Quem avisar numa emergência?
-            </T>
-            <T tipo="apagado" centro>
-              No SOS, o app liga para o 192 e manda a sua localização para esta pessoa — mesmo sem
+            <Cabeca titulo="Quem avisar numa emergência?">
+              No SOS, o app liga para o 192 e manda a sua localização para esta pessoa, mesmo sem
               internet, por SMS.
-            </T>
-            <Campo
+            </Cabeca>
+            <CampoNoVeu
               rotulo="Nome do contato"
               value={contato}
               onChangeText={setContato}
               autoCapitalize="words"
               placeholder="Ex.: Rafael"
             />
-            <Campo
+            <CampoNoVeu
               rotulo="Telefone com DDD"
               value={telefone}
               onChangeText={setTelefone}
               keyboardType="phone-pad"
               placeholder="(31) 99999-0000"
             />
-            <Cartao fundo={cor.apagado}>
-              <T tipo="apagado" estilo={{ fontSize: 14 }}>
-                Avise essa pessoa de que ela é o seu contato de emergência no app.
-              </T>
-            </Cartao>
+            <TextoNoVeu nivel="legenda">
+              Avise essa pessoa de que ela é o seu contato de emergência no app.
+            </TextoNoVeu>
           </>
         ) : null}
 
-        {passo === 4 ? (
+        {passo === PASSO_DO_MEDICO ? (
           <>
-            <T tipo="titulo" centro>
-              Quem acompanha a sua gestação?
-            </T>
-            <T tipo="apagado" centro>
+            <Cabeca titulo="Quem acompanha a sua gestação?">
               {SOS_NO_APP
                 ? "No SOS, o app manda o e-mail de emergência para o seu médico ou médica e deixa a mensagem pronta no WhatsApp, com a sua localização."
                 : "Fica guardado na sua conta, para você ter o contato sempre à mão."}
-            </T>
-            <Campo
+            </Cabeca>
+            <CampoNoVeu
               rotulo="Nome do médico ou médica"
               value={medicoNome}
               onChangeText={setMedicoNome}
               autoCapitalize="words"
             />
-            <Campo
+            <CampoNoVeu
               rotulo="Celular (WhatsApp)"
               value={medicoCelular}
               onChangeText={setMedicoCelular}
               keyboardType="phone-pad"
               placeholder="(31) 99999-0000"
+              {...campoComErro("celular")}
             />
-            <Campo
+            <CampoNoVeu
               rotulo="E-mail"
               value={medicoEmail}
               onChangeText={setMedicoEmail}
               keyboardType="email-address"
               autoCapitalize="none"
+              {...campoComErro("email")}
             />
           </>
         ) : null}
 
         {passo === PASSO_DA_REDE ? (
           <>
-            <T tipo="titulo" centro>
-              Uma amiga te chamou?
-            </T>
-            <T tipo="apagado" centro>
+            <Cabeca titulo="Uma amiga te chamou?">
               {modo === "nasceu"
-                ? `Com o código dela, vocês viram amigas aqui dentro: ela ganha ${RECOMPENSA_DA_INDICACAO} sementinhas, e vocês ${COMUNIDADE_NO_APP ? "se veem na Comunidade" : "acompanham o jogo uma da outra"}.`
-                : `Com o código dela, vocês viram amigas aqui dentro: ela ganha ${RECOMPENSA_DA_INDICACAO} sementinhas, e vocês podem formar uma dupla e ${COMUNIDADE_NO_APP ? "se ver na Comunidade" : "acompanhar o jogo uma da outra"}.`}
-            </T>
-            <Campo
+                ? `Digite o código dela e vocês viram amigas no app. Ela ganha ${RECOMPENSA_DA_INDICACAO} sementinhas.`
+                : `Digite o código dela e vocês viram amigas no app, prontas para formar uma dupla. Ela ganha ${RECOMPENSA_DA_INDICACAO} sementinhas.`}
+              {COMUNIDADE_NO_APP ? " Vocês também se veem na Comunidade." : ""}
+            </Cabeca>
+            <CampoNoVeu
               rotulo="Código da amiga"
               value={codigo}
               onChangeText={(t) => {
@@ -437,80 +541,50 @@ export default function Ritual() {
               autoCapitalize="characters"
               autoCorrect={false}
               placeholder="Ex.: JULI7K"
+              {...campoComErro("codigo")}
             />
-            <Botao
-              rotulo={indicacao === "ligou" ? "Vocês já são amigas 💛" : "Ligar à minha amiga"}
-              tipo="secundario"
-              carregando={ligando}
-              desabilitado={indicacao === "ligou" || codigoLimpo(codigo).length < 3}
-              aoTocar={() => void ligar()}
-            />
-            {indicacao ? (
-              <Cartao fundo={indicacao === "ligou" ? cor.destaque : cor.apagado}>
-                <T tipo="corpo">{fraseDaIndicacao(indicacao, RECOMPENSA_DA_INDICACAO)}</T>
-              </Cartao>
+            {/* O botão aparece quando há um código para usar (o "Começar"
+                também tenta ligar antes de seguir). */}
+            {indicacao === "ligou" || codigoLimpo(codigo).length >= 3 ? (
+              <Botao
+                rotulo={indicacao === "ligou" ? "Vocês já são amigas" : "Usar o código"}
+                tipo="secundario"
+                carregando={ligando}
+                desabilitado={indicacao === "ligou"}
+                aoTocar={() => void ligar()}
+              />
             ) : null}
-            <T tipo="apagado" centro estilo={{ fontSize: 14 }}>
+            {indicacao ? (
+              <View
+                accessibilityLiveRegion="polite"
+                style={{
+                  padding: espaco.lg,
+                  borderRadius: canto.dentro,
+                  ...curva,
+                  backgroundColor: "rgba(255,255,255,0.1)",
+                }}
+              >
+                <TextoNoVeu nivel="legenda">
+                  {fraseDaIndicacao(indicacao, RECOMPENSA_DA_INDICACAO)}
+                </TextoNoVeu>
+              </View>
+            ) : null}
+            <TextoNoVeu nivel="nota">
               Sem código? Depois, na aba Amigas, você convida quem quiser.
-            </T>
+            </TextoNoVeu>
           </>
         ) : null}
-
-        {erro ? (
-          <T tipo="apagado" cor={cor.urgente}>
-            {erro}
-          </T>
-        ) : null}
-        <Botao
-          rotulo={passo < total - 1 ? "Continuar" : "Começar"}
-          aoTocar={() => void avancar()}
-          carregando={salvando || (passo === PASSO_DA_REDE && ligando)}
-        />
-        {passo >= 2 ? (
-          <Botao
-            rotulo="Pular por agora"
-            tipo="texto"
-            aoTocar={() => (passo < total - 1 ? setPasso(seguinte(passo)) : void salvar())}
-          />
-        ) : null}
-        {passo > 0 ? (
-          <Botao rotulo="Voltar" tipo="texto" aoTocar={() => setPasso(anterior(passo))} />
-        ) : null}
-      </Tela>
-    </KeyboardAvoidingView>
+      </MolduraDoPasso>
+    </FundoDaEntrada>
   );
 }
 
-function Escolha({
-  rotulo,
-  marcado,
-  aoTocar,
-}: {
-  rotulo: string;
-  marcado: boolean;
-  aoTocar: () => void;
-}) {
+/** O título de um passo (a serifada) e a linha de apoio, se houver. */
+function Cabeca({ titulo, children }: { titulo: string; children?: ReactNode }) {
   return (
-    <Pressable
-      accessibilityRole="radio"
-      accessibilityState={{ checked: marcado }}
-      onPress={() => {
-        toque();
-        aoTocar();
-      }}
-      style={{
-        minHeight: ALVO_MINIMO + 8,
-        borderRadius: raio.md,
-        borderWidth: 2,
-        borderColor: marcado ? cor.primaria : cor.borda,
-        backgroundColor: marcado ? cor.destaque : cor.cartao,
-        paddingHorizontal: espaco.lg,
-        justifyContent: "center",
-      }}
-    >
-      <T tipo="rotulo" cor={marcado ? cor.textoDestaque : cor.texto}>
-        {rotulo}
-      </T>
-    </Pressable>
+    <View style={{ gap: espaco.sm }}>
+      <TituloNoVeu>{titulo}</TituloNoVeu>
+      {children ? <TextoNoVeu>{children}</TextoNoVeu> : null}
+    </View>
   );
 }
