@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   BONUS_DA_DUPLA,
+  chamaDaDupla,
   corDaUltimaVez,
   emPausa,
   fraseDoErroDaDupla,
@@ -41,6 +42,35 @@ describe("as amigas no app", () => {
       "🏅 A melhor de vocês foi 12 dias seguidos · 20 dias juntas no total",
     );
     expect(memoriaDaDupla({ sequencia: 6, recorde: 6, juntas: 6 })).toBeNull();
+  });
+
+  test("a dupla ativa no cartão: o número, com quem, e a frase no lugar do zero", () => {
+    const d = { estado: "ativa", nome: "Juliana Almeida", juntas: 20, paradaHa: 0 };
+    expect(chamaDaDupla({ ...d, sequencia: 6, recorde: 12 })).toEqual({
+      numero: 6,
+      unidade: "dias juntas",
+      com: "com Juliana",
+      frase: null,
+      memoria: "A melhor de vocês foi 12 dias seguidos · 20 dias juntas no total",
+      acesa: true,
+    });
+    expect(chamaDaDupla({ ...d, sequencia: 1, recorde: 1, juntas: 1 }).unidade).toBe("dia juntas");
+    expect(chamaDaDupla({ ...d, sequencia: 1, recorde: 1, juntas: 1 }).memoria).toBeNull();
+    const pausa = chamaDaDupla({ ...d, sequencia: 0, recorde: 12, paradaHa: 6 });
+    expect(pausa.numero).toBeNull();
+    expect(pausa.acesa).toBe(false);
+    expect(pausa.frase).toMatch(/nada do que vocês fizeram se perdeu/);
+    expect(pausa.frase).not.toMatch(/sumiu|doente|hospital|internad|aconteceu|motivo/i);
+    expect(chamaDaDupla({ ...d, sequencia: 0, recorde: 0, juntas: 0 }).frase).toBe(
+      "A chama começa no dia em que você e Juliana aparecerem.",
+    );
+    /* O desenho do app não leva emoji nem travessão. */
+    for (const t of [
+      pausa.frase,
+      pausa.memoria,
+      chamaDaDupla({ ...d, sequencia: 0, recorde: 3 }).frase,
+    ])
+      expect(t ?? "").not.toMatch(/[—🔥🌱💛🏅]/u);
   });
 
   test("os erros da dupla e o bônus da fonte única", () => {

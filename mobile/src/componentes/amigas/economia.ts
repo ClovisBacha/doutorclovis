@@ -1,3 +1,4 @@
+import { InteractionManager, Platform } from "react-native";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { seloDasAmigas } from "~/lib/selos";
 import {
@@ -23,6 +24,8 @@ import {
   type PerfilDeAmiga,
 } from "~/servidor/amigas";
 import { ligarPelaIndicacao } from "~/servidor/ganhos";
+import { supabase } from "~/servidor/supabase";
+import { ymdLocal } from "~/lib/gestacao";
 
 /**
  * As amigas, do servidor do site — ou, na bancada, de exemplo, pelos MESMOS
@@ -30,11 +33,43 @@ import { ligarPelaIndicacao } from "~/servidor/ganhos";
  * uma lista vazia que afirmaria "você não tem amigas".
  *
  * Bancada: `&amigas=0` (sem nenhuma), `&dupla=sem|enviado|recebido|ativa|pausa`,
- * `&pedidos=0`; no perfil, `&postos=0` (Cantinho sem nada posto) e
- * `&perfil=fechado` (a amiga em Modo Cuidado).
+ * `&pedidos=0` (ou `&pedidos=2`), `&falha=1` (responder um pedido falha, e ele
+ * volta à tela); no perfil, `&postos=0` (Cantinho sem nada posto),
+ * `&perfil=fechado` (a amiga em Modo Cuidado) e `&perfil=falhou`.
  */
 
 const espera = (ms = 350) => new Promise((r) => setTimeout(r, ms));
+
+/** O máximo que uma leitura de foco espera a transição acabar. */
+const ESPERA_MAXIMA_MS = 700;
+
+/**
+ * Roda `f` depois da transição (a volta de uma atividade, a troca de aba):
+ * a animação anda primeiro e a leitura vem depois, em vez de as respostas
+ * redesenharem a tela no meio do caminho. Com teto: animação que não usa o
+ * fio nativo conta como "interação" e, num laço, seguraria a leitura para
+ * sempre (é o que acontece na web, onde nenhuma usa).
+ */
+export function depoisDaTransicao(f: () => void): { cancel: () => void } {
+  let feito = false;
+  let tarefa: { cancel: () => void } | null = null;
+  const uma = () => {
+    if (feito) return;
+    feito = true;
+    clearTimeout(relogio);
+    tarefa?.cancel();
+    f();
+  };
+  const relogio = setTimeout(uma, Platform.OS === "web" ? 0 : ESPERA_MAXIMA_MS);
+  if (Platform.OS !== "web") tarefa = InteractionManager.runAfterInteractions(uma);
+  return {
+    cancel: () => {
+      feito = true;
+      clearTimeout(relogio);
+      tarefa?.cancel();
+    },
+  };
+}
 
 /**
  * O que ela já fez NESTA abertura da bancada: sem isto, aceitar um pedido e
@@ -139,14 +174,57 @@ export async function lerAmigas(): Promise<LeituraDasAmigas | null> {
   if (ehBancada()) {
     await espera();
     const amigas = amigasDaBancada();
+    guardarAsAmigas(amigas);
     return { careMode: parametroDaBancada("luto") === "1", amigas, dupla: duplaDaBancada(amigas) };
   }
   try {
     const r = await minhasAmigas();
-    return r.ok ? { careMode: r.careMode, amigas: r.amigas, dupla: r.dupla } : null;
+    if (!r.ok) return null;
+    guardarAsAmigas(r.careMode ? [] : r.amigas);
+    return { careMode: r.careMode, amigas: r.amigas, dupla: r.dupla };
   } catch {
     return null;
   }
+}
+
+/* ── As amigas na memória (18/11/2026) ──────────────────────────────────────
+   A lista já traz o rosto, o nome e os números de cada uma: guardadas aqui,
+   o perfil dela abre com tudo isso na transição, e só a cena espera o
+   servidor (antes, "Amiga" e um spinner para dados que já estavam na mão).
+   ⚠️ Só em memória (LGPD: nada social no aparelho), e esquecidas quando a
+   conta sai ou troca. */
+
+const amigasNaMemoria = new Map<string, PerfilDeAmiga>();
+let donoDaMemoria: string | null | undefined;
+let ouvindoAConta = false;
+
+function ouvirAConta() {
+  if (ouvindoAConta || ehBancada()) return;
+  ouvindoAConta = true;
+  supabase.auth.onAuthStateChange((evento, sessao) => {
+    const uid = sessao?.user.id ?? null;
+    if (evento === "SIGNED_OUT" || (donoDaMemoria !== undefined && uid !== donoDaMemoria)) {
+      esquecerAsAmigas();
+    }
+    donoDaMemoria = uid;
+  });
+}
+
+function guardarAsAmigas(amigas: readonly PerfilDeAmiga[]) {
+  ouvirAConta();
+  amigasNaMemoria.clear();
+  for (const a of amigas) amigasNaMemoria.set(a.id, a);
+}
+
+/** A amiga como a lista a leu por último (ou `null`): o perfil abre com ela. */
+export function amigaNaMemoria(id: string): PerfilDeAmiga | null {
+  return amigasNaMemoria.get(id) ?? null;
+}
+
+/** Sair da conta esquece as amigas e o bônus cobrado (o próximo login começa do zero). */
+export function esquecerAsAmigas() {
+  amigasNaMemoria.clear();
+  bonusCobradoEm = null;
 }
 
 export type Pedido = { id: string; nome: string; diasNoApp: number };
@@ -173,11 +251,15 @@ export async function contarParaOSelo(pos: boolean): Promise<number | null> {
 export async function lerPedidos(): Promise<Pedido[]> {
   if (ehBancada()) {
     await espera();
-    return parametroDaBancada("pedidos") === "0"
-      ? []
-      : [{ id: "0b6e1f2a-4444-4c44-8a44-444444444444", nome: "Bianca Lima", diasNoApp: 14 }].filter(
-          (p) => !naBancada.respondidos.has(p.id),
-        );
+    const quantos = parametroDaBancada("pedidos");
+    if (quantos === "0") return [];
+    const exemplo: Pedido[] = [
+      { id: "0b6e1f2a-4444-4c44-8a44-444444444444", nome: "Bianca Lima", diasNoApp: 14 },
+      { id: "0b6e1f2a-5555-4c55-8a55-555555555555", nome: "Ana Paula Ribeiro", diasNoApp: 3 },
+    ];
+    return exemplo
+      .slice(0, quantos === "2" ? 2 : 1)
+      .filter((p) => !naBancada.respondidos.has(p.id));
   }
   try {
     const r = await pedidosDeAmizade();
@@ -198,6 +280,7 @@ export async function lerPerfilDaAmiga(id: string): Promise<LeituraDoPerfil> {
     const perfil = amigasDaBancada().find((a) => a.id === id) ?? amigasDaBancada()[0];
     if (!perfil) return { ok: false, indisponivel: false };
     if (parametroDaBancada("perfil") === "fechado") return { ok: false, indisponivel: true };
+    if (parametroDaBancada("perfil") === "falhou") return { ok: false, indisponivel: false };
     const vazio = parametroDaBancada("postos") === "0";
     return {
       ok: true,
@@ -238,13 +321,24 @@ export async function lerPerfilDaAmiga(id: string): Promise<LeituraDoPerfil> {
 
 type Resultado = { ok: true } | { ok: false; error?: string };
 
+/**
+ * Quantas vezes algo mudou nas amigas NESTA abertura (um pedido respondido,
+ * uma dupla, uma amizade desfeita). As telas que poupam releitura (no máximo
+ * uma por minuto) releem na hora quando este número andou: sair da amizade
+ * no perfil dela e voltar à aba já mostra a lista sem ela.
+ */
+let mudancas = 0;
+export const mudancasNasAmigas = () => mudancas;
+
 async function tentar(f: () => Promise<{ ok: boolean; error?: string }>): Promise<Resultado> {
   if (ehBancada()) {
     await espera();
+    mudancas++;
     return { ok: true };
   }
   try {
     const r = await f();
+    if (r.ok) mudancas++;
     return r.ok ? { ok: true } : { ok: false, error: r.error };
   } catch {
     return { ok: false, error: "falhou" };
@@ -277,7 +371,9 @@ export const sairDaAmizade = (amigaId: string) => {
   });
   return tentar(() => encerrarAmizade({ amigaId }));
 };
-export const responderPedido = (amigaId: string, aceitar: boolean) => {
+export const responderPedido = (amigaId: string, aceitar: boolean): Promise<Resultado> => {
+  if (ehBancada() && parametroDaBancada("falha") === "1")
+    return espera().then(() => ({ ok: false, error: "falhou" }));
   anotar(() => {
     naBancada.respondidos.add(amigaId);
     if (aceitar) naBancada.aceitos.add(amigaId);
@@ -320,14 +416,34 @@ export async function ligarPeloCodigo(codigo: string): Promise<ResultadoDaIndica
   }
 }
 
-/** O bônus da dupla de hoje (e de ontem): quanto entrou agora. */
-export async function cobrarOBonus(): Promise<number> {
-  if (ehBancada()) return 0;
+/**
+ * O BÔNUS DA DUPLA (o de hoje e o de ontem: quanto entrou agora), cobrado UMA
+ * vez por dia (`ymdLocal`), venha a cobrança da aba das Amigas ou da linha
+ * delas no Bebê. Antes saía a cada leitura da aba, três chamadas à Vercel por
+ * troca de aba. O servidor paga também o de ontem, então o dia que fechar
+ * depois da cobrança não se perde: entra na de amanhã. Falha de rede não
+ * conta como cobrada.
+ */
+let bonusCobradoEm: string | null = null;
+let cobrando = false;
+
+export async function cobrarOBonusDoDia(): Promise<number> {
+  const hoje = ymdLocal();
+  if (bonusCobradoEm === hoje || cobrando) return 0;
+  if (ehBancada()) {
+    bonusCobradoEm = hoje;
+    return 0;
+  }
+  cobrando = true;
   try {
     const r = await cobrarBonusDaDupla();
-    return r.ok ? r.ganho : 0;
+    if (!r.ok) return 0;
+    bonusCobradoEm = hoje;
+    return r.ganho;
   } catch {
     return 0;
+  } finally {
+    cobrando = false;
   }
 }
 

@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { linhaDaDuplaNoHoje, primeiroNomeDaAmiga, rostosDaFaixa } from "~/lib/jornada/amigas";
+import {
+  linhaDaDuplaNoHoje,
+  primeiroNomeDaAmiga,
+  rodaDeAmigas,
+  rostosDaFaixa,
+} from "~/lib/jornada/amigas";
 
 const dupla = (o: Partial<Parameters<typeof linhaDaDuplaNoHoje>[0] & object> = {}) => ({
   estado: "ativa",
@@ -27,27 +32,45 @@ describe("as amigas no Hoje", () => {
     expect(rostosDaFaixa([], 5)).toEqual({ rostos: [], mais: 0 });
   });
 
-  test("a dupla diz o fato — e no pós-parto não existe", () => {
-    expect(linhaDaDuplaNoHoje(dupla(), true, false)).toBe("🔥 6 dias juntas com Juliana");
+  test("a dupla diz o fato, sem emoji nem travessão, e no pós-parto não existe", () => {
+    expect(linhaDaDuplaNoHoje(dupla(), true, false)).toBe("6 dias juntas com Juliana");
     expect(linhaDaDuplaNoHoje(dupla({ sequencia: 1 }), true, false)).toBe(
-      "🔥 1 dia juntas com Juliana",
+      "1 dia juntas com Juliana",
     );
     expect(linhaDaDuplaNoHoje(dupla({ sequencia: 0, recorde: 0 }), true, false)).toBe(
-      "🔥 A chama com Juliana começa quando as duas aparecerem",
+      "A chama com Juliana começa quando as duas aparecerem",
     );
     expect(linhaDaDuplaNoHoje(dupla({ sequencia: 0, paradaHa: 6 }), true, false)).toBe(
-      "A dupla com Juliana está em pausa — nada se perdeu",
+      "A dupla com Juliana está em pausa",
     );
     expect(linhaDaDuplaNoHoje(dupla({ estado: "convite-recebido" }), true, false)).toBe(
-      "Juliana te chamou para a dupla 🔥",
+      "Juliana te chamou para a dupla",
     );
     expect(linhaDaDuplaNoHoje(dupla({ estado: "convite-enviado" }), true, false)).toBe(
       "Você chamou Juliana para a dupla",
     );
-    expect(linhaDaDuplaNoHoje(null, true, false)).toContain("Chame uma amiga para a dupla");
+    expect(linhaDaDuplaNoHoje(null, true, false)).toBe("Chame uma amiga para a dupla");
     expect(linhaDaDuplaNoHoje(null, false, false)).toBeNull();
     expect(linhaDaDuplaNoHoje(dupla(), true, true)).toBeNull();
     expect(linhaDaDuplaNoHoje(dupla({ estado: "convite-recebido" }), true, true)).toBeNull();
+    for (const d of [
+      dupla(),
+      dupla({ sequencia: 0, paradaHa: 6 }),
+      dupla({ estado: "convite-recebido" }),
+    ])
+      expect(linhaDaDuplaNoHoje(d, true, false)).not.toMatch(/[—🔥🌱💛]/u);
+  });
+
+  test("a roda de amigas: os primeiros nomes, e o resto contado", () => {
+    expect(rodaDeAmigas([])).toBeNull();
+    expect(rodaDeAmigas(["Juliana Almeida"])).toBe("Juliana");
+    expect(rodaDeAmigas(["Juliana Almeida", "Camila Souza"])).toBe("Juliana e Camila");
+    expect(rodaDeAmigas(["Juliana Almeida", "Camila Souza", "Marina Costa"])).toBe(
+      "Juliana, Camila e Marina",
+    );
+    expect(rodaDeAmigas(["Juliana", "Camila", "Marina", "Bianca", "Ana"])).toBe(
+      "Juliana, Camila e mais 3",
+    );
   });
 
   test("a pausa nunca diz o motivo", () => {

@@ -28,8 +28,8 @@ export type RespostaDoPedido =
 export function fraseDoPedido(r: RespostaDoPedido): { texto: string; ok: boolean } {
   if (r.ok) {
     return r.achou
-      ? { texto: `Pedido enviado para ${r.nome ?? "ela"} 💛 Ela escolhe se aceita.`, ok: true }
-      : { texto: "Se esse e-mail for de alguém do app, ela recebe o seu pedido 💛", ok: true };
+      ? { texto: `Pedido enviado para ${r.nome ?? "ela"}. Ela escolhe se aceita.`, ok: true }
+      : { texto: "Se esse e-mail for de alguém do app, ela recebe o seu pedido.", ok: true };
   }
   switch (r.error) {
     case "muitos_convites":
@@ -122,7 +122,8 @@ export function rostosDaFaixa<T extends { vistaEm: string | null }>(
 /**
  * A linha da dupla na faixa do Hoje — `null` quando não há o que dizer. No
  * pós-parto a dupla não existe (decisão do dono: lá ela não acende). Em pausa,
- * diz o FATO e que nada se perdeu, nunca o motivo.
+ * diz o FATO, nunca o motivo. Sem emoji nem travessão: é a segunda linha de
+ * uma lista (18/11/2026), e a chama desenhada já está no cartão da dupla.
  */
 export function linhaDaDuplaNoHoje(
   dupla: {
@@ -136,17 +137,84 @@ export function linhaDaDuplaNoHoje(
   pos: boolean,
 ): string | null {
   if (pos) return null;
-  if (!dupla) return temAmigas ? "Chame uma amiga para a dupla: +10 🌱 por dia juntas" : null;
+  if (!dupla) return temAmigas ? "Chame uma amiga para a dupla" : null;
   const ela = primeiroNomeDaAmiga(dupla.nome);
-  if (dupla.estado === "convite-recebido") return `${ela} te chamou para a dupla 🔥`;
+  if (dupla.estado === "convite-recebido") return `${ela} te chamou para a dupla`;
   if (dupla.estado === "convite-enviado") return `Você chamou ${ela} para a dupla`;
   if (dupla.estado !== "ativa") return null;
-  if (emPausa(dupla)) return `A dupla com ${ela} está em pausa — nada se perdeu`;
+  if (emPausa(dupla)) return `A dupla com ${ela} está em pausa`;
   if (dupla.sequencia > 0)
-    return `🔥 ${dupla.sequencia} ${dupla.sequencia === 1 ? "dia" : "dias"} juntas com ${ela}`;
+    return `${dupla.sequencia} ${dupla.sequencia === 1 ? "dia" : "dias"} juntas com ${ela}`;
   return dupla.recorde > 0
-    ? `🔥 A chama com ${ela} está esperando vocês duas`
-    : `🔥 A chama com ${ela} começa quando as duas aparecerem`;
+    ? `A chama com ${ela} espera vocês duas`
+    : `A chama com ${ela} começa quando as duas aparecerem`;
+}
+
+/**
+ * Os nomes da roda, para a segunda linha das amigas no Hoje quando não há
+ * dupla a contar (o pós-parto, ou a dupla ainda por formar): "Juliana, Camila
+ * e Marina", ou "Juliana, Camila e mais 3". Na ordem de quem apareceu por último.
+ */
+export function rodaDeAmigas(nomes: readonly string[]): string | null {
+  const primeiros = nomes.map(primeiroNomeDaAmiga);
+  if (primeiros.length === 0) return null;
+  if (primeiros.length === 1) return primeiros[0]!;
+  if (primeiros.length <= 3)
+    return `${primeiros.slice(0, -1).join(", ")} e ${primeiros[primeiros.length - 1]}`;
+  return `${primeiros.slice(0, 2).join(", ")} e mais ${primeiros.length - 2}`;
+}
+
+/** A dupla ativa como o cartão a desenha (`chamaDaDupla`). */
+export type ChamaDaDuplaNaTela = {
+  /** O número grande; `null` quando a chama está em zero e a frase ocupa o lugar dele. */
+  numero: number | null;
+  /** "dias juntas" (ou "dia juntas"), ao lado do número. */
+  unidade: string;
+  /** "com Juliana". */
+  com: string;
+  /** A frase da pausa ou do começo, no lugar do número. */
+  frase: string | null;
+  /** O recorde, quando ele passa a chama de hoje. */
+  memoria: string | null;
+  acesa: boolean;
+};
+
+/**
+ * A DUPLA ATIVA NO CARTÃO (18/11/2026): a chama de vocês é o número grande, e
+ * não uma pílula embaixo de uma explicação. Em zero, a frase toma o lugar do
+ * número, com a chama apagada; em pausa, diz o fato e que nada se perdeu,
+ * nunca o motivo. `linhaDaDupla` e `memoriaDaDupla` ficam como estão (o
+ * texto delas é o do site); este é o desenho do app, sem emoji.
+ */
+export function chamaDaDupla(d: {
+  estado: string;
+  nome: string | null;
+  sequencia: number;
+  recorde: number;
+  juntas: number;
+  paradaHa: number | null;
+}): ChamaDaDuplaNaTela {
+  const ela = primeiroNomeDaAmiga(d.nome);
+  const memoria =
+    d.recorde > d.sequencia
+      ? `A melhor de vocês foi ${d.recorde} dias seguidos${d.juntas > d.recorde ? ` · ${d.juntas} dias juntas no total` : ""}`
+      : null;
+  if (d.sequencia > 0) {
+    return {
+      numero: d.sequencia,
+      unidade: d.sequencia === 1 ? "dia juntas" : "dias juntas",
+      com: `com ${ela}`,
+      frase: null,
+      memoria,
+      acesa: true,
+    };
+  }
+  const frase = emPausa(d)
+    ? "A chama de vocês está parada há uns dias. Ela volta a contar no dia em que as duas aparecerem, e nada do que vocês fizeram se perdeu."
+    : d.recorde > 0
+      ? `A chama espera você e ${ela}. Ela volta a contar no dia em que as duas aparecerem.`
+      : `A chama começa no dia em que você e ${ela} aparecerem.`;
+  return { numero: null, unidade: "", com: `com ${ela}`, frase, memoria, acesa: false };
 }
 
 /* ── O convite e o código da amiga (fase 3) ─────────────────────────────── */

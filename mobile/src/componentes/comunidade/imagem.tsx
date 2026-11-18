@@ -1,6 +1,7 @@
 import { Image, type ImageSource } from "expo-image";
-import { Text, View, type StyleProp, type ViewStyle } from "react-native";
-import { corDaInicial, inicialDe } from "~/lib/comunidade/regras";
+import { LinearGradient } from "expo-linear-gradient";
+import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { degradeDaInicial, inicialDe } from "~/lib/comunidade/regras";
 import { cor, fonte } from "~/tema";
 
 /**
@@ -20,18 +21,30 @@ export function fonteDaImagem(url: string): ImageSource | number {
   return { uri: url };
 }
 
-/** Avatar: a foto, ou a inicial sobre a cor da pessoa (estável pelo id). */
+/**
+ * O AVATAR do app inteiro — o topo das abas, as amigas, os pedidos, a dupla e
+ * o perfil de uma amiga (18/11/2026: as Amigas tinham um avatar próprio, com
+ * os pastéis do site e a inicial branca a 1,7:1, e a mesma pessoa aparecia com
+ * duas cores na mesma tela).
+ *
+ * A foto, ou a inicial sobre o degradê da pessoa (estável pelo id), como o
+ * monograma dos Contatos. `anel` desenha o fio branco que separa dois rostos
+ * sobrepostos.
+ */
 export function Avatar({
   id,
   nome,
   url,
   tamanho = 40,
+  anel = 0,
   estilo,
 }: {
   id: string;
   nome: string;
   url: string | null | undefined;
   tamanho?: number;
+  /** A espessura do anel branco (0 = sem anel). */
+  anel?: number;
   estilo?: StyleProp<ViewStyle>;
 }) {
   const base: StyleProp<ViewStyle> = [
@@ -42,8 +55,9 @@ export function Avatar({
       overflow: "hidden",
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: url ? cor.apagado : corDaInicial(id),
+      backgroundColor: url ? cor.apagado : degradeDaInicial(id)[1],
     },
+    anel ? { borderWidth: anel, borderColor: cor.branco } : null,
     estilo,
   ];
   if (url) {
@@ -59,12 +73,22 @@ export function Avatar({
       </View>
     );
   }
+  const letra = Math.max(13, Math.round((tamanho - 2 * anel) * 0.42));
   return (
     <View style={base} accessible={false}>
+      <LinearGradient
+        pointerEvents="none"
+        colors={degradeDaInicial(id)}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
       <Text
         style={{
           ...fonte.titulo,
-          fontSize: Math.max(13, Math.round(tamanho * 0.42)),
+          fontSize: letra,
+          lineHeight: Math.round(letra * 1.2),
+          letterSpacing: -0.5,
           color: cor.branco,
         }}
       >

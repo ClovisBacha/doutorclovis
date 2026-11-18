@@ -350,21 +350,37 @@ export function inicialDe(nome: string | null | undefined): string {
   return (n[0] ?? "?").toLocaleUpperCase("pt-BR");
 }
 
-/** Cores da inicial — as famílias da marca, escolhidas pelo id (estável). */
+/**
+ * O monograma de quem não tem foto (18/11/2026): um degradê do Amanhecer, de
+ * cima à esquerda para baixo à direita, como o monograma dos Contatos do
+ * iPhone. Antes era um disco chapado com cores da paleta do site (o tijolo e o
+ * vinho), a "cara de Claude". Cada par segura a inicial branca a 4,5:1 nas
+ * DUAS pontas (o teste mede): a letra fica no meio, e o meio é a mistura.
+ */
 export const CORES_DA_INICIAL = [
-  "#ab5e5c",
-  "#0369a1",
-  "#c2410c",
-  "#047857",
-  "#4d7c0f",
-  "#6d28d9",
-  "#8f4b49",
+  ["#cf2468", "#a8164f"], // framboesa
+  ["#7c4ddb", "#5a35c0"], // violeta
+  ["#5a3fc0", "#231942"], // ameixa-noite
+  ["#c0482f", "#a8164f"], // coral do amanhecer
+  ["#b04ca0", "#7e2f78"], // orquídea da tarde
+  ["#3f63d8", "#2b3fa8"], // céu do dia
+  ["#9b4dca", "#6c2e9e"], // lavanda
 ] as const;
 
-export function corDaInicial(id: string): string {
+function indiceDaPessoa(id: string): number {
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return CORES_DA_INICIAL[h % CORES_DA_INICIAL.length];
+  return h % CORES_DA_INICIAL.length;
+}
+
+/** O par do degradê da inicial, estável pelo id (duas Marias, duas cores). */
+export function degradeDaInicial(id: string): readonly [string, string] {
+  return CORES_DA_INICIAL[indiceDaPessoa(id)];
+}
+
+/** A cor chapada da pessoa (a ponta clara do par), para quem não desenha degradê. */
+export function corDaInicial(id: string): string {
+  return degradeDaInicial(id)[0];
 }
 
 /** "1.234" → "1,2 mil". Números pequenos ficam inteiros. */

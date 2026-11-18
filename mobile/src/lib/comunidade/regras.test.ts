@@ -11,6 +11,7 @@ import {
   contagemCurta,
   corDaInicial,
   CORES_DA_INICIAL,
+  degradeDaInicial,
   fotosDoPost,
   fotosParaPublicar,
   inicialDe,
@@ -212,7 +213,24 @@ describe("gente", () => {
     expect(inicialDe(" ana")).toBe("A");
     expect(inicialDe("")).toBe("?");
     expect(corDaInicial("abc")).toBe(corDaInicial("abc"));
-    expect(CORES_DA_INICIAL.includes(corDaInicial("qualquer") as never)).toBe(true);
+    expect(degradeDaInicial("abc")).toEqual(degradeDaInicial("abc"));
+    expect(CORES_DA_INICIAL.map((p) => p[0]).includes(corDaInicial("qualquer") as never)).toBe(
+      true,
+    );
+  });
+  test("o monograma segura a inicial branca a 4,5:1 nas duas pontas do degradê", () => {
+    const luminancia = (hex: string) => {
+      const [r, g, b] = [1, 3, 5].map((i) => {
+        const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+        return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+    };
+    const comBranco = (hex: string) => 1.05 / (luminancia(hex) + 0.05);
+    const fracas = CORES_DA_INICIAL.flat().filter((c) => comBranco(c) < 4.5);
+    expect(fracas).toEqual([]);
+    /* E o tijolo e o vinho do site (a paleta antiga) não voltam. */
+    expect(CORES_DA_INICIAL.flat().join(" ")).not.toMatch(/#ab5e5c|#8f4b49/i);
   });
   test("contagem curta", () => {
     expect(contagemCurta(12)).toBe("12");

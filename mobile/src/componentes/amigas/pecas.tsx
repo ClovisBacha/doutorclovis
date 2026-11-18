@@ -1,152 +1,217 @@
-import { Image } from "expo-image";
-import { ChevronRight } from "lucide-react-native";
-import { useState, type ReactNode } from "react";
-import { Modal, Pressable, Text, View } from "react-native";
-import { corDoAvatar, inicialDoNome, tempoNoApp, ultimaVez } from "@/lib/amigas";
-import { toque } from "~/componentes/base";
+import {
+  Check,
+  ChevronRight,
+  Ellipsis,
+  Heart,
+  Send,
+  Share as IconeDeCompartilhar,
+} from "lucide-react-native";
+import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  ActionSheetIOS,
+  Platform,
+  Pressable,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
+import { tempoNoApp, ultimaVez } from "@/lib/amigas";
+import { linkDeIndicacao } from "@/lib/indicacao";
+import { Botao, Campo, Cartao, Tocavel, TituloDaSecao } from "~/componentes/base";
 import { ChamaDaSequencia } from "~/componentes/caminho/pecas";
+import { Avatar } from "~/componentes/comunidade/imagem";
+import { Folha } from "~/componentes/jornada/pecas";
+import { Painel, RAIO_DENTRO_DO_PAINEL } from "~/componentes/painel";
+import { lerAIndicacao } from "~/componentes/recompensas/economia-do-cantinho";
+import { lerMeuPerfilSocialSePreciso, useMeuPerfilSocial } from "~/lib/comunidade/meu-perfil";
 import {
   BONUS_DA_DUPLA,
+  chamaDaDupla,
   corDaUltimaVez,
-  emPausa,
   fraseDoErroDaDupla,
-  linhaDaDupla,
-  memoriaDaDupla,
+  fraseDoPedido,
+  mensagemDeConviteDoApp,
+  primeiroNomeDaAmiga,
 } from "~/lib/jornada/amigas";
+import { useSessao } from "~/lib/sessao";
 import type { DuplaNaTela, PerfilDeAmiga } from "~/servidor/amigas";
 import {
   chamarParaDupla,
   desfazerADupla,
+  pedirAmizade,
   responderConviteDaDupla,
+  type Pedido,
 } from "~/componentes/amigas/economia";
-import { ALVO_MINIMO, cor, espaco, fonte } from "~/tema";
+import {
+  ALVO_MINIMO,
+  canto,
+  cor,
+  curva,
+  escala,
+  espaco,
+  fonte,
+  fonteDoNumero,
+  sombraFlutuante,
+} from "~/tema";
 
 /**
- * As peças da aba das Amigas, no desenho do site (`src/components/amigas.tsx`):
- * o avatar (a foto, ou a inicial na cor do id), a linha da amiga, o cartão da
- * dupla com os quatro estados e a folha de sair.
+ * As peças da aba das Amigas e do perfil de uma amiga.
  *
  * NÃO é placar: a lista mostra o que cada uma CONSTRUIU (troféus, a chama
  * dela), nunca lado a lado com a minha, e nada clínico.
+ *
+ * O desenho de 18/11/2026 (a vistoria): tudo nas cores e nos materiais do tema
+ * (a paleta paralela `tinta` saiu), um avatar só para o app inteiro (o de
+ * `comunidade/imagem.tsx`), a lista agrupada do iOS, a dupla com cara de
+ * conquista, a confirmação nativa e o convite num painel só. Digitar no campo
+ * não redesenha a aba (`ChamarUmaAmiga` guarda o próprio estado) e as linhas
+ * só se redesenham quando a amiga muda (`memo`).
  */
 
-export const tinta = {
-  titulo: "#2f2140",
-  sub: "#6d5b85",
-  apagado: "#b8a6c9",
-  rosa: "#c9316f",
-  violeta: "#7c3aed",
-  ambar: "#a35a09",
-  ambarFundo: "#fdf0d4",
-} as const;
+/* ── Quem sou eu (para os dois rostos da dupla) ─────────────────────────── */
 
-export function Avatar({
-  nome,
-  id,
-  url,
-  tamanho = 44,
-}: {
-  nome: string;
-  id: string;
-  url: string | null;
-  tamanho?: number;
-}) {
-  if (url) {
-    return (
-      <Image
-        source={{ uri: url }}
-        style={{ width: tamanho, height: tamanho, borderRadius: tamanho / 2 }}
-        contentFit="cover"
-        accessibilityIgnoresInvertColors
-      />
-    );
-  }
-  return (
-    <View
-      style={{
-        width: tamanho,
-        height: tamanho,
-        borderRadius: tamanho / 2,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: corDoAvatar(id),
-      }}
-    >
-      <Text style={{ ...fonte.titulo, fontSize: tamanho * 0.42, color: cor.branco }}>
-        {inicialDoNome(nome)}
-      </Text>
-    </View>
-  );
+/** Ela mesma, como o botão do perfil a mostra: a foto, ou a inicial na cor dela. */
+export function useEu(): { id: string; nome: string; url: string | null } {
+  const { sessao, perfil } = useSessao();
+  const uid = sessao?.user.id ?? null;
+  const meu = useMeuPerfilSocial(uid);
+  useEffect(() => {
+    if (uid) void lerMeuPerfilSocialSePreciso(uid);
+  }, [uid]);
+  return {
+    id: uid ?? "eu",
+    nome: meu?.nome ?? perfil?.display_name ?? perfil?.full_name ?? "Você",
+    url: meu?.avatarUrl ?? null,
+  };
 }
 
+/** O título de um painel das Amigas: a serifada do tema, alinhada ao cartão de dentro. */
 export function CabecalhoDaSecao({ titulo, direita }: { titulo: string; direita?: ReactNode }) {
   return (
-    <View
-      style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 4, marginBottom: 8 }}
-    >
-      <Text
-        accessibilityRole="header"
-        style={{ flex: 1, ...fonte.titulo, fontSize: 18, color: tinta.titulo }}
-      >
-        {titulo}
-      </Text>
-      {direita}
+    <View style={{ paddingHorizontal: 4 }}>
+      <TituloDaSecao direita={direita}>{titulo}</TituloDaSecao>
     </View>
   );
 }
 
-function PilulaDeTrofeus({ quantos }: { quantos: number }) {
+/* ── Dois rostos juntos ─────────────────────────────────────────────────── */
+
+/**
+ * Os dois rostos sobrepostos, com o que as une na emenda: a chama (a dupla
+ * ativa) ou o coração (o convite). O anel branco separa um rosto do outro.
+ */
+export function ParDeRostos({
+  eu,
+  ela,
+  tamanho,
+  emenda,
+}: {
+  eu: { id: string; nome: string; url: string | null };
+  ela: { id: string; nome: string; url: string | null };
+  tamanho: number;
+  emenda: "chama-acesa" | "chama-apagada" | "coracao";
+}) {
+  const sobra = tamanho >= 56 ? 12 : 8;
+  const anel = 3;
+  const largura = tamanho * 2 - sobra;
+  const meio = tamanho - sobra / 2;
+  const chama = emenda !== "coracao";
+  /* A arte da chama tem folga em volta: 42 pt de arte enchem um disco de 46. */
+  const disco = chama ? Math.round(tamanho * 0.72) : 26;
   return (
     <View
       accessible
-      accessibilityLabel={`${quantos} ${quantos === 1 ? "troféu" : "troféus"}`}
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 4,
-        borderRadius: 999,
-        backgroundColor: "#fdf3d9",
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-      }}
+      accessibilityLabel={`Você e ${primeiroNomeDaAmiga(ela.nome)}`}
+      style={{ width: largura, height: tamanho + disco / 2 - 2 }}
     >
-      <Text style={{ fontSize: 13 }}>🏆</Text>
-      <Text style={{ ...fonte.titulo, fontSize: 13, color: tinta.ambar }}>{quantos}</Text>
+      <View style={{ flexDirection: "row" }}>
+        <Avatar id={eu.id} nome={eu.nome} url={eu.url} tamanho={tamanho} anel={anel} />
+        <Avatar
+          id={ela.id}
+          nome={ela.nome}
+          url={ela.url}
+          tamanho={tamanho}
+          anel={anel}
+          estilo={{ marginLeft: -sobra }}
+        />
+      </View>
+      <View
+        style={{
+          position: "absolute",
+          left: meio - disco / 2,
+          top: tamanho - disco / 2 - 2,
+          width: disco,
+          height: disco,
+          borderRadius: disco / 2,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: cor.branco,
+          ...sombraFlutuante,
+        }}
+      >
+        {chama ? (
+          <ChamaDaSequencia acesa={emenda === "chama-acesa"} tamanho={Math.round(disco * 0.92)} />
+        ) : (
+          <Heart size={14} color={cor.primaria} fill={cor.primaria} strokeWidth={2} />
+        )}
+      </View>
     </View>
   );
 }
 
-/** Uma amiga na lista: o rosto, o nome, "vista há 2h" (nunca "online") e os troféus. */
-export function LinhaDaAmiga({ a, aoAbrir }: { a: PerfilDeAmiga; aoAbrir: () => void }) {
+/* ── A lista das amigas ─────────────────────────────────────────────────── */
+
+/** A linha tem 64 pt; o divisor começa depois do rosto (16 + 44 + 12). */
+const RECUO_DO_DIVISOR = 72;
+
+/**
+ * Uma amiga na lista agrupada: o rosto, o nome e, embaixo, "vista há 2h · 14
+ * troféus" (nunca "online", e o troféu como texto da linha: uma coluna de
+ * números, com a lista ordenada pela chama, lia-se como ranking).
+ */
+export const LinhaDaAmiga = memo(function LinhaDaAmiga({
+  a,
+  aoAbrir,
+  primeira,
+  ultima,
+}: {
+  a: PerfilDeAmiga;
+  aoAbrir: (id: string) => void;
+  primeira: boolean;
+  ultima: boolean;
+}) {
   const vista = ultimaVez(a.vistaEm);
+  const quando = vista ? `vista ${vista}` : tempoNoApp(a.diasNoApp);
+  const trofeus = a.trofeus > 0 ? `${a.trofeus} ${a.trofeus === 1 ? "troféu" : "troféus"}` : null;
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${a.nome}. ${vista ? `Vista ${vista}` : tempoNoApp(a.diasNoApp)}. ${a.trofeus} troféus. Abrir`}
-      onPress={() => {
-        toque();
-        aoAbrir();
-      }}
+      accessibilityLabel={`${a.nome}. ${quando}${trofeus ? `. ${trofeus}` : ""}. Abrir o Cantinho dela`}
+      onPress={() => aoAbrir(a.id)}
       style={({ pressed }) => ({
         flexDirection: "row",
         alignItems: "center",
-        gap: 10,
-        borderRadius: 20,
-        backgroundColor: "rgba(255,255,255,0.9)",
-        padding: 10,
-        opacity: pressed ? 0.85 : 1,
-        shadowColor: "#50286e",
-        shadowOpacity: 0.06,
-        shadowRadius: 5,
-        shadowOffset: { width: 0, height: 1 },
+        gap: 12,
+        minHeight: 64,
+        paddingVertical: 10,
+        paddingLeft: 16,
+        paddingRight: 14,
+        backgroundColor: pressed ? cor.apagado : "transparent",
+        borderTopLeftRadius: primeira ? RAIO_DENTRO_DO_PAINEL : 0,
+        borderTopRightRadius: primeira ? RAIO_DENTRO_DO_PAINEL : 0,
+        borderBottomLeftRadius: ultima ? RAIO_DENTRO_DO_PAINEL : 0,
+        borderBottomRightRadius: ultima ? RAIO_DENTRO_DO_PAINEL : 0,
       })}
     >
-      <Avatar nome={a.nome} id={a.id} url={a.avatarUrl} />
+      <Avatar id={a.id} nome={a.nome} url={a.avatarUrl} tamanho={44} />
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text numberOfLines={1} style={{ ...fonte.titulo, fontSize: 15, color: tinta.titulo }}>
+        <Text numberOfLines={1} style={{ ...fonte.forte, ...escala.manchete, color: cor.texto }}>
           {a.nome}
         </Text>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 1 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 }}>
           {vista ? (
             <View
               style={{
@@ -157,88 +222,194 @@ export function LinhaDaAmiga({ a, aoAbrir }: { a: PerfilDeAmiga; aoAbrir: () => 
               }}
             />
           ) : null}
-          <Text style={{ ...fonte.media, fontSize: 13, color: tinta.sub }}>
-            {vista ? `vista ${vista}` : tempoNoApp(a.diasNoApp)}
+          <Text
+            numberOfLines={1}
+            style={{ flexShrink: 1, ...fonte.normal, ...escala.nota, color: cor.textoApagado }}
+          >
+            {trofeus ? `${quando} · ${trofeus}` : quando}
           </Text>
         </View>
       </View>
-      <PilulaDeTrofeus quantos={a.trofeus} />
-      <ChevronRight size={18} color={tinta.apagado} />
+      <ChevronRight size={16} color={cor.textoApagado} strokeWidth={2.4} />
+      {ultima ? null : (
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            left: RECUO_DO_DIVISOR,
+            right: 0,
+            bottom: 0,
+            height: StyleSheet.hairlineWidth,
+            backgroundColor: cor.divisor,
+          }}
+        />
+      )}
     </Pressable>
+  );
+});
+
+/** As amigas num cartão só, como uma lista dos Ajustes ou dos Contatos. */
+export function ListaDeAmigas({
+  amigas,
+  aoAbrir,
+}: {
+  amigas: readonly PerfilDeAmiga[];
+  aoAbrir: (id: string) => void;
+}) {
+  return (
+    <Cartao estilo={{ padding: 0, gap: 0, borderRadius: RAIO_DENTRO_DO_PAINEL }}>
+      {amigas.map((a, i) => (
+        <LinhaDaAmiga
+          key={a.id}
+          a={a}
+          aoAbrir={aoAbrir}
+          primeira={i === 0}
+          ultima={i === amigas.length - 1}
+        />
+      ))}
+    </Cartao>
   );
 }
 
-function BotaoPilula({
+/* ── Um pedido de amizade ───────────────────────────────────────────────── */
+
+export const CartaoDoPedido = memo(function CartaoDoPedido({
+  p,
+  respondendo,
+  aoResponder,
+}: {
+  p: Pedido;
+  /** Qual dos dois ela tocou (os dois param até a resposta voltar). */
+  respondendo: "sim" | "nao" | null;
+  aoResponder: (p: Pedido, aceitar: boolean) => void;
+}) {
+  return (
+    <Cartao estilo={{ borderRadius: RAIO_DENTRO_DO_PAINEL, padding: 14, gap: 14 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+        <Avatar id={p.id} nome={p.nome} url={null} tamanho={44} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text numberOfLines={1} style={{ ...fonte.forte, ...escala.manchete, color: cor.texto }}>
+            {p.nome}
+          </Text>
+          <Text style={{ ...fonte.normal, ...escala.nota, color: cor.textoApagado }}>
+            {primeiraMaiuscula(tempoNoApp(p.diasNoApp))}
+          </Text>
+        </View>
+      </View>
+      <View style={{ flexDirection: "row", gap: espaco.sm }}>
+        <Botao
+          rotulo="Aceitar"
+          tamanho="compacto"
+          icone={<Check size={16} color={cor.branco} strokeWidth={2.8} />}
+          carregando={respondendo === "sim"}
+          desabilitado={!!respondendo}
+          estilo={{ flex: 1 }}
+          aoTocar={() => aoResponder(p, true)}
+        />
+        <Botao
+          rotulo="Agora não"
+          tipo="suave"
+          tamanho="compacto"
+          carregando={respondendo === "nao"}
+          desabilitado={!!respondendo}
+          estilo={{ flex: 1 }}
+          aoTocar={() => aoResponder(p, false)}
+        />
+      </View>
+    </Cartao>
+  );
+});
+
+/* ── O botão "•••" ──────────────────────────────────────────────────────── */
+
+/** O "•••" de 44 pt: a saída mora atrás dele, e não num botão do tamanho da tela. */
+export function BotaoMais({
   rotulo,
   aoTocar,
-  cheio,
-  cor: c = tinta.rosa,
-  desabilitado,
+  estilo,
 }: {
   rotulo: string;
   aoTocar: () => void;
-  cheio?: boolean;
-  cor?: string;
-  desabilitado?: boolean;
+  estilo?: StyleProp<ViewStyle>;
 }) {
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={rotulo}
-      accessibilityState={{ disabled: !!desabilitado }}
-      disabled={desabilitado}
-      onPress={() => {
-        toque();
-        aoTocar();
-      }}
-      style={({ pressed }) => ({
-        flex: 1,
-        minHeight: ALVO_MINIMO,
-        alignItems: "center",
-        justifyContent: "center",
-        borderRadius: 999,
-        paddingHorizontal: espaco.md,
-        backgroundColor: cheio ? c : "rgba(255,255,255,0.9)",
-        borderWidth: cheio ? 0 : 1,
-        borderColor: "#ead9f2",
-        opacity: desabilitado ? 0.5 : pressed ? 0.85 : 1,
-      })}
+    <Tocavel
+      rotulo={rotulo}
+      aoTocar={aoTocar}
+      estilo={[
+        {
+          width: ALVO_MINIMO,
+          height: ALVO_MINIMO,
+          borderRadius: ALVO_MINIMO / 2,
+          alignItems: "center",
+          justifyContent: "center",
+        },
+        estilo,
+      ]}
     >
-      <Text style={{ ...fonte.titulo, fontSize: 14, color: cheio ? cor.branco : tinta.sub }}>
-        {rotulo}
+      <Ellipsis size={22} color={cor.textoApagado} strokeWidth={2.4} />
+    </Tocavel>
+  );
+}
+
+/* ── A dupla ────────────────────────────────────────────────────────────── */
+
+/** A regra da dupla, para quem ainda vai decidir (sem dupla, ou convidada). */
+function RegraDaDupla() {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.md }}>
+      <ChamaDaSequencia acesa={false} tamanho={30} />
+      <Text style={{ flex: 1, ...fonte.normal, ...escala.legenda, color: cor.textoCorpo }}>
+        Vocês seguram uma chama juntas: o dia conta quando as duas aparecem, e cada uma ganha{" "}
+        {BONUS_DA_DUPLA} sementinhas por dia juntas.
       </Text>
-    </Pressable>
+    </View>
   );
 }
 
 /**
  * A DUPLA DE SEQUÊNCIA — os quatro estados do site: sem dupla (chamar uma
  * amiga), convite enviado (cancelar), convite recebido (aceitar / agora não) e
- * ativa (a chama juntas, a memória, a pausa e desfazer). Uma dupla ativa por
- * pessoa: o banco garante, e é de propósito — duas viram placar.
+ * ativa. Uma dupla ativa por pessoa: o banco garante, e é de propósito — duas
+ * viram placar.
+ *
+ * Ativa, ela é a conquista (18/11/2026): os dois rostos com a chama na
+ * emenda e o número grande, como a ofensiva de um jogo. A regra sai (quem
+ * volta todo dia não precisa relê-la), e desfazer vai para o "•••".
  */
-export function CartaoDaDupla({
+export const CartaoDaDupla = memo(function CartaoDaDupla({
   dupla,
   amigas,
   aoMudar,
   avisar,
+  confirmar,
 }: {
   dupla: DuplaNaTela | null;
-  amigas: PerfilDeAmiga[];
+  amigas: readonly PerfilDeAmiga[];
   aoMudar: () => void;
   avisar: (t: string) => void;
+  confirmar: (p: PedidoDeConfirmacao) => void;
 }) {
-  const [ocupado, setOcupado] = useState(false);
-  const [desfazendo, setDesfazendo] = useState(false);
+  const eu = useEu();
+  const [ocupado, setOcupado] = useState<string | null>(null);
   const estado = dupla?.estado ?? "sem";
+  const dela = dupla
+    ? {
+        id: dupla.amigaId ?? "ela",
+        nome: dupla.nome ?? "",
+        url: amigas.find((a) => a.id === dupla.amigaId)?.avatarUrl ?? null,
+      }
+    : null;
+  const nomeDela = primeiroNomeDaAmiga(dupla?.nome);
 
   async function agir(
+    qual: string,
     acao: () => Promise<{ ok: true } | { ok: false; error?: string }>,
     sucesso: string | null,
   ) {
-    setOcupado(true);
+    setOcupado(qual);
     const r = await acao();
-    setOcupado(false);
+    setOcupado(null);
     if (!r.ok) {
       avisar(fraseDoErroDaDupla(r.error));
       return;
@@ -247,304 +418,440 @@ export function CartaoDaDupla({
     aoMudar();
   }
 
-  return (
-    <View
-      style={{
-        borderRadius: 22,
-        backgroundColor: "rgba(255,255,255,0.92)",
-        padding: espaco.lg,
-        gap: espaco.md,
-        shadowColor: "#50286e",
-        shadowOpacity: 0.07,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 2 },
-      }}
-    >
-      <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.md }}>
-        <ChamaDaSequencia acesa={estado === "ativa" && (dupla?.sequencia ?? 0) > 0} tamanho={34} />
-        <Text
-          style={{
-            flex: 1,
-            ...fonte.media,
-            fontSize: 14,
-            lineHeight: 20,
-            color: tinta.sub,
-          }}
-        >
-          Vocês duas seguram a mesma chama: o dia conta quando as duas aparecem, e cada uma ganha{" "}
-          <Text style={{ ...fonte.titulo, color: tinta.titulo }}>+{BONUS_DA_DUPLA} 🌱</Text> por dia
-          juntas. Ninguém fica atrás de ninguém.
-        </Text>
-      </View>
-
-      {estado === "ativa" && dupla ? (
-        <View style={{ gap: espaco.sm }}>
-          <View style={{ flexDirection: "row", alignItems: "center", alignSelf: "flex-start" }}>
-            <View
+  if (estado === "ativa" && dupla && dela) {
+    const c = chamaDaDupla(dupla);
+    return (
+      <Cartao
+        estilo={{
+          borderRadius: RAIO_DENTRO_DO_PAINEL,
+          paddingTop: espaco.xl,
+          paddingBottom: espaco.lg + 2,
+          alignItems: "center",
+          gap: espaco.md,
+        }}
+      >
+        <BotaoMais
+          rotulo={`Mais opções da dupla com ${nomeDela}`}
+          estilo={{ position: "absolute", top: 4, right: 4 }}
+          aoTocar={() =>
+            confirmar({
+              titulo: `Desfazer a dupla com ${nomeDela}?`,
+              texto: `A dupla some da tela das duas e o bônus de ${BONUS_DA_DUPLA} sementinhas por dia juntas para. Ela não é avisada. Se mudarem de ideia, é só chamar de novo.`,
+              sim: "Desfazer a dupla",
+              nao: "Manter",
+              aoConfirmar: () => void agir("desfazer", desfazerADupla, "A dupla foi desfeita."),
+            })
+          }
+        />
+        <ParDeRostos
+          eu={eu}
+          ela={dela}
+          tamanho={64}
+          emenda={c.acesa ? "chama-acesa" : "chama-apagada"}
+        />
+        {c.numero !== null ? (
+          <View
+            accessible
+            accessibilityLabel={`${c.numero} ${c.unidade} ${c.com}`}
+            style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+          >
+            <Text
               style={{
-                zIndex: 1,
-                width: 56,
-                height: 56,
-                borderRadius: 28,
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: "#e595bb",
-                borderWidth: 2,
-                borderColor: cor.branco,
+                ...fonteDoNumero,
+                fontSize: 44,
+                lineHeight: 50,
+                letterSpacing: -1,
+                color: cor.atencao,
+                fontVariant: ["tabular-nums"],
               }}
             >
-              <Text style={{ ...fonte.titulo, fontSize: 14, color: cor.branco }}>Você</Text>
-            </View>
-            <View style={{ marginLeft: -8 }}>
-              <Avatar
-                nome={dupla.nome ?? ""}
-                id={dupla.amigaId ?? ""}
-                url={amigas.find((a) => a.id === dupla.amigaId)?.avatarUrl ?? null}
-                tamanho={56}
-              />
-            </View>
-            {/* O coração mora na emenda das duas, e não solto ao lado. */}
-            <View
-              style={{
-                position: "absolute",
-                zIndex: 2,
-                left: 38,
-                bottom: -4,
-                width: 28,
-                height: 28,
-                borderRadius: 14,
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: cor.branco,
-              }}
-            >
-              <Text style={{ fontSize: 15, lineHeight: 18, color: "#db2777" }}>♥</Text>
-            </View>
-          </View>
-          <Text style={{ ...fonte.titulo, fontSize: 17, color: tinta.titulo }}>
-            Você + {dupla.nome}
-          </Text>
-          {dupla.sequencia > 0 ? (
-            <View
-              style={{
-                alignSelf: "flex-start",
-                borderRadius: 999,
-                backgroundColor: tinta.ambarFundo,
-                paddingHorizontal: 12,
-                paddingVertical: 5,
-              }}
-            >
-              <Text style={{ ...fonte.titulo, fontSize: 14, color: tinta.ambar }}>
-                {linhaDaDupla(dupla)}
+              {c.numero}
+            </Text>
+            <View>
+              <Text style={{ ...fonte.normal, ...escala.legenda, color: cor.textoApagado }}>
+                {c.unidade}
               </Text>
+              <Text style={{ ...fonte.forte, ...escala.legenda, color: cor.texto }}>{c.com}</Text>
             </View>
-          ) : (
-            <Text style={{ ...fonte.media, fontSize: 14, color: tinta.sub }}>
-              {linhaDaDupla(dupla)}
-            </Text>
-          )}
-          {memoriaDaDupla(dupla) ? (
-            <Text style={{ ...fonte.media, fontSize: 13, color: tinta.sub }}>
-              {memoriaDaDupla(dupla)}
-            </Text>
-          ) : null}
-          {emPausa(dupla) ? (
-            <Text style={{ ...fonte.normal, fontSize: 13, lineHeight: 19, color: tinta.sub }}>
-              A chama de vocês está parada há uns dias — ela volta a contar no dia em que as duas
-              aparecerem, e nada do que vocês já fizeram se perdeu.
-            </Text>
-          ) : null}
-          <View style={{ flexDirection: "row" }}>
-            <BotaoPilula
-              rotulo="Desfazer a dupla"
-              desabilitado={ocupado}
-              aoTocar={() => setDesfazendo(true)}
-            />
           </View>
-          {/* A chama sai dos dias em que as DUAS apareceram, e não da linha da
-              dupla: chamar de novo traz a mesma chama de volta. Por isso a folha
-              não ameaça perda nenhuma — diz só o que para de fato. */}
-          <FolhaDeConfirmar
-            titulo={`Desfazer a dupla com ${(dupla.nome ?? "ela").split(/\s+/)[0]}?`}
-            texto={`A dupla some da tela das duas e o bônus de +${BONUS_DA_DUPLA} 🌱 por dia juntas para. Ela não é avisada — e, se mudarem de ideia, é só chamar de novo.`}
-            sim="Desfazer"
-            nao="Manter"
-            aberta={desfazendo}
-            aoFechar={() => setDesfazendo(false)}
-            aoConfirmar={() => {
-              setDesfazendo(false);
-              void agir(desfazerADupla, "A dupla foi desfeita.");
+        ) : (
+          <Text
+            style={{
+              textAlign: "center",
+              paddingHorizontal: espaco.sm,
+              ...fonte.normal,
+              ...escala.legenda,
+              color: cor.textoCorpo,
             }}
+          >
+            {c.frase}
+          </Text>
+        )}
+        {c.memoria ? (
+          <Text
+            style={{
+              textAlign: "center",
+              paddingHorizontal: espaco.sm,
+              ...fonte.normal,
+              ...escala.nota,
+              color: cor.textoApagado,
+            }}
+          >
+            {c.memoria}
+          </Text>
+        ) : null}
+      </Cartao>
+    );
+  }
+
+  return (
+    <Cartao estilo={{ borderRadius: RAIO_DENTRO_DO_PAINEL, gap: espaco.lg }}>
+      {estado === "convite-enviado" && dela ? (
+        <View style={{ alignItems: "center", gap: espaco.md }}>
+          <ParDeRostos eu={eu} ela={dela} tamanho={52} emenda="coracao" />
+          <Text
+            style={{
+              textAlign: "center",
+              ...fonte.normal,
+              ...escala.legenda,
+              color: cor.textoCorpo,
+            }}
+          >
+            Você chamou <Text style={{ ...fonte.forte, color: cor.texto }}>{nomeDela}</Text> para a
+            dupla. Agora é com ela.
+          </Text>
+          <Botao
+            rotulo="Cancelar o convite"
+            tipo="texto"
+            tamanho="compacto"
+            carregando={ocupado === "cancelar"}
+            desabilitado={!!ocupado}
+            aoTocar={() => void agir("cancelar", desfazerADupla, null)}
           />
         </View>
       ) : null}
 
-      {estado === "convite-recebido" && dupla ? (
-        <View style={{ gap: espaco.sm }}>
-          <Text style={{ ...fonte.media, fontSize: 15, color: tinta.titulo }}>
-            <Text style={{ ...fonte.titulo }}>{dupla.nome}</Text> te chamou para uma dupla.
-          </Text>
+      {estado === "convite-recebido" && dupla && dela ? (
+        <>
+          <View style={{ alignItems: "center", gap: espaco.md }}>
+            <ParDeRostos eu={eu} ela={dela} tamanho={52} emenda="coracao" />
+            <Text
+              style={{
+                textAlign: "center",
+                ...fonte.normal,
+                ...escala.corpo,
+                color: cor.texto,
+              }}
+            >
+              <Text style={fonte.forte}>{nomeDela}</Text> te chamou para uma dupla.
+            </Text>
+          </View>
+          <RegraDaDupla />
           <View style={{ flexDirection: "row", gap: espaco.sm }}>
-            <BotaoPilula
-              rotulo="Aceitar 🔥"
-              cheio
-              cor="#b45309"
-              desabilitado={ocupado}
+            <Botao
+              rotulo="Aceitar"
+              tamanho="compacto"
+              icone={<Check size={16} color={cor.branco} strokeWidth={2.8} />}
+              carregando={ocupado === "aceitar"}
+              desabilitado={!!ocupado}
+              estilo={{ flex: 1 }}
               aoTocar={() =>
                 void agir(
+                  "aceitar",
                   () => responderConviteDaDupla(dupla.amigaId!, true),
-                  "Dupla formada! A chama começa hoje 🔥",
+                  `Dupla formada. A chama de vocês começa hoje.`,
                 )
               }
             />
-            <BotaoPilula
+            <Botao
               rotulo="Agora não"
-              desabilitado={ocupado}
-              aoTocar={() => void agir(() => responderConviteDaDupla(dupla.amigaId!, false), null)}
+              tipo="suave"
+              tamanho="compacto"
+              carregando={ocupado === "recusar"}
+              desabilitado={!!ocupado}
+              estilo={{ flex: 1 }}
+              aoTocar={() =>
+                void agir("recusar", () => responderConviteDaDupla(dupla.amigaId!, false), null)
+              }
             />
           </View>
-        </View>
-      ) : null}
-
-      {estado === "convite-enviado" && dupla ? (
-        <View style={{ gap: espaco.sm }}>
-          <Text style={{ ...fonte.media, fontSize: 15, color: tinta.titulo }}>
-            Convite enviado para <Text style={{ ...fonte.titulo }}>{dupla.nome}</Text>. Esperando
-            ela aceitar.
-          </Text>
-          <View style={{ flexDirection: "row" }}>
-            <BotaoPilula
-              rotulo="Cancelar o convite"
-              desabilitado={ocupado}
-              aoTocar={() => void agir(desfazerADupla, null)}
-            />
-          </View>
-        </View>
+        </>
       ) : null}
 
       {estado === "sem" ? (
-        amigas.length === 0 ? (
-          <Text style={{ ...fonte.media, fontSize: 14, color: tinta.sub }}>
-            Quando uma amiga entrar pelo seu convite, ela aparece aqui para formar dupla.
-          </Text>
-        ) : (
-          <View style={{ gap: espaco.sm }}>
-            <Text style={{ ...fonte.titulo, fontSize: 14, color: tinta.titulo }}>
-              Chamar para a dupla
+        <>
+          <RegraDaDupla />
+          {amigas.length === 0 ? (
+            <Text style={{ ...fonte.normal, ...escala.legenda, color: cor.textoApagado }}>
+              Quando uma amiga entrar pelo seu convite, vocês podem formar uma dupla.
             </Text>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: espaco.sm }}>
-              {amigas.slice(0, 8).map((a) => (
-                <Pressable
-                  key={a.id}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Chamar ${a.nome} para a dupla`}
-                  disabled={ocupado}
-                  onPress={() => {
-                    toque();
-                    void agir(() => chamarParaDupla(a.id), "Convite enviado 🔥");
-                  }}
-                  style={({ pressed }) => ({
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 6,
-                    minHeight: ALVO_MINIMO,
-                    borderRadius: 999,
-                    paddingLeft: 4,
-                    paddingRight: 14,
-                    backgroundColor: "#fff7ed",
-                    borderWidth: 1,
-                    borderColor: "#fde3c4",
-                    opacity: ocupado ? 0.5 : pressed ? 0.85 : 1,
-                  })}
-                >
-                  <Avatar nome={a.nome} id={a.id} url={a.avatarUrl} tamanho={34} />
-                  <Text style={{ ...fonte.titulo, fontSize: 14, color: tinta.ambar }}>
-                    {a.nome.split(/\s+/)[0]}
-                  </Text>
-                </Pressable>
-              ))}
+          ) : (
+            <View style={{ gap: espaco.sm }}>
+              <Text style={{ ...fonte.forte, ...escala.legenda, color: cor.texto }}>
+                Chamar para a dupla
+              </Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: espaco.sm }}>
+                {amigas.slice(0, 8).map((a) => (
+                  <Tocavel
+                    key={a.id}
+                    rotulo={`Chamar ${a.nome} para a dupla`}
+                    desabilitado={!!ocupado}
+                    aoTocar={() =>
+                      void agir(
+                        a.id,
+                        () => chamarParaDupla(a.id),
+                        `Convite enviado para ${primeiroNomeDaAmiga(a.nome)}.`,
+                      )
+                    }
+                    estilo={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: espaco.sm,
+                      minHeight: ALVO_MINIMO,
+                      borderRadius: canto.pilula,
+                      ...curva,
+                      paddingLeft: 4,
+                      paddingRight: 14,
+                      backgroundColor: cor.apagado,
+                      opacity: ocupado && ocupado !== a.id ? 0.5 : 1,
+                    }}
+                  >
+                    <Avatar id={a.id} nome={a.nome} url={a.avatarUrl} tamanho={36} />
+                    <Text style={{ ...fonte.forte, ...escala.legenda, color: cor.texto }}>
+                      {primeiroNomeDaAmiga(a.nome)}
+                    </Text>
+                  </Tocavel>
+                ))}
+              </View>
             </View>
-          </View>
-        )
+          )}
+        </>
       ) : null}
-    </View>
+    </Cartao>
   );
-}
+});
 
-/** Uma folha de confirmação: a pergunta, o que acontece de fato, e duas saídas. */
-export function FolhaDeConfirmar({
-  titulo,
-  texto,
-  sim,
-  nao,
-  aberta,
-  aoFechar,
-  aoConfirmar,
-}: {
+/* ── A confirmação ──────────────────────────────────────────────────────── */
+
+export type PedidoDeConfirmacao = {
   titulo: string;
   texto: string;
+  /** A saída (destrutiva): "Desfazer a dupla", "Sair da amizade". */
   sim: string;
+  /** Ficar como está: "Manter", "Ficar". */
   nao: string;
-  aberta: boolean;
-  aoFechar: () => void;
   aoConfirmar: () => void;
+};
+
+/**
+ * A CONFIRMAÇÃO de uma saída. No iPhone, a folha de ações do sistema (a que
+ * todo mundo conhece, com a saída em vermelho e o "Manter" embaixo). Fora do
+ * iOS (Android e a bancada), a `Folha` do app como reserva.
+ */
+export function useConfirmar(): {
+  confirmar: (p: PedidoDeConfirmacao) => void;
+  folha: ReactNode;
+} {
+  const [pedido, setPedido] = useState<PedidoDeConfirmacao | null>(null);
+  const confirmar = useCallback((p: PedidoDeConfirmacao) => {
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          title: p.titulo,
+          message: p.texto,
+          options: [p.sim, p.nao],
+          destructiveButtonIndex: 0,
+          cancelButtonIndex: 1,
+          userInterfaceStyle: "light",
+        },
+        (i) => {
+          if (i === 0) p.aoConfirmar();
+        },
+      );
+      return;
+    }
+    setPedido(p);
+  }, []);
+  const fechar = useCallback(() => setPedido(null), []);
+  return { confirmar, folha: <FolhaDeConfirmar pedido={pedido} aoFechar={fechar} /> };
+}
+
+/** A reserva da confirmação: a `Folha` do app (alça e área segura), com a saída em vermelho. */
+function FolhaDeConfirmar({
+  pedido,
+  aoFechar,
+}: {
+  pedido: PedidoDeConfirmacao | null;
+  aoFechar: () => void;
 }) {
+  /* A folha desce com o último texto, e não vazia. */
+  const ultimo = useRef(pedido);
+  if (pedido) ultimo.current = pedido;
+  const p = pedido ?? ultimo.current;
   return (
-    <Modal visible={aberta} transparent animationType="slide" onRequestClose={aoFechar}>
-      <Pressable
-        accessibilityLabel="Fechar"
-        onPress={aoFechar}
-        style={{ flex: 1, backgroundColor: "rgba(20,10,30,0.35)" }}
-      />
-      <View
-        style={{
-          borderTopLeftRadius: 28,
-          borderTopRightRadius: 28,
-          backgroundColor: cor.branco,
-          padding: espaco.xl,
-          paddingBottom: espaco.xxl,
-          gap: espaco.md,
-        }}
-      >
-        <Text
-          accessibilityRole="header"
-          style={{ ...fonte.titulo, fontSize: 20, color: tinta.titulo }}
-        >
-          {titulo}
-        </Text>
-        <Text style={{ ...fonte.media, fontSize: 15, lineHeight: 22, color: tinta.sub }}>
-          {texto}
-        </Text>
-        <View style={{ flexDirection: "row", gap: espaco.sm }}>
-          <BotaoPilula rotulo={sim} cheio cor="#9f1239" aoTocar={aoConfirmar} />
-          <BotaoPilula rotulo={nao} aoTocar={aoFechar} />
-        </View>
+    <Folha aberta={!!pedido} aoFechar={aoFechar} titulo={p?.titulo}>
+      <Text style={{ ...fonte.normal, ...escala.legenda, color: cor.textoCorpo }}>{p?.texto}</Text>
+      <View style={{ gap: espaco.sm, marginTop: espaco.xs }}>
+        <Botao
+          rotulo={p?.sim ?? ""}
+          tipo="perigo"
+          aoTocar={() => {
+            aoFechar();
+            p?.aoConfirmar();
+          }}
+        />
+        <Botao rotulo={p?.nao ?? ""} tipo="secundario" aoTocar={aoFechar} />
       </View>
-    </Modal>
+    </Folha>
   );
 }
 
-/** A confirmação de sair da amizade — sem drama, e ninguém é avisado. */
-export function FolhaDeSair({
-  nome,
-  aberta,
-  aoFechar,
-  aoConfirmar,
-}: {
-  nome: string;
-  aberta: boolean;
-  aoFechar: () => void;
-  aoConfirmar: () => void;
-}) {
+/* ── Chamar uma amiga ───────────────────────────────────────────────────── */
+
+/**
+ * CHAMAR UMA AMIGA — um painel só (antes eram dois blocos, um formulário e um
+ * banner em degradê, que diziam quase a mesma coisa): o convite pelo link, o
+ * código dela à mão e o pedido por código ou e-mail para quem já está no app.
+ * O que se digita mora AQUI, e não na aba: cada tecla redesenhava a bolha, a
+ * dupla e a lista inteira.
+ */
+export function ChamarUmaAmiga({ avisar }: { avisar: (t: string) => void }) {
+  const [codigo, setCodigo] = useState<string | null>(null);
+  const [termo, setTermo] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [resposta, setResposta] = useState<{ texto: string; ok: boolean } | null>(null);
+
+  useEffect(() => {
+    let vivo = true;
+    void lerAIndicacao().then((i) => {
+      if (vivo) setCodigo(i?.codigo ?? null);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, []);
+
+  const pronto = termo.trim().length >= 3;
+
+  async function enviar() {
+    if (!pronto || enviando) return;
+    setEnviando(true);
+    setResposta(null);
+    const r = await pedirAmizade(termo.trim());
+    setEnviando(false);
+    setResposta(fraseDoPedido(r));
+    if (r.ok) setTermo("");
+  }
+
+  async function convidar() {
+    const link = linkDeIndicacao(codigo);
+    if (!link || !codigo) {
+      avisar("Ainda estou preparando o seu link. Tente de novo em instantes.");
+      return;
+    }
+    /* Com o código ESCRITO: quem baixa o app digita no cadastro ("Uma amiga
+       te chamou?"); o link é do site, que o captura sozinho. */
+    try {
+      await Share.share({ message: mensagemDeConviteDoApp(codigo, link) });
+    } catch {
+      avisar("Não consegui abrir o compartilhamento.");
+    }
+  }
+
   return (
-    <FolhaDeConfirmar
-      titulo={`Sair da amizade com ${nome.split(/\s+/)[0]}?`}
-      texto="Ela não aparece mais aqui, e você some da lista dela. Se tinham uma dupla, ela acaba. Ninguém é avisado."
-      sim="Sair da amizade"
-      nao="Ficar"
-      aberta={aberta}
-      aoFechar={aoFechar}
-      aoConfirmar={aoConfirmar}
-    />
+    <Painel>
+      <CabecalhoDaSecao titulo="Chamar uma amiga" />
+      <Botao
+        rotulo="Convidar pelo link"
+        icone={<Send size={18} color={cor.branco} strokeWidth={2.4} />}
+        aoTocar={() => void convidar()}
+      />
+      {codigo ? (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingHorizontal: 4,
+          }}
+        >
+          <Text style={{ ...fonte.normal, ...escala.legenda, color: cor.textoApagado }}>
+            Seu código
+          </Text>
+          <Tocavel
+            rotulo={`Seu código, ${codigo.split("").join(" ")}. Compartilhar`}
+            aoTocar={() => void convidar()}
+            estilo={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: espaco.sm,
+              minHeight: ALVO_MINIMO,
+              paddingHorizontal: 14,
+              borderRadius: canto.pilula,
+              ...curva,
+              backgroundColor: cor.apagado,
+            }}
+          >
+            <Text
+              selectable
+              style={{ ...fonte.titulo, fontSize: 17, letterSpacing: 1.5, color: cor.texto }}
+            >
+              {codigo}
+            </Text>
+            <IconeDeCompartilhar size={15} color={cor.textoApagado} strokeWidth={2.4} />
+          </Tocavel>
+        </View>
+      ) : null}
+
+      <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: cor.borda }} />
+
+      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: espaco.sm }}>
+        <View style={{ flex: 1 }}>
+          <Campo
+            rotulo="Ela já está no app?"
+            value={termo}
+            onChangeText={setTermo}
+            onSubmitEditing={() => void enviar()}
+            placeholder="Código ou e-mail dela"
+            accessibilityHint="O código de indicação ou o e-mail da conta dela"
+            keyboardType="email-address"
+            returnKeyType="send"
+            enablesReturnKeyAutomatically
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={{ minHeight: 48 }}
+          />
+        </View>
+        <Botao
+          rotulo="Enviar"
+          carregando={enviando}
+          desabilitado={!pronto}
+          aoTocar={() => void enviar()}
+        />
+      </View>
+      {resposta ? (
+        <Text
+          accessibilityLiveRegion="polite"
+          style={{
+            paddingHorizontal: 4,
+            ...fonte.media,
+            ...escala.nota,
+            color: resposta.ok ? cor.sementinha : cor.atencaoForte,
+          }}
+        >
+          {resposta.texto}
+        </Text>
+      ) : null}
+      <Text
+        style={{ paddingHorizontal: 4, ...fonte.normal, ...escala.nota, color: cor.textoApagado }}
+      >
+        Peça o código dela, que fica nas Recompensas, ou use o e-mail da conta dela. Ela recebe o
+        pedido e escolhe se aceita.
+      </Text>
+    </Painel>
   );
+}
+
+function primeiraMaiuscula(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
