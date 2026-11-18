@@ -6,6 +6,7 @@ import {
   lerAgenda,
   semCompromisso,
   type Compromisso,
+  type ModoDaAgenda,
 } from "~/lib/agenda/agenda";
 import { reagendarAgenda } from "~/lib/agenda/lembretes";
 import { estadoAtual, gravarChave } from "~/lib/jornada/loja";
@@ -26,14 +27,17 @@ export function useAgenda() {
 /** Lê a agenda do estado ATUAL da loja (e não da renderização): duas gravações seguidas não se apagam. */
 const agendaAgora = () => lerAgenda(estadoAtual().blob[CHAVE_AGENDA]);
 
-export async function salvarCompromisso(c: Compromisso): Promise<"ok" | "sem-permissao"> {
+export async function salvarCompromisso(
+  c: Compromisso,
+  modo?: ModoDaAgenda,
+): Promise<"ok" | "sem-permissao"> {
   const nova = comCompromisso(agendaAgora(), c);
   gravarChave(CHAVE_AGENDA, nova);
-  return reagendarAgenda(nova, true);
+  return reagendarAgenda(nova, true, modo);
 }
 
-export async function apagarCompromisso(id: string): Promise<void> {
+export async function apagarCompromisso(id: string, modo?: ModoDaAgenda): Promise<void> {
   const nova = semCompromisso(agendaAgora(), id);
   gravarChave(CHAVE_AGENDA, nova);
-  await reagendarAgenda(nova);
+  await reagendarAgenda(nova, false, modo);
 }

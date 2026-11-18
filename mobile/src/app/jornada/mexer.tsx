@@ -221,6 +221,8 @@ export default function Mexer() {
               contentContainerStyle={{ paddingHorizontal: margem.tela, paddingBottom: espaco.xxl }}
             >
               <FimDoMomento
+                momento="movement"
+                cor={PALETA.acao}
                 titulo="Corpo soltinho"
                 fala={
                   at.cuidado ? "Você cuidou de você hoje." : "Você cuidou de você e do bebê hoje."

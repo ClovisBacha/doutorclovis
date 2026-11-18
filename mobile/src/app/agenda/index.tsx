@@ -1,6 +1,14 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { Bell, BellOff, CalendarPlus, MapPin, NotebookPen, Plus, Settings } from "lucide-react-native";
+import {
+  Bell,
+  BellOff,
+  CalendarPlus,
+  MapPin,
+  NotebookPen,
+  Plus,
+  Settings,
+} from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
 import { Linking, Platform, Text, View } from "react-native";
 import { LinhaDeAjuste, SecaoDeAjustes } from "~/componentes/ajustes";
@@ -53,9 +61,9 @@ export default function Agenda() {
   const assinatura = JSON.stringify(lista);
   useEffect(() => {
     if (!pronto || loja.bancada) return;
-    void reagendarAgenda(lista);
+    void reagendarAgenda(lista, false, { cuidado });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assinatura, pronto, loja.bancada]);
+  }, [assinatura, pronto, loja.bancada, cuidado]);
 
   const marcar = () =>
     router.push(
@@ -121,9 +129,7 @@ export default function Agenda() {
               cuidado={cuidado}
             />
           ) : (
-            <SecaoDeAjustes
-              rodape={diaEscolhido === dpp ? "A data provável do parto." : undefined}
-            >
+            <SecaoDeAjustes rodape={diaEscolhido === dpp ? "A data provável do parto." : undefined}>
               <LinhaDeAjuste
                 Icone={CalendarPlus}
                 tinta={cor.agenda}
@@ -215,7 +221,9 @@ function Destaque({ c, agora, cuidado }: { c: Compromisso; agora: Date; cuidado:
           brilhoDe(cor.agenda, 0.6),
         ]}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <View
+          style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
+        >
           <Text
             style={{
               ...fonte.forte,
@@ -245,7 +253,12 @@ function Destaque({ c, agora, cuidado }: { c: Compromisso; agora: Date; cuidado:
           <View style={{ flex: 1, gap: 2 }}>
             <Text
               numberOfLines={2}
-              style={{ ...fonte.display, ...escala.titulo2, letterSpacing: -0.2, color: cor.branco }}
+              style={{
+                ...fonte.display,
+                ...escala.titulo2,
+                letterSpacing: -0.2,
+                color: cor.branco,
+              }}
             >
               {nome}
             </Text>
@@ -266,7 +279,12 @@ function Destaque({ c, agora, cuidado }: { c: Compromisso; agora: Date; cuidado:
             ) : null}
             {c.nota ? (
               <View style={{ flexDirection: "row", gap: 6 }}>
-                <NotebookPen size={15} strokeWidth={2.2} color={BRANCO_SUAVE} style={{ marginTop: 2 }} />
+                <NotebookPen
+                  size={15}
+                  strokeWidth={2.2}
+                  color={BRANCO_SUAVE}
+                  style={{ marginTop: 2 }}
+                />
                 <Text
                   numberOfLines={3}
                   style={{ flex: 1, ...fonte.normal, ...escala.legenda, color: BRANCO_SUAVE }}

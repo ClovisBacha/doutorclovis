@@ -1,6 +1,6 @@
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
-import { lembretesDaAgenda, type Compromisso } from "~/lib/agenda/agenda";
+import { lembretesDaAgenda, type Compromisso, type ModoDaAgenda } from "~/lib/agenda/agenda";
 import { notificacoesPermitidas } from "~/lib/notificacoes";
 
 /**
@@ -12,14 +12,19 @@ import { notificacoesPermitidas } from "~/lib/notificacoes";
 
 const PREFIXO = "dc-agenda-";
 
-/** "sem-permissao" quando o iPhone recusou: a tela diz como ligar nos Ajustes. */
+/**
+ * "sem-permissao" quando o iPhone recusou: a tela diz como ligar nos Ajustes.
+ * `modo.cuidado`: no Modo Cuidado o aviso não fala de "pré-natal" nem de
+ * "caderneta da gestante" (`lembretesDaAgenda`, 18/11/2026).
+ */
 export async function reagendarAgenda(
   lista: readonly Compromisso[],
   pedirPermissao = false,
+  modo?: ModoDaAgenda,
 ): Promise<"ok" | "sem-permissao"> {
   if (Platform.OS === "web") return "ok";
   await cancelarLembretesDaAgenda();
-  const lembretes = lembretesDaAgenda(lista, new Date());
+  const lembretes = lembretesDaAgenda(lista, new Date(), undefined, modo);
   if (!lembretes.length) return "ok";
   if (!(await notificacoesPermitidas(pedirPermissao))) return "sem-permissao";
   try {

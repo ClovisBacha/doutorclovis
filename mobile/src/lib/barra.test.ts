@@ -7,8 +7,8 @@ import { semComentarios } from "@/lib/sem-comentarios";
  * A BARRA (decisão do dono de 13/11/2026: "o bebê é o centro [...] deve ficar
  * no meio. O jogo deve ficar na direita e a questão das amigas [...] na
  * esquerda"): Amigas · Bebê · Trilha, e o app abre no Bebê. No Modo Cuidado,
- * Hoje · Início (18/11/2026: sem a trilha, e sem as Amigas, que no luto eram
- * uma aba com uma frase só). A Comunidade e o SOS ficam no código, escondidos
+ * uma tela só, "Hoje" (18/11/2026: sem a trilha, sem as Amigas e sem o Início,
+ * que desenhava a mesma TelaDoCuidado), e então sem barra. A Comunidade e o SOS ficam no código, escondidos
  * pelas chaves `COMUNIDADE_NO_APP` e `SOS_NO_APP` de `config.ts`.
  *
  * Esta catraca cobra a ordem das abas, que a Saúde não volte por um link
@@ -42,7 +42,9 @@ describe("a barra: Amigas · Bebê · Trilha", () => {
     expect(BARRA).toContain('name="jornada" options={{ title: cuidado ? "Hoje" : "Bebê" }}');
     expect(BARRA).toMatch(/title: "Amigas", \.\.\.\(cuidado \? \{ href: null \} : \{\}\)/);
     expect(BARRA).toMatch(/title: "Trilha", \.\.\.\(cuidado \? \{ href: null \} : \{\}\)/);
-    expect(BARRA).toMatch(/title: "Início", \.\.\.\(cuidado \? \{\} : \{ href: null \}\)/);
+    expect(BARRA).toContain(
+      '<Tabs.Screen name="inicio" options={{ title: "Início", href: null }} />',
+    );
     expect(BARRA).toMatch(/COMUNIDADE_NO_APP \? \{\} : \{ href: null \}/);
     expect(BARRA).toContain("{SOS_NO_APP ? <BotaoDoSos /> : null}");
     const { COMUNIDADE_NO_APP, SOS_NO_APP } = await import("~/config");
@@ -96,7 +98,7 @@ describe("a barra: Amigas · Bebê · Trilha", () => {
     /* O broto é a sementinha (a moeda): a Trilha é um caminho. */
     expect(BARRA).toMatch(/trilha: Route,/);
     expect(BARRA).not.toMatch(/\bSprout\b/);
-    /* Uma aba só (o luto, quando o Início se juntar ao Hoje) não é barra. */
+    /* Uma aba só (o luto: o Início se juntou ao Hoje) não é barra. */
     expect(BARRA).toMatch(/const semBarra = rotas\.length <= 1;/);
     expect(BARRA).toContain("if (semBarra) return null;");
   });

@@ -441,6 +441,8 @@ export default function Meditar() {
           contentContainerStyle={{ paddingHorizontal: margem.tela, paddingBottom: espaco.xxl }}
         >
           <FimDoMomento
+            momento="meditation"
+            cor={PALETA.acao}
             titulo={`${m} ${m === 1 ? "minuto" : "minutos"} só seus`}
             fala={
               (humor && FECHAMENTO[humor]) ||

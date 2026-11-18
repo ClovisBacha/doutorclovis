@@ -269,6 +269,8 @@ export default function GratidaoTela() {
           contentContainerStyle={{ paddingHorizontal: margem.tela, paddingBottom: espaco.xxl }}
         >
           <FimDoMomento
+            momento="gratitude"
+            cor={PALETA.acao}
             titulo="Guardei"
             /* O confete GRANDE só no número redondo — no dia comum, a estrela. */
             confete={marco ? "grande" : false}

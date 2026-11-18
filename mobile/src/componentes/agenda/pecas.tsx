@@ -196,7 +196,10 @@ export function LinhaDoCompromisso({
           {passado ? "" : ` · ${faltaQuanto(c.quando, agora)}`}
         </Text>
         {c.onde ? (
-          <Text numberOfLines={1} style={{ ...fonte.normal, ...escala.nota, color: cor.textoApagado }}>
+          <Text
+            numberOfLines={1}
+            style={{ ...fonte.normal, ...escala.nota, color: cor.textoApagado }}
+          >
             {c.onde}
           </Text>
         ) : null}
@@ -345,13 +348,14 @@ export function AgendaNaHoje({ loja, cuidado }: { loja: EstadoDaLoja; cuidado?: 
   const bruto = loja.blob[CHAVE_AGENDA];
   const lista = useMemo(() => lerAgenda(bruto), [bruto]);
   const assinatura = JSON.stringify(lista);
+  const noCuidado = cuidado ?? daSessao;
   useEffect(() => {
     if (!loja.pronto || loja.bancada) return;
-    void reagendarAgenda(lista);
+    void reagendarAgenda(lista, false, { cuidado: noCuidado });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assinatura, loja.pronto, loja.bancada]);
+  }, [assinatura, loja.pronto, loja.bancada, noCuidado]);
   const agora = new Date();
-  return <ProximaNaHoje c={proximo(lista, agora)} agora={agora} cuidado={cuidado ?? daSessao} />;
+  return <ProximaNaHoje c={proximo(lista, agora)} agora={agora} cuidado={noCuidado} />;
 }
 
 /** O cartão da agenda no Início: a folhinha da próxima e o atalho (em todo modo). */

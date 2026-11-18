@@ -483,20 +483,10 @@ export function JornadaDaGestacao({
     [D, hoje],
   );
   const aoAbrirDia = useCallback((d: number) => ir(`/jornada/dia?D=${d}`), []);
-  const aoAbrirSemana = useCallback(
-    (s: number) => {
-      /* Abrir o álbum de uma semana que já chegou guarda a figurinha dela,
-         como no site (`collectSticker`). */
-      const figurinhas = listaDeNumeros(estadoAtual().blob[CHAVE_FIGURINHAS]);
-      if (s <= semana && !figurinhas.includes(s))
-        gravarChave(
-          CHAVE_FIGURINHAS,
-          [...figurinhas, s].sort((a, b) => a - b),
-        );
-      ir(`/jornada/semana?semana=${s}`);
-    },
-    [semana],
-  );
+  /* A figurinha da semana é guardada pela tela da semana (`semana.tsx`), e
+     não aqui antes de navegar: guardada aqui, a semana nunca via a primeira
+     coleta, e a figurinha não DESCOLAVA (18/11/2026). */
+  const aoAbrirSemana = useCallback((s: number) => ir(`/jornada/semana?semana=${s}`), []);
   const aoAbrirLoja = useCallback(
     () => ir(aResgatar > 0 ? "/jornada/recompensas?aba=conquistas" : "/jornada/recompensas"),
     [aResgatar],
@@ -575,17 +565,22 @@ export function JornadaDaGestacao({
           cenário da lojinha equipado, ou aberta fora das abas, a luz de fundo
           (e o cenário, por cima). */}
       {noCeu ? null : <FundoDeLuz />}
-      <View style={{ paddingHorizontal: margem.tela }}>
-        {vista === "aba" ? (
-          <CabecalhoDaTrilha
-            sub={`Semana ${semana}${nomeDoBebe ? ` · ${nomeDoBebe}` : ""}`}
-            ceu={noCeu && dasAbas ? CEUS[dasAbas.fase] : null}
-          />
-        ) : (
-          <BarraDoTopo titulo="Trilha" />
-        )}
-      </View>
       <Caminho
+        /* O cabeçalho vai na camada de cima da trilha, junto do placar: a
+           lista passa por baixo dos dois (pacote da trilha, 18/11/2026). */
+        cabecalho={
+          <View style={{ paddingHorizontal: margem.tela }}>
+            {vista === "aba" ? (
+              <CabecalhoDaTrilha
+                sub={`Semana ${semana}${nomeDoBebe ? ` · ${nomeDoBebe}` : ""}`}
+                ceu={noCeu && dasAbas ? CEUS[dasAbas.fase] : null}
+              />
+            ) : (
+              <BarraDoTopo titulo="Trilha" />
+            )}
+          </View>
+        }
+        aoRecarregarCarteira={() => void recarregar()}
         hojeD={D}
         semanaAtual={semana}
         fases={fases}
@@ -866,17 +861,19 @@ export function JornadaDoPosParto({
         edges={["top"]}
         style={{ flex: 1, backgroundColor: posNoCeu ? "transparent" : cor.fundo }}
       >
-        <View style={{ paddingHorizontal: espaco.lg }}>
-          {vista === "aba" ? (
-            <CabecalhoDaTrilha
-              sub={`O 4º trimestre${nomeDoBebe ? ` · ${nomeDoBebe}` : ""}`}
-              ceu={posNoCeu && dasAbas ? CEUS[dasAbas.fase] : null}
-            />
-          ) : (
-            <BarraDoTopo titulo="O 4º trimestre" />
-          )}
-        </View>
         <TrilhaDoPosParto
+          cabecalho={
+            <View style={{ paddingHorizontal: margem.tela }}>
+              {vista === "aba" ? (
+                <CabecalhoDaTrilha
+                  sub={`O 4º trimestre${nomeDoBebe ? ` · ${nomeDoBebe}` : ""}`}
+                  ceu={posNoCeu && dasAbas ? CEUS[dasAbas.fase] : null}
+                />
+              ) : (
+                <BarraDoTopo titulo="O 4º trimestre" />
+              )}
+            </View>
+          }
           hojeD={hojeNaTrilha}
           blob={loja.blob}
           chama={diasDeChama}

@@ -28,11 +28,11 @@ export const unstable_settings = { initialRouteName: "jornada" };
  * (o céu com o bebê da semana, o acompanhamento e o cuidado do dia — a "Hoje"
  * de 19/10), e o app abre nela; a trilha do jogo fica à direita.
  *
- * No Modo Cuidado a barra não fala do bebê nem do jogo: o meio vira "Hoje"
- * (os cuidados com ela) e o "Início" (o acolhimento e a agenda) entra à
- * direita. A trilha sai, e as Amigas também (18/11/2026): no luto a aba era
- * só uma frase solta sobre o céu, uma porta para lugar nenhum. Sobrando uma
- * aba só, a barra some (`BarraDeBaixo`).
+ * No Modo Cuidado a barra não fala do bebê nem do jogo. Desde 18/11/2026 o
+ * luto é UMA tela só (`TelaDoCuidado`: o acolhimento, os números de ajuda, os
+ * cuidados e a agenda), que a aba do meio desenha com o nome "Hoje"; a
+ * trilha, as Amigas e o "Início" (que desenhava a mesma tela) saem. Sobrando
+ * uma aba só, a barra some (`BarraDeBaixo`), e o perfil fica no alto da tela.
  *
  * Com as chaves de `config.ts` ligadas, voltam a aba Comunidade
  * (`COMUNIDADE_NO_APP`) e o botão do SOS no meio (`SOS_NO_APP`): o SOS não é
@@ -79,11 +79,9 @@ export default function LayoutDasAbas() {
           name="trilha"
           options={{ title: "Trilha", ...(cuidado ? { href: null } : {}) }}
         />
-        {/* O acolhimento e a agenda do Modo Cuidado; fora dele, leva à aba do bebê. */}
-        <Tabs.Screen
-          name="inicio"
-          options={{ title: "Início", ...(cuidado ? {} : { href: null }) }}
-        />
+        {/* A rota antiga do luto: hoje a aba do meio desenha a mesma tela
+            (`TelaDoCuidado`), então ela fica escondida sempre. */}
+        <Tabs.Screen name="inicio" options={{ title: "Início", href: null }} />
         <Tabs.Screen
           name="comunidade"
           options={{ title: "Comunidade", ...(COMUNIDADE_NO_APP ? {} : { href: null }) }}

@@ -3,7 +3,6 @@ import { Platform } from "react-native";
 import { gravarJson, lerJson } from "~/lib/armazem";
 import { tituloDaAulaDoApp } from "~/lib/jornada/aulas-do-app";
 import {
-  DIAS_AGENDADOS,
   lembretesDaJornada,
   lerPreferencia,
   type ContextoDoLembrete,

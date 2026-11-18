@@ -283,6 +283,8 @@ export default function Bebe() {
           contentContainerStyle={{ paddingHorizontal: margem.tela, paddingBottom: espaco.xxl }}
         >
           <FimDoMomento
+            momento="bonding"
+            cor={PALETA.acao}
             titulo="Beijo entregue"
             fala="Esse minuto com a sua voz ficou guardado, só de vocês."
             desfecho={desfecho}

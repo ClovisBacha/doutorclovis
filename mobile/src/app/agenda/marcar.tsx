@@ -128,14 +128,17 @@ export default function MarcarConsulta() {
 
   async function salvar() {
     setSalvando(true);
-    const r = await salvarCompromisso({
-      id: existente?.id ?? novoId(),
-      tipo,
-      quando,
-      titulo: titulo.trim() || undefined,
-      onde: onde.trim() || undefined,
-      nota: nota.trim() || undefined,
-    });
+    const r = await salvarCompromisso(
+      {
+        id: existente?.id ?? novoId(),
+        tipo,
+        quando,
+        titulo: titulo.trim() || undefined,
+        onde: onde.trim() || undefined,
+        nota: nota.trim() || undefined,
+      },
+      { cuidado },
+    );
     setSalvando(false);
     /* Sem permissão, a consulta fica guardada e a tela explica antes de sair. */
     if (r === "sem-permissao" && !jaPassou) setSemPermissao(true);
@@ -149,7 +152,7 @@ export default function MarcarConsulta() {
 
   function apagar() {
     if (!existente) return;
-    const ir = () => void apagarCompromisso(existente.id).then(fechar);
+    const ir = () => void apagarCompromisso(existente.id, { cuidado }).then(fechar);
     /* No iPhone, a pergunta do sistema; na web da bancada, a confirmação na tela. */
     if (Platform.OS === "web") return setConfirmarApagar(true);
     Alert.alert("Apagar da agenda?", "Os lembretes dela também saem.", [
@@ -160,10 +163,7 @@ export default function MarcarConsulta() {
 
   if (semPermissao) {
     return (
-      <TelaDaPilha
-        titulo="Guardado na agenda"
-        esquerda={<View />}
-      >
+      <TelaDaPilha titulo="Guardado na agenda" esquerda={<View />}>
         <SecaoDeAjustes rodape="As notificações do app estão desligadas no iPhone. Ligue nos Ajustes para eu te lembrar na véspera e duas horas antes.">
           <LinhaDeAjuste
             Icone={BellOff}
@@ -305,7 +305,7 @@ export default function MarcarConsulta() {
           <Confirmacao
             pergunta="Apagar da agenda? Os lembretes dela também saem."
             rotuloSim="Apagar"
-            aoConfirmar={() => void apagarCompromisso(existente.id).then(fechar)}
+            aoConfirmar={() => void apagarCompromisso(existente.id, { cuidado }).then(fechar)}
             aoCancelar={() => setConfirmarApagar(false)}
           />
         ) : (
@@ -361,9 +361,7 @@ function FichaDoTipo({
       })}
     >
       <Icone size={17} strokeWidth={2.2} color={ativa ? cor.branco : cor.agenda} />
-      <Text
-        style={{ ...fonte.forte, ...escala.legenda, color: ativa ? cor.branco : cor.texto }}
-      >
+      <Text style={{ ...fonte.forte, ...escala.legenda, color: ativa ? cor.branco : cor.texto }}>
         {rotulo}
       </Text>
     </Pressable>
