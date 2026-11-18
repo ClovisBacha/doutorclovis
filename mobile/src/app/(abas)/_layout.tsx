@@ -1,19 +1,21 @@
-import { Redirect, router, Tabs } from "expo-router";
-import { Baby, House, MessageCircleHeart, Sprout, Sun, Users } from "lucide-react-native";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Redirect, router, Tabs, useIsFocused } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import { Baby, House, MessageCircleHeart, Route, Sun, Users } from "lucide-react-native";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Animated, AppState, Easing, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { contarParaOSelo } from "~/componentes/amigas/economia";
-import { FolgaDaBarra, toque } from "~/componentes/base";
+import { FolgaDaBarra, selecao, toque } from "~/componentes/base";
 import { CEUS, CeuCompartilhado, CeuVivo, useFaseDoCeu } from "~/componentes/ceu-vivo";
 import { useDiaDaJornada } from "~/componentes/jornada/usarJornada";
+import { FundoDeLuz } from "~/componentes/luz";
 import { Pulso, useMovimentoReduzido, useParalaxe } from "~/componentes/movimento";
 import { Vidro } from "~/componentes/vidro";
 import { api } from "~/lib/comunidade/api";
 import { mudarSelos, rotuloDaAba, textoDoSelo, useSelos, zerarSelos } from "~/lib/selos";
 import { useSessao } from "~/lib/sessao";
 import { COMUNIDADE_NO_APP, SOS_NO_APP } from "~/config";
-import { ALVO_MINIMO, cor, curva, fonte, raio, vidro } from "~/tema";
+import { ALVO_MINIMO, cor, curva, fonte, luz, raio, vidro } from "~/tema";
 
 /** O app abre na aba do bebê, a do meio — inclusive quando outra aba é a
  * primeira da lista (as Amigas, à esquerda). */
@@ -27,8 +29,10 @@ export const unstable_settings = { initialRouteName: "jornada" };
  * de 19/10), e o app abre nela; a trilha do jogo fica à direita.
  *
  * No Modo Cuidado a barra não fala do bebê nem do jogo: o meio vira "Hoje"
- * (os cuidados com ela), a trilha sai e o "Início" (o acolhimento e a agenda)
- * entra à direita.
+ * (os cuidados com ela) e o "Início" (o acolhimento e a agenda) entra à
+ * direita. A trilha sai, e as Amigas também (18/11/2026): no luto a aba era
+ * só uma frase solta sobre o céu, uma porta para lugar nenhum. Sobrando uma
+ * aba só, a barra some (`BarraDeBaixo`).
  *
  * Com as chaves de `config.ts` ligadas, voltam a aba Comunidade
  * (`COMUNIDADE_NO_APP`) e o botão do SOS no meio (`SOS_NO_APP`): o SOS não é
@@ -45,44 +49,92 @@ export default function LayoutDasAbas() {
      até ela se medir) para a rolagem terminar acima do vidro. */
   const baixo = useSafeAreaInsets().bottom;
   const [folga, setFolga] = useState(() => ALTURA_DA_BARRA + distanciaDaBorda(baixo));
-  /* UM CÉU SÓ atrás das três abas: a aba que quer o céu fica transparente, e
-     trocar de aba é trocar o que flutua sobre o mesmo lugar. */
+  if (!carregandoSessao && !sessao) return <Redirect href="/entrar" />;
+  /* `freezeOnBlur`: a aba escondida (a trilha, com semanas de moedas) não
+     redesenha quando ela conclui algo noutra tela; desenha uma vez ao voltar,
+     já com o estado novo. Os laços dela já param fora de foco
+     (`useMovimentoReduzido`), e o congelamento vem um quadro depois, quando
+     eles já pararam. */
+  const abas = (
+    <FolgaDaBarra.Provider value={folga}>
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          sceneStyle: { backgroundColor: "transparent" },
+          freezeOnBlur: true,
+        }}
+        tabBar={(props) => <BarraDeBaixo {...props} aoMedir={setFolga} />}
+      >
+        {/* As Amigas à esquerda; no Modo Cuidado elas descansam (está tudo
+            guardado, e voltam quando ela desligar). */}
+        <Tabs.Screen
+          name="amigas"
+          options={{ title: "Amigas", ...(cuidado ? { href: null } : {}) }}
+        />
+        {/* O bebê no meio, e o app abre nele. No Modo Cuidado a aba não fala do
+            bebê: vira "Hoje", com um sol. */}
+        <Tabs.Screen name="jornada" options={{ title: cuidado ? "Hoje" : "Bebê" }} />
+        {/* O jogo à direita; no Modo Cuidado não há trilha nem placar. */}
+        <Tabs.Screen
+          name="trilha"
+          options={{ title: "Trilha", ...(cuidado ? { href: null } : {}) }}
+        />
+        {/* O acolhimento e a agenda do Modo Cuidado; fora dele, leva à aba do bebê. */}
+        <Tabs.Screen
+          name="inicio"
+          options={{ title: "Início", ...(cuidado ? {} : { href: null }) }}
+        />
+        <Tabs.Screen
+          name="comunidade"
+          options={{ title: "Comunidade", ...(COMUNIDADE_NO_APP ? {} : { href: null }) }}
+        />
+      </Tabs>
+    </FolgaDaBarra.Provider>
+  );
+  /* Ligar ou desligar o Modo Cuidado troca o fundo inteiro, e as abas
+     remontam na do meio: ela cai em "Hoje" (ou no Bebê), nunca numa aba que
+     acabou de sumir. */
+  return cuidado ? <LuzDasAbas>{abas}</LuzDasAbas> : <CeuDasAbas>{abas}</CeuDasAbas>;
+}
+
+/**
+ * UM CÉU SÓ atrás das três abas: a aba que quer o céu fica transparente, e
+ * trocar de aba é trocar o que flutua sobre o mesmo lugar. Fica num filho
+ * próprio para o Modo Cuidado nem ligar o sensor da paralaxe nem animar um céu
+ * que nenhuma tela dele mostra.
+ */
+function CeuDasAbas({ children }: { children: ReactNode }) {
   const fase = useFaseDoCeu();
   const { x, y } = useParalaxe();
   const ceuDasAbas = useMemo(() => ({ fase, x, y }), [fase, x, y]);
-  if (!carregandoSessao && !sessao) return <Redirect href="/entrar" />;
   return (
     <View style={{ flex: 1, backgroundColor: CEUS[fase].chao }}>
       <CeuVivo fase={fase} x={x} y={y} />
-      <CeuCompartilhado.Provider value={ceuDasAbas}>
-        <FolgaDaBarra.Provider value={folga}>
-          <Tabs
-            screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: "transparent" } }}
-            tabBar={(props) => <BarraDeBaixo {...props} aoMedir={setFolga} />}
-          >
-            <Tabs.Screen name="amigas" options={{ title: "Amigas" }} />
-            {/* O bebê no meio, e o app abre nele. No Modo Cuidado a aba não fala do
-          bebê: vira "Hoje", com um sol. */}
-            <Tabs.Screen name="jornada" options={{ title: cuidado ? "Hoje" : "Bebê" }} />
-            {/* O jogo à direita; no Modo Cuidado não há trilha nem placar. */}
-            <Tabs.Screen
-              name="trilha"
-              options={{ title: "Trilha", ...(cuidado ? { href: null } : {}) }}
-            />
-            {/* O acolhimento e a agenda do Modo Cuidado; fora dele, leva à aba do bebê. */}
-            <Tabs.Screen
-              name="inicio"
-              options={{ title: "Início", ...(cuidado ? {} : { href: null }) }}
-            />
-            <Tabs.Screen
-              name="comunidade"
-              options={{ title: "Comunidade", ...(COMUNIDADE_NO_APP ? {} : { href: null }) }}
-            />
-          </Tabs>
-        </FolgaDaBarra.Provider>
-      </CeuCompartilhado.Provider>
+      <BarraDeStatusDoCeu claro={CEUS[fase].claro} />
+      <CeuCompartilhado.Provider value={ceuDasAbas}>{children}</CeuCompartilhado.Provider>
     </View>
   );
+}
+
+/** O fundo do Modo Cuidado: a luz clara, PARADA, e nenhum céu para as abas lerem. */
+function LuzDasAbas({ children }: { children: ReactNode }) {
+  return (
+    <View style={{ flex: 1, backgroundColor: luz.base }}>
+      <FundoDeLuz />
+      <CeuCompartilhado.Provider value={null}>{children}</CeuCompartilhado.Provider>
+    </View>
+  );
+}
+
+/**
+ * O relógio e a bateria do iPhone pela cor do céu: escuros no amanhecer,
+ * claros no azul do dia, na tarde e na noite (pretos sobre o índigo da noite
+ * ficavam com 1,3:1, invisíveis). Só enquanto as abas estão à vista: a tela
+ * que entra por cima (clara) volta à barra escura da raiz sozinha.
+ */
+function BarraDeStatusDoCeu({ claro }: { claro: boolean }) {
+  const aVista = useIsFocused();
+  return aVista ? <StatusBar style={claro ? "dark" : "light"} animated /> : null;
 }
 
 /** O vão entre uma aba e outra, dentro da cápsula. */
@@ -135,10 +187,12 @@ function useSelosDaBarra(ligado: boolean, pos: boolean) {
   }, [ligado, atualizar]);
 }
 
+/* A Trilha é um caminho (Route), e não o broto: o broto é a sementinha, a
+   moeda do jogo. */
 const ICONES = {
   amigas: Users,
   jornada: Baby,
-  trilha: Sprout,
+  trilha: Route,
   inicio: House,
   comunidade: MessageCircleHeart,
 } as const;
@@ -162,6 +216,12 @@ function BarraDeBaixo({
   const rotas = (state.routes as { key: string; name: keyof typeof ICONES }[]).filter(
     (r) => descriptors[r.key]?.options?.tabBarItemStyle?.display !== "none",
   );
+  /* Uma aba só não é barra: some, e a rolagem guarda só a folga do traço do
+     iPhone. */
+  const semBarra = rotas.length <= 1;
+  useEffect(() => {
+    if (semBarra) aoMedir(baixo + 16);
+  }, [semBarra, baixo, aoMedir]);
   /* A LENTE: a gota clara da aba escolhida DESLIZA de uma aba para a outra,
      com mola — não pula. (Com o SOS no meio da barra as abas não têm a mesma
      largura, e a lente volta a ser o fundo de cada uma.) */
@@ -200,9 +260,19 @@ function BarraDeBaixo({
         accessibilityState={{ selected: ativo }}
         accessibilityLabel={rotuloDaAba(titulo, n)}
         onPress={() => {
-          toque();
+          /* O `tabPress` sai SEMPRE, também na aba que já está aberta: é o
+             que deixa a tela rolar ao topo (ou voltar a hoje) no segundo
+             toque, como em todo app do iPhone (`useScrollToTop`). */
+          const evento = navigation.emit({
+            type: "tabPress",
+            target: rota.key,
+            canPreventDefault: true,
+          });
+          if (ativo || evento.defaultPrevented) return;
+          selecao();
           navigation.navigate(rota.name);
         }}
+        onLongPress={() => navigation.emit({ type: "tabLongPress", target: rota.key })}
         style={{
           flex: 1,
           alignItems: "center",
@@ -239,6 +309,7 @@ function BarraDeBaixo({
       </Pressable>
     );
   };
+  if (semBarra) return null;
   return (
     <View
       pointerEvents="box-none"
@@ -259,6 +330,7 @@ function BarraDeBaixo({
         estilo={{ minHeight: ALTURA_DA_BARRA, padding: 5, justifyContent: "center" }}
       >
         <View
+          accessibilityRole="tablist"
           onLayout={(e) => setFila(e.nativeEvent.layout.width)}
           style={{ flexDirection: "row", alignItems: "center", gap: VAO }}
         >
@@ -295,7 +367,7 @@ function BotaoDoSos() {
       <HaloDoSos />
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="SOS — emergência"
+        accessibilityLabel="SOS, emergência"
         accessibilityHint="Abre a tela de emergência: ligar 192 e avisar quem você cadastrou"
         onPress={() => {
           toque(false);

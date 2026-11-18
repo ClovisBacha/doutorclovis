@@ -82,7 +82,17 @@ let pullEmVoo: Promise<boolean> | null = null;
 let relogio: ReturnType<typeof setTimeout> | null = null;
 const ouvintes = new Set<() => void>();
 
+/**
+ * Só avisa quem ouve quando algo MUDOU (17/11/2026, "o app está travado").
+ * Cada `definir` acordava todas as telas que leem a loja — a aba do bebê, a
+ * trilha escondida, a atividade aberta — e o pull fazia `{ nuvem: "ok" }` a
+ * cada volta ao app e antes de cada envio, mesmo já estando ok: uma onda de
+ * render do app inteiro 1,5 s depois de ela concluir uma atividade, no meio
+ * da festa. Comparação rasa, de propósito: o blob novo é sempre outro objeto.
+ */
 function definir(parcial: Partial<EstadoDaLoja>) {
+  const campos = Object.keys(parcial) as (keyof EstadoDaLoja)[];
+  if (campos.every((k) => estado[k] === parcial[k])) return;
   estado = { ...estado, ...parcial };
   ouvintes.forEach((f) => f());
 }

@@ -7,8 +7,9 @@ import { semComentarios } from "@/lib/sem-comentarios";
  * A BARRA (decisão do dono de 13/11/2026: "o bebê é o centro [...] deve ficar
  * no meio. O jogo deve ficar na direita e a questão das amigas [...] na
  * esquerda"): Amigas · Bebê · Trilha, e o app abre no Bebê. No Modo Cuidado,
- * Amigas · Hoje · Início (sem trilha). A Comunidade e o SOS ficam no código,
- * escondidos pelas chaves `COMUNIDADE_NO_APP` e `SOS_NO_APP` de `config.ts`.
+ * Hoje · Início (18/11/2026: sem a trilha, e sem as Amigas, que no luto eram
+ * uma aba com uma frase só). A Comunidade e o SOS ficam no código, escondidos
+ * pelas chaves `COMUNIDADE_NO_APP` e `SOS_NO_APP` de `config.ts`.
  *
  * Esta catraca cobra a ordem das abas, que a Saúde não volte por um link
  * esquecido, e que ninguém EMPURRE uma aba de uma tela empilhada — isso abre
@@ -39,6 +40,7 @@ describe("a barra: Amigas · Bebê · Trilha", () => {
     const abas = [...BARRA.matchAll(/<Tabs\.Screen\s+name="(\w+)"/g)].map((m) => m[1]);
     expect(abas).toEqual(["amigas", "jornada", "trilha", "inicio", "comunidade"]);
     expect(BARRA).toContain('name="jornada" options={{ title: cuidado ? "Hoje" : "Bebê" }}');
+    expect(BARRA).toMatch(/title: "Amigas", \.\.\.\(cuidado \? \{ href: null \} : \{\}\)/);
     expect(BARRA).toMatch(/title: "Trilha", \.\.\.\(cuidado \? \{ href: null \} : \{\}\)/);
     expect(BARRA).toMatch(/title: "Início", \.\.\.\(cuidado \? \{\} : \{ href: null \}\)/);
     expect(BARRA).toMatch(/COMUNIDADE_NO_APP \? \{\} : \{ href: null \}/);
@@ -82,6 +84,42 @@ describe("a barra: Amigas · Bebê · Trilha", () => {
     /* "Ver a trilha" troca de aba; empurrar a trilha abriria outra barra. */
     expect(aba).toContain('irParaAba("/trilha")');
     expect(aba).not.toMatch(/\bir\(\s*["'`]\/jornada\/trilha["'`]/);
+  });
+
+  test("a barra fala iOS: tabPress no segundo toque, toque de seleção, o caminho na Trilha", () => {
+    /* Sem o `tabPress`, nenhuma tela consegue rolar ao topo quando ela toca
+       de novo na aba aberta (`useScrollToTop`). */
+    expect(BARRA).toMatch(
+      /navigation\.emit\(\{\s*type: "tabPress",\s*target: rota\.key,\s*canPreventDefault: true/,
+    );
+    expect(BARRA).toMatch(/if \(ativo \|\| evento\.defaultPrevented\) return;\s*selecao\(\);/);
+    /* O broto é a sementinha (a moeda): a Trilha é um caminho. */
+    expect(BARRA).toMatch(/trilha: Route,/);
+    expect(BARRA).not.toMatch(/\bSprout\b/);
+    /* Uma aba só (o luto, quando o Início se juntar ao Hoje) não é barra. */
+    expect(BARRA).toMatch(/const semBarra = rotas\.length <= 1;/);
+    expect(BARRA).toContain("if (semBarra) return null;");
+  });
+
+  test("o céu das abas: a barra de status pela cor dele, e nada de céu no Modo Cuidado", () => {
+    expect(BARRA).toMatch(/<StatusBar style=\{claro \? "dark" : "light"\} animated \/>/);
+    expect(BARRA).toMatch(/<BarraDeStatusDoCeu claro=\{CEUS\[fase\]\.claro\} \/>/);
+    /* O céu, a paralaxe e a hora moram num filho que o luto nem monta. */
+    expect(BARRA).toContain(
+      "return cuidado ? <LuzDasAbas>{abas}</LuzDasAbas> : <CeuDasAbas>{abas}</CeuDasAbas>;",
+    );
+    const luto = BARRA.slice(BARRA.indexOf("function LuzDasAbas"));
+    expect(luto.slice(0, luto.indexOf("\n}\n"))).toMatch(
+      /<FundoDeLuz \/>[\s\S]*<CeuCompartilhado\.Provider value=\{null\}>/,
+    );
+    const principal = BARRA.slice(BARRA.indexOf("export default function LayoutDasAbas"));
+    expect(principal.slice(0, principal.indexOf("\n}\n"))).not.toMatch(
+      /useParalaxe|useFaseDoCeu|<CeuVivo/,
+    );
+  });
+
+  test("as abas escondidas não redesenham (freezeOnBlur)", () => {
+    expect(BARRA).toMatch(/<Tabs\s+screenOptions=\{\{[^<]*freezeOnBlur: true,[^<]*tabBar=/);
   });
 
   test("os selos: a barra lê ao voltar para o app, e não no Modo Cuidado", () => {
