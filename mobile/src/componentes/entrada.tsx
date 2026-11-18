@@ -95,10 +95,10 @@ export function TituloNoVeu({
     <Text
       accessibilityRole="header"
       style={{
-        ...fonte.titulo,
+        ...fonte.display,
         fontSize: tamanho,
-        lineHeight: Math.round(tamanho * 1.12),
-        letterSpacing: aperto.titulo,
+        lineHeight: Math.round(tamanho * 1.14),
+        letterSpacing: -0.2,
         color: cor.branco,
         textAlign: centro ? "center" : "left",
       }}

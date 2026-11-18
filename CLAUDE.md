@@ -67,8 +67,17 @@ ERA a paleta do Claude; não volte a ela.
 - **Paleta** (`mobile/src/tema`): tinta ameixa-noite, framboesa para agir, névoa
   lilás no fundo, luz de pêssego; o degradê `amanhecer` só em vitrine, nunca
   atrás de texto pequeno. Cor nova entra no tema, com o contraste medido.
-- **Letra**: sempre por `fonte.*` (`...fonte.forte`). Títulos, números e botões
-  na arredondada do sistema (SF Pro Rounded); texto corrido na SF Pro.
+- **Letra** (refeita em 18/11/2026: "essas fontes [...] ainda parecem IA"):
+  sempre por `fonte.*` e pela `escala` do tema (grande 34, titulo1 28,
+  titulo2 22, titulo3 20, manchete 17, corpo 17, chamada 16, legenda 15, nota
+  13). **Títulos grandes (22+) na serifada do sistema** (`fonte.display`, New
+  York); **números e etiquetas do jogo na arredondada** (`fonte.titulo`,
+  `fonteDoNumero`); **botões, rótulos e o resto na SF Pro** (`fonte.forte`,
+  `normal`, `media`). Tamanho novo entra na `escala`, não solto numa tela.
+- **Campos e botões**: o `Campo` é o preenchido do iOS (névoa, sem borda,
+  aro framboesa no foco); o `Botao` tem `tamanho` (grande/médio/compacto) e o
+  desabilitado é a face clara da própria cor. Toque: `toque()` no botão,
+  `selecao()` ao escolher, `sucesso()` ao ganhar (`base.tsx`).
 - **Vidro** (`componentes/vidro.tsx`): o Liquid Glass é só a camada que FLUTUA
   (a barra de abas, o placar da trilha, a barra que nasce, os botões soltos, as
   etiquetas sobre a arte), sempre no esquema claro. Cartão de conteúdo é

@@ -25,6 +25,8 @@ export const cor = {
   entradaVidro: "rgba(255,255,255,0.82)",
   apagado: "#f4f0fa",
   textoApagado: "#6b6384",
+  /** O texto de exemplo dentro de um campo vazio (não é valor: mais claro). */
+  placeholder: "#958da9",
   destaque: "#ffe4ee",
   textoDestaque: "#7c1140",
   borda: "#e9e3f2",
@@ -33,16 +35,16 @@ export const cor = {
   /** Só para o QR da ficha: leitor de QR quer preto puro no branco. */
   preto: "#000000",
   // Famílias (mesmas do site): a cor diz de que assunto é a tela.
-  chutes: "#0369a1",
-  chutesFundo: "#e0f2fe",
+  chutes: "#2c6aa8",
+  chutesFundo: "#e3eefa",
   contracoes: "#c2410c",
   contracoesFundo: "#ffedd5",
   saude: "#047857",
   saudeFundo: "#d1fae5",
   nutricao: "#4d7c0f",
   nutricaoFundo: "#ecfccb",
-  agenda: "#4338ca",
-  agendaFundo: "#e0e7ff",
+  agenda: "#5a3fc0",
+  agendaFundo: "#ece7fb",
   jogo: "#6d28d9",
   jogoFundo: "#ede9fe",
   sementinha: "#15803d",
@@ -77,7 +79,25 @@ export const cor = {
   atencaoFundo: "#fef3c7",
   ok: "#047857",
   okFundo: "#d1fae5",
+  /* 18/11/2026 (a vistoria): os papéis que faltavam, para nenhuma tela pôr
+     uma cor solta. */
+  /** O texto corrido dentro de um cartão: um degrau abaixo da tinta. */
+  textoCorpo: "#463d63",
+  /** O trilho de uma barra de progresso ou de um anel vazio. */
+  trilho: "#ece6f6",
+  /** O chevron das linhas de lista (›). */
+  chevron: "#c3bdd2",
+  /** O véu atrás de uma folha que sobe. */
+  veu: "rgba(35,25,66,0.32)",
+  sementinhaFundo: "#e9f7ee",
+  acertoFundo: "#e3f6e8",
+  /** O "quase": a resposta errada, sem o vermelho de alarme. */
+  quase: "#b45309",
+  quaseFundo: "#fff4e0",
 } as const;
+
+/** O ouro do jogo (estrelas, troféu, a moeda): do brilho à sombra. */
+export const ouro = { claro: "#ffe08a", medio: "#fbbf24", escuro: "#f0a51c" } as const;
 
 /**
  * A LETRA (16/11/2026, pedido do dono: "está com muita cara de feito no
@@ -113,19 +133,33 @@ export const fonteDoNumero: Letra = LETRA_DO_SISTEMA
 const REDONDA =
   Platform.OS === "web" ? "ui-rounded, system-ui, -apple-system, sans-serif" : "ui-rounded";
 
-export const fonte: Readonly<Record<"normal" | "media" | "forte" | "titulo", Letra>> =
+/**
+ * A SERIFADA do sistema (New York, a dos Livros e do Diário da Apple), só nos
+ * TÍTULOS GRANDES (18/11/2026, o dono: "essas fontes [...] ainda parecem IA").
+ * A arredondada em tudo — título, botão, rótulo — é a cara de app gerado; a
+ * serifada dá voz de revista aos títulos, e a SF Pro fica no que se lê e se
+ * toca. Na web (a bancada), Georgia no lugar.
+ */
+const SERIFADA = Platform.OS === "web" ? "ui-serif, 'New York', Georgia, serif" : "ui-serif";
+
+export const fonte: Readonly<Record<"normal" | "media" | "forte" | "titulo" | "display", Letra>> =
   LETRA_DO_SISTEMA
     ? {
         normal: { fontFamily: "System", fontWeight: "400" },
         media: { fontFamily: "System", fontWeight: "500" },
-        forte: { fontFamily: REDONDA, fontWeight: "600" },
+        /* Botão, rótulo, ficha: a SF Pro firme (como nos Ajustes e no Fitness). */
+        forte: { fontFamily: "System", fontWeight: "600" },
+        /* A arredondada fica com o JOGO: números, placar, etiquetas do jogo. */
         titulo: { fontFamily: REDONDA, fontWeight: "700" },
+        /* Títulos grandes (22 pt ou mais): a serifada. */
+        display: { fontFamily: SERIFADA, fontWeight: "600" },
       }
     : {
         normal: { fontFamily: "Nunito_500Medium" },
         media: { fontFamily: "Nunito_600SemiBold" },
         forte: { fontFamily: "Nunito_700Bold" },
         titulo: { fontFamily: "Nunito_800ExtraBold" },
+        display: { fontFamily: "Nunito_800ExtraBold" },
       };
 
 /**
@@ -140,6 +174,41 @@ export const aperto = { titulo: -0.6, subtitulo: -0.3 } as const;
 
 export const espaco = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;
 export const raio = { sm: 12, md: 18, lg: 26, pilula: 999 } as const;
+
+/**
+ * A ESCALA DA LETRA (18/11/2026) — a do iOS no tamanho padrão. Um tamanho
+ * novo entra aqui, e não solto numa tela: é a falta de escala (16, 19, 21, 23…
+ * um em cada tela) que dá a cara de coisa gerada.
+ *
+ * - `grande` e `titulo1`/`titulo2`: na serifada (`fonte.display`).
+ * - `titulo3` e `manchete`: SF Pro firme (`fonte.forte`).
+ * - `corpo`, `chamada`, `legenda`, `nota`: SF Pro (`fonte.normal`/`media`).
+ */
+export const escala = {
+  grande: { fontSize: 34, lineHeight: 41 },
+  titulo1: { fontSize: 28, lineHeight: 34 },
+  titulo2: { fontSize: 22, lineHeight: 28 },
+  titulo3: { fontSize: 20, lineHeight: 25 },
+  manchete: { fontSize: 17, lineHeight: 22 },
+  corpo: { fontSize: 17, lineHeight: 24 },
+  chamada: { fontSize: 16, lineHeight: 21 },
+  legenda: { fontSize: 15, lineHeight: 20 },
+  nota: { fontSize: 13, lineHeight: 18 },
+} as const;
+
+/** O canto por PAPEL: o mesmo papel, o mesmo canto, em todo o app. */
+export const canto = {
+  icone: 10,
+  campo: 14,
+  /** Um bloco dentro de um painel ou cartão. */
+  dentro: 20,
+  cartao: 26,
+  painel: 34,
+  pilula: 999,
+} as const;
+
+/** A margem da tela (16, a do iOS) e a de um momento de foco (24). */
+export const margem = { tela: 16, foco: 24 } as const;
 
 /** O canto contínuo do iPhone (a "squircle"), e não o arco de círculo. */
 export const curva = { borderCurve: "continuous" } as const;
@@ -162,6 +231,20 @@ export const sombraFlutuante = {
   boxShadow:
     "0px 2px 4px rgba(35,25,66,0.06), 0px 12px 32px -8px rgba(35,25,66,0.22), 0px 28px 56px -20px rgba(35,25,66,0.20)",
 } as const;
+
+/** As sombras por papel (todas em `boxShadow`, desenhadas uma vez). */
+export const sombras = {
+  cartao: sombra,
+  painel: { boxShadow: "0px 20px 44px -20px rgba(20,12,60,0.5)" },
+  flutuante: sombraFlutuante,
+} as const;
+
+/** O brilho colorido embaixo de um botão cheio ou de uma ficha de destaque. */
+export function brilhoDe(corHex: string, alfa = 0.55): { boxShadow: string } {
+  const h = corHex.replace("#", "");
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+  return { boxShadow: `0px 10px 22px -10px rgba(${r},${g},${b},${alfa})` };
+}
 
 /**
  * O VIDRO e a LUZ. O vidro de verdade (Liquid Glass, iOS 26) mora em

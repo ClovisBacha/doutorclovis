@@ -45,7 +45,8 @@ export const CEUS: Record<FaseDoCeu, Ceu> = {
   amanhecer: {
     arte: require("../../../src/assets/ceu/amanhecer.webp"),
     tinta: "#2e2348",
-    sec: "#55487e",
+    /* 4,5:1 sobre o lilás claro do pé do céu (era #55487e, 3,8:1). */
+    sec: "#3b3064",
     numero: "rgba(255,255,255,0.6)",
     topo: "#8f90df",
     chao: "#b3a4e6",

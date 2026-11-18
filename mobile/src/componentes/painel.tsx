@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
 import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
-import { curva, espaco } from "~/tema";
+import { canto, curva, espaco } from "~/tema";
+
+/** O canto de um bloco DENTRO do painel (o canto de fora menos o respiro). */
+export const RAIO_DENTRO_DO_PAINEL = canto.dentro;
 
 /**
  * O PAINEL: um bloco solto sobre o céu, com o título dentro — como os cartões
@@ -22,7 +25,7 @@ export function Painel({
     <View
       style={[
         {
-          borderRadius: 34,
+          borderRadius: canto.painel,
           ...curva,
           padding: 14,
           gap: espaco.md,
