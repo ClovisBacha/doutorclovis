@@ -1,8 +1,9 @@
-import { router, useLocalSearchParams } from "expo-router";
-import { Volume2, VolumeX, X } from "lucide-react-native";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocalSearchParams } from "expo-router";
+import { Volume2, VolumeX } from "lucide-react-native";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Animated,
+  AppState,
   Easing,
   Image,
   Pressable,
@@ -30,35 +31,45 @@ import {
 } from "@/lib/gratidao";
 import { paraLike } from "@/lib/like-seguro";
 import { haQuantoTempo } from "@/lib/quando-foi";
-import { Carregando, T, Tela, toque } from "~/componentes/base";
+import { toque } from "~/componentes/base";
 import {
   BolhaComBalao,
   BotaoDaAtividade,
+  BotaoRedondo,
   Brilho,
+  CarregandoAtividade,
+  fecharAtividade,
   FundoDaAtividade,
-  sombraDe,
+  LinhaDaAtividade,
+  Segmentos,
+  SobrelinhaDaAtividade,
   Superficie,
-  type PaletaDaAtividade,
+  TopoDaAtividade,
+  TrocaDeEtapa,
 } from "~/componentes/jornada/atividade";
-import { corBebe, corJornada } from "~/componentes/jornada/cores";
+import { corDaAtividade } from "~/componentes/jornada/cores";
 import { concluirMomento, FimDoMomento, type Desfecho } from "~/componentes/jornada/fim";
 import { FolhaDeSons, type SomEscolhido } from "~/componentes/jornada/folha-de-sons";
-import { BarraDoTopo, voltarParaJornada } from "~/componentes/jornada/pecas";
 import { useAtividade } from "~/componentes/jornada/usarJornada";
-import { useMovimentoReduzido } from "~/componentes/movimento";
+import { lacoQueDescansa, useMovimentoReduzido } from "~/componentes/movimento";
 import { tocarSomDeFundo, type SomDeFundo } from "~/lib/audio/som-de-fundo";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { cartaDoDiaNoApp, falaDaBolhaNaCartaNoApp, poolDeHojeNoApp } from "~/lib/jornada/cartas";
 import { gravarChave, useLoja } from "~/lib/jornada/loja";
 import { CHAVE_CARTAS_LIDAS } from "~/lib/jornada/momentos";
 import { supabase } from "~/servidor/supabase";
-import { ALVO_MINIMO, cor, espaco, fonte } from "~/tema";
+import { ALVO_MINIMO, cor, escala, espaco, fonte, margem } from "~/tema";
 
 /**
  * A CARTA PARA O BEBÊ — o `BondingBlock` do app antigo: ela lê em voz alta,
- * linha a linha, no ritmo dela (só o botão avança — quem para para chorar, ou
- * para repetir o nome do bebê, não perde o lugar), com um som calmo de fundo e
- * corações subindo. No fim, "Beijo entregue".
+ * linha a linha, no ritmo dela (quem para para chorar, ou para repetir o nome
+ * do bebê, não perde o lugar), com um som calmo de fundo e corações subindo.
+ * No fim, "Beijo entregue".
+ *
+ * A leitura tem o gesto dos Stories (18/11/2026): um toque à direita segue, um
+ * toque no terço esquerdo volta uma linha (antes ela só andava para a frente,
+ * e um toque duplo sem querer pulava a linha que ela ia ler). A linha velha sai
+ * antes de a nova entrar.
  *
  * As cartas e a régua (por fase, nunca cruzando gestação com pós-parto) são do
  * site (`@/lib/cartas-do-bebe`); a do dia não repete a de ontem
@@ -73,16 +84,7 @@ import { ALVO_MINIMO, cor, espaco, fonte } from "~/tema";
  *          [&gratidoes=1] [&folha=1] [&fechou=1]
  */
 
-const PALETA: PaletaDaAtividade = {
-  fundo: [corBebe.fundoTopo, corBebe.fundoMeio, corBebe.fundoBase],
-  forte: corBebe.forte,
-  titulo: corBebe.titulo,
-  secao: corBebe.secao,
-  borda: corBebe.borda,
-  vidro: corBebe.vidro,
-  discreto: corBebe.discreto,
-  brancoSuave: corBebe.brancoSuave,
-};
+const PALETA = corDaAtividade.carta;
 
 /** O envelope com coração, nas artes 3D do app: a carta é um objeto, e não um texto solto. */
 const ARTE_DA_CARTA = require("../../../../src/assets/bebe/carta.webp");
@@ -100,10 +102,12 @@ const GRATIDOES_DA_BANCADA: Gratidao[] = [
   "Rimos muito no jantar com a família.",
 ].map((texto, i) => ({ texto, quando: `2026-0${(i % 9) + 1}-10T12:00:00Z` }));
 
+type Etapa = "intro" | "lista" | "leitura" | "fim";
+
 export default function Bebe() {
   const at = useAtividade("bonding");
   const loja = useLoja();
-  const [etapa, setEtapa] = useState<"intro" | "lista" | "leitura" | "fim">("intro");
+  const [etapa, setEtapa] = useState<Etapa>("intro");
   const [linha, setLinha] = useState(0);
   const [cartaEscolhida, setCartaEscolhida] = useState<Carta | null>(null);
   const [lendoAsDelas, setLendoAsDelas] = useState(false);
@@ -137,7 +141,7 @@ export default function Bebe() {
   const cartaAtiva = cartaEscolhida ?? cartaHoje;
   const carta = lendoAsDelas && cartaDelas ? cartaDelas : cartaAtiva;
 
-  /* Vindo do "Ver carta 💌" da Gratidão: abre já na carta das gratidões dela,
+  /* Vindo do "Ver a carta" da Gratidão: abre já na carta das gratidões dela,
      assim que as gratidões chegam (a carta só existe com oito ou mais). */
   const { delas } = useLocalSearchParams<{ delas?: string }>();
   const abriuDelas = useRef(false);
@@ -220,13 +224,12 @@ export default function Bebe() {
     comecar();
   }
 
-  /* O ✕ fecha a atividade, de qualquer fase, como no site — sair da leitura
-     não pode custar dois toques. */
+  /* O fechar sai da atividade, de qualquer etapa, como no site — sair da
+     leitura não pode custar dois toques. */
   function sair() {
     fundo.current?.parar();
     fundo.current = null;
-    if (router.canGoBack()) router.back();
-    else voltarParaJornada();
+    fecharAtividade();
   }
 
   function trocarSom(k: SomEscolhido) {
@@ -253,36 +256,35 @@ export default function Bebe() {
     );
   }
 
-  if (!at.pronto) {
-    return (
-      <Tela bordas={["top", "bottom"]}>
-        <Carregando />
-      </Tela>
-    );
-  }
+  if (!at.pronto) return <CarregandoAtividade paleta={PALETA} />;
 
   if (at.cuidado || !carta || !cartaHoje) {
     return (
-      <Tela bordas={["top", "bottom"]}>
-        <BarraDoTopo titulo="Jornada" />
-        <T>Hoje a jornada é sobre cuidar de você. Respirar e escrever continuam aqui.</T>
-        <BotaoDaAtividade cor={corJornada.roxo} rotulo="Voltar" aoTocar={voltarParaJornada} />
-      </Tela>
+      <FundoDaAtividade paleta={PALETA}>
+        <TopoDaAtividade />
+        <View style={{ paddingHorizontal: margem.foco, paddingTop: espaco.xl, gap: espaco.xl }}>
+          <Text style={{ ...fonte.normal, ...escala.corpo, color: cor.textoCorpo }}>
+            Hoje a trilha é sobre cuidar de você. Respirar e escrever continuam aqui.
+          </Text>
+          <BotaoDaAtividade cor={PALETA.acao} rotulo="Voltar" aoTocar={fecharAtividade} />
+        </View>
+      </FundoDaAtividade>
     );
   }
 
   const dia = at.D ?? 0;
+  let miolo: ReactNode;
 
   if (etapa === "fim") {
-    return (
-      <FundoDaAtividade paleta={PALETA}>
-        <CoracoesSubindo dia={dia} />
+    miolo = (
+      <>
+        <TopoDaAtividade aoFechar={sair} />
         <ScrollView
-          contentContainerStyle={{ padding: espaco.lg, paddingBottom: 120, gap: espaco.md }}
+          contentContainerStyle={{ paddingHorizontal: margem.tela, paddingBottom: espaco.xxl }}
         >
           <FimDoMomento
             titulo="Beijo entregue"
-            fala="Esse minuto com a sua voz ficou guardado, só de vocês. 💛"
+            fala="Esse minuto com a sua voz ficou guardado, só de vocês."
             desfecho={desfecho}
             D={at.D}
             cuidado={false}
@@ -292,7 +294,7 @@ export default function Bebe() {
                acompanhamento, não o clímax. */
             arte={
               <View style={{ alignItems: "center", justifyContent: "center" }}>
-                <Brilho tamanho={200} />
+                <Brilho tamanho={200} tinta={PALETA.luz} />
                 <Image
                   source={ARTE_DA_CARTA}
                   accessibilityIgnoresInvertColors
@@ -304,350 +306,274 @@ export default function Bebe() {
             balao={falaDaBolhaNaCartaNoApp({ tela: "done" })}
           />
         </ScrollView>
-      </FundoDaAtividade>
+      </>
     );
-  }
-
-  if (etapa === "leitura") {
-    const ultima = linha >= carta.lines.length - 1;
-    return (
-      <FundoDaAtividade paleta={PALETA}>
-        <CoracoesSubindo dia={dia} />
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            paddingHorizontal: espaco.lg,
-            paddingVertical: espaco.sm,
-          }}
-        >
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Fechar"
-            onPress={sair}
-            style={({ pressed }) => ({
-              width: ALVO_MINIMO,
-              height: ALVO_MINIMO,
-              marginLeft: -espaco.sm,
-              alignItems: "center",
-              justifyContent: "center",
-              opacity: pressed ? 0.6 : 1,
-            })}
-          >
-            <X size={24} color={corBebe.fechar} />
-          </Pressable>
+  } else if (etapa === "leitura") {
+    const total = carta.lines.length;
+    const ultima = linha >= total - 1;
+    const voltar = () => {
+      if (linha <= 0) return;
+      toque();
+      setLinha((l) => Math.max(0, l - 1));
+    };
+    const avancar = () => {
+      if (ultima) return;
+      toque();
+      setLinha((l) => Math.min(total - 1, l + 1));
+    };
+    miolo = (
+      <>
+        <TopoDaAtividade
+          aoFechar={sair}
+          meio={
+            <Segmentos
+              paleta={PALETA}
+              total={total}
+              atual={linha}
+              altura={3}
+              rotulo={`Linha ${linha + 1} de ${total}`}
+            />
+          }
+          direita={
+            <BotaoRedondo rotulo="Trocar o som de fundo" aoTocar={() => setFolha(true)}>
+              {som === "silencio" ? (
+                <VolumeX size={20} color={cor.textoApagado} strokeWidth={2.2} />
+              ) : (
+                <Volume2 size={20} color={cor.texto} strokeWidth={2.2} />
+              )}
+            </BotaoRedondo>
+          }
+        />
+        <View style={{ flex: 1 }}>
+          {/* O gesto dos Stories: o terço esquerdo volta, o resto segue. */}
           <View
-            accessibilityLabel={`Linha ${linha + 1} de ${carta.lines.length}`}
+            style={[StyleSheet.absoluteFill, { flexDirection: "row" }]}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            <Pressable style={{ flex: 1 }} onPress={voltar} />
+            <Pressable style={{ flex: 2 }} onPress={avancar} />
+          </View>
+          <View
+            pointerEvents="none"
             style={{
               flex: 1,
-              flexDirection: "row",
-              flexWrap: "wrap",
-              justifyContent: "center",
-              gap: 4,
-            }}
-          >
-            {/* As que faltam ficam cinza, como no site (lá, `grayscale`; aqui, o
-                coração branco apagado, que é o que o filtro desenhava). */}
-            {carta.lines.map((_, i) => (
-              <Text key={i} style={{ fontSize: 14, opacity: i <= linha ? 1 : 0.55 }}>
-                {i <= linha ? "💗" : "🤍"}
-              </Text>
-            ))}
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Trocar o som de fundo"
-            onPress={() => {
-              toque();
-              setFolha(true);
-            }}
-            style={({ pressed }) => ({
-              width: ALVO_MINIMO,
-              height: ALVO_MINIMO,
-              marginRight: -espaco.xs,
               alignItems: "center",
               justifyContent: "center",
-              opacity: pressed ? 0.6 : 1,
-            })}
-          >
-            <View
-              style={{
-                width: 38,
-                height: 38,
-                borderRadius: 19,
-                backgroundColor: cor.branco,
-                alignItems: "center",
-                justifyContent: "center",
-                ...sombraDe(corBebe.forte, 0.6),
-              }}
-            >
-              {som === "silencio" ? (
-                <VolumeX size={18} color={corBebe.secao} strokeWidth={2.3} />
-              ) : (
-                <Volume2 size={18} color={corBebe.forte} strokeWidth={2.3} />
-              )}
-            </View>
-          </Pressable>
-        </View>
-        <View
-          style={{
-            flex: 1,
-            alignItems: "center",
-            justifyContent: "center",
-            paddingHorizontal: espaco.xxl,
-          }}
-        >
-          <LinhaQueEntra key={`${carta.title}-${linha}`} texto={carta.lines[linha] ?? ""} />
-          <Text
-            style={{
-              marginTop: espaco.xxl,
-              ...fonte.media,
-              fontSize: 13,
-              letterSpacing: 0.65,
-              textTransform: "uppercase",
-              color: corBebe.leiaEmVoz,
+              paddingHorizontal: margem.foco + espaco.sm,
             }}
           >
-            leia em voz alta, no seu ritmo
-          </Text>
-          {/* A última linha não é "próxima": é o fim da carta — e vira o botão
-              cheio, porque é ali que a leitura termina. */}
-          <View style={{ marginTop: espaco.lg, width: "100%", maxWidth: 300 }}>
+            <LinhaQueTroca chave={`${carta.title}-${linha}`} texto={carta.lines[linha] ?? ""} />
+            <Text
+              style={{
+                marginTop: espaco.xxl,
+                textAlign: "center",
+                ...fonte.normal,
+                ...escala.nota,
+                color: cor.textoApagado,
+              }}
+            >
+              Leia em voz alta, no seu ritmo.{"\n"}Toque à esquerda para voltar uma linha.
+            </Text>
+          </View>
+        </View>
+        {/* A última linha não é "próxima": é o fim da carta — e vira o botão
+            cheio, porque é ali que a leitura termina. */}
+        <View style={{ paddingHorizontal: margem.foco, paddingBottom: espaco.md }}>
+          <BotaoComAcoes
+            aoAnterior={voltar}
+            aoProxima={avancar}
+            podeVoltar={linha > 0}
+            podeSeguir={!ultima}
+          >
             <BotaoDaAtividade
               claro={!ultima}
-              cor={corBebe.forte}
-              rotulo={ultima ? "Terminei de ler 💛" : "Próxima linha"}
+              cor={PALETA.acao}
+              rotulo={ultima ? "Terminei de ler" : "Próxima linha"}
               aoTocar={() => {
                 if (ultima) void terminar();
                 else setLinha((l) => l + 1);
               }}
             />
-          </View>
+          </BotaoComAcoes>
         </View>
-        <FolhaDeSons
-          aberta={folha}
-          som={som}
-          cuidado={false}
-          paleta={PALETA}
-          veu={corBebe.veu}
-          tinta={corBebe.link}
-          aoFechar={() => setFolha(false)}
-          aoEscolher={(k) => {
-            trocarSom(k);
-            setFolha(false);
-          }}
-        />
-      </FundoDaAtividade>
+      </>
     );
-  }
-
-  if (etapa === "lista") {
-    return (
-      <FundoDaAtividade paleta={PALETA}>
+  } else if (etapa === "lista") {
+    miolo = (
+      <>
+        <TopoDaAtividade voltar aoFechar={() => setEtapa("intro")} />
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: espaco.xl, paddingBottom: espaco.xxl }}
+          contentContainerStyle={{ paddingHorizontal: margem.foco, paddingBottom: espaco.xxl }}
         >
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setEtapa("intro")}
-            style={{ alignSelf: "flex-start", minHeight: ALVO_MINIMO, justifyContent: "center" }}
-          >
-            <Text style={{ ...fonte.forte, fontSize: 13, color: corBebe.link }}>‹ Voltar</Text>
-          </Pressable>
-          <View style={{ alignItems: "center" }}>
-            <Text style={estilos.rotulo}>Suas cartas</Text>
-            <Text
-              accessibilityRole="header"
-              style={{
-                marginTop: 4,
-                ...fonte.titulo,
-                fontSize: 24,
-                lineHeight: 30,
-                letterSpacing: -0.24,
-                color: corBebe.titulo,
-              }}
-            >
-              {album.length} {album.length === 1 ? "carta" : "cartas"} nesta fase
-            </Text>
-            <Text
-              style={{
-                marginTop: 4,
-                maxWidth: 320,
-                textAlign: "center",
-                ...fonte.normal,
-                fontSize: 13,
-                lineHeight: 18,
-                color: corBebe.discreto,
-              }}
-            >
-              Toque numa carta pra ler de novo, no seu ritmo. 💛
-            </Text>
-          </View>
-          <View style={{ marginTop: 20, gap: espaco.md }}>
-            {album.map((c) => {
-              const quando = ultimaLeitura(leituras, c.id);
-              return (
-                <Pressable
-                  key={c.id}
-                  accessibilityRole="button"
-                  onPress={() => {
-                    toque();
-                    abrirDoAlbum(c);
-                  }}
-                  style={({ pressed }) => ({
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: espaco.md,
-                    minHeight: ALVO_MINIMO + 16,
-                    paddingHorizontal: espaco.lg,
-                    paddingVertical: espaco.md,
-                    borderRadius: 20,
-                    backgroundColor: cor.branco,
-                    opacity: pressed ? 0.8 : 1,
-                    ...sombraDe(corBebe.forte, 0.7),
-                  })}
-                >
-                  <Text style={{ fontSize: 24 }}>{c.emoji}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={{
-                        ...fonte.forte,
-                        fontSize: 14,
-                        lineHeight: 19,
-                        color: corBebe.titulo,
-                      }}
-                    >
-                      {c.title}
-                    </Text>
-                    <Text style={{ ...fonte.normal, fontSize: 13, color: corBebe.lida }}>
-                      {quando ? `Lida ${haQuantoTempo(quando, new Date())}` : "Ainda não lida"}
-                    </Text>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
-        </ScrollView>
-      </FundoDaAtividade>
-    );
-  }
-
-  return (
-    <FundoDaAtividade paleta={PALETA}>
-      <View style={{ paddingHorizontal: espaco.lg }}>
-        <BarraDoTopo />
-      </View>
-      <ScrollView
-        contentContainerStyle={{
-          flexGrow: 1,
-          alignItems: "center",
-          justifyContent: "center",
-          paddingHorizontal: espaco.xxl,
-          paddingBottom: espaco.xxl,
-        }}
-      >
-        <BolhaComBalao
-          humor="apaixonado"
-          paleta={PALETA}
-          fala={falaDaBolhaNaCartaNoApp({
-            tela: "intro",
-            fraseDeLeitura,
-            lendoAsDelas,
-            periodo: periodoDaHora(new Date().getHours()),
-          })}
-        />
-        {/* A CARTA, como objeto: o papel branco com o envelope 3D por cima. Era
-            um título solto no degradê — e uma carta é algo que se segura. */}
-        <Superficie
-          tinta={corBebe.forte}
-          estilo={{
-            marginTop: 52,
-            width: "100%",
-            maxWidth: 360,
-            alignItems: "center",
-            paddingTop: 50,
-            paddingBottom: espaco.xl,
-            paddingHorizontal: espaco.xl,
-          }}
-        >
-          <View
-            pointerEvents="none"
-            style={{
-              position: "absolute",
-              top: -42,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Image
-              source={ARTE_DA_CARTA}
-              accessibilityIgnoresInvertColors
-              style={{ width: 84, height: 84 }}
-            />
-          </View>
-          <Text style={estilos.rotulo}>{lendoAsDelas ? "Escrita por você" : "Carta de hoje"}</Text>
+          <SobrelinhaDaAtividade paleta={PALETA}>Suas cartas</SobrelinhaDaAtividade>
           <Text
             accessibilityRole="header"
             style={{
               marginTop: 4,
-              textAlign: "center",
-              ...fonte.titulo,
-              fontSize: 28,
-              lineHeight: 34,
-              letterSpacing: -0.3,
-              color: corBebe.titulo,
+              ...fonte.display,
+              ...escala.titulo1,
+              letterSpacing: -0.2,
+              color: cor.texto,
             }}
           >
-            {carta.title} {carta.emoji}
+            {album.length} {album.length === 1 ? "carta" : "cartas"} nesta fase
           </Text>
           <Text
             style={{
-              marginTop: espaco.md,
-              textAlign: "center",
+              marginTop: 4,
               ...fonte.normal,
-              fontSize: 15,
-              lineHeight: 23,
-              color: corBebe.texto,
+              ...escala.legenda,
+              color: cor.textoApagado,
             }}
           >
-            {lendoAsDelas ? (
-              <>
-                Esta carta é feita das coisas boas que{" "}
-                <Text style={{ ...fonte.titulo }}>você mesma anotou</Text> na Gratidão, na ordem em
-                que aconteceram. Leia em voz alta, devagar. 💛
-              </>
-            ) : (
-              <>
-                Encontre um lugar calmo, mão na barriga… e leia{" "}
-                <Text style={{ ...fonte.titulo }}>em voz alta</Text>, devagar. A sua voz é o som
-                preferido do bebê. 💛
-              </>
-            )}
+            Toque numa carta para ler de novo, no seu ritmo.
           </Text>
-        </Superficie>
-        <View style={{ marginTop: espaco.xl, width: "100%", maxWidth: 360 }}>
-          <BotaoDaAtividade cor={corBebe.forte} rotulo="Começar a ler 💗" aoTocar={comecar} />
-        </View>
-        {/* Só existe com oito ou mais gratidões: uma carta de três linhas seria
-            pior que não ter. */}
-        {cartaDelas ? (
-          <Link
-            texto={
-              lendoAsDelas
-                ? "Ler a carta de hoje 💌"
-                : `Ler as ${gratidoes?.length ?? 0} coisas boas que você anotou ✨`
-            }
-            aoTocar={() => {
-              setLendoAsDelas((v) => !v);
-              setLinha(0);
-            }}
+          <View style={{ marginTop: espaco.xl, gap: espaco.md }}>
+            {album.map((c) => {
+              const quando = ultimaLeitura(leituras, c.id);
+              return (
+                <LinhaDaAtividade
+                  key={c.id}
+                  arte={<Text style={{ fontSize: 24 }}>{c.emoji}</Text>}
+                  titulo={c.title}
+                  legenda={quando ? `Lida ${haQuantoTempo(quando, new Date())}` : "Ainda não lida"}
+                  aoTocar={() => abrirDoAlbum(c)}
+                />
+              );
+            })}
+          </View>
+        </ScrollView>
+      </>
+    );
+  } else {
+    miolo = (
+      <>
+        <TopoDaAtividade aoFechar={sair} />
+        <ScrollView
+          contentContainerStyle={{
+            paddingHorizontal: margem.foco,
+            paddingTop: espaco.xs,
+            paddingBottom: espaco.xxl,
+          }}
+        >
+          <BolhaComBalao
+            lado
+            humor="apaixonado"
+            fala={falaDaBolhaNaCartaNoApp({
+              tela: "intro",
+              fraseDeLeitura,
+              lendoAsDelas,
+              periodo: periodoDaHora(new Date().getHours()),
+            })}
           />
-        ) : null}
-        {/* O álbum: sem ele, cada carta some no dia seguinte. */}
-        {!lendoAsDelas ? (
-          <Link texto="📖 Ver todas as cartas" aoTocar={() => setEtapa("lista")} />
-        ) : null}
-      </ScrollView>
+          {/* A CARTA, como objeto: o papel claro com o envelope 3D por cima. Era
+              um título solto no degradê — e uma carta é algo que se segura. */}
+          <Superficie
+            tinta={PALETA.acao}
+            estilo={{
+              marginTop: 60,
+              alignItems: "center",
+              paddingTop: 50,
+              paddingBottom: espaco.xl,
+              paddingHorizontal: espaco.xl,
+            }}
+          >
+            <View
+              pointerEvents="none"
+              style={{ position: "absolute", top: -42, alignItems: "center" }}
+            >
+              <Brilho tamanho={130} tinta={PALETA.luz} />
+              <Image
+                source={ARTE_DA_CARTA}
+                accessibilityIgnoresInvertColors
+                style={{ width: 84, height: 84 }}
+              />
+            </View>
+            <SobrelinhaDaAtividade paleta={PALETA}>
+              {lendoAsDelas ? "Escrita por você" : "Carta de hoje"}
+            </SobrelinhaDaAtividade>
+            <Text
+              accessibilityRole="header"
+              style={{
+                marginTop: 6,
+                textAlign: "center",
+                ...fonte.display,
+                ...escala.titulo1,
+                letterSpacing: -0.2,
+                color: cor.texto,
+              }}
+            >
+              {carta.title} {carta.emoji}
+            </Text>
+            <Text
+              style={{
+                marginTop: espaco.md,
+                textAlign: "center",
+                ...fonte.normal,
+                ...escala.legenda,
+                lineHeight: 22,
+                color: cor.textoCorpo,
+              }}
+            >
+              {lendoAsDelas ? (
+                <>
+                  Esta carta é feita das coisas boas que{" "}
+                  <Text style={{ ...fonte.forte }}>você mesma anotou</Text> na Gratidão, na ordem em
+                  que aconteceram. Leia em voz alta, devagar.
+                </>
+              ) : (
+                <>
+                  Ache um lugar calmo, ponha a mão na barriga e leia{" "}
+                  <Text style={{ ...fonte.forte }}>em voz alta</Text>, devagar. A sua voz é o som
+                  preferido do bebê.
+                </>
+              )}
+            </Text>
+          </Superficie>
+          <View style={{ marginTop: espaco.xl }}>
+            <BotaoDaAtividade cor={PALETA.acao} rotulo="Começar a ler" aoTocar={comecar} />
+          </View>
+          {/* Só existe com oito ou mais gratidões: uma carta de três linhas seria
+              pior que não ter. */}
+          {cartaDelas ? (
+            <Link
+              texto={
+                lendoAsDelas
+                  ? "Ler a carta de hoje"
+                  : `Ler as ${gratidoes?.length ?? 0} coisas boas que você anotou`
+              }
+              aoTocar={() => {
+                setLendoAsDelas((v) => !v);
+                setLinha(0);
+              }}
+            />
+          ) : null}
+          {/* O álbum: sem ele, cada carta some no dia seguinte. */}
+          {!lendoAsDelas ? (
+            <Link texto="Ver todas as cartas" aoTocar={() => setEtapa("lista")} />
+          ) : null}
+        </ScrollView>
+      </>
+    );
+  }
+
+  const comCoracoes = etapa === "leitura" || etapa === "fim";
+  return (
+    <FundoDaAtividade paleta={PALETA}>
+      {comCoracoes ? <CoracoesSubindo dia={dia} parados={folha} /> : null}
+      <TrocaDeEtapa chave={etapa}>{miolo}</TrocaDeEtapa>
+      <FolhaDeSons
+        aberta={folha && etapa === "leitura"}
+        som={som}
+        cuidado={false}
+        paleta={PALETA}
+        aoFechar={() => setFolha(false)}
+        aoEscolher={(k) => {
+          trocarSom(k);
+          setFolha(false);
+        }}
+      />
     </FundoDaAtividade>
   );
 }
@@ -662,70 +588,148 @@ function Link({ texto, aoTocar }: { texto: string; aoTocar: () => void }) {
       }}
       style={({ pressed }) => ({
         marginTop: espaco.sm,
+        alignSelf: "center",
         minHeight: ALVO_MINIMO,
+        paddingHorizontal: espaco.md,
         justifyContent: "center",
-        opacity: pressed ? 0.6 : 1,
+        opacity: pressed ? 0.55 : 1,
       })}
     >
-      <Text
-        style={{
-          ...fonte.forte,
-          fontSize: 13,
-          color: corBebe.link,
-          textDecorationLine: "underline",
-          textDecorationColor: corBebe.sublinhado,
-        }}
-      >
-        {texto}
-      </Text>
+      <Text style={{ ...fonte.forte, ...escala.legenda, color: PALETA.acao }}>{texto}</Text>
     </Pressable>
   );
 }
 
-/** A linha da carta entra deslizando de leve (o `dc-q-slide` do site). */
-function LinhaQueEntra({ texto }: { texto: string }) {
+/**
+ * O botão da leitura, com as ações de "anterior" e "próxima" para o leitor de
+ * tela (o gesto dos dois lados da tela não existe para quem não a vê).
+ */
+function BotaoComAcoes({
+  aoAnterior,
+  aoProxima,
+  podeVoltar,
+  podeSeguir,
+  children,
+}: {
+  aoAnterior: () => void;
+  aoProxima: () => void;
+  podeVoltar: boolean;
+  podeSeguir: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <View
+      accessibilityActions={[
+        ...(podeVoltar ? [{ name: "anterior", label: "Linha anterior" }] : []),
+        ...(podeSeguir ? [{ name: "proxima", label: "Próxima linha" }] : []),
+      ]}
+      onAccessibilityAction={(e) => {
+        if (e.nativeEvent.actionName === "anterior") aoAnterior();
+        if (e.nativeEvent.actionName === "proxima") aoProxima();
+      }}
+    >
+      {children}
+    </View>
+  );
+}
+
+/**
+ * A linha da carta: a velha sai (some e sobe um pouco), e só então a nova
+ * entra (aparece e assenta). Antes a velha sumia seca.
+ */
+function LinhaQueTroca({ texto, chave }: { texto: string; chave: string }) {
   const reduzido = useMovimentoReduzido();
+  const [visivel, setVisivel] = useState({ texto, chave });
+  const [saindo, setSaindo] = useState(false);
   const v = useRef(new Animated.Value(reduzido ? 1 : 0)).current;
+  const pedida = useRef({ texto, chave });
+  pedida.current = { texto, chave };
+
   useEffect(() => {
-    if (reduzido) return;
-    Animated.timing(v, {
+    if (chave === visivel.chave) return;
+    if (reduzido) setVisivel({ texto, chave });
+    else setSaindo(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chave]);
+
+  useEffect(() => {
+    if (!saindo) return;
+    const a = Animated.timing(v, {
+      toValue: 0,
+      duration: 110,
+      easing: Easing.in(Easing.quad),
+      useNativeDriver: true,
+    });
+    a.start(() => {
+      setVisivel(pedida.current);
+      setSaindo(false);
+    });
+    return () => a.stop();
+  }, [saindo, v]);
+
+  useEffect(() => {
+    if (reduzido) {
+      v.setValue(1);
+      return;
+    }
+    v.setValue(0);
+    const a = Animated.timing(v, {
       toValue: 1,
-      duration: 320,
+      duration: 200,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
-    }).start();
-  }, [v, reduzido]);
+    });
+    a.start();
+    return () => a.stop();
+  }, [visivel.chave, reduzido, v]);
+
   return (
     <Animated.Text
       accessibilityLiveRegion="polite"
       style={{
         maxWidth: 384,
         textAlign: "center",
-        ...fonte.media,
-        fontSize: 26,
-        lineHeight: 42,
-        color: corBebe.titulo,
+        ...fonte.display,
+        ...escala.titulo1,
+        lineHeight: 40,
+        fontWeight: "500",
+        letterSpacing: -0.2,
+        color: cor.texto,
         opacity: v,
-        transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }],
+        transform: [
+          {
+            translateY: v.interpolate({
+              inputRange: [0, 1],
+              outputRange: [saindo ? -8 : 8, 0],
+            }),
+          },
+        ],
       }}
     >
-      {texto}
+      {visivel.texto}
     </Animated.Text>
   );
 }
 
 /**
- * Os corações subindo (`dcHeartRise` do site): sete, de 💗 💛 🤍, em colunas
- * que mudam com o dia, cada um no seu tempo. Com "Reduzir movimento", nenhum.
+ * Os corações subindo (`dcHeartRise` do site): cinco, de 💗 💛 🤍, em colunas
+ * que mudam com o dia, cada um no seu tempo. Eles sobem algumas vezes e
+ * descansam; param com a folha de sons aberta e com o app fora da tela. Com
+ * "Reduzir movimento", nenhum.
  */
-function CoracoesSubindo({ dia }: { dia: number }) {
+function CoracoesSubindo({ dia, parados }: { dia: number; parados: boolean }) {
   const reduzido = useMovimentoReduzido();
+  const [ativo, setAtivo] = useState(AppState.currentState === "active");
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (s) => setAtivo(s === "active"));
+    return () => sub.remove();
+  }, []);
   const { height } = useWindowDimensions();
   const coracoes = useMemo(
     () =>
-      Array.from({ length: 7 }, (_, i) => ({
-        esquerda: 8 + ((i * 13 + dia * 7) % 84),
-        atraso: ((i * 1.3) % 6) * 1000,
+      Array.from({ length: 5 }, (_, i) => ({
+        esquerda: 8 + ((i * 17 + dia * 7) % 84),
+        atraso: ((i * 1.3) % 5) * 1000,
         duracao: (6 + (i % 3) * 2) * 1000,
         emoji: i % 3 === 0 ? "💗" : i % 3 === 1 ? "💛" : "🤍",
         tamanho: i % 2 === 0 ? 24 : 18,
@@ -736,7 +740,7 @@ function CoracoesSubindo({ dia }: { dia: number }) {
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill} accessible={false}>
       {coracoes.map((c, i) => (
-        <Coracao key={i} {...c} subida={height * 0.64} />
+        <Coracao key={i} {...c} subida={height * 0.64} parado={parados || !ativo} />
       ))}
     </View>
   );
@@ -749,6 +753,7 @@ function Coracao({
   emoji,
   tamanho,
   subida,
+  parado,
 }: {
   esquerda: number;
   atraso: number;
@@ -756,12 +761,14 @@ function Coracao({
   emoji: string;
   tamanho: number;
   subida: number;
+  parado: boolean;
 }) {
   const v = useRef(new Animated.Value(0)).current;
   useEffect(() => {
+    if (parado) return;
     const anim = Animated.sequence([
       Animated.delay(atraso),
-      Animated.loop(
+      lacoQueDescansa(
         Animated.timing(v, {
           toValue: 1,
           duration: duracao,
@@ -771,8 +778,11 @@ function Coracao({
       ),
     ]);
     anim.start();
-    return () => anim.stop();
-  }, [v, atraso, duracao]);
+    return () => {
+      anim.stop();
+      v.setValue(0);
+    };
+  }, [v, atraso, duracao, parado]);
   return (
     <Animated.Text
       style={{
@@ -791,13 +801,3 @@ function Coracao({
     </Animated.Text>
   );
 }
-
-const estilos = StyleSheet.create({
-  rotulo: {
-    ...fonte.forte,
-    fontSize: 13,
-    letterSpacing: 2.3,
-    textTransform: "uppercase",
-    color: corBebe.rotulo,
-  },
-});

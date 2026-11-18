@@ -3,12 +3,11 @@ import { Image } from "expo-image";
 import { useKeepAwake } from "expo-keep-awake";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { Bell, ChevronDown, ChevronRight, Play, X } from "lucide-react-native";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Bell, ChevronDown, ChevronRight, Play, Volume2, VolumeX, X } from "lucide-react-native";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Animated,
   AppState,
-  Modal,
   Easing,
   Platform,
   Pressable,
@@ -16,7 +15,8 @@ import {
   Text,
   View,
 } from "react-native";
-import Svg, { Circle, Defs, Path, RadialGradient, Stop } from "react-native-svg";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Svg, { Circle, Defs, RadialGradient, Stop } from "react-native-svg";
 import {
   CHAVE_DO_PROGRAMA,
   diaDoPrograma,
@@ -25,35 +25,43 @@ import {
 } from "@/lib/meditacao-programa";
 import { DENSIDADES, falaNoCiclo, type Densidade, type Plano } from "@/lib/meditacao-sessao";
 import { sequenciaDeDatas } from "@/lib/sequencia";
-import { familiasDeSom, type SomKey } from "@/lib/som-receitas";
+import type { SomKey } from "@/lib/som-receitas";
 import { ROTULO_DO_SOM_NO_APP } from "~/lib/jornada/sons";
 import { casalAberto } from "~/lib/jornada/casal";
-import { Carregando, Tela, toque } from "~/componentes/base";
+import { toque } from "~/componentes/base";
 import {
+  ArteDaLinha,
   BolhaComBalao,
   BotaoDaAtividade,
   BotaoDaVoz,
+  BotaoDoControle,
   Brilho,
+  CarregandoAtividade,
+  ControlesDaSessao,
   Escolha,
   EscolhaComLegenda,
+  fecharAtividade,
   Ficha,
+  FOLGA_DO_RODAPE,
+  FolhaDaAtividade,
   FundoDaAtividade,
+  GrupoDaFolha,
+  LinhaDaAtividade,
+  LinhaDaFolha,
   materialDe,
+  PilulaComRelevo,
   RodapeDaAtividade,
   Secao,
-  sombraDe,
   TituloDaAtividade,
-  type PaletaDaAtividade,
+  TopoDaAtividade,
+  TrocaDeEtapa,
 } from "~/componentes/jornada/atividade";
-import { clarear, escurecer } from "~/lib/cor";
-import { corMeditacao } from "~/componentes/jornada/cores";
+import { clarear, comAlfa, escurecer, misturar } from "~/lib/cor";
+import { corDaAtividade } from "~/componentes/jornada/cores";
 import { concluirMomento, FimDoMomento, type Desfecho } from "~/componentes/jornada/fim";
 import { FolhaDeSons } from "~/componentes/jornada/folha-de-sons";
-import { BarraDoTopo, voltarParaJornada } from "~/componentes/jornada/pecas";
 import { useAtividade } from "~/componentes/jornada/usarJornada";
-import { useMovimentoReduzido } from "~/componentes/movimento";
 import { tocarAmostra, tocarSomDeFundo, type SomDeFundo } from "~/lib/audio/som-de-fundo";
-import { ARTE_DO_SOM } from "~/lib/audio/sons-de-fundo";
 import { pararVozes, tocarVoz } from "~/lib/audio/voz";
 import {
   definirLembreteDaMeditacao,
@@ -87,44 +95,60 @@ import {
 } from "~/lib/jornada/meditacao";
 import { CHAVE_LOG_MEDITACAO } from "~/lib/jornada/momentos";
 import { CICLO, DURACAO_DA_FASE, instanteNoTempo, ROTULO_DA_FASE } from "~/lib/jornada/respiracao";
-import { ALVO_MINIMO, cor, espaco, fonte } from "~/tema";
+import {
+  ALVO_MINIMO,
+  brilhoDe,
+  canto,
+  cor,
+  curva,
+  escala,
+  espaco,
+  fonte,
+  luz,
+  margem,
+  sombra,
+} from "~/tema";
 
 /**
  * MEDITAR — a meditação guiada do app antigo (`MeditationBlock` do site).
  *
- * Ela escolhe o tempo, o que está precisando e o som de fundo (tocar num som
- * deixa ouvir cinco segundos), e quanta voz quer. Nos sete primeiros dias, um
- * programa curto abre a tela no lugar das perguntas. A sessão é a respiração
- * 4-4-8 desenhada por um círculo que respira com a bolha dormindo dentro, com
- * as falas GRAVADAS do site (191 trechos) nos ciclos que o plano marca e as
- * palavras "inspire, segure, solte" no começo. No fim, "Como você está agora?"
- * — e a última fala responde ao que ela disse.
+ * Nos sete primeiros dias, um programa curto abre a tela: é a porta. Fora
+ * dele (ou em "Escolher outra"), ela escolhe o tempo e o que está precisando;
+ * o som de fundo e quanta voz quer ficam em duas linhas que abrem a folha
+ * (tocar num som deixa ouvir cinco segundos). A sessão é a respiração 4-4-8
+ * desenhada por um círculo que respira com a bolha dormindo dentro, com as
+ * falas GRAVADAS do site nos ciclos que o plano marca e as palavras "inspire,
+ * segure, solte" no começo. No fim, "Como você está agora?" — e a última fala
+ * responde ao que ela disse.
+ *
+ * SEM RELÓGIO NO JS (18/11/2026, a vistoria): a sessão redesenhava a tela
+ * inteira cinco vezes por segundo, a barra pulava de degrau em degrau e a
+ * troca de fase atrasava até 200 ms. Agora o estado muda só na troca de fase
+ * (um `setTimeout` para o fim dela), a barra anda no motor nativo e só o
+ * tempo que falta se redesenha, quando o número muda.
  *
  * Bancada: /jornada/meditar?bancada=1 [&menu=1] [&programa=<dias feitos>] [&luto=1]
- *          [&etapa=sessao|reflexo|fim|feita] [&t=<segundos>] [&pausa=toque|fundo] [&folha=1]
+ *          [&etapa=sessao|tocando|reflexo|fim|feita] [&t=<segundos>] [&pausa=toque|fundo] [&folha=1]
  */
 
-const PALETA: PaletaDaAtividade = {
-  fundo: [corMeditacao.fundoTopo, corMeditacao.fundoMeio, corMeditacao.fundoBase],
-  forte: corMeditacao.forte,
-  titulo: corMeditacao.titulo,
-  secao: corMeditacao.secao,
-  borda: corMeditacao.borda,
-  vidro: corMeditacao.vidro,
-  discreto: corMeditacao.discreto,
-  brancoSuave: corMeditacao.brancoSuave,
-};
+const PALETA = corDaAtividade.meditar;
+const MATERIAL = materialDe(PALETA);
 
 const BOLHA_DORMINDO = require("../../../../src/assets/bolha/dormindo.webp");
 
-const MATERIAL = materialDe(PALETA);
-
 /** A flor de lótus, nas artes 3D do app: no cartão do programa e no fim da sessão. */
 const ARTE_LOTUS = require("../../../../src/assets/grades/meditacoes.webp");
+/** As portas para as outras atividades: os fones com a lua, o coração na almofada. */
+const ARTE_SONS = require("../../../../src/assets/grades/sons.webp");
+const ARTE_APOIO = require("../../../../src/assets/grades/apoio.webp");
+/** A chama da sequência (6 × 6 quadros; aqui, o primeiro, parado). */
+const CHAMA = require("../../../../src/assets/chama-sequencia.webp");
 
 type Som = SomKey | "silencio";
 type Etapa = "escolha" | "sessao" | "reflexo" | "fim";
 type SessaoEmCurso = { plano: Plano; minutos: number; programa: DiaDoPrograma | null };
+
+const rotuloDoSom = (k: Som) => (k === "silencio" ? "Sem som" : ROTULO_DO_SOM_NO_APP[k].label);
 
 export default function Meditar() {
   const at = useAtividade("meditation");
@@ -141,6 +165,8 @@ export default function Meditar() {
   const [voz, setVoz] = useState(true);
   const [densidade, setDensidade] = useState<Densidade>("guiada");
   const [menuAberto, setMenuAberto] = useState(false);
+  const [folhaDoSom, setFolhaDoSom] = useState(false);
+  const [folhaDaVoz, setFolhaDaVoz] = useState(false);
   const [progFeitos, setProgFeitos] = useState<number | null>(null);
   const [etapa, setEtapa] = useState<Etapa>("escolha");
   const [sessao, setSessao] = useState<SessaoEmCurso | null>(null);
@@ -184,7 +210,8 @@ export default function Meditar() {
       pausa: pausa === "toque" || pausa === "fundo" ? pausa : null,
       folha: parametroDaBancada("folha") === "1",
     });
-    const e = parametroDaBancada("etapa");
+    const e0 = parametroDaBancada("etapa");
+    const e = e0 === "tocando" ? "sessao" : e0;
     if (e === "sessao" || e === "reflexo" || e === "fim") {
       setSessao({
         plano: planoDaSessao({
@@ -311,8 +338,7 @@ export default function Meditar() {
     fundo.current?.parar();
     fundo.current = null;
     pararVozes();
-    if (router.canGoBack()) router.back();
-    else voltarParaJornada();
+    fecharAtividade();
   }
 
   /* A pausa vive na sessão; o som de fundo, aqui (ele atravessa as etapas). */
@@ -324,16 +350,15 @@ export default function Meditar() {
     else fundo.current = tocarSomDeFundo(somAtual.current);
   }
 
-  if (!at.pronto) {
-    return (
-      <Tela bordas={["top", "bottom"]}>
-        <Carregando />
-      </Tela>
-    );
-  }
+  if (!at.pronto) return <CarregandoAtividade paleta={PALETA} />;
 
-  if (etapa === "sessao" && sessao) {
-    return (
+  const mostrarMenu = !diaAtual || menuAberto;
+  const naSessao = etapa === "sessao" && !!sessao;
+  const chave = naSessao ? "sessao" : etapa === "sessao" ? "escolha" : etapa;
+
+  let miolo: ReactNode;
+  if (naSessao) {
+    miolo = (
       <Sessao
         plano={sessao.plano}
         voz={voz}
@@ -355,22 +380,21 @@ export default function Meditar() {
         }}
       />
     );
-  }
-
-  if (etapa === "reflexo") {
-    return (
-      <FundoDaAtividade paleta={PALETA}>
+  } else if (etapa === "reflexo") {
+    miolo = (
+      <>
+        <TopoDaAtividade />
         <ScrollView
           contentContainerStyle={{
             flexGrow: 1,
             alignItems: "center",
             justifyContent: "center",
-            paddingHorizontal: espaco.xxl,
-            paddingVertical: espaco.xl,
+            paddingHorizontal: margem.foco,
+            paddingBottom: espaco.xxl,
           }}
         >
           <View style={{ alignItems: "center", justifyContent: "center" }}>
-            <Brilho tamanho={180} />
+            <Brilho tamanho={180} tinta={PALETA.luz} />
             <Image
               source={ARTE_LOTUS}
               style={{ width: 112, height: 112 }}
@@ -378,30 +402,17 @@ export default function Meditar() {
               accessibilityIgnoresInvertColors
             />
           </View>
-          <Text
-            accessibilityRole="header"
-            style={{
-              marginTop: espaco.lg,
-              textAlign: "center",
-              ...fonte.media,
-              fontSize: 26,
-              lineHeight: 32,
-              color: corMeditacao.titulo,
-            }}
-          >
-            Como você está agora?
-          </Text>
+          <TituloDaAtividade centro>Como você está agora?</TituloDaAtividade>
           <Text
             style={{
-              marginTop: 6,
+              marginTop: espaco.sm,
               textAlign: "center",
               ...fonte.normal,
-              fontSize: 13,
-              lineHeight: 18,
-              color: corMeditacao.texto,
+              ...escala.legenda,
+              color: cor.textoApagado,
             }}
           >
-            Sem resposta certa — é só pra você notar a diferença.
+            Não tem resposta certa. É só para você notar a diferença.
           </Text>
           <View style={{ marginTop: espaco.xl, width: "100%", maxWidth: 340, gap: espaco.md }}>
             {comoEstouPara(at.cuidado).map((c) => (
@@ -416,31 +427,21 @@ export default function Meditar() {
               </Escolha>
             ))}
           </View>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setEtapa("fim")}
-            hitSlop={8}
-            style={{ marginTop: espaco.lg, minHeight: ALVO_MINIMO, justifyContent: "center" }}
-          >
-            <Text style={{ ...fonte.forte, fontSize: 13, color: corMeditacao.secao }}>Pular</Text>
-          </Pressable>
+          <BotaoDeTexto rotulo="Pular" aoTocar={() => setEtapa("fim")} />
         </ScrollView>
-      </FundoDaAtividade>
+      </>
     );
-  }
-
-  if (etapa === "fim") {
+  } else if (etapa === "fim") {
     const m = minutosFeitos || minutos;
     const seqDepois = sequenciaDeDatas(lerRegistro(loja.blob[CHAVE_LOG_MEDITACAO]).dias);
-    /* O fim fica no degradê da meditação, como o do Movimento e o do Bebê:
-       num creme genérico ele parecia outra tela, de outro app. */
-    return (
-      <FundoDaAtividade paleta={PALETA}>
+    miolo = (
+      <>
+        <TopoDaAtividade />
         <ScrollView
-          contentContainerStyle={{ padding: espaco.lg, paddingBottom: 120, gap: espaco.md }}
+          contentContainerStyle={{ paddingHorizontal: margem.tela, paddingBottom: espaco.xxl }}
         >
           <FimDoMomento
-            titulo={`${m} ${m === 1 ? "minuto" : "minutos"} só seus 💜`}
+            titulo={`${m} ${m === 1 ? "minuto" : "minutos"} só seus`}
             fala={
               (humor && FECHAMENTO[humor]) ||
               "Você tirou um tempinho só pra você. Leve essa calma com você."
@@ -451,7 +452,7 @@ export default function Meditar() {
             pos={at.pos}
             arte={
               <View style={{ alignItems: "center", justifyContent: "center" }}>
-                <Brilho tamanho={200} />
+                <Brilho tamanho={200} tinta={PALETA.luz} />
                 <Image
                   source={ARTE_LOTUS}
                   style={{ width: 132, height: 132 }}
@@ -461,200 +462,315 @@ export default function Meditar() {
               </View>
             }
             confete
-            extra={
-              seqDepois > 0 ? (
-                <Text
-                  style={{
-                    textAlign: "center",
-                    ...fonte.forte,
-                    fontSize: 13,
-                    color: corMeditacao.icone,
-                  }}
-                >
-                  🔥 {seqDepois} {seqDepois === 1 ? "dia seguido" : "dias seguidos"}
-                </Text>
-              ) : null
-            }
+            extra={seqDepois > 0 ? <Sequencia dias={seqDepois} /> : null}
           />
         </ScrollView>
-      </FundoDaAtividade>
+      </>
+    );
+  } else {
+    miolo = (
+      <>
+        <TopoDaAtividade />
+        <ScrollView
+          contentContainerStyle={{
+            paddingHorizontal: margem.foco,
+            paddingTop: espaco.xs,
+            paddingBottom: mostrarMenu ? FOLGA_DO_RODAPE + espaco.lg : espaco.xxl,
+          }}
+        >
+          <BolhaComBalao lado humor="feliz" fala={falaDoBalao(registro)} />
+          <TituloDaAtividade>Meditar</TituloDaAtividade>
+
+          {/* O programa é a porta da tela: vem primeiro. */}
+          {diaAtual && !menuAberto ? (
+            <CartaoDoPrograma
+              dia={diaAtual}
+              feitos={feitosDoPrograma}
+              aoComecar={() => comecar(diaAtual)}
+              aoAbrirMenu={() => setMenuAberto(true)}
+            />
+          ) : null}
+
+          {mostrarMenu ? (
+            <>
+              <Secao topo={espaco.xl}>De quanto tempo você tem?</Secao>
+              <View style={{ flexDirection: "row", gap: espaco.sm }}>
+                {DURACOES_MEDITAR.map((m) => (
+                  <Escolha
+                    key={m}
+                    paleta={PALETA}
+                    rotulo={`${m} min`}
+                    ativa={minutos === m}
+                    aoTocar={() => setMinutos(m)}
+                    centro
+                    estilo={{ flex: 1 }}
+                  />
+                ))}
+              </View>
+
+              <Secao>O que você precisa agora?</Secao>
+              <View style={{ gap: espaco.sm }}>
+                {temas.map((t, i) => {
+                  const ativa = t === tema;
+                  return (
+                    <EscolhaComLegenda
+                      key={t.tema}
+                      paleta={PALETA}
+                      titulo={t.precisa}
+                      legenda={t.tema}
+                      ativa={ativa}
+                      aoTocar={() => setTemaIdx(i)}
+                      antes={<Text style={{ fontSize: 24 }}>{t.emoji}</Text>}
+                      depois={i === sugerida ? <SeloDoDia ativa={ativa} /> : null}
+                    />
+                  );
+                })}
+              </View>
+
+              {/* O som e a voz são ajustes, e não perguntas: duas linhas que
+                  abrem a folha (eram 32 pílulas de som e 3 linhas de voz). */}
+              <View style={{ marginTop: 28 }}>
+                <GrupoDeResumo>
+                  <LinhaDeResumo
+                    primeira
+                    rotulo="Som de fundo"
+                    valor={rotuloDoSom(som)}
+                    aoTocar={() => setFolhaDoSom(true)}
+                  />
+                  <LinhaDeResumo
+                    rotulo="Voz"
+                    valor={DENSIDADES.find((d) => d.chave === densidade)?.rotulo ?? ""}
+                    aoTocar={() => setFolhaDaVoz(true)}
+                  />
+                </GrupoDeResumo>
+              </View>
+            </>
+          ) : null}
+
+          {/* O lembrete: uma linha discreta, e não um segundo botão cheio
+              disputando com o programa. Fora do Modo Cuidado, como no site. */}
+          {at.uid && !at.cuidado ? <LembreteDiario uid={at.uid} dias={registro.dias} /> : null}
+
+          {/* Coisas que ela pode querer EM VEZ da sessão de hoje — não são
+              escolhas desta meditação, e por isso têm a cara de navegar.
+              "Para vocês dois" é preparação para o parto: só na gestação,
+              fora do Modo Cuidado, da 28ª semana em diante (`casalAberto`). */}
+          <View style={{ marginTop: espaco.xl, gap: espaco.md }}>
+            {casalAberto({ cuidado: at.cuidado, posParto: at.pos, semana: at.semana }) ? (
+              <LinhaDaAtividade
+                arte={<ArteDaLinha fonte={ARTE_APOIO} />}
+                titulo="Para vocês dois"
+                legenda="10 min com quem vai estar com você no parto"
+                aoTocar={() => {
+                  pararAmostra();
+                  router.push("/jornada/casal");
+                }}
+              />
+            ) : null}
+            <LinhaDaAtividade
+              arte={<ArteDaLinha fonte={ARTE_SONS} />}
+              titulo="Só sons, para dormir"
+              legenda="Chuva, mar ou vento, com a tela apagada"
+              aoTocar={() => {
+                pararAmostra();
+                router.push("/jornada/dormir");
+              }}
+            />
+          </View>
+        </ScrollView>
+      </>
     );
   }
 
-  const mostrarMenu = !diaAtual || menuAberto;
   return (
     <FundoDaAtividade paleta={PALETA}>
-      <View style={{ paddingHorizontal: espaco.lg }}>
-        <BarraDoTopo />
-      </View>
-      <ScrollView
-        contentContainerStyle={{ paddingHorizontal: espaco.xl, paddingBottom: espaco.xxl }}
-      >
-        <BolhaComBalao humor="feliz" fala={falaDoBalao(registro)} paleta={PALETA} />
-        <TituloDaAtividade paleta={PALETA}>Meditar</TituloDaAtividade>
-
-        {/* O lembrete fica colado na sequência: a chama diz quantos dias ela
-            veio, e isto é o que a traz. Fora do Modo Cuidado, como no site. */}
-        {at.uid && !at.cuidado ? <LembreteDiario uid={at.uid} dias={registro.dias} /> : null}
-
-        {diaAtual && !menuAberto ? (
-          <CartaoDoPrograma
-            dia={diaAtual}
-            feitos={feitosDoPrograma}
-            aoComecar={() => comecar(diaAtual)}
-            aoAbrirMenu={() => setMenuAberto(true)}
-          />
-        ) : null}
-
-        {mostrarMenu ? (
-          <>
-            <Secao paleta={PALETA}>De quanto tempo você tem?</Secao>
-            <View style={{ flexDirection: "row", gap: espaco.sm }}>
-              {DURACOES_MEDITAR.map((m) => (
-                <Escolha
-                  key={m}
-                  paleta={PALETA}
-                  rotulo={`${m} min`}
-                  ativa={minutos === m}
-                  aoTocar={() => setMinutos(m)}
-                  centro
-                  estilo={{ flex: 1 }}
-                />
-              ))}
-            </View>
-
-            <Secao paleta={PALETA}>O que você precisa agora?</Secao>
-            <View style={{ gap: espaco.sm }}>
-              {temas.map((t, i) => {
-                const ativa = t === tema;
-                return (
-                  <EscolhaComLegenda
-                    key={t.tema}
-                    paleta={PALETA}
-                    titulo={t.precisa}
-                    legenda={t.tema}
-                    ativa={ativa}
-                    aoTocar={() => setTemaIdx(i)}
-                    antes={<Text style={{ fontSize: 24 }}>{t.emoji}</Text>}
-                    depois={
-                      i === sugerida ? (
-                        <View
-                          style={{
-                            borderRadius: 999,
-                            paddingHorizontal: espaco.sm,
-                            paddingVertical: 3,
-                            backgroundColor: ativa
-                              ? corMeditacao.seloDoDiaAtivo
-                              : corMeditacao.seloDoDia,
-                          }}
-                        >
-                          <Text
-                            style={{
-                              ...fonte.forte,
-                              fontSize: 13,
-                              color: ativa ? cor.branco : corMeditacao.forte,
-                            }}
-                          >
-                            Do dia
-                          </Text>
-                        </View>
-                      ) : null
-                    }
-                  />
-                );
-              })}
-            </View>
-
-            <Secao paleta={PALETA}>Som de fundo</Secao>
-            <SonsDeFundo
-              som={som}
-              amostrando={amostrando}
-              cuidado={at.cuidado}
-              aoEscolher={escolherSom}
-            />
-            <Text
-              style={{
-                marginTop: 6,
-                ...fonte.normal,
-                fontSize: 13,
-                color: corMeditacao.dica,
-              }}
-            >
-              Toque para ouvir 5 segundos antes de escolher.
-            </Text>
-
-            <Secao paleta={PALETA}>Quanta voz você quer?</Secao>
-            <View style={{ gap: espaco.sm }}>
-              {DENSIDADES.map((d) => (
-                <EscolhaComLegenda
-                  key={d.chave}
-                  paleta={PALETA}
-                  titulo={d.rotulo}
-                  legenda={d.sub}
-                  ativa={densidade === d.chave}
-                  aoTocar={() => {
-                    setDensidade(d.chave);
-                    /* Escolher a quantidade é querer a voz: ela volta a ligar.
-                       Só o botão da sessão cala tudo. */
-                    setVoz(true);
-                  }}
-                />
-              ))}
-            </View>
-          </>
-        ) : null}
-
-        {/* Coisas que ela pode querer EM VEZ da sessão de hoje — não são
-            escolhas desta meditação. "Para vocês dois" é preparação para o
-            parto: só na gestação, fora do Modo Cuidado, da 28ª semana em
-            diante (`casalAberto`). */}
-        <View style={{ marginTop: espaco.xxl, gap: espaco.md }}>
-          {casalAberto({ cuidado: at.cuidado, posParto: at.pos, semana: at.semana }) ? (
-            <EscolhaComLegenda
-              paleta={PALETA}
-              titulo="Para vocês dois"
-              legenda="10 min com quem vai estar com você no parto"
-              ativa={false}
-              aoTocar={() => {
-                pararAmostra();
-                router.push("/jornada/casal");
-              }}
-              antes={<Text style={{ fontSize: 24 }}>🤲</Text>}
-              depois={<ChevronRight size={18} color={corMeditacao.familia} />}
-            />
-          ) : null}
-          <EscolhaComLegenda
-            paleta={PALETA}
-            titulo="Só sons, para dormir"
-            legenda="Chuva, mar ou vento — com a tela apagada"
-            ativa={false}
-            aoTocar={() => {
-              pararAmostra();
-              router.push("/jornada/dormir");
-            }}
-            antes={<Text style={{ fontSize: 24 }}>🌙</Text>}
-            depois={<ChevronRight size={18} color={corMeditacao.familia} />}
-          />
-        </View>
-      </ScrollView>
-      {mostrarMenu ? (
-        <RodapeDaAtividade paleta={PALETA}>
+      <TrocaDeEtapa chave={chave}>{miolo}</TrocaDeEtapa>
+      {chave === "escolha" && mostrarMenu ? (
+        <RodapeDaAtividade>
           <BotaoDaAtividade
-            cor={corMeditacao.forte}
+            cor={PALETA.acao}
+            luz={PALETA.luz}
             rotulo={`Começar · ${minutos} min`}
             icone={<Play size={18} color={cor.branco} fill={cor.branco} />}
             aoTocar={() => comecar()}
           />
         </RodapeDaAtividade>
       ) : null}
+      {/* As folhas do menu. Tocar num som deixa ouvir cinco segundos; a folha
+          fica aberta para ela comparar. */}
+      <FolhaDeSons
+        aberta={folhaDoSom && chave === "escolha"}
+        som={som}
+        cuidado={at.cuidado}
+        paleta={PALETA}
+        amostrando={amostrando}
+        nota="Toque num som para ouvir 5 segundos."
+        aoFechar={() => {
+          pararAmostra();
+          setFolhaDoSom(false);
+        }}
+        aoEscolher={escolherSom}
+      />
+      <FolhaDaAtividade
+        aberta={folhaDaVoz && chave === "escolha"}
+        titulo="Quanta voz você quer?"
+        paleta={PALETA}
+        aoFechar={() => setFolhaDaVoz(false)}
+      >
+        <GrupoDaFolha>
+          {DENSIDADES.map((d, i) => (
+            <LinhaDaFolha
+              key={d.chave}
+              paleta={PALETA}
+              primeira={i === 0}
+              titulo={d.rotulo}
+              legenda={d.sub}
+              marcada={densidade === d.chave}
+              aoTocar={() => {
+                setDensidade(d.chave);
+                /* Escolher a quantidade é querer a voz: ela volta a ligar.
+                   Só o botão da sessão cala tudo. */
+                setVoz(true);
+                setFolhaDaVoz(false);
+              }}
+            />
+          ))}
+        </GrupoDaFolha>
+      </FolhaDaAtividade>
     </FundoDaAtividade>
+  );
+}
+
+/* ── Peças da tela ────────────────────────────────────────────────────── */
+
+function BotaoDeTexto({ rotulo, aoTocar }: { rotulo: string; aoTocar: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={() => {
+        toque();
+        aoTocar();
+      }}
+      hitSlop={8}
+      style={({ pressed }) => ({
+        marginTop: espaco.lg,
+        minHeight: ALVO_MINIMO,
+        paddingHorizontal: espaco.md,
+        justifyContent: "center",
+        opacity: pressed ? 0.55 : 1,
+      })}
+    >
+      <Text style={{ ...fonte.forte, ...escala.legenda, color: PALETA.acao }}>{rotulo}</Text>
+    </Pressable>
+  );
+}
+
+/** O selo "Do dia" no tema sugerido. */
+function SeloDoDia({ ativa }: { ativa: boolean }) {
+  return (
+    <View
+      style={{
+        borderRadius: canto.pilula,
+        paddingHorizontal: espaco.sm,
+        paddingVertical: 3,
+        backgroundColor: ativa ? "rgba(255,255,255,0.22)" : PALETA.luz,
+      }}
+    >
+      <Text style={{ ...fonte.forte, ...escala.nota, color: ativa ? cor.branco : PALETA.acao }}>
+        Do dia
+      </Text>
+    </View>
+  );
+}
+
+/** A sequência no fim: a chama do app (o primeiro quadro do sprite) e os dias. */
+function Sequencia({ dias }: { dias: number }) {
+  const t = 22;
+  return (
+    <View
+      style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }}
+      accessible
+      accessibilityLabel={`${dias} ${dias === 1 ? "dia seguido" : "dias seguidos"}`}
+    >
+      <View style={{ width: t, height: t, overflow: "hidden" }}>
+        <Image source={CHAMA} style={{ width: t * 6, height: t * 6 }} contentFit="fill" />
+      </View>
+      <Text style={{ ...fonte.forte, ...escala.legenda, color: PALETA.acao }}>
+        {dias} {dias === 1 ? "dia seguido" : "dias seguidos"}
+      </Text>
+    </View>
+  );
+}
+
+function GrupoDeResumo({ children }: { children: ReactNode }) {
+  return (
+    <View
+      style={{
+        borderRadius: canto.dentro,
+        ...curva,
+        backgroundColor: luz.cartao,
+        borderWidth: 0.5,
+        borderColor: "rgba(255,255,255,0.9)",
+        overflow: "hidden",
+        ...sombra,
+      }}
+    >
+      {children}
+    </View>
+  );
+}
+
+/** "Som de fundo · Chuva ›": o ajuste e o valor de agora, que abre a folha. */
+function LinhaDeResumo({
+  rotulo,
+  valor,
+  aoTocar,
+  primeira,
+}: {
+  rotulo: string;
+  valor: string;
+  aoTocar: () => void;
+  primeira?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${rotulo}: ${valor}. Toque para trocar`}
+      onPress={() => {
+        toque();
+        aoTocar();
+      }}
+      style={({ pressed }) => ({
+        minHeight: ALVO_MINIMO + 8,
+        paddingHorizontal: espaco.lg,
+        backgroundColor: pressed ? cor.apagado : "transparent",
+      })}
+    >
+      <View
+        style={{
+          flex: 1,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: espaco.sm,
+          borderTopWidth: primeira ? 0 : 0.5,
+          borderTopColor: cor.borda,
+          minHeight: ALVO_MINIMO + 8,
+        }}
+      >
+        <Text style={{ flex: 1, ...fonte.forte, ...escala.legenda, color: cor.texto }}>
+          {rotulo}
+        </Text>
+        <Text style={{ ...fonte.normal, ...escala.legenda, color: cor.textoApagado }}>{valor}</Text>
+        <ChevronRight size={18} color={cor.chevron} strokeWidth={2.4} />
+      </View>
+    </Pressable>
   );
 }
 
 /* ── O lembrete diário ────────────────────────────────────────────────────── */
 
 function LembreteDiario({ uid, dias }: { uid: string; dias: readonly string[] }) {
-  /* `undefined` enquanto lê o aparelho: o cartão não pisca "Ativar" para quem já ligou. */
+  /* `undefined` enquanto lê o aparelho: a linha não pisca "Ativar" para quem já ligou. */
   const [hora, setHora] = useState<string | null | undefined>(undefined);
   const [escolhendo, setEscolhendo] = useState(false);
   const [semPermissao, setSemPermissao] = useState(false);
@@ -692,72 +808,37 @@ function LembreteDiario({ uid, dias }: { uid: string; dias: readonly string[] })
 
   if (hora === undefined) return null;
   return (
-    <View style={{ marginTop: espaco.lg }}>
+    <View style={{ marginTop: espaco.xl }}>
       <View
         style={{
           flexDirection: "row",
           alignItems: "center",
           gap: espaco.md,
-          minHeight: ALVO_MINIMO + 20,
-          paddingHorizontal: espaco.md,
-          paddingVertical: espaco.md,
-          borderRadius: 20,
-          backgroundColor: cor.branco,
-          ...sombraDe(corMeditacao.forte, 0.8),
+          minHeight: ALVO_MINIMO + 8,
         }}
       >
-        <Ficha fundo={MATERIAL.ficha}>
-          <Bell size={18} color={corMeditacao.forte} strokeWidth={2.3} />
+        <Ficha fundo={MATERIAL.ficha} tamanho={34}>
+          <Bell size={17} color={PALETA.acao} strokeWidth={2.2} />
         </Ficha>
         <View style={{ flex: 1 }}>
-          <Text style={{ ...fonte.titulo, fontSize: 14, color: corMeditacao.titulo }}>
+          <Text style={{ ...fonte.forte, ...escala.legenda, color: cor.texto }}>
             Lembrar todo dia
           </Text>
-          <Text
-            style={{
-              ...fonte.normal,
-              fontSize: 13,
-              lineHeight: 17,
-              color: corMeditacao.discreto,
-            }}
-          >
+          <Text style={{ ...fonte.normal, ...escala.nota, color: cor.textoApagado }}>
             {hora
-              ? "E fico quieto se você já tiver meditado"
-              : "Um empurrãozinho na hora que você escolher"}
+              ? "Não aviso nos dias em que você já meditou"
+              : "Um aviso na hora que você escolher"}
           </Text>
         </View>
         {hora ? (
           <>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Horário do lembrete: ${hora}. Toque para trocar`}
-              onPress={() => {
-                toque();
-                setEscolhendo(true);
-              }}
-              style={({ pressed }) => ({
-                minHeight: 36,
-                paddingHorizontal: 12,
-                borderRadius: 12,
-                backgroundColor: MATERIAL.ficha,
-                borderBottomWidth: pressed ? 1 : 3,
-                borderBottomColor: MATERIAL.labioClaro,
-                marginTop: pressed ? 2 : 0,
-                justifyContent: "center",
-              })}
-              hitSlop={4}
-            >
-              <Text
-                style={{
-                  ...fonte.titulo,
-                  fontSize: 14,
-                  color: corMeditacao.forte,
-                  fontVariant: ["tabular-nums"],
-                }}
-              >
-                {hora}
-              </Text>
-            </Pressable>
+            <PilulaComRelevo
+              paleta={PALETA}
+              rotulo={hora}
+              numero
+              rotuloAcessivel={`Horário do lembrete: ${hora}. Toque para trocar`}
+              aoTocar={() => setEscolhendo(true)}
+            />
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Desligar lembrete"
@@ -765,38 +846,35 @@ function LembreteDiario({ uid, dias }: { uid: string; dias: readonly string[] })
                 toque();
                 void definir(null);
               }}
-              hitSlop={8}
+              hitSlop={6}
               style={({ pressed }) => ({
-                minWidth: 28,
-                minHeight: 36,
+                width: 32,
+                minHeight: ALVO_MINIMO,
                 alignItems: "center",
                 justifyContent: "center",
-                opacity: pressed ? 0.6 : 1,
+                opacity: pressed ? 0.55 : 1,
               })}
             >
-              <X size={18} color={corMeditacao.iconeApagado} />
+              <X size={18} color={cor.textoApagado} strokeWidth={2.2} />
             </Pressable>
           </>
         ) : (
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel="Ativar o lembrete"
             onPress={() => {
               toque();
               void definir(HORA_PADRAO);
             }}
+            hitSlop={8}
             style={({ pressed }) => ({
-              minHeight: 36,
-              paddingHorizontal: espaco.lg,
-              borderRadius: 12,
-              backgroundColor: corMeditacao.forte,
-              borderBottomWidth: pressed ? 1 : 3,
-              borderBottomColor: MATERIAL.labioCheio,
-              marginTop: pressed ? 2 : 0,
+              minHeight: ALVO_MINIMO,
+              paddingHorizontal: espaco.sm,
               justifyContent: "center",
+              opacity: pressed ? 0.55 : 1,
             })}
-            hitSlop={5}
           >
-            <Text style={{ ...fonte.titulo, fontSize: 14, color: cor.branco }}>Ativar</Text>
+            <Text style={{ ...fonte.forte, ...escala.legenda, color: PALETA.acao }}>Ativar</Text>
           </Pressable>
         )}
       </View>
@@ -805,83 +883,42 @@ function LembreteDiario({ uid, dias }: { uid: string; dias: readonly string[] })
           style={{
             marginTop: 6,
             ...fonte.normal,
-            fontSize: 13,
-            lineHeight: 18,
-            color: corMeditacao.discreto,
+            ...escala.nota,
+            color: cor.textoApagado,
           }}
         >
           Ative as notificações do app nos Ajustes do iPhone para o lembrete chegar.
         </Text>
       ) : null}
-      <Modal
-        visible={escolhendo}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setEscolhendo(false)}
+      <FolhaDaAtividade
+        aberta={escolhendo}
+        titulo="Horário do lembrete"
+        paleta={PALETA}
+        aoFechar={() => setEscolhendo(false)}
       >
-        <View style={{ flex: 1, justifyContent: "flex-end" }}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Fechar"
-            onPress={() => setEscolhendo(false)}
-            style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              top: 0,
-              bottom: 0,
-              backgroundColor: corMeditacao.folhaVeu,
-            }}
-          />
-          <View
-            accessibilityViewIsModal
-            style={{
-              maxHeight: "70%",
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
-              backgroundColor: cor.branco,
-              paddingTop: 20,
-            }}
-          >
-            <Text
-              style={{
-                textAlign: "center",
-                ...fonte.forte,
-                fontSize: 13,
-                letterSpacing: 0.65,
-                textTransform: "uppercase",
-                color: corMeditacao.secao,
+        <View
+          style={{
+            flexDirection: "row",
+            flexWrap: "wrap",
+            justifyContent: "center",
+            gap: espaco.sm,
+          }}
+        >
+          {HORARIOS.map((h) => (
+            <PilulaComRelevo
+              key={h}
+              paleta={PALETA}
+              rotulo={h}
+              numero
+              cheia={h === hora}
+              aoTocar={() => {
+                setEscolhendo(false);
+                void definir(h);
               }}
-            >
-              Lembrar às
-            </Text>
-            <ScrollView
-              contentContainerStyle={{
-                flexDirection: "row",
-                flexWrap: "wrap",
-                gap: espaco.sm,
-                padding: espaco.xl,
-                paddingBottom: 40,
-              }}
-            >
-              {HORARIOS.map((h) => (
-                <Escolha
-                  key={h}
-                  paleta={PALETA}
-                  rotulo={h}
-                  ativa={h === hora}
-                  centro
-                  estilo={{ width: "23%" }}
-                  aoTocar={() => {
-                    setEscolhendo(false);
-                    void definir(h);
-                  }}
-                />
-              ))}
-            </ScrollView>
-          </View>
+            />
+          ))}
         </View>
-      </Modal>
+      </FolhaDaAtividade>
     </View>
   );
 }
@@ -901,288 +938,146 @@ function CartaoDoPrograma({
 }) {
   return (
     <>
-      {/* O cartão do programa é a porta principal da tela: cor cheia, relevo
-          e a flor de lótus 3D espiando no canto — a mesma arte do fim. */}
+      {/* O cartão do programa é a porta principal da tela: a cor cheia da
+          meditação e a flor de lótus 3D INTEIRA no canto (cortada na quina,
+          parecia erro). */}
       <View
         style={{
           marginTop: espaco.xl,
-          borderRadius: 26,
-          backgroundColor: corMeditacao.forte,
-          borderBottomWidth: 6,
-          borderBottomColor: MATERIAL.labioCheio,
-          padding: 20,
+          borderRadius: canto.cartao,
+          ...curva,
           overflow: "hidden",
-          ...sombraDe(corMeditacao.forte, 1.3),
+          ...brilhoDe(PALETA.acao, 0.5),
         }}
       >
-        <View
-          pointerEvents="none"
-          style={{ position: "absolute", right: -18, top: -14, opacity: 0.95 }}
+        <LinearGradient
+          colors={[clarear(PALETA.acao, 0.12), PALETA.acao, escurecer(PALETA.acao, 0.12)]}
+          locations={[0, 0.55, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{ padding: 20 }}
         >
-          <Brilho tamanho={170} tinta={clarear(corMeditacao.forte, 0.35)} />
-          <Image
-            source={ARTE_LOTUS}
-            style={{ width: 112, height: 112 }}
-            contentFit="contain"
-            accessibilityIgnoresInvertColors
-          />
-        </View>
-        <Text
-          style={{
-            ...fonte.titulo,
-            fontSize: 13,
-            letterSpacing: 1.5,
-            textTransform: "uppercase",
-            color: corMeditacao.branco80,
-          }}
-        >
-          Dia {dia.dia} de {PROGRAMA.length}
-        </Text>
-        <Text
-          style={{
-            marginTop: 6,
-            maxWidth: "68%",
-            ...fonte.titulo,
-            fontSize: 24,
-            lineHeight: 29,
-            letterSpacing: -0.3,
-            color: cor.branco,
-          }}
-        >
-          {dia.titulo}
-        </Text>
-        <Text
-          style={{
-            marginTop: 4,
-            maxWidth: "68%",
-            ...fonte.media,
-            fontSize: 14,
-            lineHeight: 19,
-            color: corMeditacao.branco85,
-          }}
-        >
-          {dia.sub}
-        </Text>
-        <View
-          style={{ marginTop: 14, flexDirection: "row", gap: 6 }}
-          accessibilityLabel={`${feitos} de ${PROGRAMA.length} dias feitos`}
-        >
-          {PROGRAMA.map((d) => (
-            <View
-              key={d.dia}
-              style={{
-                flex: 1,
-                height: 6,
-                borderRadius: 3,
-                backgroundColor: d.dia <= feitos ? cor.branco : corMeditacao.branco30,
-              }}
+          <View pointerEvents="none" style={{ position: "absolute", right: 12, top: 12 }}>
+            <Brilho tamanho={150} tinta={clarear(PALETA.acao, 0.4)} />
+            <Image
+              source={ARTE_LOTUS}
+              style={{ width: 96, height: 96 }}
+              contentFit="contain"
+              accessibilityIgnoresInvertColors
             />
-          ))}
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Começar"
-          onPress={() => {
-            toque();
-            aoComecar();
-          }}
-          style={({ pressed }) => ({
-            marginTop: espaco.lg,
-            borderRadius: 18,
-            backgroundColor: escurecer(corMeditacao.forte, 0.42),
-            paddingBottom: pressed ? 1 : 5,
-            transform: [{ translateY: pressed ? 4 : 0 }],
-          })}
-        >
-          <View
+          </View>
+          <Text
             style={{
-              minHeight: 50,
-              borderRadius: 18,
-              backgroundColor: cor.branco,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: espaco.sm,
+              ...fonte.forte,
+              ...escala.nota,
+              letterSpacing: 0.6,
+              textTransform: "uppercase",
+              color: "rgba(255,255,255,0.82)",
             }}
           >
-            <Play size={16} color={corMeditacao.icone} fill={corMeditacao.icone} />
-            <Text style={{ ...fonte.titulo, fontSize: 16, color: corMeditacao.icone }}>
-              Começar
-            </Text>
+            Dia {dia.dia} de {PROGRAMA.length}
+          </Text>
+          <Text
+            style={{
+              marginTop: 6,
+              maxWidth: "62%",
+              ...fonte.display,
+              ...escala.titulo2,
+              letterSpacing: -0.2,
+              color: cor.branco,
+            }}
+          >
+            {dia.titulo}
+          </Text>
+          <Text
+            style={{
+              marginTop: 4,
+              maxWidth: "62%",
+              ...fonte.normal,
+              ...escala.legenda,
+              color: "rgba(255,255,255,0.86)",
+            }}
+          >
+            {dia.sub}
+          </Text>
+          <View
+            style={{ marginTop: espaco.lg, flexDirection: "row", gap: 4 }}
+            accessible
+            accessibilityLabel={`${feitos} de ${PROGRAMA.length} dias feitos`}
+          >
+            {PROGRAMA.map((d) => (
+              <View
+                key={d.dia}
+                style={{
+                  flex: 1,
+                  height: 4,
+                  borderRadius: 2,
+                  backgroundColor: d.dia <= feitos ? cor.branco : "rgba(255,255,255,0.3)",
+                }}
+              />
+            ))}
           </View>
-        </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Começar"
+            onPress={() => {
+              toque();
+              aoComecar();
+            }}
+            style={({ pressed }) => ({
+              marginTop: espaco.lg,
+              borderRadius: 22,
+              ...curva,
+              backgroundColor: escurecer(PALETA.acao, 0.38),
+              paddingBottom: pressed ? 1 : 5,
+              transform: [{ translateY: pressed ? 4 : 0 }],
+            })}
+          >
+            <View
+              style={{
+                minHeight: 52,
+                borderRadius: 22,
+                ...curva,
+                backgroundColor: cor.branco,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: espaco.sm,
+              }}
+            >
+              <Play size={17} color={PALETA.acao} fill={PALETA.acao} />
+              <Text style={{ ...fonte.forte, fontSize: 17, lineHeight: 22, color: PALETA.acao }}>
+                Começar
+              </Text>
+            </View>
+          </Pressable>
+        </LinearGradient>
       </View>
       <Pressable
         accessibilityRole="button"
-        onPress={aoAbrirMenu}
+        accessibilityLabel="Escolher outra meditação"
+        onPress={() => {
+          toque();
+          aoAbrirMenu();
+        }}
+        hitSlop={6}
         style={({ pressed }) => ({
-          marginTop: espaco.md,
+          marginTop: espaco.sm,
+          alignSelf: "center",
           minHeight: ALVO_MINIMO,
+          paddingHorizontal: espaco.md,
           flexDirection: "row",
           alignItems: "center",
-          justifyContent: "space-between",
-          borderTopWidth: 1,
-          borderStyle: "dashed",
-          borderTopColor: corMeditacao.borda,
-          opacity: pressed ? 0.6 : 1,
+          gap: 4,
+          opacity: pressed ? 0.55 : 1,
         })}
       >
-        <Text style={{ ...fonte.forte, fontSize: 14, color: corMeditacao.discreto }}>
-          Ou escolha você mesma
+        <Text style={{ ...fonte.forte, ...escala.legenda, color: PALETA.acao }}>
+          Escolher outra
         </Text>
-        <ChevronDown size={18} color={corMeditacao.discreto} />
+        <ChevronDown size={18} color={PALETA.acao} strokeWidth={2.4} />
       </Pressable>
     </>
-  );
-}
-
-/* ── O som de fundo: as famílias do site, com a amostra de cinco segundos ── */
-
-function IconeDoSom({ som, tamanho = 22 }: { som: Som; tamanho?: number }) {
-  const arte = som !== "silencio" ? ARTE_DO_SOM[som] : undefined;
-  if (arte)
-    return <Image source={arte} style={{ width: tamanho, height: tamanho }} contentFit="contain" />;
-  return (
-    <Text style={{ fontSize: tamanho * 0.86 }}>
-      {som === "silencio" ? "🔇" : ROTULO_DO_SOM_NO_APP[som].emoji}
-    </Text>
-  );
-}
-
-const rotuloDoSom = (k: Som) => (k === "silencio" ? "Silêncio" : ROTULO_DO_SOM_NO_APP[k].label);
-
-function SonsDeFundo({
-  som,
-  amostrando,
-  cuidado,
-  aoEscolher,
-}: {
-  som: Som;
-  amostrando: SomKey | null;
-  cuidado: boolean;
-  aoEscolher: (k: Som) => void;
-}) {
-  /* Agrupado por família: trinta e duas pílulas numa fita lisa é um muro que
-     ninguém lê. A "Música" do site (composta ao vivo para a duração da
-     sessão) não veio: não há como gravá-la em arquivo sem perder o que ela é. */
-  const grupos: { familia: string; sons: Som[] }[] = [
-    { familia: "", sons: ["silencio"] },
-    ...familiasDeSom(cuidado).map((g) => ({ familia: g.familia as string, sons: g.sons as Som[] })),
-  ];
-  return (
-    <View style={{ gap: espaco.sm }}>
-      {grupos.map((g) => (
-        <View key={g.familia || "especiais"}>
-          {g.familia ? (
-            <Text
-              style={{
-                marginBottom: 6,
-                ...fonte.forte,
-                fontSize: 13,
-                letterSpacing: 0.65,
-                textTransform: "uppercase",
-                color: corMeditacao.familia,
-              }}
-            >
-              {g.familia}
-            </Text>
-          ) : null}
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: espaco.sm }}>
-            {g.sons.map((k) => {
-              const ativo = som === k;
-              return (
-                <Pressable
-                  key={k}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: ativo }}
-                  accessibilityLabel={`${rotuloDoSom(k)}${amostrando === k ? ", tocando a amostra" : ""}`}
-                  onPress={() => {
-                    toque();
-                    aoEscolher(k);
-                  }}
-                  style={({ pressed }) => ({
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 6,
-                    minHeight: 40,
-                    paddingHorizontal: 14,
-                    borderRadius: 999,
-                    borderWidth: ativo ? 0 : 1,
-                    borderColor: corMeditacao.borda,
-                    backgroundColor: ativo ? corMeditacao.forte : corMeditacao.vidro,
-                    opacity: pressed ? 0.8 : 1,
-                  })}
-                  hitSlop={{ top: 2, bottom: 2 }}
-                >
-                  <IconeDoSom som={k} />
-                  <Text
-                    style={{
-                      ...fonte.forte,
-                      fontSize: 13,
-                      color: ativo ? cor.branco : corMeditacao.forte,
-                    }}
-                  >
-                    {rotuloDoSom(k)}
-                  </Text>
-                  {amostrando === k ? (
-                    <Onda tinta={ativo ? cor.branco : corMeditacao.familia} />
-                  ) : null}
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-/** As três barrinhas que sobem e descem enquanto a amostra toca. */
-function Onda({ tinta }: { tinta: string }) {
-  const reduzido = useMovimentoReduzido();
-  const barras = useRef([0, 1, 2].map(() => new Animated.Value(0.4))).current;
-  useEffect(() => {
-    if (reduzido) return;
-    const laços = barras.map((b, i) =>
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(i * 180),
-          Animated.timing(b, {
-            toValue: 1,
-            duration: 300,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(b, {
-            toValue: 0.4,
-            duration: 300,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-        ]),
-      ),
-    );
-    laços.forEach((l) => l.start());
-    return () => laços.forEach((l) => l.stop());
-  }, [barras, reduzido]);
-  return (
-    <View
-      style={{ flexDirection: "row", alignItems: "flex-end", gap: 2, height: 12 }}
-      accessible={false}
-    >
-      {barras.map((b, i) => (
-        <Animated.View
-          key={i}
-          style={{
-            width: 2,
-            height: 12,
-            borderRadius: 1,
-            backgroundColor: tinta,
-            transform: [{ scaleY: b }],
-          }}
-        />
-      ))}
-    </View>
   );
 }
 
@@ -1193,6 +1088,52 @@ type Pausa = null | "toque" | "fundo";
 function MantemAcesa() {
   useKeepAwake("dc-meditar");
   return null;
+}
+
+/**
+ * O tempo que falta ("3m", e "45s" no último minuto): só ele se redesenha
+ * enquanto ela respira, e só quando o número muda.
+ */
+function TempoQueFalta({
+  total,
+  agora,
+  parado,
+}: {
+  total: number;
+  agora: () => number;
+  parado: boolean;
+}) {
+  const texto = useCallback(() => formatarRestante(total - agora()), [total, agora]);
+  const [rotulo, setRotulo] = useState(texto);
+  useEffect(() => {
+    setRotulo(texto());
+    if (parado) return;
+    let id: ReturnType<typeof setTimeout> | undefined;
+    const proximo = () => {
+      const resta = total - agora();
+      setRotulo(formatarRestante(resta));
+      if (resta <= 0) return;
+      /* No último minuto o número muda a cada segundo; antes, a cada minuto. */
+      const ate = resta <= 60 ? (resta + 0.5) % 1 || 1 : resta % 60 || 60;
+      id = setTimeout(proximo, Math.max(50, ate * 1000 + 20));
+    };
+    proximo();
+    return () => clearTimeout(id);
+  }, [total, parado, texto, agora]);
+  return (
+    <Text
+      style={{
+        minWidth: 30,
+        textAlign: "right",
+        ...fonte.forte,
+        ...escala.nota,
+        color: cor.textoApagado,
+        fontVariant: ["tabular-nums"],
+      }}
+    >
+      {rotulo}
+    </Text>
+  );
 }
 
 function Sessao({
@@ -1220,6 +1161,7 @@ function Sessao({
   aoEncerrar: (ciclo: number) => void;
 }) {
   const total = plano.totalCiclos * CICLO;
+  /* O segundo da sessão — reescrito só na troca de fase, na pausa e na volta. */
   const [t, setT] = useState(inicio.t);
   const [pausa, setPausa] = useState<Pausa>(inicio.pausa);
   const pausada = pausa !== null;
@@ -1227,27 +1169,62 @@ function Sessao({
      no meio, e o texto dela continua na tela). */
   const [retomada, setRetomada] = useState(0);
   const [folha, setFolha] = useState(inicio.folha);
-  const base = useRef({ inicio: Date.now(), acumulado: inicio.t });
+  const relogio = useRef({ desde: Date.now(), acumulado: inicio.t, rodando: false });
   const terminou = useRef(false);
-  const escala = useRef(new Animated.Value(ESCALA_RESPIRO.solte)).current;
+  const respiro = useRef(new Animated.Value(ESCALA_RESPIRO.solte)).current;
+  const barra = useRef(new Animated.Value(Math.min(1, inicio.t / total))).current;
 
+  const agora = useCallback(() => {
+    const r = relogio.current;
+    return r.acumulado + (r.rodando ? (Date.now() - r.desde) / 1000 : 0);
+  }, []);
+
+  /* O relógio de parede anda só com a sessão rodando. */
   useEffect(() => {
     if (pausada) return;
-    base.current.inicio = Date.now();
-    const id = setInterval(() => {
-      setT(base.current.acumulado + (Date.now() - base.current.inicio) / 1000);
-    }, 200);
+    const r = relogio.current;
+    r.desde = Date.now();
+    r.rodando = true;
     return () => {
-      clearInterval(id);
-      base.current.acumulado += (Date.now() - base.current.inicio) / 1000;
+      r.acumulado += (Date.now() - r.desde) / 1000;
+      r.rodando = false;
     };
   }, [pausada]);
 
   const inst = instanteNoTempo(Math.min(t, total - 0.001));
   const falaAgora = falaNoCiclo(plano, inst.ciclo);
 
+  /* A próxima troca de fase: um `setTimeout`, e um render por fase. */
+  useEffect(() => {
+    if (pausada || t >= total) return;
+    const prox = Math.min(total, t + (1 - inst.progresso) * DURACAO_DA_FASE[inst.fase]);
+    const id = setTimeout(
+      () => setT(Math.max(prox + 1e-3, agora())),
+      Math.max(0, (prox - agora()) * 1000),
+    );
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [t, pausada, total, agora]);
+
+  /* A barra da sessão anda sozinha no motor nativo, do ponto de agora ao fim. */
+  useEffect(() => {
+    const ja = Math.min(1, agora() / total);
+    barra.setValue(ja);
+    if (pausada) return;
+    const a = Animated.timing(barra, {
+      toValue: 1,
+      duration: Math.max(0, (total - agora()) * 1000),
+      easing: Easing.linear,
+      useNativeDriver: true,
+    });
+    a.start();
+    return () => a.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pausada, retomada]);
+
   function pausar(motivo: "toque" | "fundo") {
     if (pausada || terminou.current) return;
+    setT(agora());
     setPausa(motivo);
     pararVozes();
     aoPausar(true);
@@ -1255,8 +1232,8 @@ function Sessao({
   function retomar() {
     if (!pausada) return;
     /* A respiração recomeça na inspiração do MESMO ciclo — como no site. */
-    const recomeco = inst.ciclo * CICLO;
-    base.current.acumulado = recomeco;
+    const recomeco = instanteNoTempo(Math.min(agora(), total - 0.001)).ciclo * CICLO;
+    relogio.current.acumulado = recomeco;
     setT(recomeco);
     setPausa(null);
     setRetomada((n) => n + 1);
@@ -1278,13 +1255,13 @@ function Sessao({
     if (pausada) {
       /* Pausada, a bolha volta ao repouso (a expiração), de onde a próxima
          inspiração tem para onde crescer. */
-      escala.stopAnimation();
-      escala.setValue(ESCALA_RESPIRO.solte);
+      respiro.stopAnimation();
+      respiro.setValue(ESCALA_RESPIRO.solte);
       return;
     }
     if (Platform.OS !== "web")
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    Animated.timing(escala, {
+    Animated.timing(respiro, {
       toValue: ESCALA_RESPIRO[inst.fase],
       duration: Math.max(150, DURACAO_DA_FASE[inst.fase] * (1 - inst.progresso) * 1000),
       easing: Easing.linear,
@@ -1322,169 +1299,127 @@ function Sessao({
   }, [t, total, aoTerminar]);
 
   return (
-    <FundoDaAtividade paleta={PALETA}>
+    <View style={{ flex: 1 }}>
       {Platform.OS !== "web" && !pausada ? <MantemAcesa /> : null}
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          paddingHorizontal: espaco.lg,
-          paddingVertical: espaco.sm,
-          zIndex: 3,
-        }}
-      >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Fechar"
-          onPress={() => aoEncerrar(inst.ciclo)}
-          style={({ pressed }) => ({
-            width: ALVO_MINIMO,
-            height: ALVO_MINIMO,
-            marginLeft: -espaco.sm,
-            alignItems: "center",
-            justifyContent: "center",
-            opacity: pressed ? 0.6 : 1,
-          })}
-        >
-          <X size={24} color={corMeditacao.fechar} />
-        </Pressable>
+      <TopoDaAtividade
+        aoFechar={() => aoEncerrar(inst.ciclo)}
+        meio={
+          <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
+            <BarraQueAnda valor={barra} />
+            <TempoQueFalta total={total} agora={agora} parado={pausada} />
+          </View>
+        }
+      />
+
+      <View style={{ flex: 1 }}>
         <View
+          importantForAccessibility={pausada ? "no-hide-descendants" : "auto"}
+          accessibilityElementsHidden={pausada}
           style={{
             flex: 1,
-            height: 6,
-            marginHorizontal: espaco.md,
-            borderRadius: 3,
-            backgroundColor: corMeditacao.barraTrilho,
-            overflow: "hidden",
+            alignItems: "center",
+            justifyContent: "center",
+            paddingHorizontal: margem.foco,
+            paddingBottom: 96,
           }}
-          accessibilityLabel={`${Math.round((t / total) * 100)}% da sessão`}
         >
-          <View
+          <Circulo escala={respiro} rotulo={ROTULO_DA_FASE[inst.fase]} oculto={pausada} />
+          <Text
+            key={inst.ciclo}
             style={{
-              width: `${Math.min(100, (t / total) * 100)}%`,
-              height: "100%",
-              borderRadius: 3,
-              backgroundColor: corMeditacao.barra,
+              marginTop: 36,
+              minHeight: 90,
+              maxWidth: 360,
+              textAlign: "center",
+              ...fonte.display,
+              ...escala.titulo2,
+              lineHeight: 30,
+              fontWeight: "400",
+              letterSpacing: -0.2,
+              color: falaAgora ? cor.texto : cor.textoApagado,
             }}
-          />
+          >
+            {falaAgora?.texto ?? "Só respire."}
+          </Text>
         </View>
-        <Text
-          style={{
-            marginRight: espaco.sm,
-            minWidth: 28,
-            ...fonte.forte,
-            fontSize: 13,
-            color: corMeditacao.restante,
-            fontVariant: ["tabular-nums"],
-          }}
-        >
-          {formatarRestante(total - t)}
-        </Text>
-        {/* ⏸ desenhado, e não emoji: emoji tem cor própria em cada sistema. */}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={pausada ? "Continuar" : "Pausar"}
-          hitSlop={4}
-          onPress={() => {
-            toque();
-            if (pausada) retomar();
-            else pausar("toque");
-          }}
-          style={({ pressed }) => ({
-            width: 36,
-            height: 36,
-            borderRadius: 18,
-            borderWidth: 1,
-            borderColor: corMeditacao.borda,
-            backgroundColor: corMeditacao.vidro,
-            alignItems: "center",
-            justifyContent: "center",
-            opacity: pressed ? 0.7 : 1,
-          })}
-        >
-          <Svg width={15} height={15} viewBox="0 0 24 24">
-            <Path
-              d={pausada ? "M8 5.2v13.6L19 12z" : "M6.6 4.8h3.7v14.4H6.6zM13.7 4.8h3.7v14.4h-3.7z"}
-              fill={corMeditacao.icone}
-            />
-          </Svg>
-        </Pressable>
-        <BotaoDaVoz
-          ligada={voz}
-          aoTocar={aoTrocarVoz}
-          corLigada={corMeditacao.icone}
-          corDesligada={corMeditacao.iconeApagado}
-        />
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Trocar o som de fundo"
-          onPress={() => {
-            toque();
-            setFolha(true);
-          }}
-          style={({ pressed }) => ({
-            width: ALVO_MINIMO,
-            height: ALVO_MINIMO,
-            marginRight: -espaco.sm,
-            alignItems: "center",
-            justifyContent: "center",
-            opacity: pressed ? 0.6 : 1,
-          })}
-        >
-          <Text style={{ fontSize: 20 }}>{som === "silencio" ? "🔇" : "🔊"}</Text>
-        </Pressable>
       </View>
+      {/* O véu cobre a tela inteira (até atrás da barra de status), por baixo
+          do fechar e dos controles: sem faixa cortada no alto. */}
+      {pausada ? <VeuDaPausa motivo={pausa} /> : null}
 
-      <View
-        importantForAccessibility={pausada ? "no-hide-descendants" : "auto"}
-        accessibilityElementsHidden={pausada}
-        style={{
-          flex: 1,
-          alignItems: "center",
-          justifyContent: "center",
-          paddingHorizontal: espaco.xxl,
-        }}
-      >
-        <Circulo escala={escala} rotulo={ROTULO_DA_FASE[inst.fase]} oculto={pausada} />
-        <Text
-          key={inst.ciclo}
-          style={{
-            marginTop: 40,
-            minHeight: 84,
-            maxWidth: 384,
-            textAlign: "center",
-            ...fonte.titulo,
-            fontSize: 22,
-            lineHeight: 36,
-            letterSpacing: -0.22,
-            color: falaAgora ? corMeditacao.frase : corMeditacao.fraseApagada,
-          }}
-        >
-          {falaAgora?.texto ?? "Só respire."}
-        </Text>
-      </View>
-
-      {pausada ? <VeuDaPausa motivo={pausa} aoContinuar={retomar} /> : null}
+      <ControlesDaSessao
+        paleta={PALETA}
+        pausada={pausada}
+        aoAlternar={() => (pausada ? retomar() : pausar("toque"))}
+        esquerda={<BotaoDaVoz ligada={voz} aoTocar={aoTrocarVoz} />}
+        direita={
+          <BotaoDoControle rotulo="Trocar o som de fundo" aoTocar={() => setFolha(true)}>
+            {som === "silencio" ? (
+              <VolumeX size={22} color={cor.textoApagado} strokeWidth={2.2} />
+            ) : (
+              <Volume2 size={22} color={cor.texto} strokeWidth={2.2} />
+            )}
+          </BotaoDoControle>
+        }
+      />
       <FolhaDeSons
         aberta={folha}
         som={som}
         cuidado={cuidado}
         paleta={PALETA}
-        veu={corMeditacao.folhaVeu}
-        tinta={corMeditacao.icone}
         aoFechar={() => setFolha(false)}
         aoEscolher={(k) => {
           aoEscolherSom(k);
           setFolha(false);
         }}
       />
-    </FundoDaAtividade>
+    </View>
   );
 }
 
+/** A barra da sessão: enche no motor nativo, do ponto de agora até o fim. */
+function BarraQueAnda({ valor }: { valor: Animated.Value }) {
+  /* A barra cheia desliza da esquerda para dentro do trilho (deslocamento é
+     transformação: anda no motor nativo, sem depender da origem do `scale`). */
+  const [largura, setLargura] = useState(0);
+  return (
+    <View
+      onLayout={(e) => setLargura(e.nativeEvent.layout.width)}
+      style={{
+        flex: 1,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: cor.trilho,
+        overflow: "hidden",
+      }}
+    >
+      <Animated.View
+        style={{
+          height: 4,
+          width: "100%",
+          borderRadius: 2,
+          backgroundColor: PALETA.acao,
+          opacity: largura > 0 ? 1 : 0,
+          transform: [
+            { translateX: valor.interpolate({ inputRange: [0, 1], outputRange: [-largura, 0] }) },
+          ],
+        }}
+      />
+    </View>
+  );
+}
+
+/* O círculo: a luz da meditação por dentro, com um aro da ação. */
+const CIRCULO = {
+  halo: misturar(PALETA.luz, PALETA.acao, 0.12),
+  claro: "rgba(255,255,255,0.95)",
+  escuro: comAlfa(misturar(PALETA.luz, PALETA.acao, 0.28), 0.85),
+  aro: comAlfa(PALETA.acao, 0.22),
+} as const;
+
 /** O halo, o círculo e a bolha dormindo, respirando juntos na mesma escala. */
 function Circulo({
-  escala,
+  escala: s,
   rotulo,
   oculto,
 }: {
@@ -1494,15 +1429,12 @@ function Circulo({
 }) {
   return (
     <View style={{ width: 224, height: 224, alignItems: "center", justifyContent: "center" }}>
-      <Animated.View
-        style={{ position: "absolute", transform: [{ scale: escala }] }}
-        accessible={false}
-      >
+      <Animated.View style={{ position: "absolute", transform: [{ scale: s }] }} accessible={false}>
         <Svg width={224} height={224}>
           <Defs>
             <RadialGradient id="halo-da-meditacao" cx="50%" cy="50%" r="50%">
-              <Stop offset="0.35" stopColor={corMeditacao.halo} stopOpacity={0.4} />
-              <Stop offset="1" stopColor={corMeditacao.halo} stopOpacity={0} />
+              <Stop offset="0.35" stopColor={CIRCULO.halo} stopOpacity={0.55} />
+              <Stop offset="1" stopColor={CIRCULO.halo} stopOpacity={0} />
             </RadialGradient>
           </Defs>
           <Circle cx={112} cy={112} r={112} fill="url(#halo-da-meditacao)" />
@@ -1516,20 +1448,20 @@ function Circulo({
           height: 160,
           borderRadius: 80,
           borderWidth: 2,
-          borderColor: corMeditacao.circuloBorda,
+          borderColor: CIRCULO.aro,
           overflow: "hidden",
-          transform: [{ scale: escala }],
+          transform: [{ scale: s }],
         }}
       >
         <LinearGradient
-          colors={[corMeditacao.circuloClaro, corMeditacao.circuloEscuro]}
+          colors={[CIRCULO.claro, CIRCULO.escuro]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={{ flex: 1 }}
         />
       </Animated.View>
       <View style={{ alignItems: "center", gap: espaco.sm }}>
-        <Animated.View style={{ transform: [{ scale: escala }] }}>
+        <Animated.View style={{ transform: [{ scale: s }] }}>
           <Image
             source={BOLHA_DORMINDO}
             style={{ width: 96, height: 96 }}
@@ -1540,14 +1472,14 @@ function Circulo({
         <Text
           accessibilityLiveRegion="polite"
           style={{
-            /* Pausada, a palavra da fase some: no site o véu a desfocava, e
-               aqui ela vazaria por trás do "Pausado". */
+            /* Pausada, a palavra da fase some: ela vazaria por trás do "Pausado". */
             opacity: oculto ? 0 : 1,
             ...fonte.forte,
             fontSize: 15,
-            letterSpacing: 2.7,
+            lineHeight: 20,
+            letterSpacing: 1.6,
             textTransform: "uppercase",
-            color: corMeditacao.fase,
+            color: PALETA.acao,
           }}
         >
           {rotulo}
@@ -1557,69 +1489,53 @@ function Circulo({
   );
 }
 
-/** O véu da pausa: cobre a sessão, nunca a troca — a bolha continua por baixo. */
-function VeuDaPausa({ motivo, aoContinuar }: { motivo: Pausa; aoContinuar: () => void }) {
+/**
+ * O véu da pausa: cobre o círculo, nunca os controles — o botão de continuar
+ * é o grande, no pé, onde o polegar já está.
+ */
+function VeuDaPausa({ motivo }: { motivo: Pausa }) {
+  const area = useSafeAreaInsets();
   return (
     <View
-      accessibilityViewIsModal
       style={{
         position: "absolute",
         left: 0,
         right: 0,
-        top: 0,
-        bottom: 0,
-        zIndex: 2,
+        top: -area.top,
+        bottom: -area.bottom,
         alignItems: "center",
         justifyContent: "center",
-        paddingHorizontal: espaco.xxl,
-        backgroundColor: corMeditacao.veu,
+        paddingHorizontal: margem.foco + espaco.sm,
+        paddingBottom: 96,
+        backgroundColor: comAlfa(luz.base, 0.9),
       }}
     >
-      <View
-        style={{
-          width: 56,
-          height: 56,
-          borderRadius: 28,
-          backgroundColor: corMeditacao.pausaFundo,
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Svg width={24} height={24} viewBox="0 0 24 24">
-          <Path d="M6.6 4.8h3.7v14.4H6.6zM13.7 4.8h3.7v14.4h-3.7z" fill={corMeditacao.secao} />
-        </Svg>
-      </View>
       <Text
         accessibilityRole="header"
         accessibilityLiveRegion="assertive"
         style={{
-          marginTop: espaco.lg,
-          ...fonte.media,
-          fontSize: 24,
-          lineHeight: 30,
-          color: corMeditacao.titulo,
+          ...fonte.display,
+          ...escala.titulo1,
+          letterSpacing: -0.2,
+          color: cor.texto,
         }}
       >
         Pausado
       </Text>
       <Text
         style={{
-          marginTop: 6,
+          marginTop: espaco.sm,
           maxWidth: 320,
           textAlign: "center",
           ...fonte.normal,
-          fontSize: 13,
-          lineHeight: 21,
-          color: corMeditacao.texto,
+          ...escala.legenda,
+          color: cor.textoApagado,
         }}
       >
         {motivo === "fundo"
           ? "O app saiu da tela e a sessão parou aqui. Está tudo guardado."
-          : "Sem pressa. Sua respiração espera por você."}
+          : "Sem pressa. A respiração espera por você."}
       </Text>
-      <View style={{ marginTop: 28, width: "100%", maxWidth: 320 }}>
-        <BotaoDaAtividade cor={corMeditacao.forte} rotulo="Continuar" aoTocar={aoContinuar} />
-      </View>
     </View>
   );
 }

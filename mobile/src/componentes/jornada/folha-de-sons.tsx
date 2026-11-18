@@ -1,122 +1,175 @@
-import { Modal, Pressable, ScrollView, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ofertaveis, type SomKey } from "@/lib/som-receitas";
+import { Image } from "expo-image";
+import { VolumeX } from "lucide-react-native";
+import { useEffect, useRef } from "react";
+import { Animated, Easing, Text, View } from "react-native";
+import { familiasDeSom, type SomKey } from "@/lib/som-receitas";
 import { ROTULO_DO_SOM_NO_APP } from "~/lib/jornada/sons";
-import { toque } from "~/componentes/base";
-import { EscolhaComLegenda, type PaletaDaAtividade } from "~/componentes/jornada/atividade";
-import { cor, espaco, fonte } from "~/tema";
+import { ARTE_DO_SOM } from "~/lib/audio/sons-de-fundo";
+import {
+  Ficha,
+  FolhaDaAtividade,
+  GrupoDaFolha,
+  LinhaDaFolha,
+  type PaletaDaAtividade,
+} from "~/componentes/jornada/atividade";
+import { useMovimentoReduzido } from "~/componentes/movimento";
+import { cor } from "~/tema";
 
 export type SomEscolhido = SomKey | "silencio";
 
 /**
- * A FOLHA DE SONS DENTRO DA ATIVIDADE — o mesmo sheet da Meditação e do
- * Momento com o bebê no site: troca o som NA HORA, sem sair do exercício, e
- * "desligar" fica no fim da lista, separado, para não parecer mais uma faixa.
- * A legenda de cada som não é enfeite: "Drone grave" e "Pad calmo" são a mesma
- * coisa para quem nunca ouviu os dois.
+ * A FOLHA DE SONS — a mesma da Meditação e da Carta: troca o som NA HORA, sem
+ * sair do exercício. A legenda de cada som não é enfeite: "Drone grave" e "Pad
+ * calmo" são a mesma coisa para quem nunca ouviu os dois.
+ *
+ * É a folha NATIVA do iOS (`pageSheet`, 18/11/2026): sobe com o véu e o
+ * arrastar para baixo do sistema. Os sons vêm com a ARTE de cada um (a mesma
+ * do menu, e não um emoji ao lado dela), agrupados por família, com o ✓ no
+ * marcado. "Desligar som" fica no fim, separado, para não parecer mais uma
+ * faixa.
  */
 export function FolhaDeSons({
   aberta,
   som,
   cuidado,
   paleta,
-  veu,
-  tinta,
   aoFechar,
   aoEscolher,
+  amostrando,
+  nota,
 }: {
   aberta: boolean;
   som: SomEscolhido;
   cuidado: boolean;
   paleta: PaletaDaAtividade;
-  /** O véu atrás da folha (`bg-*-900/30`). */
-  veu: string;
-  /** O título e o "Desligar som" (`text-*-500`/`*-600`). */
-  tinta: string;
   aoFechar: () => void;
   aoEscolher: (k: SomEscolhido) => void;
+  /** O som que está tocando a amostra de cinco segundos (no menu da Meditação). */
+  amostrando?: SomKey | null;
+  nota?: string;
 }) {
-  const insets = useSafeAreaInsets();
   return (
-    <Modal visible={aberta} transparent animationType="slide" onRequestClose={aoFechar}>
-      <View style={{ flex: 1, justifyContent: "flex-end" }}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Fechar"
-          onPress={aoFechar}
+    <FolhaDaAtividade
+      aberta={aberta}
+      titulo="Som de fundo"
+      paleta={paleta}
+      aoFechar={aoFechar}
+      nota={nota}
+    >
+      {familiasDeSom(cuidado).map(({ familia, sons }) => (
+        <GrupoDaFolha key={familia} titulo={familia}>
+          {sons.map((k, i) => (
+            <LinhaDaFolha
+              key={k}
+              paleta={paleta}
+              primeira={i === 0}
+              arte={<ArteDoSom som={k} />}
+              titulo={ROTULO_DO_SOM_NO_APP[k].label}
+              legenda={ROTULO_DO_SOM_NO_APP[k].sub}
+              marcada={som === k}
+              aoTocar={() => aoEscolher(k)}
+              depois={amostrando === k ? <Onda tinta={paleta.acao} /> : null}
+            />
+          ))}
+        </GrupoDaFolha>
+      ))}
+      <GrupoDaFolha>
+        <LinhaDaFolha
+          paleta={paleta}
+          primeira
+          arte={
+            <Ficha fundo={cor.apagado} tamanho={28}>
+              <VolumeX size={16} color={cor.textoApagado} strokeWidth={2.2} />
+            </Ficha>
+          }
+          titulo="Desligar som"
+          marcada={som === "silencio"}
+          aoTocar={() => aoEscolher("silencio")}
+        />
+      </GrupoDaFolha>
+    </FolhaDaAtividade>
+  );
+}
+
+/** A arte do som, 28 pt (o emoji só para o som que ainda não tem arte). */
+export function ArteDoSom({ som, tamanho = 28 }: { som: SomEscolhido; tamanho?: number }) {
+  const arte = som !== "silencio" ? ARTE_DO_SOM[som] : undefined;
+  if (arte)
+    return (
+      <Image
+        source={arte}
+        style={{ width: tamanho, height: tamanho }}
+        contentFit="contain"
+        accessible={false}
+      />
+    );
+  if (som === "silencio")
+    return <VolumeX size={tamanho * 0.7} color={cor.textoApagado} strokeWidth={2.2} />;
+  return (
+    <View style={{ width: tamanho, alignItems: "center" }}>
+      <Text style={{ fontSize: tamanho * 0.78 }}>{ROTULO_DO_SOM_NO_APP[som].emoji}</Text>
+    </View>
+  );
+}
+
+/**
+ * As três barrinhas que sobem e descem enquanto o som toca. A amostra dura
+ * cinco segundos; o que toca a noite inteira passa `voltas` e descansa (o
+ * enfeite não fica girando para sempre atrás de quem dorme).
+ */
+export function Onda({
+  tinta,
+  altura = 14,
+  voltas,
+}: {
+  tinta: string;
+  altura?: number;
+  voltas?: number;
+}) {
+  const reduzido = useMovimentoReduzido();
+  const barras = useRef([0, 1, 2].map(() => new Animated.Value(0.4))).current;
+  useEffect(() => {
+    if (reduzido) return;
+    const lacos = barras.map((b, i) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(i * 180),
+          Animated.timing(b, {
+            toValue: 1,
+            duration: 300,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+          Animated.timing(b, {
+            toValue: 0.4,
+            duration: 300,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+        ]),
+        { iterations: voltas ?? -1 },
+      ),
+    );
+    lacos.forEach((l) => l.start());
+    return () => lacos.forEach((l) => l.stop());
+  }, [barras, reduzido, voltas]);
+  return (
+    <View
+      style={{ flexDirection: "row", alignItems: "flex-end", gap: 2, height: altura }}
+      accessible={false}
+    >
+      {barras.map((b, i) => (
+        <Animated.View
+          key={i}
           style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            top: 0,
-            bottom: 0,
-            backgroundColor: veu,
+            width: 3,
+            height: altura,
+            borderRadius: 2,
+            backgroundColor: tinta,
+            transform: [{ scaleY: b }],
           }}
         />
-        <View
-          accessibilityViewIsModal
-          style={{
-            maxHeight: "82%",
-            borderTopLeftRadius: 24,
-            borderTopRightRadius: 24,
-            backgroundColor: cor.branco,
-            paddingTop: 20,
-          }}
-        >
-          <Text
-            style={{
-              textAlign: "center",
-              ...fonte.forte,
-              fontSize: 13,
-              letterSpacing: 0.65,
-              textTransform: "uppercase",
-              color: tinta,
-            }}
-          >
-            Som de fundo
-          </Text>
-          <ScrollView
-            contentContainerStyle={{
-              paddingHorizontal: espaco.xl,
-              paddingTop: espaco.lg,
-              paddingBottom: Math.max(insets.bottom, espaco.lg) + espaco.lg,
-              gap: espaco.sm,
-            }}
-          >
-            {ofertaveis(cuidado).map((k) => (
-              <EscolhaComLegenda
-                key={k}
-                paleta={paleta}
-                titulo={ROTULO_DO_SOM_NO_APP[k].label}
-                legenda={ROTULO_DO_SOM_NO_APP[k].sub}
-                ativa={som === k}
-                aoTocar={() => aoEscolher(k)}
-                antes={<Text style={{ fontSize: 20 }}>{ROTULO_DO_SOM_NO_APP[k].emoji}</Text>}
-              />
-            ))}
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => {
-                toque();
-                aoEscolher("silencio");
-              }}
-              style={({ pressed }) => ({
-                marginTop: espaco.sm,
-                minHeight: 48,
-                borderRadius: 999,
-                borderWidth: 1,
-                borderColor: paleta.borda,
-                backgroundColor: paleta.vidro,
-                alignItems: "center",
-                justifyContent: "center",
-                opacity: pressed ? 0.75 : 1,
-              })}
-            >
-              <Text style={{ ...fonte.forte, fontSize: 14, color: tinta }}>🔇 Desligar som</Text>
-            </Pressable>
-          </ScrollView>
-        </View>
-      </View>
-    </Modal>
+      ))}
+    </View>
   );
 }
