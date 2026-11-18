@@ -1,6 +1,8 @@
 import type { TipoDeReacao } from "@/lib/rede-social";
 import { router } from "expo-router";
-import { Archive, Ban, Flag } from "lucide-react-native";
+import Archive from "lucide-react-native/icons/archive";
+import Ban from "lucide-react-native/icons/ban";
+import Flag from "lucide-react-native/icons/flag";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { FolhaDeOpcoes, type Opcao } from "~/componentes/comunidade/folha";
 import type { AcoesDoPost } from "~/componentes/comunidade/post";
@@ -39,7 +41,8 @@ export function useAcoesDosPosts({
   const emCurso = useRef(new Set<string>());
 
   const trocarPost = useCallback(
-    (id: string, f: (p: PostNaTela) => PostNaTela) => mudar((ps) => ps.map((p) => (p.id === id ? f(p) : p))),
+    (id: string, f: (p: PostNaTela) => PostNaTela) =>
+      mudar((ps) => ps.map((p) => (p.id === id ? f(p) : p))),
     [mudar],
   );
 

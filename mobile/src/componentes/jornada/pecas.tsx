@@ -1,6 +1,7 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { ChevronLeft, X } from "lucide-react-native";
+import ChevronLeft from "lucide-react-native/icons/chevron-left";
+import X from "lucide-react-native/icons/x";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Animated,

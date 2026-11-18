@@ -1,5 +1,5 @@
 import { Image } from "expo-image";
-import { VolumeX } from "lucide-react-native";
+import VolumeX from "lucide-react-native/icons/volume-x";
 import { useEffect, useRef } from "react";
 import { Animated, Easing, Text, View } from "react-native";
 import { familiasDeSom, type SomKey } from "@/lib/som-receitas";

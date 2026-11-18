@@ -1,6 +1,8 @@
 import { deveVerOnboarding } from "@/lib/onboarding-da-comunidade";
 import { Redirect, router, useFocusEffect } from "expo-router";
-import { Heart, ImagePlus, Search } from "lucide-react-native";
+import Heart from "lucide-react-native/icons/heart";
+import ImagePlus from "lucide-react-native/icons/image-plus";
+import Search from "lucide-react-native/icons/search";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,

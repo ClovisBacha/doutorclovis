@@ -1,7 +1,11 @@
 import { Image } from "expo-image";
 import { useKeepAwake } from "expo-keep-awake";
 import { StatusBar } from "expo-status-bar";
-import { Hand, MessageCircle, Pause, Play, Wind } from "lucide-react-native";
+import Hand from "lucide-react-native/icons/hand";
+import MessageCircle from "lucide-react-native/icons/message-circle";
+import Pause from "lucide-react-native/icons/pause";
+import Play from "lucide-react-native/icons/play";
+import Wind from "lucide-react-native/icons/wind";
 import { memo, useEffect, useRef, useState, type ReactNode } from "react";
 import { Animated, Easing, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import Svg, { Circle, Path } from "react-native-svg";

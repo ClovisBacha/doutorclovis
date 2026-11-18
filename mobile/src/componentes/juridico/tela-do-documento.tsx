@@ -1,4 +1,4 @@
-import { Mail } from "lucide-react-native";
+import Mail from "lucide-react-native/icons/mail";
 import { useRef } from "react";
 import { Text, View, type ScrollView } from "react-native";
 import { LinhaDeAjuste, SecaoDeAjustes } from "~/componentes/ajustes";

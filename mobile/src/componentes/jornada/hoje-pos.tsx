@@ -1,17 +1,15 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import {
-  Award,
-  BookOpen,
-  CalendarHeart,
-  Check,
-  ChevronRight,
-  Flame,
-  House,
-  Moon,
-  Sparkles,
-} from "lucide-react-native";
+import Award from "lucide-react-native/icons/award";
+import BookOpen from "lucide-react-native/icons/book-open";
+import CalendarHeart from "lucide-react-native/icons/calendar-heart";
+import Check from "lucide-react-native/icons/check";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
+import Flame from "lucide-react-native/icons/flame";
+import House from "lucide-react-native/icons/house";
+import Moon from "lucide-react-native/icons/moon";
+import Sparkles from "lucide-react-native/icons/sparkles";
 import { Fragment, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { Animated, Pressable, StyleSheet, Text, View, type ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";

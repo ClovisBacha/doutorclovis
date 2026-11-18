@@ -1,13 +1,11 @@
 import { router } from "expo-router";
-import {
-  CalendarPlus,
-  ChevronRight,
-  FlaskConical,
-  Pin,
-  ScanLine,
-  Stethoscope,
-  Syringe,
-} from "lucide-react-native";
+import CalendarPlus from "lucide-react-native/icons/calendar-plus";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
+import FlaskConical from "lucide-react-native/icons/flask-conical";
+import Pin from "lucide-react-native/icons/pin";
+import ScanLine from "lucide-react-native/icons/scan-line";
+import Stethoscope from "lucide-react-native/icons/stethoscope";
+import Syringe from "lucide-react-native/icons/syringe";
 import { useEffect, useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Grupo, type IconeDaLinha } from "~/componentes/ajustes";

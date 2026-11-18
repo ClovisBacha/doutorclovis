@@ -1,4 +1,4 @@
-import { Check } from "lucide-react-native";
+import Check from "lucide-react-native/icons/check";
 import { useEffect, useRef } from "react";
 import { Animated, Pressable, Text, View, type LayoutChangeEvent } from "react-native";
 import { selecao } from "~/componentes/base";

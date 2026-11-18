@@ -1,14 +1,12 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import {
-  Bell,
-  BellOff,
-  CalendarPlus,
-  MapPin,
-  NotebookPen,
-  Plus,
-  Settings,
-} from "lucide-react-native";
+import Bell from "lucide-react-native/icons/bell";
+import BellOff from "lucide-react-native/icons/bell-off";
+import CalendarPlus from "lucide-react-native/icons/calendar-plus";
+import MapPin from "lucide-react-native/icons/map-pin";
+import NotebookPen from "lucide-react-native/icons/notebook-pen";
+import Plus from "lucide-react-native/icons/plus";
+import Settings from "lucide-react-native/icons/settings";
 import { useEffect, useMemo, useState } from "react";
 import { Linking, Platform, Text, View } from "react-native";
 import { LinhaDeAjuste, SecaoDeAjustes } from "~/componentes/ajustes";

@@ -1,5 +1,8 @@
 import { Image, type ImageSource } from "expo-image";
-import { Check, ChevronRight, Lock, Play } from "lucide-react-native";
+import Check from "lucide-react-native/icons/check";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
+import Lock from "lucide-react-native/icons/lock";
+import Play from "lucide-react-native/icons/play";
 import { memo, useMemo, type ReactNode } from "react";
 import { Animated, Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
 import Svg, { Circle, Defs, Path, RadialGradient, Stop } from "react-native-svg";

@@ -1,7 +1,10 @@
 import { trimesterForWeek } from "@/lib/gestacao";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { CalendarHeart, HeartHandshake, Ruler, Weight } from "lucide-react-native";
+import CalendarHeart from "lucide-react-native/icons/calendar-heart";
+import HeartHandshake from "lucide-react-native/icons/heart-handshake";
+import Ruler from "lucide-react-native/icons/ruler";
+import Weight from "lucide-react-native/icons/weight";
 import { memo, useEffect, useRef, type ReactNode } from "react";
 import {
   Animated,
@@ -168,9 +171,7 @@ export const BebeNestaSemana = memo(function BebeNestaSemana({
           <Text style={{ ...fonte.media, ...escala.nota, color: cor.textoApagado }}>
             Do tamanho de
           </Text>
-          <Text style={{ ...fonte.forte, ...escala.titulo3, color: cor.texto }}>
-            {bebe.fruit}
-          </Text>
+          <Text style={{ ...fonte.forte, ...escala.titulo3, color: cor.texto }}>{bebe.fruit}</Text>
           <Text style={{ marginTop: 3, ...fonte.normal, ...escala.legenda, color: cor.textoCorpo }}>
             {semGeneroDoBebe(bebe.desc)}
           </Text>

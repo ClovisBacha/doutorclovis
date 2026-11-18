@@ -1,4 +1,5 @@
-import { Check, ChevronRight } from "lucide-react-native";
+import Check from "lucide-react-native/icons/check";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
 import { type ComponentType, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { toque } from "~/componentes/base";

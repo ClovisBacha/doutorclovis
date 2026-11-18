@@ -1,6 +1,9 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { ChevronRight, Share, Sprout, Trophy } from "lucide-react-native";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
+import Share from "lucide-react-native/icons/share";
+import Sprout from "lucide-react-native/icons/sprout";
+import Trophy from "lucide-react-native/icons/trophy";
 import { useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -16,18 +19,7 @@ import {
   nascimentoPorExtenso,
   type DadosDoNascimento,
 } from "~/lib/jornada/pos-parto";
-import {
-  canto,
-  cor,
-  curva,
-  escala,
-  espaco,
-  fonte,
-  luz,
-  margem,
-  ouro,
-  sombra,
-} from "~/tema";
+import { canto, cor, curva, escala, espaco, fonte, luz, margem, ouro, sombra } from "~/tema";
 
 /**
  * A CHEGADA DO BEBÊ — a festa que abre uma vez depois de ela contar o
@@ -260,8 +252,8 @@ export function FestaDoNascimento({
                 A gestação completa
               </Text>
               <Text style={{ ...fonte.media, ...escala.legenda, color: cor.atencaoTexto }}>
-                {diasCompletos} {diasCompletos === 1 ? "dia" : "dias"} de cuidado ·{" "}
-                {figurinhas} {figurinhas === 1 ? "figurinha" : "figurinhas"}
+                {diasCompletos} {diasCompletos === 1 ? "dia" : "dias"} de cuidado · {figurinhas}{" "}
+                {figurinhas === 1 ? "figurinha" : "figurinhas"}
               </Text>
               <Text style={{ ...fonte.normal, ...escala.nota, color: cor.atencaoTexto }}>
                 O álbum da gestação fica guardado para sempre.

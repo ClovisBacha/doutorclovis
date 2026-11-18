@@ -1,6 +1,10 @@
 import { trimesterForWeek } from "@/lib/gestacao";
 import { Image } from "expo-image";
-import { Flame, Hourglass, Ruler, Undo2, Weight } from "lucide-react-native";
+import Flame from "lucide-react-native/icons/flame";
+import Hourglass from "lucide-react-native/icons/hourglass";
+import Ruler from "lucide-react-native/icons/ruler";
+import Undo2 from "lucide-react-native/icons/undo-2";
+import Weight from "lucide-react-native/icons/weight";
 import {
   memo,
   useCallback,
@@ -501,7 +505,9 @@ export const CeuDoBebe = memo(function CeuDoBebe({
             <>
               <Selo>{`${trimesterForWeek(vista)}º trimestre`}</Selo>
               {semData ? null : (
-                <Selo>{vista === semana ? "Esta semana" : vista < semana ? "Já passou" : "Vem aí"}</Selo>
+                <Selo>
+                  {vista === semana ? "Esta semana" : vista < semana ? "Já passou" : "Vem aí"}
+                </Selo>
               )}
               {viajando && !semData ? <SeloDeHoje aoTocar={voltarParaHoje} /> : null}
             </>

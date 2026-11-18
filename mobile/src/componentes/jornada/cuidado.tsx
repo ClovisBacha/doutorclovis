@@ -1,7 +1,12 @@
 import { diaLocalDe, periodoDaHora } from "@/lib/frases-do-mascote";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { CalendarDays, Check, ChevronRight, PenLine, Phone, Wind } from "lucide-react-native";
+import CalendarDays from "lucide-react-native/icons/calendar-days";
+import Check from "lucide-react-native/icons/check";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
+import PenLine from "lucide-react-native/icons/pen-line";
+import Phone from "lucide-react-native/icons/phone";
+import Wind from "lucide-react-native/icons/wind";
 import { useEffect, useRef, type ComponentType, type ReactNode } from "react";
 import { Animated, Easing, Pressable, StyleSheet, Text, View } from "react-native";
 import { AvisoMedico } from "~/componentes/aviso-medico";

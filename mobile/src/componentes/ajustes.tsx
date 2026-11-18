@@ -1,5 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { ChevronRight } from "lucide-react-native";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
 import {
   Children,
   Fragment,

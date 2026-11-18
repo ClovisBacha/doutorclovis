@@ -1,7 +1,11 @@
 import { Image } from "expo-image";
 import { useKeepAwake } from "expo-keep-awake";
 import { StatusBar } from "expo-status-bar";
-import { ChevronRight, Pause, Play, Square, Timer } from "lucide-react-native";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
+import Pause from "lucide-react-native/icons/pause";
+import Play from "lucide-react-native/icons/play";
+import Square from "lucide-react-native/icons/square";
+import Timer from "lucide-react-native/icons/timer";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Animated, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";

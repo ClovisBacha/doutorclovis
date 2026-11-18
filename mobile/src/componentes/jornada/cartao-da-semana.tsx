@@ -1,6 +1,8 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { Flame, Hourglass, Star } from "lucide-react-native";
+import Flame from "lucide-react-native/icons/flame";
+import Hourglass from "lucide-react-native/icons/hourglass";
+import Star from "lucide-react-native/icons/star";
 import { memo, useState, type ReactNode } from "react";
 import { Text, View } from "react-native";
 import { bebeDaSemana } from "~/lib/bebe-da-semana";

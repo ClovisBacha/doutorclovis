@@ -1,5 +1,5 @@
 import { Image } from "expo-image";
-import { Sprout } from "lucide-react-native";
+import Sprout from "lucide-react-native/icons/sprout";
 import { useEffect, useRef, useState } from "react";
 import { Animated, Modal, StyleSheet, Text, View } from "react-native";
 import { Botao, Sobrelinha, sucesso } from "~/componentes/base";
@@ -12,17 +12,7 @@ import { useMovimentoReduzido } from "~/componentes/movimento";
 import { bebeDaSemana } from "~/lib/bebe-da-semana";
 import { cartaoDoMarco } from "~/lib/jornada/cartoes";
 import type { Festa, Marco } from "~/lib/jornada/marcos";
-import {
-  canto,
-  cor,
-  curva,
-  escala,
-  espaco,
-  fonte,
-  fonteDoNumero,
-  sombras,
-  veu,
-} from "~/tema";
+import { canto, cor, curva, escala, espaco, fonte, fonteDoNumero, sombras, veu } from "~/tema";
 
 /** O recém-nascido (o mesmo da festa e da porta do nascimento). */
 const RECEM_NASCIDO = require("../../../../src/assets/bebe/semana.webp");

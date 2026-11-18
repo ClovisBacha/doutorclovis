@@ -1,7 +1,11 @@
 import { veuDoPost } from "@/lib/conteudo-sensivel";
 import { Image } from "expo-image";
 import { Redirect, router, useLocalSearchParams } from "expo-router";
-import { Ban, EyeOff, Flag, Images, MoreHorizontal } from "lucide-react-native";
+import Ban from "lucide-react-native/icons/ban";
+import EyeOff from "lucide-react-native/icons/eye-off";
+import Flag from "lucide-react-native/icons/flag";
+import Images from "lucide-react-native/icons/images";
+import MoreHorizontal from "lucide-react-native/icons/ellipsis";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,

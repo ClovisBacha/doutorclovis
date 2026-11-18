@@ -1,5 +1,6 @@
 import { useLocalSearchParams } from "expo-router";
-import { Volume2, VolumeX } from "lucide-react-native";
+import Volume2 from "lucide-react-native/icons/volume-2";
+import VolumeX from "lucide-react-native/icons/volume-x";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Animated,

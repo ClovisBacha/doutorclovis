@@ -1,7 +1,8 @@
 import { LIMITE_DO_TEXTO, VISIBILIDADES, type Visibilidade } from "@/lib/rede-social";
 import { Image } from "expo-image";
 import { useRef, useState, type ReactNode } from "react";
-import { Check, Share as IconeDeCompartilhar } from "lucide-react-native";
+import Check from "lucide-react-native/icons/check";
+import IconeDeCompartilhar from "lucide-react-native/icons/share";
 import {
   KeyboardAvoidingView,
   Platform,

@@ -1,5 +1,11 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { Check, Flame, Gift, Heart, Sprout, Star, Trophy } from "lucide-react-native";
+import Check from "lucide-react-native/icons/check";
+import Flame from "lucide-react-native/icons/flame";
+import Gift from "lucide-react-native/icons/gift";
+import Heart from "lucide-react-native/icons/heart";
+import Sprout from "lucide-react-native/icons/sprout";
+import Star from "lucide-react-native/icons/star";
+import Trophy from "lucide-react-native/icons/trophy";
 import type { ReactNode } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { corCaminho } from "~/componentes/caminho/cores";

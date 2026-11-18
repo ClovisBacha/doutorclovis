@@ -1,5 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { Share as IconeDeCompartilhar } from "lucide-react-native";
+import IconeDeCompartilhar from "lucide-react-native/icons/share";
 import { useState } from "react";
 import { Animated, Pressable, Text, View } from "react-native";
 import { toque } from "~/componentes/base";

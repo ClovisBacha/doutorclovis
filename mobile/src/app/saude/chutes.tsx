@@ -4,17 +4,13 @@ import type { SessaoDeChutes } from "@/lib/serie-de-chutes";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Redirect } from "expo-router";
-import { CloudOff, Minus, Phone } from "lucide-react-native";
+import CloudOff from "lucide-react-native/icons/cloud-off";
+import Minus from "lucide-react-native/icons/minus";
+import Phone from "lucide-react-native/icons/phone";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Pressable, Text, View } from "react-native";
 import { Grupo, Ladrilho, Seta } from "~/componentes/ajustes";
-import {
-  Botao,
-  Carregando,
-  NaoConsegueLer,
-  TituloDaSecao,
-  toque,
-} from "~/componentes/base";
+import { Botao, Carregando, NaoConsegueLer, TituloDaSecao, toque } from "~/componentes/base";
 import { BotaoDeVidro, TelaDaPilha } from "~/componentes/cabecalho";
 import { useAviso } from "~/componentes/comunidade/folha";
 import { useMovimentoReduzido } from "~/componentes/movimento";
@@ -236,11 +232,7 @@ export default function Chutes() {
   return (
     <TelaDaPilha titulo="Movimentos do bebê" voltarPara="/inicio" sobre={aviso.elemento}>
       <View style={{ alignItems: "center", gap: espaco.md, paddingTop: espaco.sm }}>
-        <Circulo
-          contagem={emCurso?.count ?? null}
-          aoComecar={comecar}
-          aoSomar={() => somar(1)}
-        />
+        <Circulo contagem={emCurso?.count ?? null} aoComecar={comecar} aoSomar={() => somar(1)} />
         {emCurso ? (
           <>
             <Text
@@ -392,10 +384,14 @@ function Circulo({
         }
         onPressIn={afundar}
         onPressOut={soltar}
-        onPress={contando ? aoSomar : () => {
-          toque();
-          aoComecar();
-        }}
+        onPress={
+          contando
+            ? aoSomar
+            : () => {
+                toque();
+                aoComecar();
+              }
+        }
       >
         <Animated.View
           style={{
@@ -593,10 +589,7 @@ function LinhaDoSos() {
           <Text style={{ ...fonte.normal, ...escala.legenda, color: cor.texto }}>
             Sentiu o bebê diferente?
           </Text>
-          <Text
-            numberOfLines={1}
-            style={{ ...fonte.forte, ...escala.legenda, color: cor.urgente }}
-          >
+          <Text numberOfLines={1} style={{ ...fonte.forte, ...escala.legenda, color: cor.urgente }}>
             {ROTULO_DO_SOCORRO}
           </Text>
         </View>

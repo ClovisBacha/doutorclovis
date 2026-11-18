@@ -1,15 +1,13 @@
 import * as Haptics from "expo-haptics";
 import { useKeepAwake } from "expo-keep-awake";
-import {
-  BatteryLow,
-  BedDouble,
-  Hand,
-  Phone,
-  Play,
-  SkipForward,
-  Sparkles,
-  Zap,
-} from "lucide-react-native";
+import BatteryLow from "lucide-react-native/icons/battery-low";
+import BedDouble from "lucide-react-native/icons/bed-double";
+import Hand from "lucide-react-native/icons/hand";
+import Phone from "lucide-react-native/icons/phone";
+import Play from "lucide-react-native/icons/play";
+import SkipForward from "lucide-react-native/icons/skip-forward";
+import Sparkles from "lucide-react-native/icons/sparkles";
+import Zap from "lucide-react-native/icons/zap";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Animated,

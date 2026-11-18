@@ -8,16 +8,14 @@ import {
   totalDeReacoes,
   type TipoDeReacao,
 } from "@/lib/rede-social";
-import {
-  Bookmark,
-  EyeOff,
-  Globe,
-  Heart,
-  Lock,
-  MessageCircle,
-  MoreHorizontal,
-  Users,
-} from "lucide-react-native";
+import Bookmark from "lucide-react-native/icons/bookmark";
+import EyeOff from "lucide-react-native/icons/eye-off";
+import Globe from "lucide-react-native/icons/globe";
+import Heart from "lucide-react-native/icons/heart";
+import Lock from "lucide-react-native/icons/lock";
+import MessageCircle from "lucide-react-native/icons/message-circle";
+import MoreHorizontal from "lucide-react-native/icons/ellipsis";
+import Users from "lucide-react-native/icons/users";
 import { memo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { toque } from "~/componentes/base";

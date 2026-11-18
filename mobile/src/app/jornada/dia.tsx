@@ -1,6 +1,8 @@
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
-import { Check, ChevronLeft, ChevronRight } from "lucide-react-native";
+import Check from "lucide-react-native/icons/check";
+import ChevronLeft from "lucide-react-native/icons/chevron-left";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
 import { useEffect, useState, type ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";

@@ -1,5 +1,6 @@
 import { router, type Href } from "expo-router";
-import { ChevronLeft, X } from "lucide-react-native";
+import ChevronLeft from "lucide-react-native/icons/chevron-left";
+import X from "lucide-react-native/icons/x";
 import { useRef, type ReactNode, type Ref } from "react";
 import {
   ActivityIndicator,

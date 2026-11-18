@@ -1,7 +1,8 @@
 import * as Haptics from "expo-haptics";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
-import { Sprout, Target } from "lucide-react-native";
+import Sprout from "lucide-react-native/icons/sprout";
+import Target from "lucide-react-native/icons/target";
 import {
   Animated,
   Modal,

@@ -1,11 +1,9 @@
-import {
-  Check,
-  ChevronRight,
-  Ellipsis,
-  Heart,
-  Send,
-  Share as IconeDeCompartilhar,
-} from "lucide-react-native";
+import Check from "lucide-react-native/icons/check";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
+import Ellipsis from "lucide-react-native/icons/ellipsis";
+import Heart from "lucide-react-native/icons/heart";
+import Send from "lucide-react-native/icons/send";
+import IconeDeCompartilhar from "lucide-react-native/icons/share";
 import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ActionSheetIOS,

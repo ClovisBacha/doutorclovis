@@ -1,5 +1,9 @@
 import { router } from "expo-router";
-import { Download, Gamepad2, HeartPulse, Users, type LucideIcon } from "lucide-react-native";
+import type { LucideIcon } from "lucide-react-native";
+import Download from "lucide-react-native/icons/download";
+import Gamepad2 from "lucide-react-native/icons/gamepad-2";
+import HeartPulse from "lucide-react-native/icons/heart-pulse";
+import Users from "lucide-react-native/icons/users";
 import { useRef, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";

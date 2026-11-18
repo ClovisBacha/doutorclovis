@@ -1,6 +1,7 @@
 import { TITULO_DO_SOCORRO } from "@/lib/socorro-na-nutricao";
 import { router } from "expo-router";
-import { Phone, Siren } from "lucide-react-native";
+import Phone from "lucide-react-native/icons/phone";
+import Siren from "lucide-react-native/icons/siren";
 import { Linking, View } from "react-native";
 import { Botao, Cartao, T } from "~/componentes/base";
 import { SAMU } from "~/config";

@@ -1,5 +1,6 @@
 import { useLocalSearchParams } from "expo-router";
-import { BellOff, Settings } from "lucide-react-native";
+import BellOff from "lucide-react-native/icons/bell-off";
+import Settings from "lucide-react-native/icons/settings";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,

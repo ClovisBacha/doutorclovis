@@ -1,5 +1,6 @@
 import { useFocusEffect } from "expo-router";
-import { ChevronRight, UserPlus } from "lucide-react-native";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
+import UserPlus from "lucide-react-native/icons/user-plus";
 import { useCallback, useRef, useState } from "react";
 import { Text, View } from "react-native";
 import { Tocavel } from "~/componentes/base";

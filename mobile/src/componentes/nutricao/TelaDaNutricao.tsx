@@ -6,7 +6,12 @@ import { recadoDaAmostraNoApp, recadoDoBloqueioNoApp } from "~/lib/nutricao/reca
 import { pedeSocorro } from "@/lib/socorro-na-nutricao";
 import * as ImagePicker from "expo-image-picker";
 import { Redirect, router } from "expo-router";
-import { ArrowUp, Camera, Phone, ScanText, ShieldCheck, X } from "lucide-react-native";
+import ArrowUp from "lucide-react-native/icons/arrow-up";
+import Camera from "lucide-react-native/icons/camera";
+import Phone from "lucide-react-native/icons/phone";
+import ScanText from "lucide-react-native/icons/scan-text";
+import ShieldCheck from "lucide-react-native/icons/shield-check";
+import X from "lucide-react-native/icons/x";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   AccessibilityInfo,

@@ -1,5 +1,8 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { Check, ChevronLeft, ChevronRight, Lock } from "lucide-react-native";
+import Check from "lucide-react-native/icons/check";
+import ChevronLeft from "lucide-react-native/icons/chevron-left";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
+import Lock from "lucide-react-native/icons/lock";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,

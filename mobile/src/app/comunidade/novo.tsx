@@ -2,17 +2,15 @@ import { MOTIVOS_SENSIVEIS } from "@/lib/conteudo-sensivel";
 import { LIMITE_DO_TEXTO, VISIBILIDADES, type Visibilidade } from "@/lib/rede-social";
 import { Image } from "expo-image";
 import { Redirect, router } from "expo-router";
-import {
-  Camera,
-  Check,
-  ChevronDown,
-  ChevronUp,
-  Globe,
-  ImagePlus,
-  Lock,
-  Users,
-  X,
-} from "lucide-react-native";
+import Camera from "lucide-react-native/icons/camera";
+import Check from "lucide-react-native/icons/check";
+import ChevronDown from "lucide-react-native/icons/chevron-down";
+import ChevronUp from "lucide-react-native/icons/chevron-up";
+import Globe from "lucide-react-native/icons/globe";
+import ImagePlus from "lucide-react-native/icons/image-plus";
+import Lock from "lucide-react-native/icons/lock";
+import Users from "lucide-react-native/icons/users";
+import X from "lucide-react-native/icons/x";
 import { useEffect, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,

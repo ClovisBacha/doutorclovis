@@ -1,6 +1,11 @@
 import { Redirect, router, Tabs, useIsFocused } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { Baby, House, MessageCircleHeart, Route, Sun, Users } from "lucide-react-native";
+import Baby from "lucide-react-native/icons/baby";
+import House from "lucide-react-native/icons/house";
+import MessageCircleHeart from "lucide-react-native/icons/message-circle-heart";
+import Route from "lucide-react-native/icons/route";
+import Sun from "lucide-react-native/icons/sun";
+import Users from "lucide-react-native/icons/users";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Animated, AppState, Easing, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";

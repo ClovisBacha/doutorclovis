@@ -1,4 +1,4 @@
-import { Check } from "lucide-react-native";
+import Check from "lucide-react-native/icons/check";
 import type { ReactNode } from "react";
 import { Text, View } from "react-native";
 import { T } from "~/componentes/base";

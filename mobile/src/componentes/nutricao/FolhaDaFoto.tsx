@@ -1,5 +1,6 @@
 import type { AssuntoDaFoto } from "@/lib/foto-da-nutricao";
-import { Camera, ImagePlus } from "lucide-react-native";
+import Camera from "lucide-react-native/icons/camera";
+import ImagePlus from "lucide-react-native/icons/image-plus";
 import { Modal, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Botao, T } from "~/componentes/base";

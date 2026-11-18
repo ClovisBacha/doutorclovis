@@ -1,4 +1,6 @@
-import { Check, ShieldCheck, Sparkles } from "lucide-react-native";
+import Check from "lucide-react-native/icons/check";
+import ShieldCheck from "lucide-react-native/icons/shield-check";
+import Sparkles from "lucide-react-native/icons/sparkles";
 import { useCallback, useEffect, useState } from "react";
 import { Modal, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";

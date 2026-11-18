@@ -1,6 +1,7 @@
 import { useNavigation } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
-import { ArrowDown, ArrowUp } from "lucide-react-native";
+import ArrowDown from "lucide-react-native/icons/arrow-down";
+import ArrowUp from "lucide-react-native/icons/arrow-up";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,

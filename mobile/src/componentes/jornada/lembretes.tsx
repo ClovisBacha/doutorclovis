@@ -1,5 +1,7 @@
 import { useFocusEffect } from "expo-router";
-import { Bell, ChevronRight, X } from "lucide-react-native";
+import Bell from "lucide-react-native/icons/bell";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
+import X from "lucide-react-native/icons/x";
 import { useCallback, useEffect, useState } from "react";
 import { Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Botao, selecao, toque } from "~/componentes/base";

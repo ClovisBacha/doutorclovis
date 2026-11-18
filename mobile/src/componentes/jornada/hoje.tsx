@@ -13,7 +13,10 @@ import {
   type ScrollView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Check, ChevronRight, Flame, Play } from "lucide-react-native";
+import Check from "lucide-react-native/icons/check";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
+import Flame from "lucide-react-native/icons/flame";
+import Play from "lucide-react-native/icons/play";
 import Svg, { Circle, Text as SvgText } from "react-native-svg";
 import {
   Sobrelinha,

@@ -1,5 +1,8 @@
 import { Image } from "expo-image";
-import { Check, Lock, Sparkles, Trophy } from "lucide-react-native";
+import Check from "lucide-react-native/icons/check";
+import Lock from "lucide-react-native/icons/lock";
+import Sparkles from "lucide-react-native/icons/sparkles";
+import Trophy from "lucide-react-native/icons/trophy";
 import {
   memo,
   useCallback,

@@ -1,7 +1,7 @@
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { Lock } from "lucide-react-native";
+import Lock from "lucide-react-native/icons/lock";
 import type { ReactNode } from "react";
 import { ActivityIndicator, Animated, Platform, Pressable, Text, View } from "react-native";
 import type { Raridade } from "@/lib/conquistas";

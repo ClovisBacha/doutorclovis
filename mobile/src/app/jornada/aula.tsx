@@ -2,7 +2,11 @@ import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
-import { BookOpen, Check, Lightbulb, ListChecks, X } from "lucide-react-native";
+import BookOpen from "lucide-react-native/icons/book-open";
+import Check from "lucide-react-native/icons/check";
+import Lightbulb from "lucide-react-native/icons/lightbulb";
+import ListChecks from "lucide-react-native/icons/list-checks";
+import X from "lucide-react-native/icons/x";
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import {
   AccessibilityInfo,

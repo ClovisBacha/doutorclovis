@@ -1,7 +1,9 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams } from "expo-router";
-import { Baby, ChevronLeft, Ellipsis } from "lucide-react-native";
+import Baby from "lucide-react-native/icons/baby";
+import ChevronLeft from "lucide-react-native/icons/chevron-left";
+import Ellipsis from "lucide-react-native/icons/ellipsis";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Animated, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";

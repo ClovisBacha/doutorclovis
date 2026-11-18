@@ -1,5 +1,8 @@
 import { router, useFocusEffect } from "expo-router";
-import { Award, PenLine, Wind, X } from "lucide-react-native";
+import Award from "lucide-react-native/icons/award";
+import PenLine from "lucide-react-native/icons/pen-line";
+import Wind from "lucide-react-native/icons/wind";
+import X from "lucide-react-native/icons/x";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";

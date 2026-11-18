@@ -1,4 +1,4 @@
-import { ShieldCheck } from "lucide-react-native";
+import ShieldCheck from "lucide-react-native/icons/shield-check";
 import { Text, View } from "react-native";
 import { AVISO_MEDICO } from "~/lib/aviso-medico";
 import { cor, escala, espaco, fonte } from "~/tema";
@@ -37,7 +37,9 @@ export function AvisoMedico({ curto = false }: { curto?: boolean }) {
           {AVISO_MEDICO.titulo}
         </Text>
       </View>
-      <Text style={{ ...fonte.normal, ...escala.nota, color: cor.textoApagado, textAlign: "center" }}>
+      <Text
+        style={{ ...fonte.normal, ...escala.nota, color: cor.textoApagado, textAlign: "center" }}
+      >
         {AVISO_MEDICO.completo}
       </Text>
     </View>

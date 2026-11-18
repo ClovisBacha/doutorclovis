@@ -2,7 +2,11 @@ import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { AlertCircle, Check, ChevronLeft, Eye, EyeOff } from "lucide-react-native";
+import AlertCircle from "lucide-react-native/icons/circle-alert";
+import Check from "lucide-react-native/icons/check";
+import ChevronLeft from "lucide-react-native/icons/chevron-left";
+import Eye from "lucide-react-native/icons/eye";
+import EyeOff from "lucide-react-native/icons/eye-off";
 import {
   createContext,
   useCallback,

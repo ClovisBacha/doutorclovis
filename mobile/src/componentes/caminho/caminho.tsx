@@ -1,4 +1,4 @@
-import { ShieldCheck } from "lucide-react-native";
+import ShieldCheck from "lucide-react-native/icons/shield-check";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Animated,

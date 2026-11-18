@@ -2,7 +2,12 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { Check, ChevronLeft, ChevronRight, Pause, Play, X } from "lucide-react-native";
+import Check from "lucide-react-native/icons/check";
+import ChevronLeft from "lucide-react-native/icons/chevron-left";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
+import Pause from "lucide-react-native/icons/pause";
+import Play from "lucide-react-native/icons/play";
+import X from "lucide-react-native/icons/x";
 import { memo, useEffect, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,

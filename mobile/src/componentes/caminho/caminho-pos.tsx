@@ -1,4 +1,7 @@
-import { Baby, Check, Circle, Sticker } from "lucide-react-native";
+import Baby from "lucide-react-native/icons/baby";
+import Check from "lucide-react-native/icons/check";
+import Circle from "lucide-react-native/icons/circle";
+import Sticker from "lucide-react-native/icons/sticker";
 import { memo, useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import { FlatList, Text, View } from "react-native";
 import { useAviso } from "~/componentes/aviso";

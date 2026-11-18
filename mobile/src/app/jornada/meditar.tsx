@@ -3,7 +3,13 @@ import { Image } from "expo-image";
 import { useKeepAwake } from "expo-keep-awake";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { Bell, ChevronDown, ChevronRight, Play, Volume2, VolumeX, X } from "lucide-react-native";
+import Bell from "lucide-react-native/icons/bell";
+import ChevronDown from "lucide-react-native/icons/chevron-down";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
+import Play from "lucide-react-native/icons/play";
+import Volume2 from "lucide-react-native/icons/volume-2";
+import VolumeX from "lucide-react-native/icons/volume-x";
+import X from "lucide-react-native/icons/x";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Animated,

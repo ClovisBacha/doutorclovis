@@ -1,5 +1,11 @@
 import { router } from "expo-router";
-import { BellOff, BellRing, CalendarDays, Clock, Settings, Sprout, Wind } from "lucide-react-native";
+import BellOff from "lucide-react-native/icons/bell-off";
+import BellRing from "lucide-react-native/icons/bell-ring";
+import CalendarDays from "lucide-react-native/icons/calendar-days";
+import Clock from "lucide-react-native/icons/clock";
+import Settings from "lucide-react-native/icons/settings";
+import Sprout from "lucide-react-native/icons/sprout";
+import Wind from "lucide-react-native/icons/wind";
 import { useState } from "react";
 import { Linking, Platform, Switch } from "react-native";
 import { LinhaDeAjuste, RodapeDoGrupo, SecaoDeAjustes } from "~/componentes/ajustes";
@@ -94,7 +100,9 @@ export default function Lembretes() {
           titulo={cuidado ? "Um minuto para você" : "O cuidado de hoje"}
           direita={
             <Switch
-              accessibilityLabel={cuidado ? "Lembrete de um minuto para você" : "Lembrete do cuidado de hoje"}
+              accessibilityLabel={
+                cuidado ? "Lembrete de um minuto para você" : "Lembrete do cuidado de hoje"
+              }
               value={!!pref.hora}
               onValueChange={(on) => {
                 selecao();

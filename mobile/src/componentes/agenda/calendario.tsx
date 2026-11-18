@@ -1,4 +1,5 @@
-import { ChevronLeft, ChevronRight } from "lucide-react-native";
+import ChevronLeft from "lucide-react-native/icons/chevron-left";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
 import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { selecao } from "~/componentes/base";
@@ -77,7 +78,11 @@ export function CalendarioDoMes({
       ]}
     >
       <View style={{ flexDirection: "row", alignItems: "center" }}>
-        <SetaDoMes rotulo="Mês anterior" tinta={tinta} aoTocar={() => aoMudarMes(somarMes(mes, -1))}>
+        <SetaDoMes
+          rotulo="Mês anterior"
+          tinta={tinta}
+          aoTocar={() => aoMudarMes(somarMes(mes, -1))}
+        >
           <ChevronLeft size={22} strokeWidth={2.4} color={tinta} />
         </SetaDoMes>
         <Text

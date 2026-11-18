@@ -1,7 +1,8 @@
 import { ROTULO_DO_FILTRO, VAZIO_DO_FILTRO } from "@/lib/fase-parecida";
 import { MINIMO_DA_BUSCA } from "@/lib/rede-social";
 import { Redirect, router, useLocalSearchParams } from "expo-router";
-import { Search, X } from "lucide-react-native";
+import Search from "lucide-react-native/icons/search";
+import X from "lucide-react-native/icons/x";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FlatList, Pressable, ScrollView, Switch, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";

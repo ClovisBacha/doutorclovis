@@ -13,7 +13,10 @@ import {
 import Svg, { Circle, Defs, RadialGradient, Stop } from "react-native-svg";
 import { CANTINHO_BY_ID, escalaDaArvore, faseDoDiaNoite, type CantinhoType } from "@/lib/cantinho";
 import { climasAtivos, particulasDe, type Particula } from "@/lib/clima-do-cantinho";
-import { MoveDiagonal2, Pencil, Undo2, X } from "lucide-react-native";
+import MoveDiagonal2 from "lucide-react-native/icons/move-diagonal-2";
+import Pencil from "lucide-react-native/icons/pencil";
+import Undo2 from "lucide-react-native/icons/undo-2";
+import X from "lucide-react-native/icons/x";
 import { Botao, toque, Tocavel, useFolgaDaBarra } from "~/componentes/base";
 import { Vidro } from "~/componentes/vidro";
 import { corCaminho } from "~/componentes/caminho/cores";

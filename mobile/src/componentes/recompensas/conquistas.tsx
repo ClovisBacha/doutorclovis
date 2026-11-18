@@ -1,4 +1,4 @@
-import { Sparkles } from "lucide-react-native";
+import Sparkles from "lucide-react-native/icons/sparkles";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, Modal, Pressable, Text, View, useWindowDimensions } from "react-native";
 import Svg, { Circle } from "react-native-svg";

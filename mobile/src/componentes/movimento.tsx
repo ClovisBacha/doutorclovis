@@ -1,7 +1,7 @@
 import { DeviceMotion } from "expo-sensors";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { Flame } from "lucide-react-native";
+import Flame from "lucide-react-native/icons/flame";
 import { useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   AccessibilityInfo,

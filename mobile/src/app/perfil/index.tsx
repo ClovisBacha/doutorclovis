@@ -1,15 +1,13 @@
 import Constants from "expo-constants";
 import { router, useFocusEffect } from "expo-router";
-import {
-  Ban,
-  Bell,
-  Download,
-  FileText,
-  Feather,
-  HeartPulse,
-  Lock,
-  Mail,
-} from "lucide-react-native";
+import Ban from "lucide-react-native/icons/ban";
+import Bell from "lucide-react-native/icons/bell";
+import Download from "lucide-react-native/icons/download";
+import FileText from "lucide-react-native/icons/file-text";
+import Feather from "lucide-react-native/icons/feather";
+import HeartPulse from "lucide-react-native/icons/heart-pulse";
+import Lock from "lucide-react-native/icons/lock";
+import Mail from "lucide-react-native/icons/mail";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Platform, Text, View } from "react-native";
 import { LinhaDeAjuste, SecaoDeAjustes } from "~/componentes/ajustes";
@@ -134,10 +132,14 @@ export default function Perfil() {
       );
       return;
     }
-    Alert.alert("Desligar o Modo Cuidado?", "O app volta a mostrar o bebê, a semana e as contagens.", [
-      { text: "Agora não", style: "cancel" },
-      { text: "Desligar", onPress: () => void trocarCuidado(false) },
-    ]);
+    Alert.alert(
+      "Desligar o Modo Cuidado?",
+      "O app volta a mostrar o bebê, a semana e as contagens.",
+      [
+        { text: "Agora não", style: "cancel" },
+        { text: "Desligar", onPress: () => void trocarCuidado(false) },
+      ],
+    );
   }
 
   /** A conta sai do aparelho: os rastros locais, o perfil e os selos da memória. */

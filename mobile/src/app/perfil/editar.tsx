@@ -1,14 +1,11 @@
 import { HANDLE_MAX, normalizarHandle, recusaDoHandle } from "@/lib/mencoes";
 import { LIMITE_DA_BIO, PERFIL_PUBLICO_PADRAO } from "@/lib/rede-social";
-import { Camera, Image as ImageIcon, Trash2 } from "lucide-react-native";
+import Camera from "lucide-react-native/icons/camera";
+import ImageIcon from "lucide-react-native/icons/image";
+import Trash2 from "lucide-react-native/icons/trash";
 import { useCallback, useEffect, useState } from "react";
 import { Switch, Text, TextInput, View } from "react-native";
-import {
-  CampoLivre,
-  LinhaDeCampo,
-  RECUO_SEM_ICONE,
-  SecaoDeAjustes,
-} from "~/componentes/ajustes";
+import { CampoLivre, LinhaDeCampo, RECUO_SEM_ICONE, SecaoDeAjustes } from "~/componentes/ajustes";
 import {
   Botao,
   Cartao,
@@ -272,9 +269,7 @@ export default function EditarPerfil() {
           <SecaoDeAjustes
             recuo={RECUO_SEM_ICONE}
             rodape={
-              COMUNIDADE_NO_APP
-                ? undefined
-                : "A foto e o nome aparecem para as suas amigas no app."
+              COMUNIDADE_NO_APP ? undefined : "A foto e o nome aparecem para as suas amigas no app."
             }
           >
             <LinhaDeCampo
@@ -444,8 +439,8 @@ export default function EditarPerfil() {
                     não (amigas.functions.ts): a tela não pode prometer o contrário. */}
                     <T tipo="apagado">
                       Aparecem como um selo embaixo do seu nome, para quem pode abrir o seu perfil
-                      na Comunidade. As suas amigas veem o nome do bebê de qualquer jeito, na
-                      página de amiga.
+                      na Comunidade. As suas amigas veem o nome do bebê de qualquer jeito, na página
+                      de amiga.
                     </T>
                   </>
                 ) : null}

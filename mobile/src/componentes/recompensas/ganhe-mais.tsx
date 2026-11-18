@@ -1,4 +1,4 @@
-import { ChevronRight } from "lucide-react-native";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Animated, Easing, Linking, Pressable, Share, Text, View } from "react-native";
 import { BONUS_INFLUENCIADORA } from "@/lib/economia-sementinhas";

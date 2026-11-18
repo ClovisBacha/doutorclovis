@@ -1,6 +1,7 @@
 import { haQuantoPublicou } from "@/lib/rede-social";
 import { router } from "expo-router";
-import { Heart, MoreHorizontal } from "lucide-react-native";
+import Heart from "lucide-react-native/icons/heart";
+import MoreHorizontal from "lucide-react-native/icons/ellipsis";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { toque } from "~/componentes/base";

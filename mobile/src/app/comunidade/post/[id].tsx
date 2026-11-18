@@ -1,5 +1,8 @@
 import { Redirect, useLocalSearchParams } from "expo-router";
-import { Flag, Send, Trash2, X } from "lucide-react-native";
+import Flag from "lucide-react-native/icons/flag";
+import Send from "lucide-react-native/icons/send";
+import Trash2 from "lucide-react-native/icons/trash";
+import X from "lucide-react-native/icons/x";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
