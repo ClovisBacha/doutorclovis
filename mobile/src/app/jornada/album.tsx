@@ -16,7 +16,9 @@ import { CabecalhoDaPilha } from "~/componentes/cabecalho";
 import { rota } from "~/componentes/jornada/bancada";
 import { Folha, voltarParaJornada } from "~/componentes/jornada/pecas";
 import { useJornada } from "~/componentes/jornada/usarJornada";
+import { ArteDaBolha } from "~/componentes/movimento";
 import { Contagem } from "~/componentes/recompensas/pecas";
+import { falaDoAlbum } from "~/lib/bolha/conversa";
 import { listaDeNumeros } from "~/lib/jornada/momentos";
 import {
   diaNaTrilhaDoPos,
@@ -42,6 +44,10 @@ import { figurinhaDaSemana } from "~/lib/bebe-da-semana";
  * semana que passou sem ela é um vão tracejado; a que ainda vem é só o
  * número. Quatro por fileira, agrupadas por trimestre, com a capa dizendo
  * quantas semanas já têm a sua.
+ *
+ * 19/11/2026: a Bolha guia também aqui. Na capa, ela explica o álbum (o
+ * colado e o vazio, sem cobrar); a frase mora no cérebro dela
+ * (`falaDoAlbum`), e passa pela mesma catraca das outras falas.
  *
  * Bancada: /jornada/album?bancada=1&pos=1 [&idade=40]
  */
@@ -163,58 +169,69 @@ export default function AlbumDeVoces() {
   );
 }
 
-/** A capa: a arte do álbum, quantas semanas já têm a sua figurinha e uma barra fina. */
+/**
+ * A capa: a arte do álbum, quantas semanas já têm a sua figurinha e uma barra
+ * fina; embaixo, a Bolha explicando o álbum.
+ */
 function Capa({ ganhas, chegaram, pos }: { ganhas: number; chegaram: number; pos: boolean }) {
   const fracao = chegaram > 0 ? Math.min(1, ganhas / chegaram) : 0;
   return (
-    <Cartao estilo={{ flexDirection: "row", alignItems: "center", gap: espaco.lg }}>
-      <Image
-        source={require("../../../../src/assets/bebe/album.webp")}
-        style={{ width: 76, height: 76 }}
-        contentFit="contain"
-        accessibilityIgnoresInvertColors
-      />
-      <View style={{ flex: 1, gap: espaco.xs }}>
-        <Sobrelinha>Figurinhas</Sobrelinha>
-        <Text
-          accessibilityLabel={
-            chegaram > 0
-              ? `${ganhas} de ${chegaram} semanas com figurinha`
-              : "Nenhuma figurinha ainda"
-          }
-          style={{
-            ...fonte.titulo,
-            ...escala.titulo2,
-            color: cor.texto,
-            fontVariant: ["tabular-nums"],
-          }}
-        >
-          {chegaram > 0 ? `${ganhas} de ${chegaram} semanas` : "Nenhuma ainda"}
-        </Text>
-        <View
-          style={{ height: 6, borderRadius: 3, overflow: "hidden", backgroundColor: cor.trilho }}
-        >
-          <View
+    <Cartao estilo={{ gap: espaco.lg }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.lg }}>
+        <Image
+          source={require("../../../../src/assets/bebe/album.webp")}
+          style={{ width: 76, height: 76 }}
+          contentFit="contain"
+          accessibilityIgnoresInvertColors
+        />
+        <View style={{ flex: 1, gap: espaco.xs }}>
+          <Sobrelinha>Figurinhas</Sobrelinha>
+          <Text
+            accessibilityLabel={
+              chegaram > 0
+                ? `${ganhas} de ${chegaram} semanas com figurinha`
+                : "Nenhuma figurinha ainda"
+            }
             style={{
-              width: `${Math.round(fracao * 100)}%`,
-              height: 6,
-              borderRadius: 3,
-              backgroundColor: cor.primaria,
+              ...fonte.titulo,
+              ...escala.titulo2,
+              color: cor.texto,
+              fontVariant: ["tabular-nums"],
             }}
-          />
+          >
+            {chegaram > 0 ? `${ganhas} de ${chegaram} semanas` : "Nenhuma ainda"}
+          </Text>
+          <View
+            style={{ height: 6, borderRadius: 3, overflow: "hidden", backgroundColor: cor.trilho }}
+          >
+            <View
+              style={{
+                width: `${Math.round(fracao * 100)}%`,
+                height: 6,
+                borderRadius: 3,
+                backgroundColor: cor.primaria,
+              }}
+            />
+          </View>
         </View>
-        <Text
+      </View>
+      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: espaco.sm }}>
+        <ArteDaBolha humor="orgulhosa" tamanho={52} />
+        <View
           style={{
-            marginTop: 2,
-            ...fonte.normal,
-            ...escala.nota,
-            color: cor.textoApagado,
+            flex: 1,
+            borderRadius: canto.dentro,
+            borderBottomLeftRadius: 6,
+            ...curva,
+            paddingHorizontal: 14,
+            paddingVertical: 10,
+            backgroundColor: cor.apagado,
           }}
         >
-          {pos
-            ? "A gestação inteira e as 12 primeiras semanas de vida, num lugar só."
-            : "Feche um dia da semana e a figurinha dela vem para cá."}
-        </Text>
+          <Text style={{ ...fonte.media, ...escala.legenda, color: cor.textoCorpo }}>
+            {falaDoAlbum({ ganhas, pos })}
+          </Text>
+        </View>
       </View>
     </Cartao>
   );

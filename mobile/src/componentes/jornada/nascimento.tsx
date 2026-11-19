@@ -7,12 +7,12 @@ import Trophy from "lucide-react-native/icons/trophy";
 import { useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { BOLHA } from "~/componentes/artes";
 import { Botao, Cartao, Tocavel, toque } from "~/componentes/base";
-import { Brilho } from "~/componentes/jornada/atividade";
 import { FolhaDeCompartilhar } from "~/componentes/jornada/compartilhar";
 import { legendaDaChegada } from "~/lib/jornada/cartoes";
 import { Confete } from "~/componentes/jornada/pecas";
-import { ArteDaBolha, Flutuar } from "~/componentes/movimento";
+import { BolhaViva } from "~/componentes/movimento";
 import { comAlfa } from "~/lib/cor";
 import {
   medidasPorExtenso,
@@ -34,9 +34,13 @@ import { canto, cor, curva, escala, espaco, fonte, luz, margem, ouro, sombra } f
  * do app"): toda cor vem do tema (eram 16 soltas, com um botão azul-céu e o
  * degradê rosa-violeta de fábrica na porta); os dois botões são o `Botao` do
  * app, em pílulas de 48; o título é a serifada.
+ *
+ * 19/11/2026 (o dono: "tirar as imagens dos bebês [...] o bebê bolha será esse
+ * guia"): o recém-nascido ilustrado saiu da festa, do cartão e da porta. No
+ * lugar, a Bolha: comemorando na festa e no cartão, surpresa na porta ("nasceu?").
+ * Nada atrás dela (o brilho que ficava atrás do bebê saiu junto).
  */
 
-export const RECEM_NASCIDO = require("../../../../src/assets/bebe/semana.webp");
 const CEU = require("../../../../src/assets/ceu/amanhecer.webp");
 
 const LARGURA = 300;
@@ -89,8 +93,11 @@ export function CartaoDaChegada({
           {nome ?? "Nosso bebê"}
         </Text>
         <View style={{ marginTop: 14, alignItems: "center", justifyContent: "center" }}>
-          <Brilho tamanho={250} />
-          <Image source={RECEM_NASCIDO} style={{ width: 200, height: 200 }} contentFit="contain" />
+          <Image
+            source={BOLHA.comemorando}
+            style={{ width: 200, height: 200 }}
+            contentFit="contain"
+          />
         </View>
         <View style={{ marginTop: 18, alignItems: "center", gap: 6 }}>
           <Text style={{ ...fonte.forte, ...escala.manchete, color: cor.texto }}>
@@ -202,15 +209,7 @@ export function FestaDoNascimento({
             {quem} chegou!
           </Text>
           <View style={{ alignItems: "center", justifyContent: "center", height: 230 }}>
-            <Brilho tamanho={280} />
-            <Flutuar>
-              <Image
-                source={RECEM_NASCIDO}
-                style={{ width: 210, height: 210 }}
-                contentFit="contain"
-                accessibilityLabel={`${quem} numa manta quentinha, logo depois de chegar`}
-              />
-            </Flutuar>
+            <BolhaViva humor="comemorando" tamanho={220} />
           </View>
           <Text
             style={{
@@ -290,19 +289,17 @@ export function FestaDoNascimento({
             />
           </View>
 
-          <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
-            <ArteDaBolha humor="comemorando" tamanho={44} />
-            <Text
-              style={{
-                flex: 1,
-                ...fonte.normal,
-                ...escala.nota,
-                color: cor.textoApagado,
-              }}
-            >
-              A trilha agora acompanha as 12 primeiras semanas de vocês dois.
-            </Text>
-          </View>
+          <Text
+            style={{
+              textAlign: "center",
+              paddingHorizontal: espaco.md,
+              ...fonte.normal,
+              ...escala.nota,
+              color: cor.textoApagado,
+            }}
+          >
+            A trilha agora acompanha as 12 primeiras semanas de vocês dois.
+          </Text>
 
           {confirmando ? (
             <Cartao fundo={cor.destaque} estilo={{ alignSelf: "stretch", gap: espaco.md }}>
@@ -361,8 +358,9 @@ export function FestaDoNascimento({
 /**
  * A PORTA, na tela do Bebê a partir da semana 37 — o "{bebê} nasceu?" do
  * site. Leva ao fluxo de contar o nascimento. É uma LINHA do grupo de atalhos
- * do Bebê (64 pt, a ficha de 44 com o degradê, o fio recuado 70): o material é
- * o do grupo. `solta` lhe dá o material próprio, para quem a puser fora dele.
+ * do Bebê (64 pt, a Bolha no lugar da ficha de 44, o fio recuado 70): o
+ * material é o do grupo. `solta` lhe dá o material próprio, para quem a puser
+ * fora dele.
  */
 export function PortaDoNascimento({
   nome,
@@ -405,27 +403,15 @@ export function PortaDoNascimento({
             ],
       ]}
     >
-      <LinearGradient
-        colors={[cor.primaria, cor.jogo]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={{
-          width: 44,
-          height: 44,
-          borderRadius: canto.campo,
-          ...curva,
-          alignItems: "center",
-          justifyContent: "center",
-          overflow: "hidden",
-        }}
-      >
+      {/* A Bolha, surpresa, solta (sem a ficha atrás): ela é quem pergunta. */}
+      <View style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}>
         <Image
-          source={RECEM_NASCIDO}
-          style={{ width: 40, height: 40 }}
+          source={BOLHA.surpresa}
+          style={{ width: 52, height: 52 }}
           contentFit="contain"
           accessible={false}
         />
-      </LinearGradient>
+      </View>
       <View style={{ flex: 1, gap: 1 }}>
         <Text numberOfLines={1} style={{ ...fonte.forte, ...escala.chamada, color: cor.texto }}>
           {quem} nasceu?

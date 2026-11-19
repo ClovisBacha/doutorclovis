@@ -10,10 +10,20 @@ import Flame from "lucide-react-native/icons/flame";
 import House from "lucide-react-native/icons/house";
 import Moon from "lucide-react-native/icons/moon";
 import Sparkles from "lucide-react-native/icons/sparkles";
-import { Fragment, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
+import {
+  Fragment,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from "react";
 import { Animated, Pressable, StyleSheet, Text, View, type ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Botao, selecao, TituloDaSecao, toque, useFimDaRolagem } from "~/componentes/base";
+import { BOLHA } from "~/componentes/artes";
+import { Botao, TituloDaSecao, toque, useFimDaRolagem } from "~/componentes/base";
+import { ConversaComABolha } from "~/componentes/bolha/conversa";
 import {
   CEUS,
   ceuDaHora,
@@ -28,11 +38,16 @@ import { Selo } from "~/componentes/jornada/ceu-do-bebe";
 import { AjudaAgora } from "~/componentes/jornada/cuidado";
 import type { LeituraDasConquistas } from "~/componentes/jornada/economia";
 import { AnelDoDia, ARTE, FICHA, useMomentoDoDia } from "~/componentes/jornada/hoje";
-import { RECEM_NASCIDO } from "~/componentes/jornada/nascimento";
 import { Confete, Folha } from "~/componentes/jornada/pecas";
-import { ArteDaBolha, Flutuar, useParalaxe, type HumorDaArte } from "~/componentes/movimento";
+import { ArteDaBolha, useParalaxe } from "~/componentes/movimento";
 import { Painel, RAIO_DENTRO_DO_PAINEL } from "~/componentes/painel";
 import { Vidro } from "~/componentes/vidro";
+import {
+  destinoNoPos,
+  type ContextoDaBolha,
+  type Destino,
+  type DestinoNoPos,
+} from "~/lib/bolha/conversa";
 import { clarear, comAlfa } from "~/lib/cor";
 import { montarGrade, paraResgatar, placar } from "~/lib/jornada/conquistas";
 import type { FlagsDoDia } from "~/lib/jornada/momentos";
@@ -63,11 +78,20 @@ import {
 
 /**
  * HOJE, NO 4º TRIMESTRE — a mesma tela do cuidado diário, agora com o bebê no
- * colo: o céu da hora, o recém-nascido enrolado na manta (e não mais o feto da
- * semana), e o dia do `PosPartoJourney` do site — TRÊS tarefas que fecham o
- * dia (como você está, o desafio, a leitura da semana) e ganham a figurinha da
- * semana de vida. Respirar, o momento com o bebê e a gratidão ficam "para
- * quando sobrar um minuto": acendem a chama e não cobram nada.
+ * colo: o céu da hora, o número da semana de vida com a Bolha na frente, e o
+ * dia do `PosPartoJourney` do site — TRÊS tarefas que fecham o dia (como você
+ * está, o desafio, a leitura da semana) e ganham a figurinha da semana de
+ * vida. Respirar, o momento com o bebê e a gratidão ficam "para quando sobrar
+ * um minuto": acendem a chama e não cobram nada.
+ *
+ * 19/11/2026 (o dono: "nosso principal personagem agora será o bebê bolha.
+ * Eu quero tirar as imagens dos bebês [...] o bebê bolha será esse guia"): o
+ * recém-nascido ilustrado saiu do céu e da barra que nasce; no lugar, a
+ * Bolha apaixonada na frente do número. E a Bolha GUIA é o primeiro painel,
+ * como na gestação: ela pergunta como você está (o check-in do humor mora nela
+ * agora), leva ao desafio, à leitura e aos minutos seus, e comemora o dia
+ * cheio (`lib/bolha/conversa.ts`, `modo: "pos"`). Quando ela conta que está
+ * triste, o apoio aparece logo abaixo da Bolha.
  *
  * 18/11/2026 (a vistoria de design): o pós-parto tinha parado numa versão
  * antiga da tela do bebê — azul-céu do Tailwind, as tintas do creme e vinho,
@@ -78,6 +102,8 @@ import {
  *
  * "Triste" no check-in abre o apoio: o CVV (188) e o 192, tocáveis. Sem "fale
  * com o seu médico": o app não encaminha (decisão do dono, 21/10/2026).
+ *
+ * Bancada: /jornada?bancada=1&pos=1 [&hora=21] [&humor=Triste] [&estado=fechado]
  */
 
 export type AtividadeDoPos = "meditation" | "bonding" | "gratitude";
@@ -134,7 +160,7 @@ export function TelaDoQuartoTrimestre({
   flags,
   humorDeHoje,
   desafio,
-  recado,
+  nomeDela,
   chama,
   figurinhas,
   avisos,
@@ -166,7 +192,13 @@ export function TelaDoQuartoTrimestre({
   /** O humor marcado hoje, se já foi. */
   humorDeHoje: string | null;
   desafio: { emoji: string; label: string } | null;
-  recado: string;
+  /**
+   * @deprecated A Bolha conversa (19/11/2026): o recado de uma linha não é mais
+   * desenhado. Passe `nomeDela`.
+   */
+  recado?: string;
+  /** O primeiro nome dela, para a Bolha dar bom-dia pelo nome (sem ele, "Bom dia."). */
+  nomeDela?: string | null;
   chama: number;
   /** Todas as figurinhas: as da gestação e as do 4º trimestre. */
   figurinhas: number;
@@ -204,8 +236,38 @@ export function TelaDoQuartoTrimestre({
   const [semanaAberta, setSemanaAberta] = useState(false);
   const fim = useFimDaRolagem(espaco.xxl);
   const dia = arrumarODiaDoPos(flags, !!desafio);
-  const humorDaBolha: HumorDaArte =
-    feitos >= total ? "orgulhosa" : humorPedeApoio(humorDeHoje) ? "apaixonado" : "feliz";
+  /* O check-in do humor mora na Bolha: na lista, ele é uma linha que leva até ela. */
+  const linhas = dia.perguntarHumor
+    ? [{ tarefa: "humor" as const, feita: false }, ...dia.lista]
+    : dia.lista;
+
+  /* ── A Bolha guia (19/11/2026) ── */
+  const bolha = useBolhaDoPos({
+    D,
+    pronto,
+    hora,
+    nomeDela: nomeDela ?? null,
+    nomeDoBebe,
+    semana,
+    flags,
+    humorDeHoje,
+    chama,
+    desafio: formou ? null : (desafio?.label ?? null),
+    formou,
+  });
+  const aoAbrirDaBolha = useCallback(
+    (d: Destino) => {
+      const passo = destinoNoPos(d);
+      if (passo === "desafio") aoFazerDesafio();
+      else if (passo === "leitura") setSemanaAberta(true);
+      else if (passo === "dormir") router.push(rota("/jornada/dormir") as never);
+      else if (passo === "trilha") aoVerTrilha();
+      else aoAbrir(passo);
+    },
+    [aoFazerDesafio, aoVerTrilha, aoAbrir],
+  );
+  /* "Como você está hoje", na lista, rola até a Bolha (que pergunta). */
+  const yDaBolha = useRef(0);
 
   /* A rolagem move as camadas do céu (o número, o bebê) e faz nascer a barra
      de vidro: tudo no fio nativo, sem passar pelo JavaScript a cada quadro. */
@@ -245,7 +307,6 @@ export function TelaDoQuartoTrimestre({
             saudacao={saudacao}
             direita={direita}
             nomeDoBebe={nomeDoBebe}
-            quem={quem}
             semana={semana}
             idadeDias={idadeDias}
             formou={formou}
@@ -256,6 +317,23 @@ export function TelaDoQuartoTrimestre({
         {/* Os blocos, soltos sobre o céu. */}
         <View style={{ paddingHorizontal: 12, gap: 14 }}>
           {avisos}
+
+          {/* A Bolha guia: a primeira coisa depois do céu, como na gestação. */}
+          <View
+            onLayout={(e) => {
+              yDaBolha.current = e.nativeEvent.layout.y;
+            }}
+          >
+            <Painel>
+              <ConversaComABolha
+                key={bolha.chave}
+                contexto={bolha.contexto}
+                aoAbrir={aoAbrirDaBolha}
+                aoMarcarHumor={aoMarcarHumor}
+              />
+              {humorPedeApoio(humorDeHoje) ? <Apoio /> : null}
+            </Painel>
+          </View>
 
           {formou ? (
             <Formatura quem={quem} />
@@ -283,27 +361,7 @@ export function TelaDoQuartoTrimestre({
                 </Animated.View>
               </View>
 
-              {/* A bolha, pequena: a personagem que acompanha. */}
-              <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
-                <ArteDaBolha humor={humorDaBolha} tamanho={58} />
-                <View
-                  style={{
-                    flex: 1,
-                    ...MATERIAL,
-                    borderTopLeftRadius: 6,
-                    paddingHorizontal: 14,
-                    paddingVertical: 11,
-                  }}
-                >
-                  <Text style={{ ...fonte.media, ...escala.legenda, color: cor.textoCorpo }}>
-                    {recado}
-                  </Text>
-                </View>
-              </View>
-
               {feitos >= total ? <DiaCompleto semana={semana} /> : null}
-              {dia.perguntarHumor ? <ComoVoceEsta aoMarcar={aoMarcarHumor} /> : null}
-              {humorPedeApoio(humorDeHoje) ? <Apoio /> : null}
 
               {dia.destaque === "desafio" && desafio ? (
                 <Destaque
@@ -336,9 +394,9 @@ export function TelaDoQuartoTrimestre({
               ) : null}
 
               {/* As outras tarefas, numa lista só (e não cartões soltos). */}
-              {dia.lista.length ? (
+              {linhas.length ? (
                 <View style={{ ...MATERIAL, paddingVertical: 4 }}>
-                  {dia.lista.map(({ tarefa, feita }, i) => (
+                  {linhas.map(({ tarefa, feita }, i) => (
                     <Fragment key={tarefa}>
                       {i > 0 ? <Divisoria /> : null}
                       <LinhaDaTarefa
@@ -348,6 +406,12 @@ export function TelaDoQuartoTrimestre({
                         humorDeHoje={humorDeHoje}
                         desafio={desafio}
                         aoLer={() => setSemanaAberta(true)}
+                        aoIrABolha={() =>
+                          lista.current?.scrollTo({
+                            y: Math.max(0, alturaDoCeu + yDaBolha.current - topo - 64),
+                            animated: true,
+                          })
+                        }
                       />
                     </Fragment>
                   ))}
@@ -429,21 +493,122 @@ export function TelaDoQuartoTrimestre({
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   O céu: o recém-nascido e o número da semana de vida
+   A Bolha guia: o contexto do momento
    ══════════════════════════════════════════════════════════════════════════ */
 
-/** O lado da arte do recém-nascido. */
-const BEBE = 214;
-/** O número fica no alto e o bebê embaixo, por cima dele: a parte de cima do
- *  número aparece acima da manta, como o da gestação. */
-const ALTURA_DAS_CAMADAS = BEBE + 84;
+const ORDEM_DOS_PASSOS: readonly DestinoNoPos[] = ["desafio", "leitura", ...ATIVIDADES_DO_POS];
 
 /**
- * O HERÓI: o bom-dia, o número da semana de vida atrás do bebê e o bebê na
- * manta, em camadas que a rolagem separa — o número anda a 0,4 da rolagem e o
- * bebê a 0,2 (os dois ficam para trás do texto, que anda inteiro). Embaixo, a
+ * O que a Bolha lê do dia do pós. A conversa RECOMEÇA (a `chave` muda) quando
+ * ela faz alguma coisa (o desafio, a leitura, um minuto seu), e a Bolha abre
+ * comentando o que acabou de ser feito (`recem`) e seguindo para o próximo.
+ * O humor não recomeça a conversa: a própria Bolha o perguntou e já responde.
+ */
+function useBolhaDoPos({
+  D,
+  pronto,
+  hora,
+  nomeDela,
+  nomeDoBebe,
+  semana,
+  flags,
+  humorDeHoje,
+  chama,
+  desafio,
+  formou,
+}: {
+  D: number;
+  /** A jornada já foi lida do aparelho: antes disso, o que "aparece feito" não acabou de ser feito. */
+  pronto: boolean;
+  hora: number;
+  nomeDela: string | null;
+  nomeDoBebe: string | null;
+  semana: number;
+  flags: FlagsDoDia;
+  humorDeHoje: string | null;
+  chama: number;
+  desafio: string | null;
+  formou: boolean;
+}): { chave: string; contexto: ContextoDaBolha } {
+  const feitos = ORDEM_DOS_PASSOS.filter((p) =>
+    p === "desafio" || p === "leitura" ? !!flags[p] : !!flags[`w_${p}`],
+  );
+  const assinatura = `${D}:${feitos.join(",")}`;
+  /* O que mudou desde o último desenho (o padrão do React para "guardar o que
+     veio antes": o estado se ajusta no próprio desenho, sem efeito). */
+  const [marca, setMarca] = useState<{
+    assinatura: string;
+    pronto: boolean;
+    recem: DestinoNoPos[];
+  }>({ assinatura, pronto, recem: [] });
+  if (marca.assinatura !== assinatura || marca.pronto !== pronto) {
+    const [diaAntes, antes = ""] = marca.assinatura.split(":");
+    const ja = diaAntes === String(D) ? antes.split(",") : [];
+    /* O dia que chega do aparelho na abertura não é "acabou de fazer". */
+    const recem = marca.pronto && pronto ? feitos.filter((p) => !ja.includes(p)) : [];
+    setMarca({ assinatura, pronto, recem });
+  }
+  const recem = marca.assinatura === assinatura && marca.pronto === pronto ? marca.recem : [];
+  const contexto = useMemo<ContextoDaBolha>(
+    () => ({
+      hora,
+      D,
+      modo: "pos",
+      nomeDela,
+      nomeDoBebe,
+      semana,
+      feitos: ATIVIDADES_DO_POS.filter((a) => !!flags[`w_${a}`]),
+      /* O humor marcado sem o check-in de hoje (no site, ou na mescla) conta
+         como respondido: a Bolha não pergunta de novo o que a lista diz feito. */
+      humor: humorDeHoje ?? (flags.humor ? "Bem" : null),
+      chama,
+      doPos: {
+        desafio,
+        desafioFeito: !!flags.desafio,
+        leituraFeita: !!flags.leitura,
+        formou,
+        recem,
+      },
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      hora,
+      D,
+      nomeDela,
+      nomeDoBebe,
+      semana,
+      assinatura,
+      humorDeHoje,
+      !!flags.humor,
+      chama,
+      desafio,
+      formou,
+      recem,
+    ],
+  );
+  return { chave: assinatura, contexto };
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O céu: a Bolha e o número da semana de vida
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** O lado da Bolha no céu. */
+const BEBE = 200;
+/** O número fica no alto e a Bolha embaixo, por cima dele: a parte de cima do
+ *  número aparece acima dela, como o da gestação. */
+const ALTURA_DAS_CAMADAS = BEBE + 92;
+
+/**
+ * O HERÓI: o bom-dia, o número da semana de vida e a Bolha na frente dele, em
+ * camadas que a rolagem separa — o número anda a 0,4 da rolagem e a Bolha a
+ * 0,2 (os dois ficam para trás do texto, que anda inteiro). Embaixo, o nome, a
  * semana em texto (o número é enfeite: o leitor de tela não o lê) e as duas
  * etiquetas: os dias de vocês e a fase.
+ *
+ * 19/11/2026: o recém-nascido ilustrado saiu (o dono: "tirar as imagens dos
+ * bebês [...] o número 24 ali estava muito bacana"). Na frente do número, a
+ * Bolha apaixonada (os coraçõezinhos: vocês dois), sem brilho atrás.
  */
 function CeuDoColo({
   topo,
@@ -452,7 +617,6 @@ function CeuDoColo({
   saudacao,
   direita,
   nomeDoBebe,
-  quem,
   semana,
   idadeDias,
   formou,
@@ -464,7 +628,6 @@ function CeuDoColo({
   saudacao: string;
   direita?: ReactNode;
   nomeDoBebe: string | null;
-  quem: string;
   semana: number;
   idadeDias: number;
   formou: boolean;
@@ -555,8 +718,12 @@ function CeuDoColo({
           </Text>
         </Animated.View>
 
-        {/* 2 · O bebê na manta, na frente. */}
+        {/* 2 · A Bolha, na frente (nada atrás dela: nem brilho, nem disco). */}
         <Animated.View
+          pointerEvents="none"
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+          accessibilityElementsHidden
           style={{
             position: "absolute",
             left: 0,
@@ -567,15 +734,7 @@ function CeuDoColo({
             transform: [{ translateY: camada(0.2) }],
           }}
         >
-          <Brilho tamanho={280} />
-          <Flutuar>
-            <Image
-              source={RECEM_NASCIDO}
-              style={{ width: BEBE, height: BEBE }}
-              contentFit="contain"
-              accessibilityLabel={`${quem} numa manta quentinha, nos primeiros dias`}
-            />
-          </Flutuar>
+          <ArteDaBolha humor="apaixonado" tamanho={BEBE} />
         </Animated.View>
       </View>
 
@@ -620,7 +779,7 @@ function CeuDoColo({
 
 /**
  * A BARRA QUE NASCE: quando o céu sai da tela, desce do topo uma cápsula de
- * vidro com o recém-nascido, o nome, a semana de vida e as tarefas do dia; um
+ * vidro com a Bolha, o nome, a semana de vida e as tarefas do dia; um
  * toque volta ao topo. Desliza (e não esmaece): vidro com transparência
  * animada perde o efeito no meio do caminho.
  */
@@ -657,7 +816,7 @@ function BarraDoColo({
   const quando = formou ? "12 semanas" : `Semana ${semana} de vida`;
   return (
     <>
-      {/* Com o bebê fora da tela, o topo se desfaz na cor do alto do céu: o que
+      {/* Com o céu fora da tela, o topo se desfaz na cor do alto do céu: o que
           rola não passa por baixo do relógio do iPhone. */}
       <Animated.View
         pointerEvents="none"
@@ -706,7 +865,12 @@ function BarraDoColo({
               paddingVertical: 5,
             }}
           >
-            <Image source={RECEM_NASCIDO} style={{ width: 34, height: 34 }} contentFit="contain" />
+            <Image
+              source={BOLHA.apaixonado}
+              style={{ width: 34, height: 34 }}
+              contentFit="contain"
+              accessible={false}
+            />
             <Text style={{ ...fonte.forte, ...escala.legenda, color: cor.texto }}>
               {nomeDoBebe ?? "O bebê"}
             </Text>
@@ -851,6 +1015,7 @@ function LinhaDaTarefa({
   humorDeHoje,
   desafio,
   aoLer,
+  aoIrABolha,
 }: {
   tarefa: TarefaDoPos;
   feita: boolean;
@@ -858,6 +1023,8 @@ function LinhaDaTarefa({
   humorDeHoje: string | null;
   desafio: { emoji: string; label: string } | null;
   aoLer: () => void;
+  /** O humor ainda não respondido: a linha leva até a Bolha, que pergunta. */
+  aoIrABolha: () => void;
 }) {
   if (tarefa === "humor") {
     const h = HUMORES_DO_POS.find((x) => x.label === humorDeHoje);
@@ -866,8 +1033,15 @@ function LinhaDaTarefa({
         ficha={cor.atencaoFundo}
         arte={<Text style={{ fontSize: 24, lineHeight: 30 }}>{h?.emoji ?? "🙂"}</Text>}
         titulo="Como você está hoje"
-        sub={humorDeHoje ? `Você disse: ${humorDeHoje.toLowerCase()}` : "Respondido"}
+        sub={
+          !feita
+            ? "Conte para a Bolha"
+            : humorDeHoje
+              ? `Você disse: ${humorDeHoje.toLowerCase()}`
+              : "Respondido"
+        }
         feito={feita}
+        aoTocar={feita ? undefined : aoIrABolha}
       />
     );
   }
@@ -990,70 +1164,6 @@ function Destaque({
           aoTocar={aoTocar}
           estilo={{ alignSelf: "flex-start", marginTop: espaco.md }}
         />
-      </View>
-    </View>
-  );
-}
-
-/** O check-in de humor: a primeira das três tarefas. Respondido, vira uma linha. */
-function ComoVoceEsta({ aoMarcar }: { aoMarcar: (humor: string) => void }) {
-  return (
-    <View style={{ ...MATERIAL, padding: espaco.md, gap: espaco.md }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.md }}>
-        <Image
-          source={require("../../../../src/assets/grades/humor.webp")}
-          style={{ width: 44, height: 44 }}
-          contentFit="contain"
-          accessible={false}
-        />
-        <View style={{ flex: 1 }}>
-          <Text
-            accessibilityRole="header"
-            style={{ ...fonte.forte, ...escala.manchete, color: cor.texto }}
-          >
-            Como você está hoje?
-          </Text>
-          <Text style={{ ...fonte.normal, ...escala.legenda, color: cor.textoApagado }}>
-            O seu bem-estar conta tanto quanto o do bebê.
-          </Text>
-        </View>
-      </View>
-      <View style={{ flexDirection: "row", gap: espaco.xs }}>
-        {HUMORES_DO_POS.map((h) => (
-          <Pressable
-            key={h.label}
-            accessibilityRole="button"
-            accessibilityLabel={`Estou ${h.label.toLowerCase()}`}
-            onPress={() => {
-              selecao();
-              aoMarcar(h.label);
-            }}
-            style={({ pressed }) => ({
-              flex: 1,
-              minHeight: 68,
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 2,
-              borderRadius: 14,
-              ...curva,
-              backgroundColor: cor.apagado,
-              transform: [{ scale: pressed ? 0.95 : 1 }],
-            })}
-          >
-            <Text maxFontSizeMultiplier={1.3} style={{ fontSize: 24, lineHeight: 30 }}>
-              {h.emoji}
-            </Text>
-            <Text
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.85}
-              maxFontSizeMultiplier={1.3}
-              style={{ ...fonte.media, ...escala.nota, color: cor.texto }}
-            >
-              {h.label}
-            </Text>
-          </Pressable>
-        ))}
       </View>
     </View>
   );

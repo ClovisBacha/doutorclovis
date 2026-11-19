@@ -1,4 +1,3 @@
-import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LayoutAnimation, Text, View } from "react-native";
@@ -12,9 +11,9 @@ import { Botao, Carregando, T, Tocavel } from "~/componentes/base";
 import { TelaDaPilha } from "~/componentes/cabecalho";
 import { CalendarioDoMes, mesDe, type Mes } from "~/componentes/agenda/calendario";
 import { rota } from "~/componentes/jornada/bancada";
-import { RECEM_NASCIDO } from "~/componentes/jornada/nascimento";
 import { Folha } from "~/componentes/jornada/pecas";
 import { useJornada } from "~/componentes/jornada/usarJornada";
+import { ArteDaBolha } from "~/componentes/movimento";
 import { Escolha } from "~/componentes/saude/pecas";
 import { diaCurto } from "~/lib/agenda/agenda";
 import { ehBancada, recarregarNaBancada } from "~/lib/bancada";
@@ -51,7 +50,11 @@ import { canto, cor, curva, escala, espaco, fonte } from "~/tema";
  * formulário web"): o dia é uma linha com as fichas Hoje / Ontem / Outro dia
  * (o calendário só abre no "Outro dia"); a hora, o peso e o comprimento são
  * campos em linha, com a unidade fora do campo; a confirmação sobe numa folha
- * com o bebê e o resumo.
+ * com o resumo.
+ *
+ * 19/11/2026: no lugar do recém-nascido ilustrado, a Bolha (apaixonada na
+ * pergunta do dia, surpresa na confirmação, feliz quando é só corrigir os
+ * dados). O dono: "tirar as imagens dos bebês [...] o bebê bolha será esse guia".
  *
  * Bancada: /jornada/nascimento?bancada=1 [&semana=39] [&pos=1]
  */
@@ -200,12 +203,7 @@ export default function ContarONascimento() {
   return (
     <TelaDaPilha titulo={jaNasceu ? "O nascimento" : "Contar o nascimento"} voltarPara="/jornada">
       <View style={{ alignItems: "center", gap: espaco.sm }}>
-        <Image
-          source={RECEM_NASCIDO}
-          style={{ width: 128, height: 128 }}
-          contentFit="contain"
-          accessible={false}
-        />
+        <ArteDaBolha humor={jaNasceu ? "feliz" : "apaixonado"} tamanho={128} />
         <Text
           accessibilityRole="header"
           style={{
@@ -335,12 +333,7 @@ export default function ContarONascimento() {
       <Folha aberta={confirmando && "dados" in previa} aoFechar={() => setConfirmando(false)}>
         {"dados" in previa ? (
           <View style={{ alignItems: "center", gap: espaco.md }}>
-            <Image
-              source={RECEM_NASCIDO}
-              style={{ width: 112, height: 112 }}
-              contentFit="contain"
-              accessible={false}
-            />
+            <ArteDaBolha humor="surpresa" tamanho={112} />
             <Text
               accessibilityRole="header"
               style={{

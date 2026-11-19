@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { COMUNIDADE_NO_APP } from "~/config";
 import { primeiraFrase } from "~/lib/jornada/lembrete-da-jornada";
+import { CONDUTA_DO_POS } from "~/lib/jornada/regua-do-pos";
 import {
   abreFestaDoNascimento,
   CHAVE_FEITOS_POS,
@@ -40,6 +41,9 @@ const SITE = readFileSync(
   "utf8",
 );
 
+/** As figurinhas que o app trocou (19/11/2026: sem bebê ilustrado), com a do site. */
+const TROCADAS_DO_SITE: Readonly<Record<string, string>> = { 1: "🤱", 2: "🍼", 3: "👶" };
+
 describe("o 4º trimestre do app é o do site", () => {
   test("as fases e as figurinhas de cada semana são as mesmas", () => {
     for (const f of FASES_DO_POS) {
@@ -47,8 +51,20 @@ describe("o 4º trimestre do app é o do site", () => {
         `{ n: ${f.n}, from: ${f.from}, to: ${f.to}, emoji: "${f.emoji}", name: "${f.name}" }`,
       );
     }
-    for (const [semana, emoji] of Object.entries(FIGURINHAS_DO_POS))
-      expect(SITE).toContain(`  ${semana}: "${emoji}",`);
+    for (const [semana, emoji] of Object.entries(FIGURINHAS_DO_POS)) {
+      const doSite = TROCADAS_DO_SITE[semana];
+      /* A trocada é do app, e o site ainda tem a dele (a troca é de propósito). */
+      if (doSite)
+        expect([SITE.includes(`  ${semana}: "${doSite}",`), emoji]).toEqual([true, emoji]);
+      else expect(SITE).toContain(`  ${semana}: "${emoji}",`);
+    }
+  });
+
+  test("nenhuma figurinha é bebê, mãe amamentando ou mamadeira (19/11/2026)", () => {
+    const fora = Object.values(FIGURINHAS_DO_POS).filter((e) => /👶|🤱|🍼|🧒|👼|🤰/u.test(e));
+    expect(fora).toEqual([]);
+    for (const [semana, doSite] of Object.entries(TROCADAS_DO_SITE))
+      expect(FIGURINHAS_DO_POS[Number(semana)]).not.toBe(doSite);
   });
 
   test("as cores das semanas são as do posMeta", () => {
@@ -203,13 +219,9 @@ describe("o nascimento", () => {
   });
 });
 
-/* O que o desafio e o texto da semana não dizem (21/10/2026: rede social +
-   gamificação, não conselho médico) — o roteiro clínico do site, palavra por
-   palavra: mamadas, lóquios, coto, vacinas, consulta puerperal, contracepção,
-   "marcos esperados". "Banho" entra só como o do bebê: um banho sem pressa é
-   gentileza com ela. */
-const CONDUTA =
-  /\b(m[eé]dic[oa]s?|pediatra|consultas?|exames?|vacinas?|rem[eé]dios?|suplement\w*|vitaminas?|puerp\w*|amament\w*|mamadas?|mamar|peito|leite|pega|mamilos?|ordenh\w*|mastite|mamadeiras?|banho (do|no) beb[eê]|dar banho|coto|umbig\w*|c[oó]licas?|febre|icter[ií]cia|chupeta|ber[cç]o|cadeirinha|bru[cç]os|teste do \w+|l[oó]quios?|sangr\w*|pontos|cicatriz\w*|assoalho|p[eé]lvic\w*|abd[oô]m\w*|contracep\w*|anticoncep\w*|exerc[ií]cios?|treinar|treino|liberad[oa]|liberou|recupera\w*|baby blues|depress\w*|ansiedade|tristeza|psic[oó]\w*|terapia|procure|diagn[oó]stic\w*|ferro|nutri\w*|dieta|hidrat\w*|dormir|durma|sono|soneca|cochil\w*|acalm\w*|ninar|normal|esperad[oa]s?|deveria|desenvolvimento|peso|gramas?|quilos?)\b/i;
+/* O que o desafio e o texto da semana não dizem: a régua mora em
+   `regua-do-pos.ts`, porque as falas da Bolha no pós passam por ela também. */
+const CONDUTA = CONDUTA_DO_POS;
 
 const TODOS_OS_TEXTOS = [
   ...Object.entries(DESAFIOS_DO_POS).map(([D, d]) => [`D${D}`, d.label] as const),

@@ -54,11 +54,16 @@ export const FASES_DO_POS: readonly Fase[] = [
 
 export const SEMANAS_DO_POS = 12;
 
-/** A figurinha de cada semana de vida (`POS_EMOJI`). */
+/**
+ * A figurinha de cada semana de vida (`POS_EMOJI`). As três primeiras são do
+ * APP (19/11/2026, o dono: "tirar as imagens dos bebês"): o site tinha o bebê
+ * (👶), a mãe amamentando (🤱) e a mamadeira (🍼), que o conteúdo do pós-parto
+ * também não traz. No lugar, a casa da chegada, a bolha e o coração das mãos.
+ */
 export const FIGURINHAS_DO_POS: Readonly<Record<number, string>> = {
-  1: "🤱",
-  2: "🍼",
-  3: "👶",
+  1: "🏡",
+  2: "🫧",
+  3: "🫶",
   4: "💜",
   5: "🌙",
   6: "😊",
