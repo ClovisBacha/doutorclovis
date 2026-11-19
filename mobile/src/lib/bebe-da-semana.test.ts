@@ -52,6 +52,18 @@ describe("a reta final no app", () => {
       }
     }
   });
+
+  test("a reta final deseja, não aconselha: sem 'vale', 'deve', 'precisa', 'procure' nem travessão", () => {
+    /* 19/11/2026: o app é de bem-estar, e a 41 dizia "vale guardar estes dias
+       com calma: descanso, colo e gente querida". */
+    for (const s of [40, 41, 42, 43]) {
+      const r = retaFinalNoApp(s)!;
+      for (const texto of [r.titulo, r.corpo]) {
+        expect(texto).not.toMatch(/\b(vale|deve\w*|precisa\w*|procure|recomend\w*|tente)\b/i);
+        expect(texto).not.toMatch(/—|–/);
+      }
+    }
+  });
 });
 
 describe("a frase do mascote no app", () => {

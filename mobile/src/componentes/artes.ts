@@ -1,6 +1,9 @@
 /**
  * As artes do site, reaproveitadas no app (uma cópia aqui divergiria da do
  * site no primeiro ajuste de arte). Caminho relativo a mobile/src/componentes.
+ *
+ * As cinco artes do bebê (`BEBE`, 6 a 40 semanas) saíram em 19/11/2026: o app
+ * não desenha mais o bebê, e a Bolha é a personagem (`sem-bebe-ilustrado.test.ts`).
  */
 export const BOLHA = {
   feliz: require("../../../src/assets/bolha/feliz.webp"),
@@ -12,12 +15,3 @@ export const BOLHA = {
   estudiosa: require("../../../src/assets/bolha/estudiosa.webp"),
   exercicio: require("../../../src/assets/bolha/exercicio.webp"),
 } as const;
-
-/** As cinco artes do bebê (6, 10, 20, 30, 40 semanas) — `semanaDaArte` escolhe. */
-export const BEBE: Record<number, number> = {
-  6: require("../../../src/assets/bebes/semana-06.webp"),
-  10: require("../../../src/assets/bebes/semana-10.webp"),
-  20: require("../../../src/assets/bebes/semana-20.webp"),
-  30: require("../../../src/assets/bebes/semana-30.webp"),
-  40: require("../../../src/assets/bebes/semana-40.webp"),
-};

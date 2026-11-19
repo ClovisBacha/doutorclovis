@@ -51,6 +51,13 @@ import {
  * O desenho é um MOSAICO (16/11/2026): o anel da gestação grande à esquerda,
  * o tamanho e o peso ao lado, a fruta numa faixa larga. O semana a semana
  * (`app/bebe.tsx`) usa este mesmo painel para a semana que a régua mostra.
+ *
+ * 19/11/2026 (o app é de bem-estar materno, e a Bolha é a guia): aqui ficam
+ * só os DADOS da semana, sem ilustração do bebê; quem conversa é a Bolha, no
+ * painel de cima (`ConversaComABolha`). A voz é a de quem acompanha, nunca a
+ * de quem mede: as mexidinhas se contam quando ela quiser (a mesma frase da
+ * tela dos movimentos), e a reta final é carinho, sem prazo
+ * (`retaFinalNoApp`).
  */
 export const BebeNestaSemana = memo(function BebeNestaSemana({
   semana,
@@ -212,7 +219,7 @@ export const BebeNestaSemana = memo(function BebeNestaSemana({
                 </FichaDoAtalho>
               }
               titulo={NOME_DOS_MOVIMENTOS}
-              rotulo={`${NOME_DOS_MOVIMENTOS}: conte as mexidinhas, no seu tempo`}
+              rotulo={`${NOME_DOS_MOVIMENTOS}: conte as mexidinhas quando quiser`}
               aoTocar={() => router.push("/saude/chutes")}
             />
           ) : null}

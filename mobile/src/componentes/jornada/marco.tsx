@@ -1,37 +1,44 @@
 import { Image } from "expo-image";
 import Sprout from "lucide-react-native/icons/sprout";
-import { useEffect, useRef, useState } from "react";
-import { Animated, Modal, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Animated, Modal, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Botao, Sobrelinha, sucesso } from "~/componentes/base";
 import { CEUS, faseDeAgora } from "~/componentes/ceu-vivo";
-import { arteDoBebe } from "~/componentes/jornada/arte-do-bebe";
-import { Brilho } from "~/componentes/jornada/atividade";
+import { CompartilharNaFesta } from "~/componentes/jornada/cartao-da-semana";
 import { CompartilharConquista } from "~/componentes/jornada/cartao-de-conquista";
 import { Confete } from "~/componentes/jornada/pecas";
-import { useMovimentoReduzido } from "~/componentes/movimento";
-import { bebeDaSemana } from "~/lib/bebe-da-semana";
+import { BolhaViva, useMovimentoReduzido } from "~/componentes/movimento";
+import { festaDaBolha } from "~/lib/bolha/festa";
+import { comAlfa } from "~/lib/cor";
 import { cartaoDoMarco } from "~/lib/jornada/cartoes";
-import type { Festa, Marco } from "~/lib/jornada/marcos";
+import type { Festa } from "~/lib/jornada/marcos";
 import { canto, cor, curva, escala, espaco, fonte, fonteDoNumero, sombras, veu } from "~/tema";
 
-/** O recém-nascido (o mesmo da festa e da porta do nascimento). */
-const RECEM_NASCIDO = require("../../../../src/assets/bebe/semana.webp");
-
-/** A altura da vitrine: o céu da hora com o bebê na frente do número. */
-const VITRINE = 236;
+/** A altura da vitrine: o céu da hora com a Bolha na frente do número. */
+const VITRINE = 228;
+/** O lado da Bolha na vitrine. */
+const BOLHA = 184;
+/**
+ * Um número de um algarismo (a semana 8, o 1º mês) some inteiro atrás da
+ * Bolha: os dois se afastam, como o relógio e a pessoa da tela de bloqueio.
+ */
+const AFASTA = 48;
 
 /**
- * "CHEGOU UM NOVO MARCO" — a festa da semana nova, do fim de um trimestre, do
+ * "SEMANA NOVA" — a festa da semana nova, do fim de um trimestre, do
  * nascimento e de cada mês do bebê (`~/lib/jornada/marcos`). O servidor paga
  * esses marcos sozinho; o app passava o crédito em silêncio, e o site abria
  * esta tela com o bebê da semana. Só abre sobre um crédito que o extrato
  * mostra — a soma dita aqui é a que entrou.
  *
- * É o "uau" de toda semana (18/11/2026, a vistoria: "ninguém a abriu"). Era um
- * emoji de fruta num cartão branco solto (às vezes a fruta errada). Agora é a
- * mesma cena da tela do bebê, em miniatura: o céu da hora, o número da semana
- * atrás e o bebê da semana na frente, chegando numa mola só, com o toque de
- * sucesso na mão.
+ * É o "uau" de toda semana. 19/11/2026, decisão do dono ("nosso principal
+ * personagem agora será o bebê bolha. Eu quero tirar as imagens dos bebês
+ * [...] o número 24 ali estava muito bacana"): a mesma cena do céu da aba, em
+ * miniatura, com a BOLHA comemorando na frente do número gigante, no lugar
+ * do bebê ilustrado (e do recém-nascido enrolado, no nascimento e nos meses).
+ * Nada atrás dela, nem o brilho. E é ela que fala, num balão: a semana nova
+ * ligada ao que o app tem para ela (a aula nova, um tempo para respirar),
+ * sem conduta (`~/lib/bolha/festa`).
  */
 export function FestaDoMarco({
   festa,
@@ -46,17 +53,6 @@ export function FestaDoMarco({
   return <ConteudoDaFesta festa={festa} nomeDoBebe={nomeDoBebe} aoFechar={aoFechar} />;
 }
 
-/** O que a vitrine mostra: a arte e o número que fica atrás dela. */
-function vitrineDo(m: Marco): { arte: number; numero: string | null } {
-  if (m.tipo === "semana") return { arte: arteDoBebe(m.semana), numero: String(m.semana) };
-  if (m.tipo === "trimestre") {
-    const ultima = m.trimestre === 1 ? 13 : 27;
-    return { arte: arteDoBebe(ultima), numero: String(ultima) };
-  }
-  if (m.tipo === "mes") return { arte: RECEM_NASCIDO, numero: String(m.meses) };
-  return { arte: RECEM_NASCIDO, numero: null };
-}
-
 function ConteudoDaFesta({
   festa,
   nomeDoBebe,
@@ -67,47 +63,39 @@ function ConteudoDaFesta({
   aoFechar: () => void;
 }) {
   const m = festa.principal;
-  const bebe = nomeDoBebe ?? "O bebê";
   const reduzido = useMovimentoReduzido();
   /* O céu de quando a festa abriu (a mesma hora da tela de trás). */
   const [ceu] = useState(() => CEUS[faseDeAgora()]);
-  const { arte, numero } = vitrineDo(m);
+  const v = useMemo(() => festaDaBolha(m, nomeDoBebe), [m, nomeDoBebe]);
+  const afasta = v.numero != null && v.numero < 10 ? AFASTA : 0;
 
-  /* A chegada: a arte numa mola só, e o toque de sucesso na mão. */
+  /* A chegada: o número sobe de trás, a Bolha chega numa mola, e o toque de
+     sucesso na mão. Uma vez, e nada disso com "reduzir movimento". */
   const chega = useRef(new Animated.Value(reduzido ? 1 : 0)).current;
+  const numeroChega = useRef(new Animated.Value(reduzido ? 1 : 0)).current;
   useEffect(() => {
     sucesso();
     if (reduzido) {
       chega.setValue(1);
+      numeroChega.setValue(1);
       return;
     }
-    Animated.spring(chega, {
-      toValue: 1,
-      useNativeDriver: true,
-      speed: 9,
-      bounciness: 11,
-      delay: 120,
-    }).start();
+    Animated.parallel([
+      Animated.timing(numeroChega, {
+        toValue: 1,
+        duration: 520,
+        useNativeDriver: true,
+      }),
+      Animated.spring(chega, {
+        toValue: 1,
+        useNativeDriver: true,
+        speed: 9,
+        bounciness: 11,
+        delay: 160,
+      }),
+    ]).start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [festa.chaves.join("|")]);
-
-  const semana = m.tipo === "semana" ? bebeDaSemana(m.semana) : null;
-  const titulo =
-    m.tipo === "semana"
-      ? `Semana ${m.semana}`
-      : m.tipo === "trimestre"
-        ? `Fim do ${m.trimestre}º trimestre`
-        : m.tipo === "nascimento"
-          ? "Boas-vindas ao mundo"
-          : `${bebe} com ${m.meses} ${m.meses === 1 ? "mês" : "meses"}`;
-  const texto =
-    m.tipo === "semana"
-      ? `${semana!.desc} Do tamanho de ${semana!.fruit.toLowerCase()}, ${semana!.size}.`
-      : m.tipo === "trimestre"
-        ? `Uma fase inteira de cuidado ficou para trás. O ${m.trimestre + 1}º trimestre começa agora.`
-        : m.tipo === "nascimento"
-          ? `${bebe} chegou. Agora a jornada é de vocês dois.`
-          : "Mais um mês de vocês dois juntos.";
 
   return (
     <Modal transparent animationType="fade" visible onRequestClose={aoFechar}>
@@ -116,7 +104,8 @@ function ConteudoDaFesta({
           flex: 1,
           alignItems: "center",
           justifyContent: "center",
-          padding: espaco.xl,
+          paddingHorizontal: espaco.xl,
+          paddingVertical: espaco.lg,
           backgroundColor: veu.tinta(0.55),
         }}
       >
@@ -125,135 +114,210 @@ function ConteudoDaFesta({
           style={{
             width: "100%",
             maxWidth: 360,
+            maxHeight: "100%",
             borderRadius: canto.painel,
             ...curva,
             backgroundColor: cor.cartao,
             ...sombras.flutuante,
           }}
         >
-          {/* A vitrine: o céu da hora, o número atrás, o bebê na frente. */}
-          <View
-            accessible={false}
-            importantForAccessibility="no-hide-descendants"
-            accessibilityElementsHidden
-            style={{
-              height: VITRINE,
-              borderTopLeftRadius: canto.painel,
-              borderTopRightRadius: canto.painel,
-              ...curva,
-              overflow: "hidden",
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: ceu.chao,
-            }}
+          {/* Num iPhone baixo (ou com a letra grande), a festa rola dentro do cartão. */}
+          <ScrollView
+            style={{ flexShrink: 1 }}
+            bounces={false}
+            showsVerticalScrollIndicator={false}
           >
-            <Image
-              source={ceu.arte}
-              style={StyleSheet.absoluteFill}
-              contentFit="cover"
-              contentPosition="top"
-            />
-            {numero ? (
-              <Text
-                allowFontScaling={false}
-                style={{
-                  position: "absolute",
-                  top: 8,
-                  ...fonteDoNumero,
-                  fontSize: 180,
-                  lineHeight: 190,
-                  letterSpacing: -8,
-                  fontVariant: ["tabular-nums"],
-                  color: ceu.numero,
-                }}
-              >
-                {numero}
-              </Text>
-            ) : null}
-            <Animated.View
+            {/* A vitrine: o céu da hora, o número atrás, a Bolha na frente. */}
+            <View
+              accessible={false}
+              importantForAccessibility="no-hide-descendants"
+              accessibilityElementsHidden
               style={{
-                marginTop: 34,
+                height: VITRINE,
+                borderTopLeftRadius: canto.painel,
+                borderTopRightRadius: canto.painel,
+                ...curva,
+                overflow: "hidden",
                 alignItems: "center",
                 justifyContent: "center",
-                opacity: chega.interpolate({
-                  inputRange: [0, 0.3, 1],
-                  outputRange: [0, 1, 1],
-                  extrapolate: "clamp",
-                }),
-                transform: [
-                  { scale: chega.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] }) },
-                  { translateY: chega.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) },
-                ],
+                backgroundColor: ceu.chao,
               }}
             >
-              <Brilho tamanho={230} />
-              <Image source={arte} style={{ width: 160, height: 160 }} contentFit="contain" />
-            </Animated.View>
-          </View>
-
-          <View
-            style={{
-              alignItems: "center",
-              gap: espaco.md,
-              paddingHorizontal: espaco.xl,
-              paddingTop: espaco.lg,
-              paddingBottom: espaco.lg,
-            }}
-          >
-            <Sobrelinha tinta={cor.primariaEscura}>Chegou um novo marco</Sobrelinha>
-            <Text
-              accessibilityRole="header"
-              style={{
-                marginTop: -4,
-                textAlign: "center",
-                ...fonte.display,
-                ...escala.titulo1,
-                letterSpacing: -0.2,
-                color: cor.texto,
-              }}
-            >
-              {titulo}
-            </Text>
-            <Text
-              style={{
-                textAlign: "center",
-                ...fonte.normal,
-                ...escala.legenda,
-                color: cor.textoCorpo,
-              }}
-            >
-              {texto}
-            </Text>
-            <View
-              accessible
-              accessibilityLabel={`Mais ${festa.sementinhas} sementinhas`}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 6,
-                borderRadius: canto.pilula,
-                backgroundColor: cor.sementinhaFundo,
-                paddingHorizontal: espaco.lg,
-                paddingVertical: espaco.sm,
-              }}
-            >
-              <Sprout size={18} color={cor.sementinha} strokeWidth={2.4} />
-              <Text style={{ ...fonte.titulo, ...escala.chamada, color: cor.sementinha }}>
-                +{festa.sementinhas} sementinhas
-              </Text>
-            </View>
-            <View style={{ alignSelf: "stretch", marginTop: espaco.xs, gap: espaco.sm }}>
-              <Botao rotulo="Que bom!" tamanho="grande" aoTocar={aoFechar} />
-              <CompartilharConquista
-                d={cartaoDoMarco(m, nomeDoBebe)}
-                tinta={cor.primaria}
-                fundoDoBotao={cor.destaque}
+              <Image
+                source={ceu.arte}
+                style={StyleSheet.absoluteFill}
+                contentFit="cover"
+                contentPosition="top"
               />
+              {v.numero != null ? (
+                <Animated.Text
+                  allowFontScaling={false}
+                  style={{
+                    position: "absolute",
+                    top: 4,
+                    ...fonteDoNumero,
+                    fontSize: v.numero >= 10 ? 184 : 200,
+                    lineHeight: 200,
+                    letterSpacing: -8,
+                    fontVariant: ["tabular-nums"],
+                    color: ceu.numero,
+                    textShadowColor: comAlfa(cor.texto, 0.16),
+                    textShadowOffset: { width: 0, height: 6 },
+                    textShadowRadius: 18,
+                    opacity: numeroChega,
+                    transform: [
+                      { translateX: -afasta },
+                      {
+                        translateY: numeroChega.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [30, 0],
+                        }),
+                      },
+                    ],
+                  }}
+                >
+                  {v.numero}
+                </Animated.Text>
+              ) : null}
+              <Animated.View
+                style={{
+                  marginTop: v.numero != null ? 48 : 60,
+                  opacity: chega.interpolate({
+                    inputRange: [0, 0.3, 1],
+                    outputRange: [0, 1, 1],
+                    extrapolate: "clamp",
+                  }),
+                  transform: [
+                    { translateX: afasta },
+                    { scale: chega.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] }) },
+                    { translateY: chega.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) },
+                  ],
+                }}
+              >
+                <BolhaViva humor={v.pose} tamanho={v.numero != null ? BOLHA : BOLHA + 12} />
+              </Animated.View>
             </View>
-          </View>
+
+            <View
+              style={{
+                alignItems: "center",
+                gap: espaco.md,
+                paddingHorizontal: espaco.xl,
+                paddingTop: espaco.lg,
+                paddingBottom: espaco.lg,
+              }}
+            >
+              <View style={{ alignItems: "center", gap: 2 }}>
+                <Sobrelinha tinta={cor.primariaEscura}>{v.sobrelinha}</Sobrelinha>
+                <Text
+                  accessibilityRole="header"
+                  style={{
+                    textAlign: "center",
+                    ...fonte.display,
+                    ...escala.titulo1,
+                    letterSpacing: -0.2,
+                    color: cor.texto,
+                  }}
+                >
+                  {v.titulo}
+                </Text>
+                {v.dado ? (
+                  <Text
+                    style={{
+                      textAlign: "center",
+                      ...fonte.media,
+                      ...escala.legenda,
+                      color: cor.textoApagado,
+                    }}
+                  >
+                    {v.dado}
+                  </Text>
+                ) : null}
+              </View>
+              <BalaoDaBolha texto={v.fala} />
+              <View
+                accessible
+                accessibilityLabel={`Mais ${festa.sementinhas} sementinhas`}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                  borderRadius: canto.pilula,
+                  backgroundColor: cor.sementinhaFundo,
+                  paddingHorizontal: espaco.lg,
+                  paddingVertical: 7,
+                }}
+              >
+                <Sprout size={18} color={cor.sementinha} strokeWidth={2.4} />
+                <Text style={{ ...fonte.titulo, ...escala.chamada, color: cor.sementinha }}>
+                  +{festa.sementinhas} sementinhas
+                </Text>
+              </View>
+              <View style={{ alignSelf: "stretch", marginTop: espaco.xs, gap: espaco.sm }}>
+                <Botao rotulo="Que bom!" tamanho="grande" aoTocar={aoFechar} />
+                {m.tipo === "semana" ? (
+                  <CompartilharNaFesta semana={m.semana} nomeDoBebe={nomeDoBebe} />
+                ) : (
+                  <CompartilharConquista
+                    d={cartaoDoMarco(m, nomeDoBebe)}
+                    tinta={cor.primaria}
+                    fundoDoBotao={cor.destaque}
+                  />
+                )}
+              </View>
+            </View>
+          </ScrollView>
         </View>
         <Confete pecas={48} />
       </View>
     </Modal>
+  );
+}
+
+/**
+ * O BALÃO DA BOLHA: o que ela diz na festa. A ponta sobe para a vitrine, onde
+ * ela está; a névoa lilás do app, e não um cartão branco sobre o branco.
+ */
+function BalaoDaBolha({ texto }: { texto: string }) {
+  return (
+    <View
+      accessible
+      accessibilityLabel={`A Bolha diz: ${texto}`}
+      style={{ alignSelf: "stretch", marginTop: espaco.xs }}
+    >
+      <View
+        style={{
+          position: "absolute",
+          top: -6,
+          left: "50%",
+          marginLeft: -7,
+          width: 14,
+          height: 14,
+          borderRadius: 3,
+          backgroundColor: cor.apagado,
+          transform: [{ rotate: "45deg" }],
+        }}
+      />
+      <View
+        style={{
+          borderRadius: canto.dentro,
+          ...curva,
+          backgroundColor: cor.apagado,
+          paddingHorizontal: espaco.lg,
+          paddingVertical: espaco.md,
+        }}
+      >
+        <Text
+          style={{
+            textAlign: "center",
+            ...fonte.media,
+            ...escala.legenda,
+            color: cor.textoCorpo,
+          }}
+        >
+          {texto}
+        </Text>
+      </View>
+    </View>
   );
 }

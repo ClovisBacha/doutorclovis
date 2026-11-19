@@ -157,6 +157,10 @@ export function bebeDaSemana(semana: number) {
  * "não é sinal de problema"): régua clínica, que o app não dá. Fica o carinho,
  * sem prazo. A tela mostra o título e o corpo; o resto também é trocado, para
  * nenhuma tela futura trazer de volta o "Termo tardio" ou a dica do site.
+ *
+ * 19/11/2026 (bem-estar sem conduta): o corpo da 41 dizia "vale guardar estes
+ * dias com calma: descanso, colo e gente querida" — um conselho, numa trinca.
+ * Virou um desejo, como os outros dois.
  */
 const RETA_FINAL_NO_APP = {
   40: {
@@ -167,7 +171,7 @@ const RETA_FINAL_NO_APP = {
   41: {
     titulo: "Cada bebê tem o seu tempo",
     corpo:
-      "Enquanto o encontro não acontece, vale guardar estes dias com calma: descanso, colo e gente querida por perto.",
+      "Enquanto o encontro não chega, que estes dias sejam de calma e de gente querida por perto.",
   },
   42: {
     titulo: "Pertinho do encontro",

@@ -24,11 +24,17 @@ import { ALVO_MINIMO, escala, espaco, fonte, margem } from "~/tema";
  *
  * 18/11/2026 (a vistoria: "uma segunda implementação, mais pobre, da mesma
  * viagem pelas semanas — e chega a mostrar outro bebê para a mesma semana").
- * Agora é a MESMA cena da aba do bebê: o céu vivo da hora, o número atrás, o
- * bebê da semana (`arteDoBebe`, a regra única) e a régua do tempo — um
- * controle só, no lugar da faixa de 37 fichas e das setas. Embaixo, o mesmo
- * painel da aba (`BebeNestaSemana`) acompanha a semana que a régua mostra; a
- * data provável só aparece na semana de hoje (é dela, e não da semana vista).
+ * Agora é a MESMA cena da aba do bebê: o céu vivo da hora, o número atrás, a
+ * Bolha na frente e a régua do tempo — um controle só, no lugar da faixa de
+ * 37 fichas e das setas. Embaixo, o mesmo painel da aba (`BebeNestaSemana`)
+ * acompanha a semana que a régua mostra; a data provável só aparece na semana
+ * de hoje (é dela, e não da semana vista).
+ *
+ * 19/11/2026, decisão do dono ("Eu quero tirar as imagens dos bebês [...] o
+ * número 24 ali estava muito bacana"): nenhuma ilustração do bebê, em semana
+ * nenhuma. Quem conta o tempo é o número gigante; a Bolha, a guia do app, fica
+ * na frente dele, e faz cara de surpresa quando ela viaja pelas semanas
+ * (`ceu-do-bebe.tsx`). A catraca é `sem-bebe-ilustrado.test.ts`.
  */
 export default function Bebe() {
   const { perfil, cuidado } = useSessao();

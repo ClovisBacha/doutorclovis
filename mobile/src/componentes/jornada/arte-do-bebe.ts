@@ -3,8 +3,13 @@
  * e 40 semanas), nunca a próxima. Uma regra só para o app inteiro (18/11/2026,
  * a vistoria): o "semana a semana" usava a arte mais PRÓXIMA (`semanaDaArte`
  * do site) e, da 26 à 29 e da 36 à 39, mostrava outro bebê para a mesma
- * semana, adiantado. A tela do bebê, o semana a semana, a barra que nasce, a
- * festa da semana e o cartão dos Stories passam todos por aqui.
+ * semana, adiantado.
+ *
+ * ⚠️ 19/11/2026, decisão do dono: o app não desenha mais o bebê ("Eu quero
+ * tirar as imagens dos bebês"). O céu, o semana a semana, a festa da semana e
+ * o cartão dos Stories já mostram a Bolha na frente do número. Este arquivo
+ * fica só enquanto um arquivo da lista provisória de
+ * `sem-bebe-ilustrado.test.ts` ainda o usa; com a lista zerada, ele sai.
  */
 const BEBES = [
   { desde: 0, arte: require("../../../../src/assets/bebes/semana-06.webp") },
