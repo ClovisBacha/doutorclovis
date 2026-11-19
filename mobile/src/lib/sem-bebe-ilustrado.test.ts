@@ -55,14 +55,8 @@ const BEBE_ILUSTRADO: readonly { nome: string; re: RegExp }[] = [
  * (o segundo teste cobra), e nenhum arquivo novo entra.
  */
 const AINDA_DESENHAM_O_BEBE: readonly string[] = [
-  /* A definição: sai quando a revelação deixar de usá-la. */
-  "componentes/jornada/arte-do-bebe.ts",
-  /* Pacote A: a revelação do ritual (o bebê da semana). */
-  "componentes/revelacao-do-bebe.tsx",
-  /* Pacote D: o nascimento e o 4º trimestre (o recém-nascido enrolado). */
-  "componentes/jornada/nascimento.tsx",
-  "app/jornada/nascimento.tsx",
-  "componentes/jornada/hoje-pos.tsx",
+  /* Zerada em 19/11/2026, depois de juntar os pacotes A–E: nenhum arquivo do
+     app desenha mais o bebê. Não volta a crescer. */
 ];
 
 const usos = (codigo: string) => BEBE_ILUSTRADO.filter((b) => b.re.test(codigo)).map((b) => b.nome);

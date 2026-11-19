@@ -185,7 +185,7 @@ const Respostas = memo(function Respostas({
     <View style={{ flexDirection: "row", flexWrap: "wrap", gap: espaco.sm, paddingLeft: 72 }}>
       {respostas.map((r, i) => {
         const cheio = r.tipo === "abrir" && i === 0;
-        const emoji = r.tipo === "humor" ? EMOJI_DO_HUMOR[r.humor] : null;
+        const emoji = r.tipo === "humor" ? (r.emoji ?? EMOJI_DO_HUMOR[r.humor]) : null;
         return (
           <Tocavel
             key={r.id}

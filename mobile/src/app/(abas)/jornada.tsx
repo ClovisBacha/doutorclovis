@@ -85,7 +85,6 @@ import {
   type ChaveDoCuidado,
 } from "~/lib/jornada/hoje";
 import { primeiroNome } from "~/lib/gestacao";
-import { recadoDaBolhaNoApp } from "~/lib/recado-da-bolha";
 import { ConversaComABolha } from "~/componentes/bolha/conversa";
 import type { ContextoDaBolha, Destino } from "~/lib/bolha/conversa";
 import { BarraDoTopo, voltarParaJornada } from "~/componentes/jornada/pecas";
@@ -548,6 +547,7 @@ export function JornadaDaGestacao({
           cuidados={cuidados}
           bolha={
             <ConversaComABolha
+              key={feitosDeHoje.length}
               contexto={contextoDaBolha}
               aoAbrir={aoAbrirDaBolha}
               aoMarcarHumor={aoMarcarHumor}
@@ -926,15 +926,7 @@ export function JornadaDoPosParto({
         flags={flags}
         humorDeHoje={humorDeHoje}
         desafio={terminou ? null : desafioDoPos(D)}
-        recado={recadoDaBolhaNoApp({
-          feitos,
-          total: 3,
-          dia: D,
-          hora,
-          bebe: nomeDoBebe ?? undefined,
-          posParto: true,
-          careMode: false,
-        })}
+        nomeDela={primeiroNome(perfil.display_name)}
         chama={diasDeChama}
         figurinhas={figurinhas}
         avisos={avisos}

@@ -238,9 +238,9 @@ export function lerResultadoDaIndicacao(
 export function fraseDaIndicacao(r: ResultadoDaIndicacao, bonus: number): string {
   switch (r) {
     case "ligou":
-      return `Pronto: vocês agora são amigas 💛 Ela ganhou ${bonus} sementinhas e aparece nas suas Amigas.`;
+      return `Pronto, vocês agora são amigas. Ela ganhou ${bonus} sementinhas e já aparece nas suas Amigas.`;
     case "nao-encontrou":
-      return "Não encontrei esse código — ou você já entrou pelo convite de outra amiga. Confira as letras com ela.";
+      return "Não encontrei esse código, ou você já entrou pelo convite de outra amiga. Confira as letras com ela.";
     case "depois":
       return "Guardei o código: assim que a sua conta terminar de ficar pronta, eu ligo vocês.";
     default:
