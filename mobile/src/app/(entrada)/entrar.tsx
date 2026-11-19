@@ -17,9 +17,10 @@ import { Botao, selecao, toque } from "~/componentes/base";
 import {
   VitrineDaAula,
   VitrineDaBolha,
-  VitrineDasAmigas,
+  VitrineDaPausa,
   VitrineDaTrilha,
   VitrineDoFim,
+  VitrineDoMexer,
 } from "~/componentes/boas-vindas";
 import {
   CHAVE_JA_ENTROU,
@@ -36,20 +37,29 @@ import { Vidro } from "~/componentes/vidro";
 import { appleDisponivel, entrarComApple } from "~/lib/apple";
 import { lerJson } from "~/lib/armazem";
 import { parametroDaBancada } from "~/lib/bancada";
+import { SLIDES } from "~/lib/boas-vindas";
 import { cor, escala, espaco, fonte } from "~/tema";
 
 /**
  * AS BOAS-VINDAS (17/11/2026, o dono: "um caminho que nem a gente está
  * fazendo do Marca Ponto, de slides para você entrar no aplicativo").
  *
- * Como no Marca Ponto: o produto ANTES de pedir qualquer coisa. Cinco slides
+ * Como no Marca Ponto: o produto ANTES de pedir qualquer coisa. Seis slides
  * que deslizam com o dedo (ou com "Continuar"), sobre o céu vivo da hora. A
  * vitrine anda mais devagar que o slide (a profundidade das apresentações da
  * Apple); com "reduzir movimento", ela só esmaece.
  *
- *   0. a bolha e o nome — "Começar" ou "Já tenho conta";
- *   1. a aula do dia · 2. a trilha que vira jogo · 3. as amigas;
- *   4. a conta: Apple, e-mail, ou "já tenho conta".
+ * 19/11/2026, o dono: "eu quero vender esse aplicativo [...] um aplicativo de
+ * bem-estar materno [...] o bebê bolha será esse guia neste caminho". Os
+ * slides vendem bem-estar, com a Bolha conduzindo:
+ *
+ *   0. a Bolha se apresenta, num balão, e o nome do app — "Começar" ou
+ *      "Já tenho conta";
+ *   1. a aula do dia · 2. respirar (a meditação e os sons da noite) ·
+ *   3. mexer o corpo · 4. a trilha com uma amiga;
+ *   5. a conta: Apple, e-mail, ou "já tenho conta", com a Bolha comemorando.
+ *
+ * Os textos moram em `lib/boas-vindas.ts`, com a catraca de conteúdo.
  *
  * Quem já entrou neste aparelho (`CHAVE_JA_ENTROU`) abre direto no último
  * slide, no modo "que bom te ver de novo" — sem refazer a apresentação.
@@ -59,7 +69,7 @@ import { cor, escala, espaco, fonte } from "~/tema";
  * quem volta.
  */
 
-const TOTAL = 5;
+const TOTAL = 6;
 const FIM = TOTAL - 1;
 
 type Modo = "nova" | "voltou";
@@ -140,11 +150,13 @@ export default function BoasVindas() {
   if (modo === null) return <FundoDaEntrada>{null}</FundoDaEntrada>;
 
   const voltou = modo === "voltou";
-  const slides: { vitrine: ReactNode; titulo: string; texto: string; acoes: ReactNode }[] = [
+  const continuar = (n: number) => (
+    <Botao rotulo="Continuar" aoTocar={() => ir(n)} estilo={{ minHeight: 56 }} />
+  );
+  const slides: { vitrine: ReactNode; titulo: string; texto?: string; acoes: ReactNode }[] = [
     {
-      vitrine: <VitrineDaBolha largura={width} />,
-      titulo: "Mãe Esperta",
-      texto: "Aprenda sobre a sua gravidez jogando.",
+      vitrine: <VitrineDaBolha largura={width} altura={height} ativa={pagina === 0} />,
+      ...SLIDES.bolha,
       acoes: (
         <>
           <Botao rotulo="Começar" aoTocar={() => ir(1)} estilo={{ minHeight: 56 }} />
@@ -158,30 +170,15 @@ export default function BoasVindas() {
         </>
       ),
     },
+    { vitrine: <VitrineDaAula largura={width} />, ...SLIDES.aula, acoes: continuar(2) },
+    { vitrine: <VitrineDaPausa largura={width} />, ...SLIDES.pausa, acoes: continuar(3) },
+    { vitrine: <VitrineDoMexer largura={width} />, ...SLIDES.mexer, acoes: continuar(4) },
+    { vitrine: <VitrineDaTrilha largura={width} />, ...SLIDES.trilha, acoes: continuar(5) },
     {
-      vitrine: <VitrineDaAula largura={width} />,
-      titulo: "Uma aula curta por dia",
-      texto: "Perguntas rápidas sobre a semana em que você está. Cada acerto vale sementinhas.",
-      acoes: <Botao rotulo="Continuar" aoTocar={() => ir(2)} estilo={{ minHeight: 56 }} />,
-    },
-    {
-      vitrine: <VitrineDaTrilha largura={width} />,
-      titulo: "Cada dia é um passo na trilha",
-      texto: "Faça a aula e ganhe estrelas. Volte amanhã e a chama cresce.",
-      acoes: <Botao rotulo="Continuar" aoTocar={() => ir(3)} estilo={{ minHeight: 56 }} />,
-    },
-    {
-      vitrine: <VitrineDasAmigas largura={width} />,
-      titulo: "Jogue junto com uma amiga",
-      texto: "Formem uma dupla. Quando as duas fecham o dia, cada uma ganha sementinhas.",
-      acoes: <Botao rotulo="Continuar" aoTocar={() => ir(4)} estilo={{ minHeight: 56 }} />,
-    },
-    {
-      vitrine: <VitrineDoFim largura={width} ativa={pagina === FIM} />,
-      titulo: voltou ? "Que bom te ver de novo" : "Crie a sua conta",
-      texto: voltou
-        ? "Entre e continue a trilha de onde parou."
-        : "Leva um minuto. Depois, é só dizer em que semana você está.",
+      vitrine: (
+        <VitrineDoFim largura={width} altura={height} ativa={pagina === FIM} voltou={voltou} />
+      ),
+      ...(voltou ? SLIDES.voltou : SLIDES.conta),
       acoes: (
         <>
           {erro ? <ErroNoVeu>{erro}</ErroNoVeu> : null}
@@ -294,7 +291,7 @@ export default function BoasVindas() {
                 <TituloNoVeu centro nivel={i === 0 ? "grande" : "titulo1"}>
                   {s.titulo}
                 </TituloNoVeu>
-                <TextoNoVeu centro>{s.texto}</TextoNoVeu>
+                {s.texto ? <TextoNoVeu centro>{s.texto}</TextoNoVeu> : null}
                 <View style={{ gap: espaco.sm, marginTop: espaco.lg }}>{s.acoes}</View>
               </ColunaDaEntrada>
             </View>
@@ -307,9 +304,10 @@ export default function BoasVindas() {
 }
 
 /**
- * O alto dos slides 1 a 4: os tracinhos do progresso (cada um enche enquanto
- * o dedo arrasta) e o "Pular", de vidro (ele flutua sobre o céu, que de manhã
- * é claro). Some no slide 0, onde só há a bolha e o nome.
+ * O alto dos slides 1 em diante: os tracinhos do progresso (cada um enche
+ * enquanto o dedo arrasta) e o "Pular", de vidro (ele flutua sobre o céu, que
+ * de manhã é claro). Some no slide 0, onde só há a Bolha e o nome; o "Pular"
+ * some também no último, que já é a conta.
  */
 function BarraDoAlto({
   x,
@@ -384,7 +382,7 @@ function BarraDoAlto({
         <Animated.View
           style={{
             opacity: x.interpolate({
-              inputRange: [largura * 0.5, largura, largura * 3, largura * 3.5],
+              inputRange: [largura * 0.5, largura, largura * (FIM - 1), largura * (FIM - 0.5)],
               outputRange: [0, 1, 1, 0],
               extrapolate: "clamp",
             }),

@@ -1,8 +1,9 @@
 import { dueDateFromLmp } from "@/lib/gestacao";
 import { router, useLocalSearchParams } from "expo-router";
-import { useRef, useState, type ReactNode } from "react";
+import { useRef, useState } from "react";
 import { View } from "react-native";
 import { Botao, sucesso } from "~/componentes/base";
+import { FalaDaBolha, RespostaDela } from "~/componentes/bolha/na-entrada";
 import {
   CampoNoVeu,
   ErroNoVeu,
@@ -12,11 +13,9 @@ import {
   MolduraDoPasso,
   SegmentosDoPasso,
   TextoNoVeu,
-  TituloNoVeu,
   TopoDoPasso,
 } from "~/componentes/entrada";
-import { BolhaViva } from "~/componentes/movimento";
-import { RevelacaoDoBebe } from "~/componentes/revelacao-do-bebe";
+import { RevelacaoDaSemana } from "~/componentes/revelacao-da-semana";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { gravarPerfil } from "~/lib/gravar-perfil";
 import { abrirLoja, gravarChave } from "~/lib/jornada/loja";
@@ -36,15 +35,17 @@ import { ligarPeloCodigo } from "~/componentes/amigas/economia";
 import { codigoLimpo, fraseDaIndicacao, type ResultadoDaIndicacao } from "~/lib/jornada/amigas";
 import { RECOMPENSA_DA_INDICACAO } from "~/lib/jornada/recompensas";
 import {
+  falaDoRitual,
   ordemDoRitual,
   PASSO_DO_CONTATO,
   PASSO_DO_MEDICO,
-  revelaOBebe,
+  revelaASemana,
   semanaDaRevelacao,
+  type FalaDoRitual,
   type ModoDaData,
 } from "~/lib/ritual";
 import { useSessao } from "~/lib/sessao";
-import { canto, curva, espaco } from "~/tema";
+import { espaco } from "~/tema";
 import { COMUNIDADE_NO_APP, SOS_NO_APP } from "~/config";
 
 type Modo = ModoDaData;
@@ -70,11 +71,20 @@ type Erro = { texto: string; vez: number; campo?: Campo };
  * clara e fica no MESMO céu da entrada, com a moldura de passo dela (os
  * tracinhos, o voltar de vidro, o passo novo deslizando da direita e o botão
  * preso acima do teclado). Com o SOS desligado, o contato e o médico saem
- * (`ordemDoRitual`). No fim do primeiro ritual, a REVELAÇÃO do bebê da semana
- * (`revelaOBebe`), e só então a primeira aba.
+ * (`ordemDoRitual`).
+ *
+ * 19/11/2026, o dono: "o bebê bolha vai ser aquele personagem que vai
+ * conversar com a mãe". A BOLHA CONDUZ: cada pergunta chega como fala dela,
+ * num balão (com os três pontinhos antes), e a resposta do passo anterior
+ * aparece do lado direito, como na conversa da aba do Bebê. O que ela diz
+ * mora em `falaDoRitual` (`lib/ritual.ts`, com catraca). No fim do primeiro
+ * ritual, a REVELAÇÃO: a Bolha comemorando na frente do número da semana
+ * (`revelaASemana`), e só então a primeira aba.
  *
  * Bancada: /ritual?bancada=1 · `&passo=N` abre num passo · `&revelar=24`
- * abre na revelação.
+ * abre na revelação · `&nome=`, `&data=dd/mm/aaaa`, `&bebe=`, `&codigo=` e
+ * `&indicacao=ligou|nao-encontrou|depois|falhou` preenchem as respostas (os
+ * mesmos estados da tela).
  */
 export default function Ritual() {
   const { sessao, perfil, recarregarPerfil } = useSessao();
@@ -90,22 +100,26 @@ export default function Ritual() {
   const [direcao, setDirecao] = useState<1 | -1>(1);
   /* Nunca o começo do e-mail: é o nome que as amigas veem (nome-do-cadastro.ts). */
   const [nome, setNome] = useState(
-    nomeParaSugerir({
-      doPerfil: perfil?.display_name,
-      daConta: sessao?.user.user_metadata?.display_name as string | undefined,
-      email: sessao?.user.email,
-    }),
+    () =>
+      parametroDaBancada("nome") ??
+      nomeParaSugerir({
+        doPerfil: perfil?.display_name,
+        daConta: sessao?.user.user_metadata?.display_name as string | undefined,
+        email: sessao?.user.email,
+      }),
   );
   const modoInicial: Modo = perfil?.birth_date ? "nasceu" : perfil?.reference_date ? "us" : "dum";
   const [modo, setModo] = useState<Modo>(modoInicial);
   const [data, setData] = useState(
-    deYmd(
-      modoInicial === "nasceu"
-        ? perfil?.birth_date
-        : modoInicial === "us"
-          ? perfil?.reference_date
-          : perfil?.lmp_date,
-    ),
+    () =>
+      parametroDaBancada("data") ??
+      deYmd(
+        modoInicial === "nasceu"
+          ? perfil?.birth_date
+          : modoInicial === "us"
+            ? perfil?.reference_date
+            : perfil?.lmp_date,
+      ),
   );
   const [semanasUs, setSemanasUs] = useState(
     perfil?.reference_weeks != null ? String(perfil.reference_weeks) : "",
@@ -113,14 +127,17 @@ export default function Ritual() {
   const [diasUs, setDiasUs] = useState(
     perfil?.reference_days != null ? String(perfil.reference_days) : "",
   );
-  const [bebe, setBebe] = useState(perfil?.baby_name ?? "");
+  const [bebe, setBebe] = useState(() => parametroDaBancada("bebe") ?? perfil?.baby_name ?? "");
   const [contato, setContato] = useState(perfil?.emergency_contact ?? "");
   const [telefone, setTelefone] = useState(perfil?.emergency_phone ?? "");
   const [medicoNome, setMedicoNome] = useState(perfil?.medico_nome ?? "");
   const [medicoCelular, setMedicoCelular] = useState(perfil?.medico_celular ?? "");
   const [medicoEmail, setMedicoEmail] = useState(perfil?.medico_email ?? "");
-  const [codigo, setCodigo] = useState("");
-  const [indicacao, setIndicacao] = useState<ResultadoDaIndicacao | null>(null);
+  const [codigo, setCodigo] = useState(() => parametroDaBancada("codigo") ?? "");
+  const [indicacao, setIndicacao] = useState<ResultadoDaIndicacao | null>(() => {
+    const r = parametroDaBancada("indicacao");
+    return r === "ligou" || r === "nao-encontrou" || r === "depois" || r === "falhou" ? r : null;
+  });
   const [ligando, setLigando] = useState(false);
   const [erro, setErro] = useState<Erro | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -225,9 +242,9 @@ export default function Ritual() {
 
   async function salvar() {
     const ymd = paraYmd(data);
-    /* O primeiro ritual termina revelando o bebê da semana (nunca corrigindo
-       a data, nunca depois do parto, nunca no Modo Cuidado). */
-    const semana = revelaOBebe({ editar, modo, cuidado: perfil?.care_mode === true })
+    /* O primeiro ritual termina revelando a semana, com a Bolha (nunca
+       corrigindo a data, nunca depois do parto, nunca no Modo Cuidado). */
+    const semana = revelaASemana({ editar, modo, cuidado: perfil?.care_mode === true })
       ? semanaDaRevelacao({
           modo,
           ymd,
@@ -308,10 +325,22 @@ export default function Ritual() {
   if (revelacao != null)
     return (
       <FundoDaEntrada veu="inteiro">
-        <RevelacaoDoBebe semana={revelacao} aoTerminar={abrirAsAbas} />
+        <RevelacaoDaSemana semana={revelacao} nome={nome} aoTerminar={abrirAsAbas} />
       </FundoDaEntrada>
     );
 
+  /* O que a Bolha diz neste passo, e a resposta do passo anterior do lado dela. */
+  const fala = falaDoRitual({
+    passo,
+    editar,
+    modo,
+    nome,
+    data,
+    semanasUs,
+    diasUs,
+    bebe,
+    anterior: indice > 0 ? (ordem[indice - 1] ?? null) : null,
+  });
   const erroEm = (campo: Campo) => (erro?.campo === campo ? erro : null);
   const campoComErro = (campo: Campo) => ({
     erro: erroEm(campo)?.texto,
@@ -332,18 +361,15 @@ export default function Ritual() {
         chave={passo}
         direcao={direcao}
         topo={
-          <>
-            <TopoDoPasso aoVoltar={voltar} semVoltar={!voltar}>
-              <SegmentosDoPasso total={ordem.length} atual={indice} />
-            </TopoDoPasso>
-            <BolhaViva humor={ultimo ? "comemorando" : "feliz"} tamanho={72} />
-          </>
+          <TopoDoPasso aoVoltar={voltar} semVoltar={!voltar}>
+            <SegmentosDoPasso total={ordem.length} atual={indice} />
+          </TopoDoPasso>
         }
         pe={
           <>
             {erro && !erro.campo ? <ErroNoVeu>{erro.texto}</ErroNoVeu> : null}
             <Botao
-              rotulo={ultimo ? "Começar" : "Continuar"}
+              rotulo={ultimo ? (editar ? "Salvar" : "Começar") : "Continuar"}
               tamanho="grande"
               aoTocar={() => void avancar()}
               carregando={salvando || (passo === PASSO_DA_REDE && ligando)}
@@ -359,30 +385,27 @@ export default function Ritual() {
           </>
         }
       >
+        <Conversa fala={fala} />
+
         {passo === 0 ? (
-          <>
-            <Cabeca titulo="Como você quer ser chamada?">
-              É o nome que as suas amigas veem no app.
-            </Cabeca>
-            <CampoNoVeu
-              rotulo="Seu nome"
-              value={nome}
-              onChangeText={setNome}
-              autoFocus={!nome}
-              autoComplete="name"
-              textContentType="givenName"
-              autoCapitalize="words"
-              returnKeyType="next"
-              onSubmitEditing={() => void avancar()}
-              placeholder="Ex.: Marina"
-              {...campoComErro("nome")}
-            />
-          </>
+          <CampoNoVeu
+            rotulo="Seu nome"
+            value={nome}
+            onChangeText={setNome}
+            autoFocus={!nome}
+            autoComplete="name"
+            textContentType="givenName"
+            autoCapitalize="words"
+            returnKeyType="next"
+            onSubmitEditing={() => void avancar()}
+            placeholder="Ex.: Marina"
+            dica="É o nome que as suas amigas veem no app."
+            {...campoComErro("nome")}
+          />
         ) : null}
 
         {passo === 1 ? (
           <>
-            <Cabeca titulo="Em que fase você está?" />
             <View style={{ gap: espaco.sm }}>
               <EscolhaNoVeu
                 rotulo="Sei a data da última menstruação"
@@ -449,28 +472,19 @@ export default function Ritual() {
         ) : null}
 
         {passo === 2 ? (
-          <>
-            <Cabeca titulo={modo === "nasceu" ? "Como se chama o bebê?" : "O bebê já tem nome?"}>
-              Pode deixar em branco se ainda não decidiram.
-            </Cabeca>
-            <CampoNoVeu
-              rotulo="Nome do bebê"
-              value={bebe}
-              onChangeText={setBebe}
-              autoFocus={!bebe}
-              autoCapitalize="words"
-              returnKeyType="next"
-              onSubmitEditing={() => void avancar()}
-            />
-          </>
+          <CampoNoVeu
+            rotulo="Nome do bebê"
+            value={bebe}
+            onChangeText={setBebe}
+            autoFocus={!bebe}
+            autoCapitalize="words"
+            returnKeyType="next"
+            onSubmitEditing={() => void avancar()}
+          />
         ) : null}
 
         {passo === PASSO_DO_CONTATO && SOS_NO_APP ? (
           <>
-            <Cabeca titulo="Quem avisar numa emergência?">
-              No SOS, o app liga para o 192 e manda a sua localização para esta pessoa, mesmo sem
-              internet, por SMS.
-            </Cabeca>
             <CampoNoVeu
               rotulo="Nome do contato"
               value={contato}
@@ -493,11 +507,11 @@ export default function Ritual() {
 
         {passo === PASSO_DO_MEDICO ? (
           <>
-            <Cabeca titulo="Quem acompanha a sua gestação?">
+            <TextoNoVeu nivel="legenda">
               {SOS_NO_APP
                 ? "No SOS, o app manda o e-mail de emergência para o seu médico ou médica e deixa a mensagem pronta no WhatsApp, com a sua localização."
                 : "Fica guardado na sua conta, para você ter o contato sempre à mão."}
-            </Cabeca>
+            </TextoNoVeu>
             <CampoNoVeu
               rotulo="Nome do médico ou médica"
               value={medicoNome}
@@ -525,12 +539,6 @@ export default function Ritual() {
 
         {passo === PASSO_DA_REDE ? (
           <>
-            <Cabeca titulo="Uma amiga te chamou?">
-              {modo === "nasceu"
-                ? `Digite o código dela e vocês viram amigas no app. Ela ganha ${RECOMPENSA_DA_INDICACAO} sementinhas.`
-                : `Digite o código dela e vocês viram amigas no app, prontas para formar uma dupla. Ela ganha ${RECOMPENSA_DA_INDICACAO} sementinhas.`}
-              {COMUNIDADE_NO_APP ? " Vocês também se veem na Comunidade." : ""}
-            </Cabeca>
             <CampoNoVeu
               rotulo="Código da amiga"
               value={codigo}
@@ -541,6 +549,13 @@ export default function Ritual() {
               autoCapitalize="characters"
               autoCorrect={false}
               placeholder="Ex.: JULI7K"
+              dica={
+                (modo === "nasceu"
+                  ? "Com o código, vocês já entram como amigas."
+                  : "Com o código, vocês já entram como amigas, prontas para formar uma dupla.") +
+                ` Quem te chamou ganha ${RECOMPENSA_DA_INDICACAO} sementinhas.` +
+                (COMUNIDADE_NO_APP ? " Vocês também se veem na Comunidade." : "")
+              }
               {...campoComErro("codigo")}
             />
             {/* O botão aparece quando há um código para usar (o "Começar"
@@ -554,19 +569,24 @@ export default function Ritual() {
                 aoTocar={() => void ligar()}
               />
             ) : null}
+            {/* O resultado do código é a Bolha respondendo (as frases são dela,
+                na primeira pessoa: "Guardei o código", "eu ligo vocês"). */}
             {indicacao ? (
-              <View
-                accessibilityLiveRegion="polite"
-                style={{
-                  padding: espaco.lg,
-                  borderRadius: canto.dentro,
-                  ...curva,
-                  backgroundColor: "rgba(255,255,255,0.1)",
-                }}
-              >
-                <TextoNoVeu nivel="legenda">
-                  {fraseDaIndicacao(indicacao, RECOMPENSA_DA_INDICACAO)}
-                </TextoNoVeu>
+              <View style={{ gap: espaco.md }}>
+                <RespostaDela texto={codigoLimpo(codigo)} />
+                <FalaDaBolha
+                  texto={fraseDaIndicacao(indicacao, RECOMPENSA_DA_INDICACAO)}
+                  pose={
+                    indicacao === "ligou"
+                      ? "comemorando"
+                      : indicacao === "depois"
+                        ? "feliz"
+                        : "surpresa"
+                  }
+                  tamanho={56}
+                  nivel="corpo"
+                  escrever
+                />
               </View>
             ) : null}
             <TextoNoVeu nivel="nota">
@@ -579,12 +599,16 @@ export default function Ritual() {
   );
 }
 
-/** O título de um passo (a serifada) e a linha de apoio, se houver. */
-function Cabeca({ titulo, children }: { titulo: string; children?: ReactNode }) {
+/**
+ * A conversa de um passo: a resposta que ela deu no passo anterior, do lado
+ * direito, e a pergunta da Bolha, com os três pontinhos antes (cada passo
+ * monta a sua, então a Bolha "escreve" a cada pergunta nova).
+ */
+function Conversa({ fala }: { fala: FalaDoRitual }) {
   return (
-    <View style={{ gap: espaco.sm }}>
-      <TituloNoVeu>{titulo}</TituloNoVeu>
-      {children ? <TextoNoVeu>{children}</TextoNoVeu> : null}
+    <View style={{ gap: espaco.md }}>
+      {fala.dela ? <RespostaDela texto={fala.dela} /> : null}
+      <FalaDaBolha texto={fala.texto} pose={fala.pose} escrever pergunta />
     </View>
   );
 }
