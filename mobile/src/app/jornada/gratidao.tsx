@@ -1,4 +1,5 @@
 import * as Haptics from "expo-haptics";
+import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
@@ -23,6 +24,7 @@ import { Cartao, T, toque } from "~/componentes/base";
 import {
   BolhaComBalao,
   BotaoDaAtividade,
+  Brilho,
   CarregandoAtividade,
   fecharAtividade,
   FundoDaAtividade,
@@ -50,11 +52,17 @@ import { ALVO_MINIMO, canto, cor, curva, escala, espaco, fonte, luz, margem, som
  * então o diário mostra o que ela escreveu aqui. Escrita que falhou NUNCA vira
  * "guardado": o texto fica na tela para tentar de novo.
  *
+ * A BOLHA GUIA (19/11/2026): é ela quem pergunta, quem guarda e quem conta
+ * quantas já são ("Já são 23 coisas boas comigo"). No fim, o diário é o
+ * objeto da festa e a fala dela vem no balão, como nas outras atividades.
+ *
  * Bancada: /jornada/gratidao?bancada=1 [&etapa=guardado|lista|resumo|feita|erro]
  *          [&marco=25] [&carta=1] [&dificil=1] [&luto=1]
  */
 
 const PALETA = corDaAtividade.gratidao;
+/** O diário, nas artes 3D do app: o objeto da festa (a Bolha fala no balão). */
+const ARTE_DO_DIARIO = require("../../../../src/assets/grades/diario.webp");
 /** A carta é do Momento com o bebê: o aviso dela vem na cor de quem recebe a visita. */
 const CARTA = corDaAtividade.carta;
 
@@ -274,7 +282,20 @@ export default function GratidaoTela() {
             titulo="Guardei"
             /* O confete GRANDE só no número redondo — no dia comum, a estrela. */
             confete={marco ? "grande" : false}
-            fala={frase.replace(/^Guardei 💛\s*/, "")}
+            /* "E olha o que você me contou antes:" apontava para um cartão
+               que mora lá embaixo, depois do placar. */
+            balao={frase.replace(/^Guardei 💛\s*/, "").replace(/:$/, ", lá embaixo.")}
+            arte={
+              <View style={{ alignItems: "center", justifyContent: "center" }}>
+                <Brilho tamanho={200} tinta={PALETA.luz} />
+                <Image
+                  source={ARTE_DO_DIARIO}
+                  accessibilityIgnoresInvertColors
+                  style={{ width: 128, height: 128 }}
+                  contentFit="contain"
+                />
+              </View>
+            }
             desfecho={desfecho}
             D={at.D}
             cuidado={at.cuidado}

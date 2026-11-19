@@ -28,6 +28,7 @@ import { familiasDeSom, type SomKey } from "@/lib/som-receitas";
 import { ROTULO_DO_SOM_NO_APP } from "~/lib/jornada/sons";
 import { toque } from "~/componentes/base";
 import {
+  BolhaComBalao,
   BotaoRedondo,
   fecharAtividade,
   FundoDaNoite,
@@ -44,6 +45,7 @@ import { pararCanal, tocarVoz } from "~/lib/audio/voz";
 import { VOZ_REGRAVADA } from "~/lib/audio/regravadas";
 import { VOZ_DA_NOITE } from "~/lib/audio/vozes";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
+import { FALA_DOS_SONS } from "~/lib/jornada/bolha-nos-cuidados";
 import { ALVO_MINIMO, canto, curva, escala, espaco, fonte, margem } from "~/tema";
 
 /**
@@ -65,6 +67,10 @@ import { ALVO_MINIMO, canto, curva, escala, espaco, fonte, margem } from "~/tema
  * olho semiaberto ela precisava rolar até eles. E a tela não se redesenha mais
  * a cada segundo: só a contagem do tocador (`ContagemDoSom`) tem relógio.
  *
+ * A BOLHA GUIA (19/11/2026): de olhos fechados, ela abre a tela dizendo o
+ * que a tela faz (escolher, apagar a tela, o som desliga sozinho), no balão
+ * escuro da noite. A história continua com a voz gravada, sem texto na tela.
+ *
  * Bancada: /jornada/dormir?bancada=1 [&som=chuva] [&pausado=1] [&historia=casa-do-mar|trem-da-noite] [&escuro=1]
  */
 
@@ -73,9 +79,6 @@ const ARTE_DA_HISTORIA: Record<string, number> = {
   "casa-do-mar": require("../../../../src/assets/sons/historia-mar.webp"),
   "trem-da-noite": require("../../../../src/assets/sons/historia-trem.webp"),
 };
-
-/** Os fones com a lua, nas artes 3D do app: o cabeçalho da tela. */
-const ARTE_DOS_SONS = require("../../../../src/assets/grades/sons.webp");
 
 /** Muitas cópias na fila: a de dormir pode tocar a noite inteira, e a fila só soluça ao se refazer. */
 const COPIAS_DA_NOITE = 120;
@@ -227,35 +230,19 @@ export default function Dormir() {
           paddingBottom: som ? 150 : espaco.xxl,
         }}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.md }}>
-          <Image
-            source={ARTE_DOS_SONS}
-            style={{ width: 56, height: 56 }}
-            contentFit="contain"
-            accessible={false}
-          />
-          <Text
-            accessibilityRole="header"
-            style={{
-              flex: 1,
-              ...fonte.display,
-              ...escala.titulo1,
-              letterSpacing: -0.2,
-              color: corNoite.texto,
-            }}
-          >
-            Para dormir
-          </Text>
-        </View>
+        {/* A Bolha no lugar dos fones: é ela quem explica a tela, de olhos fechados. */}
+        <BolhaComBalao lado escuro humor="dormindo" fala={FALA_DOS_SONS} />
         <Text
+          accessibilityRole="header"
           style={{
-            marginTop: espaco.sm,
-            ...fonte.normal,
-            ...escala.legenda,
-            color: corNoite.textoCorpo,
+            marginTop: espaco.xl,
+            ...fonte.display,
+            ...escala.titulo1,
+            letterSpacing: -0.2,
+            color: corNoite.texto,
           }}
         >
-          Pode apagar a tela e deixar o celular de lado. O som continua tocando.
+          Para dormir
         </Text>
 
         <Secao escuro>Histórias</Secao>

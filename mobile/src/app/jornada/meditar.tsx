@@ -35,6 +35,7 @@ import type { SomKey } from "@/lib/som-receitas";
 import { ROTULO_DO_SOM_NO_APP } from "~/lib/jornada/sons";
 import { casalAberto } from "~/lib/jornada/casal";
 import { toque } from "~/componentes/base";
+import { BolhaViva } from "~/componentes/movimento";
 import {
   ArteDaLinha,
   BolhaComBalao,
@@ -78,6 +79,13 @@ import { HORA_PADRAO, HORARIOS, horaValida } from "~/lib/jornada/lembrete";
 import { VOZ_REGRAVADA } from "~/lib/audio/regravadas";
 import { VOZ_DA_MEDITACAO, VOZ_DA_RESPIRACAO } from "~/lib/audio/vozes";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
+import {
+  FALA_DO_REFLEXO,
+  falaDaMeditacao,
+  falaDaPausa,
+  FIM_DA_MEDITACAO_SEM_RESPOSTA,
+  RESPIRA_COMIGO,
+} from "~/lib/jornada/bolha-nos-cuidados";
 import { ymdLocal } from "~/lib/gestacao";
 import { anotarNoDiario } from "~/lib/jornada/diario";
 import { gravarChave, useLoja } from "~/lib/jornada/loja";
@@ -87,7 +95,6 @@ import {
   DURACAO_PADRAO_MEDITAR,
   DURACOES_MEDITAR,
   ESCALA_RESPIRO,
-  falaDoBalao,
   falaDoFechamento,
   FECHAMENTO,
   formatarRestante,
@@ -126,6 +133,11 @@ import {
  * falas GRAVADAS do site nos ciclos que o plano marca e as palavras "inspire,
  * segure, solte" no começo. No fim, "Como você está agora?" — e a última fala
  * responde ao que ela disse.
+ *
+ * A BOLHA GUIA (19/11/2026): de olhos fechados, ela abre a tela (o dia do
+ * programa, a sequência ou o convite), respira dentro do círculo, avisa a
+ * pausa e pergunta como ela ficou. No fim, a fala gravada da resposta sai do
+ * balão dela — o mesmo texto que a voz diz (`FECHAMENTO`, que não muda).
  *
  * SEM RELÓGIO NO JS (18/11/2026, a vistoria): a sessão redesenhava a tela
  * inteira cinco vezes por segundo, a barra pulava de degrau em degrau e a
@@ -399,27 +411,8 @@ export default function Meditar() {
             paddingBottom: espaco.xxl,
           }}
         >
-          <View style={{ alignItems: "center", justifyContent: "center" }}>
-            <Brilho tamanho={180} tinta={PALETA.luz} />
-            <Image
-              source={ARTE_LOTUS}
-              style={{ width: 112, height: 112 }}
-              contentFit="contain"
-              accessibilityIgnoresInvertColors
-            />
-          </View>
+          <BolhaComBalao humor="feliz" tamanho={112} fala={FALA_DO_REFLEXO} />
           <TituloDaAtividade centro>Como você está agora?</TituloDaAtividade>
-          <Text
-            style={{
-              marginTop: espaco.sm,
-              textAlign: "center",
-              ...fonte.normal,
-              ...escala.legenda,
-              color: cor.textoApagado,
-            }}
-          >
-            Não tem resposta certa. É só para você notar a diferença.
-          </Text>
           <View style={{ marginTop: espaco.xl, width: "100%", maxWidth: 340, gap: espaco.md }}>
             {comoEstouPara(at.cuidado).map((c) => (
               <Escolha
@@ -450,10 +443,9 @@ export default function Meditar() {
             momento="meditation"
             cor={PALETA.acao}
             titulo={`${m} ${m === 1 ? "minuto" : "minutos"} só seus`}
-            fala={
-              (humor && FECHAMENTO[humor]) ||
-              "Você tirou um tempinho só pra você. Leve essa calma com você."
-            }
+            /* A resposta dela tem a fala gravada: o balão da Bolha mostra o
+               mesmo texto que a voz diz. */
+            balao={(humor && FECHAMENTO[humor]) || FIM_DA_MEDITACAO_SEM_RESPOSTA}
             desfecho={desfecho}
             D={at.D}
             cuidado={at.cuidado}
@@ -486,8 +478,18 @@ export default function Meditar() {
             paddingBottom: mostrarMenu ? FOLGA_DO_RODAPE + espaco.lg : espaco.xxl,
           }}
         >
-          <BolhaComBalao lado humor="feliz" fala={falaDoBalao(registro)} />
-          <TituloDaAtividade>Meditar</TituloDaAtividade>
+          <BolhaComBalao
+            lado
+            humor="dormindo"
+            fala={falaDaMeditacao({
+              cuidado: at.cuidado,
+              jaFeita: at.jaFeita,
+              seguidos: sequenciaDeDatas(registro.dias),
+              diaDoPrograma:
+                diaAtual && !menuAberto ? { dia: diaAtual.dia, de: PROGRAMA.length } : null,
+            })}
+          />
+          <TituloDaAtividade>Respirar com calma</TituloDaAtividade>
 
           {/* O programa é a porta da tela: vem primeiro. */}
           {diaAtual && !menuAberto ? (
@@ -1347,7 +1349,7 @@ function Sessao({
               color: falaAgora ? cor.texto : cor.textoApagado,
             }}
           >
-            {falaAgora?.texto ?? "Só respire."}
+            {falaAgora?.texto ?? RESPIRA_COMIGO}
           </Text>
         </View>
       </View>
@@ -1469,7 +1471,9 @@ function Circulo({
         />
       </Animated.View>
       <View style={{ alignItems: "center", gap: espaco.sm }}>
-        <Animated.View style={{ transform: [{ scale: s }] }}>
+        {/* Pausada, a Bolha sai do círculo e vai para o véu (falar da pausa):
+            as duas, uma atrás da outra, viravam um fantasma. */}
+        <Animated.View style={{ opacity: oculto ? 0 : 1, transform: [{ scale: s }] }}>
           <Image
             source={BOLHA_DORMINDO}
             style={{ width: 96, height: 96 }}
@@ -1518,6 +1522,7 @@ function VeuDaPausa({ motivo }: { motivo: Pausa }) {
         backgroundColor: comAlfa(luz.base, 0.9),
       }}
     >
+      <BolhaViva humor="dormindo" tamanho={88} />
       <Text
         accessibilityRole="header"
         accessibilityLiveRegion="assertive"
@@ -1540,9 +1545,7 @@ function VeuDaPausa({ motivo }: { motivo: Pausa }) {
           color: cor.textoApagado,
         }}
       >
-        {motivo === "fundo"
-          ? "O app saiu da tela e a sessão parou aqui. Está tudo guardado."
-          : "Sem pressa. A respiração espera por você."}
+        {falaDaPausa(motivo)}
       </Text>
     </View>
   );

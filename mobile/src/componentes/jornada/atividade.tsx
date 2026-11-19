@@ -389,18 +389,34 @@ export function Brilho({ tamanho, tinta = "#ffffff" }: { tamanho: number; tinta?
   );
 }
 
-/** O balão: branco, com a sombra do material, e a ponta virada para quem fala. */
-function Balao({ fala, ponta }: { fala: string; ponta: "cima" | "esquerda" }) {
+/**
+ * O balão: branco, com a sombra do material, e a ponta virada para quem fala.
+ * Na noite (`escuro`), o material escuro e opaco da noite, com a letra clara:
+ * um balão branco acendia uma pastilha no céu de quem quer dormir.
+ */
+function Balao({
+  fala,
+  ponta,
+  escuro,
+}: {
+  fala: string;
+  ponta: "cima" | "esquerda";
+  escuro?: boolean;
+}) {
+  const fundo = escuro ? corNoite.balao : cor.branco;
   return (
     <View style={ponta === "esquerda" ? { flex: 1, justifyContent: "center" } : null}>
       <View
+        accessibilityLiveRegion="polite"
         style={{
           borderRadius: canto.dentro,
           ...curva,
-          backgroundColor: cor.branco,
+          backgroundColor: fundo,
           paddingHorizontal: espaco.lg,
           paddingVertical: 10,
-          ...sombra,
+          ...(escuro
+            ? { borderWidth: StyleSheet.hairlineWidth, borderColor: corNoite.balaoBorda }
+            : sombra),
         }}
       >
         <Text
@@ -408,7 +424,7 @@ function Balao({ fala, ponta }: { fala: string; ponta: "cima" | "esquerda" }) {
             textAlign: ponta === "cima" ? "center" : "left",
             ...fonte.media,
             ...escala.legenda,
-            color: cor.textoCorpo,
+            color: escuro ? corNoite.textoForte : cor.textoCorpo,
           }}
         >
           {fala}
@@ -423,7 +439,7 @@ function Balao({ fala, ponta }: { fala: string; ponta: "cima" | "esquerda" }) {
             width: 14,
             height: 14,
             borderRadius: 3,
-            backgroundColor: cor.branco,
+            backgroundColor: fundo,
             transform: [{ rotate: "45deg" }],
           },
           ponta === "cima"
@@ -436,45 +452,43 @@ function Balao({ fala, ponta }: { fala: string; ponta: "cima" | "esquerda" }) {
 }
 
 /**
- * O porta-voz falando num balão — "ele que vai interagir com as pessoas",
- * nas palavras do dono no app antigo. `lado` é a abertura das atividades: a
- * bolha de 88 à esquerda e o balão à direita, para a primeira escolha caber na
+ * A BOLHA GUIA falando num balão (19/11/2026: "o bebê bolha será esse guia
+ * neste caminho"). `lado` é a abertura das atividades e as falas da sessão: a
+ * bolha à esquerda e o balão à direita, para a primeira escolha caber na
  * primeira tela (a bolha grande, com o balão embaixo, ocupava ~420 pt antes
- * de qualquer coisa que se faz).
+ * de qualquer coisa que se faz). `escuro` é a noite (Para vocês dois, os sons).
+ *
+ * NADA vai atrás da Bolha: sem brilho, sem disco (a regra da bolha, de
+ * 16/11/2026). O brilho que morava aqui saiu na rodada de 19/11.
  */
 export function BolhaComBalao({
   humor,
   fala,
   tamanho,
   lado,
+  escuro,
 }: {
   humor: HumorDaBolha;
   fala: string;
   tamanho?: number;
   lado?: boolean;
+  escuro?: boolean;
 }) {
   if (lado) {
     const t = tamanho ?? 88;
     return (
       <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.md + 2 }}>
-        <View style={{ width: t, height: t, alignItems: "center", justifyContent: "center" }}>
-          <Brilho tamanho={t * 1.36} />
-          <BolhaViva humor={humor} tamanho={t} />
-        </View>
-        <Balao fala={fala} ponta="esquerda" />
+        <BolhaViva humor={humor} tamanho={t} />
+        <Balao fala={fala} ponta="esquerda" escuro={escuro} />
       </View>
     );
   }
   const t = tamanho ?? 168;
-  const grande = t >= 120;
   return (
     <View style={{ alignItems: "center" }}>
-      <View style={{ alignItems: "center", justifyContent: "center" }}>
-        {grande ? <Brilho tamanho={t * 1.45} /> : null}
-        <BolhaViva humor={humor} tamanho={t} />
-      </View>
+      <BolhaViva humor={humor} tamanho={t} />
       <View style={{ marginTop: espaco.md, maxWidth: 296 }}>
-        <Balao fala={fala} ponta="cima" />
+        <Balao fala={fala} ponta="cima" escuro={escuro} />
       </View>
     </View>
   );

@@ -13,6 +13,7 @@ import { ROTULO_DO_ALVO, SESSAO_DO_CASAL, type BlocoDoCasal } from "@/lib/sessao
 import { VOZ_REGRAVADA } from "~/lib/audio/regravadas";
 import { toque } from "~/componentes/base";
 import {
+  BolhaComBalao,
   BotaoRedondo,
   Brilho,
   CarregandoAtividade,
@@ -29,6 +30,7 @@ import { useMovimentoReduzido } from "~/componentes/movimento";
 import { pararCanal, tocarVoz } from "~/lib/audio/voz";
 import { VOZ_DA_NOITE } from "~/lib/audio/vozes";
 import { blocosDoCasalNoApp, casalAberto, SEMANA_DO_CASAL } from "~/lib/jornada/casal";
+import { FALA_DO_CASAL } from "~/lib/jornada/bolha-nos-cuidados";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { canto, curva, escala, espaco, fonte, margem } from "~/tema";
 
@@ -51,6 +53,10 @@ import { canto, curva, escala, espaco, fonte, margem } from "~/tema";
  * Fora do Modo Cuidado e do pós-parto, e só da 28ª semana em diante
  * (`casalAberto`, decisão do dono de 26/10/2026): é preparação para o parto, e
  * a voz gravada diz que o bebê "já reconhece a sua voz há semanas".
+ *
+ * A BOLHA GUIA (19/11/2026), num balão da noite: ela chama quem acompanha,
+ * avisa a pausa e fecha a sessão. A voz gravada continua sendo a que conduz
+ * os blocos (e o texto dela não muda); a Bolha só fala no que é tela.
  *
  * Bancada: /jornada/casal?bancada=1&semana=30 [&bloco=<n>] [&fim=1] [&pausado=1]
  * (sem `&semana`, a semana da bancada é antes da 28ª: a tela diz quando abre)
@@ -132,12 +138,13 @@ export default function Casal() {
       <FundoDaNoite>
         <StatusBar style="light" animated />
         <TopoDaAtividade escuro aoFechar={sair} />
-        <View style={{ paddingHorizontal: margem.foco, paddingTop: espaco.xl }}>
-          <Text style={{ ...fonte.normal, ...escala.corpo, color: corNoite.textoCorpo }}>
-            {aindaVem
-              ? `Esta sessão abre na ${SEMANA_DO_CASAL}ª semana, quando o parto já está mais perto.`
-              : "Esta sessão não faz parte da sua trilha de hoje. Respirar e escrever continuam aqui."}
-          </Text>
+        <View style={{ paddingHorizontal: margem.foco, paddingTop: espaco.xs }}>
+          <BolhaComBalao
+            lado
+            escuro
+            humor="feliz"
+            fala={aindaVem ? FALA_DO_CASAL.aindaNao(SEMANA_DO_CASAL) : FALA_DO_CASAL.foraDaTrilha}
+          />
           <BotaoClaro rotulo="Voltar" aoTocar={sair} />
         </View>
       </FundoDaNoite>
@@ -153,31 +160,24 @@ export default function Casal() {
     miolo = (
       <ScrollView
         contentContainerStyle={{
-          flexGrow: 1,
-          justifyContent: "center",
-          alignItems: "center",
           paddingHorizontal: margem.foco,
+          paddingTop: espaco.xs,
           paddingBottom: espaco.xl,
         }}
       >
-        <ArteDoCasal />
-        <TituloDaAtividade centro escuro>
-          {SESSAO_DO_CASAL.titulo}
-        </TituloDaAtividade>
+        <BolhaComBalao lado escuro humor="apaixonado" fala={FALA_DO_CASAL.abertura} />
+        <TituloDaAtividade escuro>{SESSAO_DO_CASAL.titulo}</TituloDaAtividade>
         <Text
           style={{
             marginTop: espaco.sm,
-            maxWidth: 340,
-            textAlign: "center",
             ...fonte.normal,
             ...escala.corpo,
             color: corNoite.textoCorpo,
           }}
         >
-          Dez minutos com quem vai estar com você no dia. Vocês treinam juntos três gestos de
-          parceria, sem pressa, e podem repetir quando quiserem.
+          Vocês treinam juntos três gestos de parceria, sem pressa, e podem repetir quando quiserem.
         </Text>
-        <View style={{ marginTop: espaco.xl, alignSelf: "stretch", gap: espaco.md }}>
+        <View style={{ marginTop: espaco.xl, gap: espaco.md }}>
           {GESTOS.map(({ icone: Icone, texto }) => (
             <View
               key={texto}
@@ -197,19 +197,14 @@ export default function Casal() {
         <Text
           style={{
             marginTop: espaco.xl,
-            maxWidth: 330,
-            textAlign: "center",
             ...fonte.normal,
             ...escala.nota,
             color: corNoite.textoApagado,
           }}
         >
-          Chame quem vai acompanhar você antes de começar. Dá para fazer sentada no chão, na cama ou
-          numa cadeira.
+          Dá para fazer sentada no chão, na cama ou numa cadeira.
         </Text>
-        <View style={{ alignSelf: "stretch" }}>
-          <BotaoClaro rotulo="Estamos os dois aqui" aoTocar={() => setComecou(true)} />
-        </View>
+        <BotaoClaro rotulo="Estamos os dois aqui" aoTocar={() => setComecou(true)} />
       </ScrollView>
     );
   } else if (acabou) {
@@ -226,19 +221,9 @@ export default function Casal() {
         <TituloDaAtividade centro escuro>
           Vocês treinaram juntos
         </TituloDaAtividade>
-        <Text
-          style={{
-            marginTop: espaco.sm,
-            maxWidth: 330,
-            textAlign: "center",
-            ...fonte.normal,
-            ...escala.corpo,
-            color: corNoite.textoCorpo,
-          }}
-        >
-          Cinco minutos por semana bastam para isso virar automático. No dia, ninguém vai precisar
-          lembrar de nada.
-        </Text>
+        <View style={{ marginTop: espaco.xl, width: "100%", maxWidth: 360 }}>
+          <BolhaComBalao lado escuro humor="apaixonado" tamanho={64} fala={FALA_DO_CASAL.fim} />
+        </View>
         <View style={{ width: "100%", maxWidth: 340 }}>
           <BotaoClaro rotulo="Fechar" aoTocar={sair} />
         </View>
@@ -299,16 +284,9 @@ export default function Casal() {
           {bloco.texto}
         </Text>
         {pausado ? (
-          <Text
-            style={{
-              marginTop: espaco.xl,
-              ...fonte.forte,
-              ...escala.legenda,
-              color: corNoite.textoApagado,
-            }}
-          >
-            Pausado
-          </Text>
+          <View style={{ marginTop: espaco.xl, alignSelf: "stretch" }}>
+            <BolhaComBalao lado escuro humor="feliz" tamanho={52} fala={FALA_DO_CASAL.pausa} />
+          </View>
         ) : null}
       </View>
     );

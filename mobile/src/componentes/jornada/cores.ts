@@ -86,6 +86,13 @@ export const corNoite = {
   materialBorda: "rgba(255,255,255,0.18)",
   /** O botão claro da noite: branco, com a letra na tinta da noite. */
   tintaDoBotao: "#1d1840",
+  /**
+   * O balão da Bolha na noite: o material escuro, mas OPACO (a ponta do balão
+   * se sobrepõe ao corpo, e duas camadas translúcidas fariam um losango mais
+   * escuro). A letra é `textoForte` (mais de 10:1 sobre ele).
+   */
+  balao: "#272b55",
+  balaoBorda: "rgba(255,255,255,0.16)",
   /* quem é o alvo da fala: rosa ela, azul quem acompanha, âmbar os dois */
   ela: { fundo: "rgba(255,32,86,0.2)", texto: "#ffccd3", borda: "rgba(255,99,126,0.3)" },
   par: { fundo: "rgba(0,166,244,0.2)", texto: "#b8e6fe", borda: "rgba(0,188,255,0.3)" },

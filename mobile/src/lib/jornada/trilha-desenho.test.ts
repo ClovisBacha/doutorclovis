@@ -197,7 +197,10 @@ describe("a trilha sem soluço (catraca do fonte)", () => {
 
   test("a folha do dia tem a ação principal e fala 'trilha'", () => {
     const dia = fonte("app", "jornada", "dia.tsx");
-    expect(dia).toMatch(/Começar: \$\{META_DAS_ATIVIDADES\[proxima\]\.titulo\}/);
+    /* 19/11/2026: o "Começar" é o cuidado que a Bolha sugeriu, com o nome da
+       aba do Bebê (`cuidadosDoDia`), e não mais o nome antigo da trilha. */
+    expect(dia).toMatch(/Começar: \$\{cuidadoSugerido\.titulo\}/);
+    expect(dia).toMatch(/const proxima = ordem\.find\(ehCuidado\)/);
     expect(dia).toMatch(/Voltar à trilha/);
     expect(dia).not.toMatch(/Caminho|Star\b/);
   });

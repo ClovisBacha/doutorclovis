@@ -51,12 +51,19 @@ import {
 } from "~/componentes/jornada/atividade";
 import { corDaAtividade } from "~/componentes/jornada/cores";
 import { FiguraMovimento } from "~/componentes/jornada/figura-movimento";
+import { Entrada } from "~/componentes/movimento";
 import { concluirMomento, FimDoMomento, type Desfecho } from "~/componentes/jornada/fim";
 import { useAtividade } from "~/componentes/jornada/usarJornada";
 import { pararVozes, tocarVoz } from "~/lib/audio/voz";
 import { VOZ_REGRAVADA } from "~/lib/audio/regravadas";
 import { VOZ_DO_MOVIMENTO } from "~/lib/audio/vozes";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
+import {
+  falaDoFimDoMexer,
+  falaDoMexer,
+  falaNaSessaoDoMexer,
+  type EnergiaDoMexer,
+} from "~/lib/jornada/bolha-nos-cuidados";
 import {
   DURACAO_PADRAO,
   DURACOES_MEXER,
@@ -92,6 +99,11 @@ import { SOS_NO_APP } from "~/config";
  * cada um — ela olha para o próprio corpo, não para o celular. Movimento sem
  * gravação anda em silêncio (os passos estão escritos), nunca com a voz errada.
  *
+ * A BOLHA GUIA (19/11/2026): ela abre a tela respondendo ao que ela escolhe,
+ * fala nas trocas que importam da sessão (o começo, a troca de posição, a
+ * metade e o último movimento) e fecha a festa. É texto de tela: a voz
+ * gravada continua lendo só o nome e a dica de cada movimento.
+ *
  * SEM RELÓGIO NO JS (18/11/2026, a vistoria): a sessão redesenhava a tela
  * inteira quatro vezes por segundo, e o anel andava aos trancos. Agora o
  * estado só muda nas FRONTEIRAS (um `setTimeout` para o fim de cada
@@ -109,7 +121,7 @@ const MATERIAL = materialDe(PALETA);
 const ARTE_DO_FIM = require("../../../../src/assets/grades/exercicios.webp");
 
 /** A energia de hoje — e só ela, nunca uma queixa. */
-type Energia = "com-energia" | "cansada";
+type Energia = EnergiaDoMexer;
 const ENERGIAS: readonly { chave: Energia; icone: typeof Zap; rotulo: string }[] = [
   { chave: "com-energia", icone: Zap, rotulo: "Com energia" },
   { chave: "cansada", icone: BatteryLow, rotulo: "Cansada" },
@@ -222,9 +234,7 @@ export default function Mexer() {
                 momento="movement"
                 cor={PALETA.acao}
                 titulo="Corpo soltinho"
-                fala={
-                  at.cuidado ? "Você cuidou de você hoje." : "Você cuidou de você e do bebê hoje."
-                }
+                balao={falaDoFimDoMexer({ cuidado: at.cuidado })}
                 desfecho={desfecho}
                 D={at.D}
                 cuidado={at.cuidado}
@@ -245,13 +255,7 @@ export default function Mexer() {
           </>
         ) : (
           <Abertura
-            fala={
-              at.jaFeita
-                ? "Você já se mexeu hoje! Pode fazer de novo, se o corpo pedir."
-                : at.cuidado
-                  ? "Movimentos leves, sem ir ao chão. No seu ritmo."
-                  : "Me diga como está a sua energia e quanto tempo você tem, que eu monto a sequência."
-            }
+            fala={falaDoMexer({ jaFeita: at.jaFeita, cuidado: at.cuidado, energia })}
             titulo={at.cuidado ? "Mexer devagar" : "Mexer o corpo"}
             energia={energia}
             aoEscolherEnergia={(e) => setEnergia((x) => (x === e ? null : e))}
@@ -782,6 +786,7 @@ function Sessao({
 
   const m = indice >= 0 ? seq[indice]! : null;
   const ultimo = indice + 1 >= seq.length;
+  const fala = falaNaSessaoDoMexer({ indice, total: seq.length, troca });
 
   return (
     <View style={{ flex: 1 }}>
@@ -879,19 +884,16 @@ function Sessao({
           >
             {m.cue}
           </Text>
-          {/* O aviso fica fixo, discreto, na tela do exercício. */}
-          <Text
-            style={{
-              marginTop: espaco.md,
-              maxWidth: 330,
-              textAlign: "center",
-              ...fonte.normal,
-              ...escala.nota,
-              color: cor.textoApagado,
-            }}
+          {/* A Bolha acompanha: fala no começo, na troca de posição, na metade e
+              no último, e no resto lembra que pular vale (o aviso que morava
+              aqui, fixo, agora é dela). A fala nova entra uma vez, e para. */}
+          <Entrada
+            key={fala}
+            deslocamento={8}
+            estilo={{ marginTop: espaco.lg, width: "100%", maxWidth: 384 }}
           >
-            Vá no seu ritmo e pule o que não for confortável para você.
-          </Text>
+            <BolhaComBalao lado humor="exercicio" tamanho={56} fala={fala} />
+          </Entrada>
           {/* Como montar a posição, na ordem em que o corpo entra nela. */}
           <Superficie
             tinta={PALETA.acao}

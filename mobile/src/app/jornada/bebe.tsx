@@ -52,10 +52,11 @@ import { corDaAtividade } from "~/componentes/jornada/cores";
 import { concluirMomento, FimDoMomento, type Desfecho } from "~/componentes/jornada/fim";
 import { FolhaDeSons, type SomEscolhido } from "~/componentes/jornada/folha-de-sons";
 import { useAtividade } from "~/componentes/jornada/usarJornada";
-import { lacoQueDescansa, useMovimentoReduzido } from "~/componentes/movimento";
+import { Entrada, lacoQueDescansa, useMovimentoReduzido } from "~/componentes/movimento";
 import { tocarSomDeFundo, type SomDeFundo } from "~/lib/audio/som-de-fundo";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { cartaDoDiaNoApp, falaDaBolhaNaCartaNoApp, poolDeHojeNoApp } from "~/lib/jornada/cartas";
+import { falaDaLeitura } from "~/lib/jornada/bolha-nos-cuidados";
 import { gravarChave, useLoja } from "~/lib/jornada/loja";
 import { CHAVE_CARTAS_LIDAS } from "~/lib/jornada/momentos";
 import { supabase } from "~/servidor/supabase";
@@ -77,6 +78,10 @@ import { ALVO_MINIMO, cor, escala, espaco, fonte, margem } from "~/tema";
  * (`cartaDoDiaNoApp`). O álbum reabre qualquer carta da fase, e com oito ou
  * mais gratidões guardadas existe a carta feita das coisas boas que ELA anotou.
  * O rastro de leitura viaja na jornada (`dc-path-cartas-lidas`).
+ *
+ * A BOLHA GUIA (19/11/2026): ela abre a carta, fica ouvindo a leitura (uma
+ * fala no começo, uma no meio e uma na última linha, embaixo do texto) e
+ * fecha a festa. Nada de efeito prometido: a carta é um minuto só de vocês.
  *
  * ⚠️ NÃO EXISTE NO MODO CUIDADO: não há versão suavizada de um convite para
  * falar com o bebê. A tela, se aberta por algum caminho, não fala dele.
@@ -367,17 +372,20 @@ export default function Bebe() {
             }}
           >
             <LinhaQueTroca chave={`${carta.title}-${linha}`} texto={carta.lines[linha] ?? ""} />
-            <Text
-              style={{
-                marginTop: espaco.xxl,
-                textAlign: "center",
-                ...fonte.normal,
-                ...escala.nota,
-                color: cor.textoApagado,
-              }}
+            {/* A Bolha ouvindo: a fala só muda no começo, no meio e na última
+                linha (e entra uma vez, sem ficar se mexendo atrás do texto). */}
+            <Entrada
+              key={falaDaLeitura({ linha, total })}
+              deslocamento={8}
+              estilo={{ marginTop: espaco.xxl, alignSelf: "stretch" }}
             >
-              Leia em voz alta, no seu ritmo.{"\n"}Toque à esquerda para voltar uma linha.
-            </Text>
+              <BolhaComBalao
+                lado
+                humor="apaixonado"
+                tamanho={52}
+                fala={falaDaLeitura({ linha, total })}
+              />
+            </Entrada>
           </View>
         </View>
         {/* A última linha não é "próxima": é o fim da carta — e vira o botão
@@ -528,8 +536,8 @@ export default function Bebe() {
               ) : (
                 <>
                   Ache um lugar calmo, ponha a mão na barriga e leia{" "}
-                  <Text style={{ ...fonte.forte }}>em voz alta</Text>, devagar. A sua voz é o som
-                  preferido do bebê.
+                  <Text style={{ ...fonte.forte }}>em voz alta</Text>, devagar. É um minuto só de
+                  vocês dois.
                 </>
               )}
             </Text>

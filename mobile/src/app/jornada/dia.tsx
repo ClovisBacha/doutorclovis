@@ -3,38 +3,48 @@ import { router, useLocalSearchParams } from "expo-router";
 import Check from "lucide-react-native/icons/check";
 import ChevronLeft from "lucide-react-native/icons/chevron-left";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { tituloCurtoDaAula } from "~/lib/jornada/aula";
-import { temQuizNoDia, type DailyQuiz } from "@/lib/daily-quizzes";
-import { carregarAulaDoDia } from "~/lib/jornada/aulas-do-app";
-import { recadoDaBolhaNoApp } from "~/lib/recado-da-bolha";
 import { Botao, Carregando, toque, Tocavel } from "~/componentes/base";
 import { CEUS, CeuVivo, sombraDoTexto, useFaseDoCeu, type FaseDoCeu } from "~/componentes/ceu-vivo";
-import { META_DAS_ATIVIDADES } from "~/componentes/caminho/cores";
 import { EstrelaDoDia } from "~/componentes/caminho/pecas";
 import { ARTE, FICHA } from "~/componentes/jornada/hoje";
 import { Vidro } from "~/componentes/vidro";
 import { rota } from "~/componentes/jornada/bancada";
 import { voltarParaJornada } from "~/componentes/jornada/pecas";
 import { useJornada } from "~/componentes/jornada/usarJornada";
-import { ArteDaBolha, useParalaxe, type HumorDaArte } from "~/componentes/movimento";
+import { ArteDaBolha, useParalaxe } from "~/componentes/movimento";
+import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import {
-  contarMomentos,
-  feito,
-  flagsDoDia,
-  TOTAL_DO_DIA,
-  type Momento,
-} from "~/lib/jornada/momentos";
+  ordemDaSugestao,
+  sugestao,
+  type ContextoDaBolha,
+  type Destino,
+  type Fala,
+} from "~/lib/bolha/conversa";
+import { primeiroNome } from "~/lib/gestacao";
+import { tituloDaAulaDoApp } from "~/lib/jornada/aulas-do-app";
+import { falaDoDiaQuePassou } from "~/lib/jornada/bolha-nos-cuidados";
+import { CHAVE_CHECKIN, lerCheckin, marcouHumorHoje } from "~/lib/jornada/caminho";
+import { cuidadosDoDia, type ChaveDoCuidado } from "~/lib/jornada/hoje";
+import { contarMomentos, flagsDoDia, TOTAL_DO_DIA } from "~/lib/jornada/momentos";
+import { chama as calcularChama } from "~/lib/jornada/trilha";
 import { ALVO_MINIMO, canto, cor, curva, escala, espaco, fonte, luz, margem, sombra } from "~/tema";
 
 /**
- * A FOLHA DO DIA — "Atividades de hoje", a tela que abre ao tocar num nó da
- * trilha. A bolha com um balão de fala, o título e as estrelas direto no céu,
- * a lista das cinco atividades e, fixo no pé, o botão que faz o dia andar:
- * "Começar" a primeira que falta (como o COMEÇAR do Duolingo, 18/11/2026 — a
- * folha não tinha ação principal, e ela precisava descobrir qual linha tocar).
+ * A FOLHA DO DIA — "O seu cuidado de hoje", a tela que abre ao tocar num nó
+ * da trilha. A Bolha guia no alto, a lista dos cinco cuidados com os mesmos
+ * nomes da aba do Bebê (`cuidadosDoDia`) e, fixo no pé, o botão que faz o dia
+ * andar (como o COMEÇAR do Duolingo, 18/11/2026).
+ *
+ * A BOLHA GUIA (19/11/2026, o dono: "o bebê bolha será esse guia neste
+ * caminho"): a fala dela é a do cérebro (`lib/bolha/conversa.ts`, `sugestao`),
+ * que lê a hora, o humor marcado hoje e o que já foi feito — de manhã ela
+ * puxa a aula, à noite respirar e ler para o bebê, num dia cansado o mais
+ * leve. E o "Começar" do pé é EXATAMENTE o cuidado que ela sugeriu: a fala e o
+ * botão nunca discordam. Com os cinco feitos, ela festeja; à noite, oferece
+ * os sons. Num dia que passou, ela mostra o que foi feito, sem cobrar.
  *
  * Cada linha abre a atividade que o app já tem (aula, mexer, meditar, a carta
  * e a gratidão), feita ou não: feito não é desabilitado. ⚠️ Diferença
@@ -44,10 +54,7 @@ import { ALVO_MINIMO, canto, cor, curva, escala, espaco, fonte, luz, margem, som
  * nome de ontem.
  */
 
-const ORDEM = ["aula", "movement", "meditation", "bonding", "gratitude"] as const;
-type Chave = (typeof ORDEM)[number];
-
-const ROTA: Record<Chave, string> = {
+const ROTA: Record<ChaveDoCuidado, string> = {
   aula: "/jornada/aula",
   movement: "/jornada/mexer",
   meditation: "/jornada/meditar",
@@ -55,14 +62,18 @@ const ROTA: Record<Chave, string> = {
   gratitude: "/jornada/gratidao",
 };
 
-/** A cara da bolha (`humorDaJornada` do site, sem a festa: a festa é de instante). */
-function humorDoDia(feitos: number, hora: number): HumorDaArte {
-  if (feitos >= TOTAL_DO_DIA) return "orgulhosa";
-  if (hora < 5 || feitos >= TOTAL_DO_DIA - 1) return "surpresa";
-  return "feliz";
+const ehCuidado = (d: Destino): d is ChaveDoCuidado => d !== "dormir" && d !== "trilha";
+
+/** A hora que escolhe o céu e a fala (`&hora=` na bancada, como o céu). */
+function horaDaFolha(): number {
+  const h = Number(parametroDaBancada("hora"));
+  return ehBancada() && parametroDaBancada("hora") != null && Number.isFinite(h) && h >= 0 && h < 24
+    ? h
+    : new Date().getHours();
 }
 
-const momentoDe = (c: Chave): Momento => (c === "aula" ? "aula" : c);
+/** "2 min · O sono" → "O sono": feito, o tempo que leva já não importa. */
+const semOTempo = (sub: string) => sub.replace(/^\d+ min · /, "");
 
 export default function FolhaDoDia() {
   const { dia, loja } = useJornada();
@@ -73,22 +84,6 @@ export default function FolhaDoDia() {
   const n = Number(pedido);
   const D =
     hojeD != null ? (Number.isFinite(n) && n >= 7 && n <= hojeD ? Math.floor(n) : hojeD) : null;
-
-  const [quiz, setQuiz] = useState<DailyQuiz | null | "carregando">("carregando");
-  useEffect(() => {
-    if (D == null) return;
-    let vivo = true;
-    if (!temQuizNoDia(D)) {
-      setQuiz(null);
-      return;
-    }
-    void carregarAulaDoDia(D).then((q) => {
-      if (vivo) setQuiz(q);
-    });
-    return () => {
-      vivo = false;
-    };
-  }, [D]);
 
   /* Fora da gestação (ou no Modo Cuidado) a folha não tem dia para mostrar:
      volta para a trilha, que sabe o que oferecer. */
@@ -112,21 +107,40 @@ export default function FolhaDoDia() {
   const flags = flagsDoDia(loja.blob, D);
   const feitos = contarMomentos(flags);
   const nomeDoBebe = (dia.perfil.baby_name ?? "").trim() || null;
-  const hora = new Date().getHours();
-  const recado = recadoDaBolhaNoApp({
-    feitos,
-    total: TOTAL_DO_DIA,
-    dia: D,
-    hora,
-    bebe: nomeDoBebe ?? undefined,
+  /* Os mesmos nomes da aba do Bebê: a semana DESTE dia e o assunto da aula dele. */
+  const cuidados = cuidadosDoDia({
+    flags,
     semana: Math.floor(D / 7),
-    posParto: false,
-    careMode: false,
+    nomeDoBebe,
+    assuntoDaAula: tituloDaAulaDoApp(D),
   });
-  const descDaAula = quiz && quiz !== "carregando" ? tituloCurtoDaAula(quiz.teach) : "Aula de hoje";
-  /* A ação principal: a primeira atividade que falta, na ordem da lista. */
-  const proxima = ORDEM.find((c) => !feito(flags, momentoDe(c))) ?? null;
-  const abrir = (c: Chave) => router.push(rota(ROTA[c]) as never);
+
+  /* A Bolha: hoje, o cérebro escolhe a fala e o próximo cuidado pelo momento. */
+  const hora = horaDaFolha();
+  const checkin = lerCheckin(loja.blob[CHAVE_CHECKIN]);
+  const contexto: ContextoDaBolha = {
+    hora,
+    D,
+    modo: "gestacao",
+    nomeDela: primeiroNome(dia.perfil.display_name),
+    nomeDoBebe,
+    semana: Math.floor(D / 7),
+    feitos: cuidados.filter((c) => c.feito).map((c) => c.chave),
+    humor: marcouHumorHoje(checkin, new Date()) ? (checkin.mood ?? null) : null,
+    chama: calcularChama(loja.blob, D).dias,
+  };
+  const fala: Pick<Fala, "texto" | "pose"> = ehHoje
+    ? sugestao(contexto)
+    : {
+        texto: falaDoDiaQuePassou(feitos, TOTAL_DO_DIA),
+        pose: feitos >= TOTAL_DO_DIA ? "orgulhosa" : "feliz",
+      };
+  const ordem = ehHoje ? ordemDaSugestao(contexto) : [];
+  /* A ação principal é o cuidado que a Bolha acabou de sugerir. */
+  const proxima = ordem.find(ehCuidado) ?? null;
+  const cuidadoSugerido = cuidados.find((c) => c.chave === proxima) ?? null;
+  const sonsDaNoite = !proxima && ordem.includes("dormir");
+  const abrir = (c: ChaveDoCuidado) => router.push(rota(ROTA[c]) as never);
 
   return (
     <Fundo fase={fase}>
@@ -139,13 +153,14 @@ export default function FolhaDoDia() {
         showsVerticalScrollIndicator={false}
       >
         <View style={{ alignItems: "center", marginTop: 4 }}>
-          <ArteDaBolha humor={humorDoDia(feitos, hora)} tamanho={140} />
+          <ArteDaBolha humor={fala.pose} tamanho={140} />
           {/* O balão: o rabinho aponta para CIMA, para a bolha — é o que faz o
               texto ser fala dela em vez de mais um cartão da tela. Branco
               opaco (o translúcido ficava encardido no céu da noite), e o
               rabinho por cima do corpo, sem emenda à vista. */}
-          <View style={{ marginTop: -24, width: 300, maxWidth: "100%" }}>
+          <View style={{ marginTop: -24, width: 320, maxWidth: "100%" }}>
             <View
+              accessibilityLiveRegion="polite"
               style={{
                 borderRadius: canto.cartao,
                 ...curva,
@@ -164,7 +179,7 @@ export default function FolhaDoDia() {
                   color: cor.textoCorpo,
                 }}
               >
-                {recado}
+                {fala.texto}
               </Text>
             </View>
             <View
@@ -195,7 +210,7 @@ export default function FolhaDoDia() {
               ...sombraNoCeu,
             }}
           >
-            {ehHoje ? "Atividades de hoje" : "As atividades deste dia"}
+            {ehHoje ? "O seu cuidado de hoje" : "O cuidado deste dia"}
           </Text>
           <View
             accessible
@@ -222,12 +237,12 @@ export default function FolhaDoDia() {
           </View>
           {!ehHoje ? (
             <Text style={{ ...fonte.media, ...escala.legenda, color: ceu.sec, ...sombraNoCeu }}>
-              Esse dia já passou. As atividades valem no dia de hoje.
+              Os cuidados contam no dia de hoje.
             </Text>
           ) : null}
         </View>
 
-        {/* As cinco numa lista só, cada uma com o seu objeto. */}
+        {/* Os cinco numa lista só, cada um com o seu objeto. */}
         <View
           style={{
             marginTop: espaco.md,
@@ -237,96 +252,91 @@ export default function FolhaDoDia() {
             ...MATERIAL,
           }}
         >
-          {ORDEM.map((c, i) => {
-            const meta = META_DAS_ATIVIDADES[c];
-            const fez = feito(flags, momentoDe(c));
-            const desc = c === "aula" ? descDaAula : meta.desc;
-            /* Num dia que passou, a aula não é "de hoje". */
-            const titulo = c === "aula" && !ehHoje ? "Aula do dia" : meta.titulo;
-            return (
-              <View key={c}>
-                {i > 0 ? (
-                  <View
-                    style={{
-                      height: StyleSheet.hairlineWidth,
-                      marginLeft: 82,
-                      backgroundColor: cor.borda,
-                    }}
-                  />
-                ) : null}
-                {/* A linha de lista do iOS: o toque acende (esmaece), não encolhe. */}
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`${titulo}${fez ? ", feita" : ""}`}
-                  accessibilityState={{ disabled: !ehHoje }}
-                  disabled={!ehHoje}
-                  onPress={() => {
-                    toque();
-                    abrir(c);
+          {cuidados.map(({ chave: c, titulo, sub, feito: fez }, i) => (
+            <View key={c}>
+              {i > 0 ? (
+                <View
+                  style={{
+                    height: StyleSheet.hairlineWidth,
+                    marginLeft: 82,
+                    backgroundColor: cor.borda,
                   }}
-                  style={({ pressed }) => ({
-                    flexDirection: "row",
+                />
+              ) : null}
+              {/* A linha de lista do iOS: o toque acende (esmaece), não encolhe. */}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`${titulo}. ${fez ? "Feito" : sub}`}
+                accessibilityState={{ disabled: !ehHoje }}
+                disabled={!ehHoje}
+                onPress={() => {
+                  toque();
+                  abrir(c);
+                }}
+                style={({ pressed }) => ({
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 14,
+                  paddingVertical: 10,
+                  paddingLeft: 12,
+                  paddingRight: 14,
+                  opacity: pressed ? 0.6 : 1,
+                })}
+              >
+                <View
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: 18,
+                    ...curva,
                     alignItems: "center",
-                    gap: 14,
-                    paddingVertical: 10,
-                    paddingLeft: 12,
-                    paddingRight: 14,
-                    opacity: pressed ? 0.6 : 1,
-                  })}
+                    justifyContent: "center",
+                    backgroundColor: FICHA[c],
+                  }}
                 >
-                  <View
+                  <Image source={ARTE[c]} style={{ width: 46, height: 46 }} contentFit="contain" />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text
                     style={{
-                      width: 56,
-                      height: 56,
-                      borderRadius: 18,
-                      ...curva,
-                      alignItems: "center",
-                      justifyContent: "center",
-                      backgroundColor: FICHA[c],
+                      ...fonte.forte,
+                      ...escala.chamada,
+                      color: fez ? cor.textoApagado : cor.texto,
                     }}
                   >
-                    <Image
-                      source={ARTE[c]}
-                      style={{ width: 46, height: 46 }}
-                      contentFit="contain"
-                    />
+                    {titulo}
+                  </Text>
+                  <Text
+                    numberOfLines={2}
+                    style={{
+                      marginTop: 1,
+                      ...fonte.normal,
+                      ...escala.nota,
+                      color: cor.textoApagado,
+                    }}
+                  >
+                    {fez ? `Feito · ${semOTempo(sub)}` : sub}
+                  </Text>
+                </View>
+                {fez ? (
+                  <View
+                    style={{
+                      width: 26,
+                      height: 26,
+                      borderRadius: 13,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: cor.ok,
+                    }}
+                  >
+                    <Check size={15} color={cor.branco} strokeWidth={3.2} />
                   </View>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={{ ...fonte.forte, ...escala.chamada, color: cor.texto }}>
-                      {titulo}
-                    </Text>
-                    <Text
-                      numberOfLines={3}
-                      style={{
-                        marginTop: 1,
-                        ...fonte.normal,
-                        ...escala.nota,
-                        color: cor.textoApagado,
-                      }}
-                    >
-                      {fez ? `Feito · ${desc}` : desc}
-                    </Text>
-                  </View>
-                  {fez ? (
-                    <View
-                      style={{
-                        width: 26,
-                        height: 26,
-                        borderRadius: 13,
-                        alignItems: "center",
-                        justifyContent: "center",
-                        backgroundColor: cor.ok,
-                      }}
-                    >
-                      <Check size={15} color={cor.branco} strokeWidth={3.2} />
-                    </View>
-                  ) : ehHoje ? (
-                    <ChevronRight size={20} color={cor.chevron} strokeWidth={2.4} />
-                  ) : null}
-                </Pressable>
-              </View>
-            );
-          })}
+                ) : ehHoje ? (
+                  <ChevronRight size={20} color={cor.chevron} strokeWidth={2.4} />
+                ) : null}
+              </Pressable>
+            </View>
+          ))}
         </View>
       </ScrollView>
 
@@ -348,8 +358,9 @@ export default function FolhaDoDia() {
         </Tocavel>
       </View>
 
-      {/* A AÇÃO PRINCIPAL, fixa no pé: começar o que falta; com as cinco
-          feitas, voltar à trilha. Num dia que passou, nada a começar. */}
+      {/* A AÇÃO PRINCIPAL, fixa no pé: começar o que a Bolha sugeriu; com os
+          cinco feitos, os sons à noite ou a volta à trilha. Num dia que
+          passou, nada a começar. */}
       {ehHoje ? (
         <View
           pointerEvents="box-none"
@@ -360,11 +371,17 @@ export default function FolhaDoDia() {
             bottom: insets.bottom + 12,
           }}
         >
-          {proxima ? (
+          {cuidadoSugerido ? (
             <Botao
-              rotulo={`Começar: ${META_DAS_ATIVIDADES[proxima].titulo}`}
+              rotulo={`Começar: ${cuidadoSugerido.titulo}`}
               tamanho="grande"
-              aoTocar={() => abrir(proxima)}
+              aoTocar={() => abrir(cuidadoSugerido.chave)}
+            />
+          ) : sonsDaNoite ? (
+            <Botao
+              rotulo="Sons para a noite"
+              tamanho="grande"
+              aoTocar={() => router.push(rota("/jornada/dormir") as never)}
             />
           ) : (
             <Tocavel rotulo="Voltar à trilha" aoTocar={voltarParaJornada}>

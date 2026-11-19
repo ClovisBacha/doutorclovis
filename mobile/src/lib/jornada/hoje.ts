@@ -6,6 +6,14 @@
  * lista de tarefas ("Aula de hoje · 0/1") lia como dever de casa, e o dono
  * pediu "um cuidado diário, algo mais emocional".
  *
+ * A VOZ DO BEM-ESTAR (19/11/2026, o dono: "ser esperta também é cuidar da
+ * saúde [...] um aplicativo de bem-estar materno"): aprender, mexer, respirar,
+ * ler para o bebê e guardar uma coisa boa. A linha de baixo diz o que ELA
+ * ganha naquele momento (calma, o corpo mais solto, um momento só de vocês),
+ * e nunca um efeito de saúde: nada de "reduz", "melhora", "alivia" ou "faz bem
+ * para o bebê" (`bolha-nos-cuidados.test.ts` cobra). Os mesmos nomes valem na
+ * aba do Bebê e na folha do dia (`app/jornada/dia.tsx`).
+ *
  * ⚠️ O nome do bebê vai SEM artigo ("Ler para Helena", e não "para a Helena"):
  * o artigo supõe o sexo. Sem nome, "o bebê".
  */
@@ -41,16 +49,10 @@ export function cuidadosDoDia(o: {
         ? `2 min · ${o.assuntoDaAula.trim()}`
         : "2 min · uma lição e perguntas",
     },
-    movement: { titulo: "Soltar o corpo", sub: "5 min · no ritmo do seu corpo" },
-    meditation: { titulo: `Respirar com ${para}`, sub: "3 min · a mente desacelera junto" },
-    bonding: {
-      titulo: `Ler para ${para}`,
-      sub: "1 min · uma história na sua voz",
-    },
-    gratitude: {
-      titulo: "Guardar uma coisa boa",
-      sub: `1 min · vira uma carta para ${para}`,
-    },
+    movement: { titulo: "Mexer o corpo", sub: "5 min · o corpo mais solto, no seu ritmo" },
+    meditation: { titulo: `Respirar com ${para}`, sub: "3 min · um momento de calma" },
+    bonding: { titulo: `Ler para ${para}`, sub: "1 min · um momento só de vocês dois" },
+    gratitude: { titulo: "Guardar uma coisa boa", sub: "1 min · o que foi bom fica guardado" },
   };
   return ORDEM_DOS_CUIDADOS.map((chave) => ({
     chave,
