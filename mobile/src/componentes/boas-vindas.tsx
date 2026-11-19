@@ -119,7 +119,7 @@ function BolhaQueFala({
       }}
     >
       <BalaoQueFala
-        key={chegou ? "chegou" : "antes"}
+        key={chegou ? "balao-chegou" : "balao-antes"}
         texto={fala}
         ponta="baixo"
         centro
@@ -128,7 +128,7 @@ function BolhaQueFala({
         estilo={{ maxWidth: 340 }}
       />
       <BolhaViva
-        key={ativa ? "chegou" : "longe"}
+        key={ativa ? "bolha-chegou" : "bolha-longe"}
         humor={humor}
         tamanho={ladoDaBolha(largura, altura)}
       />

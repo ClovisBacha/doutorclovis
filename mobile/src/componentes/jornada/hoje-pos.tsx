@@ -703,6 +703,9 @@ function CeuDoColo({
           <Text
             allowFontScaling={false}
             style={{
+              /* Um algarismo só: o número e a Bolha se afastam para os lados
+                 (como no céu da gestação e na festa da semana). */
+              marginRight: semana < 10 ? 84 : 0,
               ...fonteDoNumero,
               fontSize: 220,
               lineHeight: 228,
@@ -734,7 +737,9 @@ function CeuDoColo({
             transform: [{ translateY: camada(0.2) }],
           }}
         >
-          <ArteDaBolha humor="apaixonado" tamanho={BEBE} />
+          <View style={{ marginLeft: semana < 10 ? 92 : 0 }}>
+            <ArteDaBolha humor="apaixonado" tamanho={BEBE} />
+          </View>
         </Animated.View>
       </View>
 
