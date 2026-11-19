@@ -18,6 +18,38 @@ servidor dele (`/_serverFn/<sha256 do arquivo e do nome>`, ver
 site do ar derruba compras, SOS e tudo o que passa pelo servidor — e mexer num
 arquivo de `src/` que o app importa muda o que o app faz.
 
+## ⚠️ O APP É BEM-ESTAR MATERNO, E A BOLHA É A GUIA (decisão do dono, 19/11/2026)
+
+Nas palavras dele: "a mãe esperta é também aquela que cuida da saúde [...] os
+exercícios de respirar, de meditação [...] além de treinar a mente, também é
+cuidar da saúde. Nosso principal personagem agora será o bebê bolha. Eu quero
+tirar as imagens dos bebês [...] O número 24 ali estava muito bacana [...] o
+bebê bolha vai ser aquele personagem que vai conversar com a mãe [...] tem que
+ser algo inteligente [...] um aplicativo de bem-estar materno [...] o bebê
+bolha será esse guia neste caminho."
+
+- **O que o app é**: bem-estar materno. Ser esperta é cuidar de você: aprender
+  (a aula), respirar e desacelerar (meditar, os sons da noite), mexer o corpo
+  (Mexer), criar vínculo (ler para o bebê, "Para vocês dois") e guardar o que
+  foi bom (gratidão). O jogo (trilha, sementinhas, amigas) continua: é o que
+  traz de volta.
+- **A Bolha é a guia** (a mascote de sabão; o dono a chama de "bebê bolha", a
+  tela diz "a Bolha"). Ela CONVERSA: `lib/bolha/conversa.ts` é o cérebro
+  (função pura, no aparelho: lê a hora, a semana, a chama, o que ela fez e o
+  humor do dia, e escolhe a fala e as respostas) e `componentes/bolha/
+conversa.tsx` a desenha (balão, a resposta dela do lado, os botões). É o
+  primeiro painel da aba do Bebê. A catraca `conversa.test.ts` cobra: nunca
+  conduta nem promessa de efeito, o bebê sem gênero, a mesma fala o dia todo.
+- **Nenhuma ilustração de bebê** (o feto de `arteDoBebe` e o recém-nascido
+  enrolado): no céu, na frente do número gigante da semana, fica a Bolha.
+- **Saúde sem conduta**: bem-estar não é conselho médico. Pode "um momento de
+  calma", "movimentos leves, no seu ritmo"; nunca "reduz a ansiedade",
+  "melhora o sono", "faz bem ao bebê", "você deve". A regra de 21/10 abaixo
+  continua inteira.
+- Ainda não há IA de verdade na Bolha (`IA_NO_APP` desligada): ligar um chat
+  pede Termos, Privacidade e consentimento novos, e guarda-corpos contra
+  conduta — é decisão do dono.
+
 ## ⚠️ O APP É UM DUOLINGO PARA GESTANTES (decisão do dono, 11/11/2026)
 
 Nas palavras dele: "o Duolingo para grávidas [...] tirar o SOS [...] tirar a
@@ -37,6 +69,9 @@ gamificação"). Exames ficaram para depois.
   a abertura do dia (festa, reconciliação, avisos) roda só na aba do bebê.
   `barra.test.ts` cobra a ordem e por onde o app abre. Não simplifique tirando
   a tela do bebê: "é a alma do aplicativo".
+  ⚠️ Desde 19/11/2026 o céu mostra a BOLHA na frente do número da semana (não
+  a ilustração do bebê): a tela continua sendo a da semana dela, com a Bolha
+  guia conversando logo abaixo.
 
 - **O SOS e a Comunidade estão desligados por chave, não apagados**:
   `SOS_NO_APP` e `COMUNIDADE_NO_APP` em `mobile/src/config.ts` (o padrão do
