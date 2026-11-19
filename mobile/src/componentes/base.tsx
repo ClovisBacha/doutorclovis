@@ -557,7 +557,7 @@ export function NaoConsegueLer({ sossego, aoTentar }: { sossego: string; aoTenta
       <T tipo="rotulo" cor={cor.atencao}>
         Não conseguimos carregar agora
       </T>
-      <T tipo="apagado">Isso é a nossa conexão, não algo que você fez. {sossego}</T>
+      <T tipo="apagado">Foi a conexão que falhou. {sossego}</T>
       {aoTentar ? <Botao rotulo="Tentar de novo" tipo="secundario" aoTocar={aoTentar} /> : null}
     </Cartao>
   );

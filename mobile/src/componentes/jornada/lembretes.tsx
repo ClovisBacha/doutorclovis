@@ -214,7 +214,7 @@ export function ConviteDosLembretes({
       <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.md }}>
         <FichaDoSino />
         <Text style={{ flex: 1, ...fonte.forte, ...escala.chamada, color: cor.texto }}>
-          Quer um lembrete do cuidado de hoje?
+          Quer que eu te lembre do cuidado de hoje?
         </Text>
         <Pressable
           accessibilityRole="button"
@@ -238,7 +238,7 @@ export function ConviteDosLembretes({
         </Pressable>
       </View>
       <Text style={{ marginTop: -4, ...fonte.normal, ...escala.legenda, color: cor.textoCorpo }}>
-        Um aviso por dia, na hora que você escolher. Se você já cuidou, ele não toca.
+        Eu aviso uma vez por dia, na hora que você escolher. Se você já cuidou, eu fico quieta.
       </Text>
       <View style={{ flexDirection: "row", gap: espaco.sm }}>
         <Botao
