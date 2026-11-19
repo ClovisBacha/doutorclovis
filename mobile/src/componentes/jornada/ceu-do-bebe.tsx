@@ -218,6 +218,10 @@ export const CeuDoBebe = memo(function CeuDoBebe({
   useEffect(() => setVista(abre), [abre]);
   useEffect(() => aoVer?.(vista), [vista, aoVer]);
   const viajando = vista !== semana;
+  /* Um algarismo só (a semana 6) sumiria inteiro atrás da Bolha: o número e
+     ela se afastam para os lados, como o relógio e a pessoa na tela de
+     bloqueio do iPhone (o mesmo da festa da semana, `marco.tsx`). */
+  const afasta = vista < 10 ? Math.round(46 * k) : 0;
   const bebe = bebeDaSemana(vista);
   const aoGirar = useCallback(
     (s: number) => setVista(s === prender(semana) ? semana : s),
@@ -402,6 +406,7 @@ export const CeuDoBebe = memo(function CeuDoBebe({
           allowFontScaling={false}
           style={[
             camadas.numeroChegando,
+            { marginRight: afasta * 2 },
             {
               ...fonteDoNumero,
               fontSize: tamanhoDoNumero,
@@ -424,7 +429,10 @@ export const CeuDoBebe = memo(function CeuDoBebe({
         <Animated.View pointerEvents="none" style={camadas.sombra}>
           <SombraDeContato largura={Math.round(190 * k)} />
         </Animated.View>
-        <Animated.View pointerEvents="box-none" style={camadas.bebeChegando}>
+        <Animated.View
+          pointerEvents="box-none"
+          style={[camadas.bebeChegando, { marginLeft: afasta * 2 }]}
+        >
           <Faiscas gatilho={faiscas} lado={lado} />
           {/* O Flutuar dá três voltas ao aparecer e descansa (`vaivemQueDescansa`). */}
           <Flutuar>
