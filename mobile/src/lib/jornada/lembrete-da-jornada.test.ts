@@ -47,22 +47,39 @@ describe("o cuidado de hoje", () => {
   });
 
   test("hoje o texto sabe da chama e do que falta; nos outros dias, do que o dia traz", () => {
+    /* A Bolha chama, em primeira pessoa; o bebê não "agradece" (o cuidado é dela). */
     expect(textoDoCuidado(gest({ chama: 14 }), 0)).toEqual({
-      titulo: "🔥 14 dias seguidos",
-      corpo: "Um cuidado de hoje mantém a chama acesa. Helena agradece 💜",
+      titulo: "14 dias seguidos",
+      corpo: "Um cuidado hoje e a chama continua acesa. Passa aqui rapidinho?",
     });
+    /* O que falta é contado de verdade: "mais um" só quando falta um. */
     expect(textoDoCuidado(gest({ feitosHoje: 3 }), 0).corpo).toBe(
-      "3 de 5 cuidados feitos. Mais um gesto e o dia fecha.",
+      "Você já fez 3 de 5 cuidados. Faltam 2, e eu te espero aqui.",
+    );
+    expect(textoDoCuidado(gest({ feitosHoje: 4 }), 0).corpo).toBe(
+      "Você já fez 4 de 5 cuidados. Só mais um e eu acendo a última estrela.",
     );
     /* D 172: par → desafio (e 172 não é múltiplo de 3, então não há aula). */
-    expect(textoDoCuidado(gest(), 1).corpo).toBe("Desafio de hoje: Desafio do dia 172");
+    expect(textoDoCuidado(gest(), 1)).toEqual({
+      titulo: "Oi, é a Bolha",
+      corpo: "O desafio de hoje: Desafio do dia 172",
+    });
     /* D 174: múltiplo de 3 → a aula, pelo assunto da própria lição. */
-    expect(textoDoCuidado(gest(), 3).corpo).toBe(
-      "Aula de hoje: O assunto do dia 174. Uns minutinhos para você e Helena.",
+    expect(textoDoCuidado(gest(), 3)).toEqual({
+      titulo: "Oi, é a Bolha",
+      corpo: "Separei a aula de hoje: O assunto do dia 174. Dois minutinhos comigo?",
+    });
+    /* O título cortado da aula ("…") não ganha ponto final. */
+    expect(textoDoCuidado(gest({ aula: () => "Um ninho muito…" }), 3).corpo).toBe(
+      "Separei a aula de hoje: Um ninho muito… Dois minutinhos comigo?",
+    );
+    /* A frase muda de um dia para o outro (o assunto é sempre o da aula do dia). */
+    expect(textoDoCuidado(gest({ aula: (D) => `Aula ${D}` }), 4).titulo).toBe(
+      "A aula de hoje chegou",
     );
     /* Sem desafio nem aula. */
     expect(textoDoCuidado(gest({ nomeDoBebe: null }), 2).corpo).toBe(
-      "5 minutinhos para você e o bebê.",
+      "Cinco minutinhos para você e o bebê? Eu te espero aqui.",
     );
   });
 
@@ -80,12 +97,12 @@ describe("o cuidado de hoje", () => {
 
   test("no pós-parto: os três gestos, o desafio do dia; depois das 12 semanas, um minuto para ela", () => {
     const pos = gest({ modo: "pos", D: 27, idadeDias: 20, totalDoDia: 3, semana: undefined });
-    expect(textoDoCuidado(pos, 0).titulo).toBe("Como você está hoje? 💜");
-    expect(textoDoCuidado({ ...pos, feitosHoje: 1 }, 0).corpo).toBe("1 de 3 feitos. Sem pressa.");
-    expect(textoDoCuidado(pos, 1).corpo).toBe("Desafio de hoje: Desafio do dia 28");
-    expect(textoDoCuidado({ ...pos, idadeDias: 90, D: 97 }, 0).titulo).toBe(
-      "Um minuto para você 💜",
+    expect(textoDoCuidado(pos, 0).titulo).toBe("Como você está hoje?");
+    expect(textoDoCuidado({ ...pos, feitosHoje: 1 }, 0).corpo).toBe(
+      "1 de 3 feitos. Sem pressa, eu te espero.",
     );
+    expect(textoDoCuidado(pos, 1).corpo).toBe("O desafio de hoje: Desafio do dia 28");
+    expect(textoDoCuidado({ ...pos, idadeDias: 90, D: 97 }, 0).titulo).toBe("Um minuto para você");
   });
 });
 
@@ -93,7 +110,7 @@ describe("a semana nova", () => {
   test("às 9h do dia em que a semana começa, com o tamanho do bebê", () => {
     /* Hoje é 24s3d: a semana 25 começa em 4 dias (sábado, 24/10). */
     const t = textoDaSemanaNova(gest(), 4)!;
-    expect(t.titulo).toBe("Semana 25 começou! 🌱");
+    expect(t.titulo).toBe("Semana 25 começou!");
     expect(t.corpo).toMatch(/^Helena agora tem o tamanho de /);
     expect(textoDaSemanaNova(gest(), 3)).toBeNull();
     const l = lembretesDaJornada({ hora: null, semanaNova: true }, gest());
@@ -108,7 +125,7 @@ describe("a semana nova", () => {
        (30–40 dias): revisão geral, contracepção…". Agora é o texto do app. */
     const pos = gest({ modo: "pos", D: 27, idadeDias: 20, totalDoDia: 3 });
     const t = textoDaSemanaNova(pos, 1)!;
-    expect(t.titulo).toBe("Helena completa 3 semanas 💜");
+    expect(t.titulo).toBe("Helena completa 3 semanas");
     expect(t.corpo).toBe(primeiraFrase(nestaSemanaDoPos(4)));
     expect(t.corpo).not.toBe(primeiraFrase(nestaSemanaDoPos(3)));
     expect(textoDaSemanaNova(pos, 2)).toBeNull();

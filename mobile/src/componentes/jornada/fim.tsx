@@ -20,13 +20,14 @@ import { corJornada } from "~/componentes/jornada/cores";
 import { marcarLivre } from "~/componentes/jornada/livres";
 import { Constelacao, SementesSubindo } from "~/componentes/jornada/efeitos";
 import { NumeroQueConta, numeroDaPedra, PedraDoPlacar, Raios } from "~/componentes/jornada/festa";
-import { BolhaComBalao, BotaoDaAtividade, Brilho } from "~/componentes/jornada/atividade";
+import { BolhaComBalao, BotaoDaAtividade } from "~/componentes/jornada/atividade";
 import { Bolha, Confete, Estrela, Estrelas, voltarParaJornada } from "~/componentes/jornada/pecas";
 import { TrofeuSeConstruindo } from "~/componentes/caminho/pecas";
+import { FALA_DO_DIA_COMPLETO } from "~/lib/bolha/falas-do-jogo";
 import { contarMomentos, feito, flagsDoDia, type Momento } from "~/lib/jornada/momentos";
 import { marcar, useLoja } from "~/lib/jornada/loja";
 import { comAlfa } from "~/lib/cor";
-import { cor, escala, espaco, fonte, veu } from "~/tema";
+import { canto, cor, curva, escala, espaco, fonte, sombra, veu } from "~/tema";
 
 /**
  * O FIM DE UM MOMENTO — marca, paga, e celebra quando fecha o dia.
@@ -98,12 +99,18 @@ function fraseDoGanho(d: Desfecho): { texto: string; ok: boolean } | null {
  *   deste momento acende.
  * O placar fica no lugar desde o começo: a pedra das sementinhas espera com
  * "+…" e só mostra NÚMERO quando o servidor confirmou o crédito. As estrelas
- * têm nome ("Momentos de hoje") e ficam longe dos acertos, para não lerem
+ * têm nome ("Cuidados de hoje") e ficam longe dos acertos, para não lerem
  * como nota.
+ *
+ * 19/11/2026 (a Bolha guia): a Bolha da festa FALA, num balão logo abaixo
+ * dela (`falaDaBolha`; no dia fechado, "Os cinco cuidados de hoje, feitos.
+ * Cuidar de você é cuidar de vocês dois."). O brilho que ficava atrás da
+ * bolha padrão saiu: nada atrás dela (os raios são a festa, e não um disco).
  */
 export function FimDoMomento({
   titulo,
   fala,
+  falaDaBolha,
   desfecho,
   D,
   cuidado,
@@ -119,6 +126,11 @@ export function FimDoMomento({
 }: {
   titulo: string;
   fala?: string;
+  /**
+   * O que a Bolha da festa diz, num balão logo abaixo dela. Só quando o herói
+   * é a Bolha (a aula, ou a festa do dia fechado); nunca no Modo Cuidado.
+   */
+  falaDaBolha?: string;
   /** `null` enquanto o servidor responde. */
   desfecho: Desfecho | null;
   D: number | null;
@@ -223,13 +235,10 @@ export function FimDoMomento({
       <Bolha humor="estrelas" tamanho={210} />
     )
   ) : (
-    (arte ?? (
-      <View style={{ alignItems: "center", justifyContent: "center" }}>
-        <Brilho tamanho={250} />
-        <Bolha humor={cuidado ? "feliz" : "comemorando"} tamanho={210} />
-      </View>
-    ))
+    (arte ?? <Bolha humor={cuidado ? "feliz" : "comemorando"} tamanho={210} />)
   );
+  /* A fala da Bolha: a do dia fechado vence a do momento. */
+  const falaDela = cuidado ? null : festa ? FALA_DO_DIA_COMPLETO : (falaDaBolha ?? null);
 
   return (
     <View
@@ -259,6 +268,7 @@ export function FimDoMomento({
             {heroi}
           </Animated.View>
         </View>
+        {falaDela ? <FalaDaBolha texto={falaDela} /> : null}
         <Entrada atraso={220} deslocamento={12}>
           <Text
             accessibilityRole="header"
@@ -273,11 +283,7 @@ export function FimDoMomento({
             {festa ? "Cinco estrelas!" : titulo}
           </Text>
         </Entrada>
-        {festa ? (
-          <T tipo="corpo" centro cor={cor.textoApagado}>
-            Você fez os cinco momentos de hoje.
-          </T>
-        ) : fala ? (
+        {festa ? null : fala ? (
           <T tipo="corpo" centro cor={cor.textoApagado}>
             {fala}
           </T>
@@ -365,12 +371,12 @@ export function FimDoMomento({
                 color: cor.textoApagado,
               }}
             >
-              Momentos de hoje
+              Cuidados de hoje
             </Text>
             <Estrelas
               feitos={estrelasVisiveis}
               tamanho={28}
-              rotuloAcessivel={`${alvo} de 5 momentos de hoje`}
+              rotuloAcessivel={`${alvo} de 5 cuidados de hoje`}
             />
           </View>
         ) : null}
@@ -413,6 +419,56 @@ export function FimDoMomento({
       ) : null}
       {trofeu ? <TrofeuConquistado aoFechar={() => setTrofeu(false)} /> : null}
     </View>
+  );
+}
+
+/**
+ * O BALÃO DA BOLHA DA FESTA: material branco com a ponta virada PARA CIMA,
+ * para a Bolha logo acima dele (é ela quem fala). Entra junto com o título.
+ */
+function FalaDaBolha({ texto }: { texto: string }) {
+  return (
+    <Entrada atraso={160} deslocamento={10} estilo={{ alignSelf: "stretch", alignItems: "center" }}>
+      <View
+        accessibilityRole="text"
+        accessibilityLabel={`A Bolha: ${texto}`}
+        style={{
+          maxWidth: 330,
+          marginTop: -espaco.sm,
+          paddingHorizontal: espaco.lg,
+          paddingVertical: espaco.md,
+          borderRadius: canto.dentro,
+          ...curva,
+          backgroundColor: cor.cartao,
+          ...sombra,
+        }}
+      >
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            top: -6,
+            left: "50%",
+            marginLeft: -7,
+            width: 14,
+            height: 14,
+            borderRadius: 3,
+            backgroundColor: cor.cartao,
+            transform: [{ rotate: "45deg" }],
+          }}
+        />
+        <Text
+          style={{
+            textAlign: "center",
+            ...fonte.media,
+            ...escala.corpo,
+            color: cor.texto,
+          }}
+        >
+          {texto}
+        </Text>
+      </View>
+    </Entrada>
   );
 }
 

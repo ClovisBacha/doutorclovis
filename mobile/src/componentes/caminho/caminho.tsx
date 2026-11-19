@@ -1,3 +1,4 @@
+import { Image } from "expo-image";
 import ShieldCheck from "lucide-react-native/icons/shield-check";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
@@ -11,6 +12,7 @@ import {
   type TextStyle,
 } from "react-native";
 import { estadoDoNo as estadoDaPele, type TrilhaSkin } from "@/lib/trilha-skins";
+import { BOLHA } from "~/componentes/artes";
 import { useAviso } from "~/componentes/aviso";
 import { NaoConsegueLer, selecao, toque, Tocavel, useFolgaDaBarra } from "~/componentes/base";
 import {
@@ -47,6 +49,7 @@ import {
 } from "~/componentes/caminho/rolagem";
 import { Vidro } from "~/componentes/vidro";
 import { parametroDaBancada } from "~/lib/bancada";
+import { falaDoNoDeHoje, PERGUNTA_DO_HUMOR, reacaoAoHumor } from "~/lib/bolha/falas-do-jogo";
 import { misturar } from "~/lib/cor";
 import {
   HUMORES,
@@ -85,12 +88,14 @@ import { ALVO_MINIMO, canto, cor, escala, espaco, fonte, luz, margem } from "~/t
  *
  * Em cima, numa camada que FLUTUA sobre a trilha: o cabeçalho da aba (quando
  * a tela o passa), o placar (chama, amigas, troféus, sementinhas) com o lápis
- * do Arrumar ao lado, e o "Como você está hoje?" enquanto ela não responde. A
+ * do Arrumar ao lado, e a Bolha perguntando "como você está hoje?" enquanto
+ * ela não responde (o MESMO check-in da conversa da aba do bebê). A
  * trilha passa por baixo e se desfaz num degradê do céu, como no iOS.
  *
  * Embaixo, a trilha: uma faixa por fase, uma barra por semana e um nó por
  * dia, em zigue-zague, ligados por um traço — cheio até hoje, pontilhado
- * depois. Hoje é o nó maior, com o anel das cinco tarefas, o halo e o balão.
+ * depois. Hoje é o nó maior, com o anel dos cinco cuidados, o halo e o balão
+ * em que a Bolha fala ("Vamos começar?").
  *
  * A trilha é uma lista VIRTUALIZADA de blocos (uma fase, ou uma semana com os
  * sete dias): são ~300 nós. Cada bloco tem altura fixa (`montarCaminho`), e o
@@ -631,21 +636,23 @@ export function Caminho(p: PropsDoCaminho) {
       >
         {p.aoRecarregarCarteira ? (
           <NaoConsegueLer
-            sossego="Os seus momentos de hoje continuam valendo e ficam guardados neste aparelho."
+            sossego={SOSSEGO_DA_CARTEIRA}
             aoTentar={() => {
               setFolhaDaCarteira(false);
               p.aoRecarregarCarteira?.();
             }}
           />
         ) : (
-          (p.topo ?? (
-            <NaoConsegueLer sossego="Os seus momentos de hoje continuam valendo e ficam guardados neste aparelho." />
-          ))
+          (p.topo ?? <NaoConsegueLer sossego={SOSSEGO_DA_CARTEIRA} />)
         )}
       </Folha>
     </View>
   );
 }
+
+/** A carteira que não veio: o que ela fez hoje continua valendo (na voz da Bolha). */
+const SOSSEGO_DA_CARTEIRA =
+  "Os seus cuidados de hoje continuam valendo, e eu guardo tudo aqui no aparelho.";
 
 const chaveDoBloco = (b: Bloco) => (b.tipo === "fase" ? `f${b.fase.n}` : `s${b.semana}`);
 const nada = () => {};
@@ -851,10 +858,11 @@ function NoDoDia({
   const tons = tonsDaSemana(semana);
   const tom = fechado || hoje ? tons.cheia : e.tipo === "passado" ? tons.perdido : tons.futuro;
   const diaDaSemana = (D % 7) + 1;
+  const fala = hoje ? falaDoNoDeHoje({ feitos: momentos, total: 5, fechado }) : null;
   const rotulo =
     `Dia ${diaDaSemana} da semana ${semana}` +
     (hoje
-      ? `, hoje: ${momentos} de 5 atividades`
+      ? `, hoje: ${momentos} de 5 cuidados`
       : fechado
         ? ", dia completo"
         : e.tipo === "futuro"
@@ -871,7 +879,8 @@ function NoDoDia({
       fechado={fechado}
       futuro={e.tipo === "futuro"}
       anel={hoje ? (fechado ? CINCO_DE_CINCO : ANEIS[momentos]) : null}
-      balao={hoje ? (fechado ? "Dia completo" : momentos > 0 ? "Continuar" : "Começar") : null}
+      balao={fala?.texto ?? null}
+      poseDoBalao={fala?.pose}
       selo
       rotulo={rotulo}
       aoTocar={tocarNoDia}
@@ -1077,7 +1086,14 @@ function Divisor() {
 /**
  * "COMO VOCÊ ESTÁ HOJE?" — uma faixa compacta presa logo abaixo do placar
  * (antes era um cartão no alto da lista, e a lista abre na semana de hoje:
- * ninguém o via). Ao responder, ela sobe um pouco e some.
+ * ninguém o via).
+ *
+ * 19/11/2026 (a Bolha guia): quem pergunta é a Bolha ("Me conta: como você
+ * está hoje?"), com a arte dela ao lado da pergunta. É o MESMO check-in da
+ * conversa da aba do bebê (`CHAVE_CHECKIN`): respondido lá, a faixa nem
+ * aparece aqui; respondido aqui, a conversa de lá já sabe. Ao responder, ela
+ * diz uma frase curta (`reacaoAoHumor`), e a faixa sobe e some depois de um
+ * instante (uma sequência só no fio nativo, sem relógio na tela).
  */
 const FaixaDoHumor = memo(function FaixaDoHumor({
   aoMarcar,
@@ -1089,21 +1105,24 @@ const FaixaDoHumor = memo(function FaixaDoHumor({
   const reduzido = useMovimentoReduzido();
   const v = useRef(new Animated.Value(1)).current;
   const respondeu = useRef(false);
+  const [resposta, setResposta] = useState<string | null>(null);
+  const reacao = resposta ? reacaoAoHumor(resposta) : null;
   const marcar = (h: string) => {
     if (respondeu.current) return;
     respondeu.current = true;
     selecao();
+    setResposta(h);
     aoMarcar(h);
-    if (reduzido) {
-      aoSumir();
-      return;
-    }
-    Animated.timing(v, {
-      toValue: 0,
-      duration: 220,
-      easing: Easing.out(Easing.quad),
-      useNativeDriver: true,
-    }).start(() => aoSumir());
+    /* A frase dela fica um instante à vista, e a faixa sai. */
+    Animated.sequence([
+      Animated.delay(TEMPO_DA_REACAO),
+      Animated.timing(v, {
+        toValue: 0,
+        duration: reduzido ? 1 : 220,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start(() => aoSumir());
   };
   return (
     <Animated.View
@@ -1115,38 +1134,52 @@ const FaixaDoHumor = memo(function FaixaDoHumor({
       <Vidro
         tinta="rgba(255,255,255,0.72)"
         forma={canto.cartao}
-        estilo={{ paddingHorizontal: espaco.md, paddingTop: 10, paddingBottom: 2 }}
+        estilo={{ paddingHorizontal: espaco.md, paddingTop: 8, paddingBottom: reacao ? 8 : 2 }}
       >
-        <Text
-          accessibilityRole="header"
-          style={{ ...fonte.forte, ...escala.legenda, color: cor.texto, paddingHorizontal: 4 }}
-        >
-          Como você está hoje?
-        </Text>
-        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-          {HUMORES.map((h) => (
-            <Pressable
-              key={h.label}
-              accessibilityRole="button"
-              accessibilityLabel={`Estou ${h.label.toLowerCase()}`}
-              onPress={() => marcar(h.label)}
-              hitSlop={4}
-              style={({ pressed }) => ({
-                width: ALVO_MINIMO,
-                height: ALVO_MINIMO,
-                alignItems: "center",
-                justifyContent: "center",
-                transform: [{ scale: pressed ? 0.88 : 1 }],
-              })}
-            >
-              <Emoji tamanho={28}>{h.emoji}</Emoji>
-            </Pressable>
-          ))}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
+          <Image
+            source={BOLHA[reacao?.pose ?? "feliz"]}
+            accessible={false}
+            contentFit="contain"
+            style={{ width: 44, height: 44, marginVertical: -4 }}
+          />
+          <Text
+            accessibilityRole={reacao ? undefined : "header"}
+            accessibilityLiveRegion="polite"
+            style={{ flex: 1, ...fonte.forte, ...escala.legenda, color: cor.texto }}
+          >
+            {reacao ? reacao.texto : PERGUNTA_DO_HUMOR}
+          </Text>
         </View>
+        {reacao ? null : (
+          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+            {HUMORES.map((h) => (
+              <Pressable
+                key={h.label}
+                accessibilityRole="button"
+                accessibilityLabel={`Estou ${h.label.toLowerCase()}`}
+                onPress={() => marcar(h.label)}
+                hitSlop={4}
+                style={({ pressed }) => ({
+                  width: ALVO_MINIMO,
+                  height: ALVO_MINIMO,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transform: [{ scale: pressed ? 0.88 : 1 }],
+                })}
+              >
+                <Emoji tamanho={28}>{h.emoji}</Emoji>
+              </Pressable>
+            ))}
+          </View>
+        )}
       </Vidro>
     </Animated.View>
   );
 });
+
+/** Quanto a resposta da Bolha fica à vista antes de a faixa sair. */
+const TEMPO_DA_REACAO = 1600;
 
 const estilo: { numero: TextStyle; rotuloDaFaixa: TextStyle } = {
   numero: { ...fonte.titulo, ...escala.manchete, fontVariant: ["tabular-nums"] },

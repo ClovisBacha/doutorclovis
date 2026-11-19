@@ -32,6 +32,7 @@ import {
   type Bloco,
   type PontoDaTrilha,
 } from "~/lib/jornada/caminho";
+import { falaDoNoDeHoje } from "~/lib/bolha/falas-do-jogo";
 import { flagsDoDia, type Blob } from "~/lib/jornada/momentos";
 import {
   diasDoPosFechados,
@@ -431,6 +432,10 @@ const SemanaDoPos = memo(function SemanaDoPos({
         const fechado = e.tipo !== "futuro" && e.fechado;
         const tarefas = e.tipo === "futuro" ? 0 : e.tarefas;
         const tom = fechado || hoje ? tons.cheia : e.tipo === "futuro" ? tons.futuro : tons.perdido;
+        /* A Bolha fala em cima do nó de hoje também no 4º trimestre. */
+        const fala = hoje
+          ? falaDoNoDeHoje({ feitos: tarefas, total: TAREFAS_DO_POS.length, fechado })
+          : null;
         return (
           <NoDaTrilha
             key={d.D}
@@ -443,7 +448,8 @@ const SemanaDoPos = memo(function SemanaDoPos({
             fechado={fechado}
             futuro={e.tipo === "futuro"}
             anel={hoje ? ANEIS[tarefas] : null}
-            balao={hoje ? (fechado ? "Dia completo" : tarefas > 0 ? "Continuar" : "Começar") : null}
+            balao={fala?.texto ?? null}
+            poseDoBalao={fala?.pose}
             rotulo={
               `Dia ${(d.D % 7) + 1} da semana ${bloco.semana} de vida` +
               (hoje

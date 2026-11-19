@@ -6,6 +6,7 @@ import Play from "lucide-react-native/icons/play";
 import { memo, useMemo, type ReactNode } from "react";
 import { Animated, Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
 import Svg, { Circle, Defs, Path, RadialGradient, Stop } from "react-native-svg";
+import { BOLHA } from "~/componentes/artes";
 import { toque } from "~/componentes/base";
 import { corCaminho } from "~/componentes/caminho/cores";
 import {
@@ -29,6 +30,7 @@ import {
   type PontoDaTrilha,
   type Tom,
 } from "~/lib/jornada/caminho";
+import type { PoseDaBolha } from "~/lib/bolha/conversa";
 import { coresDaSemanaDoPos } from "~/lib/jornada/pos-parto";
 import { brilhoDe, canto, cor, curva, escala, espaco, fonte, luz, margem, sombra } from "~/tema";
 
@@ -388,7 +390,8 @@ function PontosDaSemana({ dias, tom }: { dias: readonly PontoDaBarra[]; tom: Tom
 
 /**
  * UM NÓ DA TRILHA. Hoje é o maior, com o anel das tarefas (ouro), o halo que
- * chama o dedo, o glifo de "começar" e o balão framboesa em cima. O dia
+ * chama o dedo, o glifo de "começar" e o balão framboesa em cima, que é a
+ * Bolha falando ("Vamos começar?", 19/11/2026). O dia
  * fechado leva o ✓ e, se pedir, o selo dourado de cinco estrelas no canto (a
  * fileira de cinco estrelinhas embaixo de cada nó saiu: repetia o ✓ e
  * empurrava a moeda para fora do ponto do caminho). Toda moeda fica CENTRADA
@@ -405,6 +408,7 @@ export const NoDaTrilha = memo(function NoDaTrilha({
   futuro,
   anel,
   balao,
+  poseDoBalao = "feliz",
   selo = false,
   rotulo,
   aoTocar,
@@ -423,7 +427,10 @@ export const NoDaTrilha = memo(function NoDaTrilha({
   futuro: boolean;
   /** Só no nó de hoje: quantas tarefas de quantas. */
   anel?: { feitos: number; total: number } | null;
+  /** A fala da Bolha em cima do nó de hoje (`falaDoNoDeHoje`). */
   balao?: string | null;
+  /** A pose da Bolha no balão (texto e pose são primitivos: o nó é `memo`). */
+  poseDoBalao?: PoseDaBolha;
   selo?: boolean;
   rotulo: string;
   aoTocar: (D: number) => void;
@@ -460,7 +467,9 @@ export const NoDaTrilha = memo(function NoDaTrilha({
         hitSlop={6}
         style={{ width: tamanho + 24, height: tamanho, alignItems: "center" }}
       >
-        {balao ? <Balao texto={balao} tamanho={tamanho} parado={parado} /> : null}
+        {balao ? (
+          <Balao texto={balao} pose={poseDoBalao} tamanho={tamanho} parado={parado} />
+        ) : null}
         <View style={{ width: tamanho, height: tamanho }}>
           {hoje && !fechado ? <Halo tamanho={tamanho} cor={tom.main} parado={parado} /> : null}
           {anel ? (
@@ -513,15 +522,32 @@ export const NoDaTrilha = memo(function NoDaTrilha({
   );
 });
 
-/** O balão de cima do nó de hoje: framboesa, letra branca (5,1:1), sem emoji. */
-function Balao({ texto, tamanho, parado }: { texto: string; tamanho: number; parado: boolean }) {
-  const largura = 220;
+/**
+ * O BALÃO DE CIMA DO NÓ DE HOJE — a Bolha falando (19/11/2026, "o bebê bolha
+ * vai ser aquele personagem que vai conversar com a mãe"). A pílula continua
+ * framboesa, a cor de agir, com a letra branca (5,1:1); a Bolha segura a
+ * ponta esquerda dela, maior que a pílula, e o texto é a fala, em letra de
+ * frase ("Vamos começar?"), e não mais a etiqueta de botão em maiúsculas.
+ * Nada atrás da Bolha: a arte fica solta sobre a pílula.
+ */
+function Balao({
+  texto,
+  pose,
+  tamanho,
+  parado,
+}: {
+  texto: string;
+  pose: PoseDaBolha;
+  tamanho: number;
+  parado: boolean;
+}) {
+  const largura = 240;
   return (
     <View
       pointerEvents="none"
       style={{
         position: "absolute",
-        top: -56,
+        top: -ALTURA_DO_BALAO - 29,
         width: largura,
         left: (tamanho + 24 - largura) / 2,
         zIndex: 2,
@@ -531,10 +557,12 @@ function Balao({ texto, tamanho, parado }: { texto: string; tamanho: number; par
       <Boiar parado={parado}>
         <View
           style={{
+            height: ALTURA_DO_BALAO,
+            justifyContent: "center",
             borderRadius: canto.pilula,
             backgroundColor: cor.primaria,
-            paddingHorizontal: 14,
-            paddingVertical: 5,
+            paddingLeft: ARTE_DO_BALAO - 2,
+            paddingRight: 14,
             ...brilhoDe(cor.primaria, 0.5),
           }}
         >
@@ -552,17 +580,19 @@ function Balao({ texto, tamanho, parado }: { texto: string; tamanho: number; par
               transform: [{ rotate: "45deg" }],
             }}
           />
-          <Text
-            numberOfLines={1}
+          <Image
+            source={BOLHA[pose]}
+            accessible={false}
+            contentFit="contain"
             style={{
-              ...fonte.titulo,
-              fontSize: 13,
-              lineHeight: 17,
-              letterSpacing: 0.4,
-              textTransform: "uppercase",
-              color: cor.branco,
+              position: "absolute",
+              left: -8,
+              top: (ALTURA_DO_BALAO - ARTE_DO_BALAO) / 2 - 1,
+              width: ARTE_DO_BALAO,
+              height: ARTE_DO_BALAO,
             }}
-          >
+          />
+          <Text numberOfLines={1} style={{ ...fonte.forte, ...escala.legenda, color: cor.branco }}>
             {texto}
           </Text>
         </View>
@@ -570,6 +600,10 @@ function Balao({ texto, tamanho, parado }: { texto: string; tamanho: number; par
     </View>
   );
 }
+
+/** A pílula da fala e a Bolha que a segura (maior que ela, de propósito). */
+const ALTURA_DO_BALAO = 32;
+const ARTE_DO_BALAO = 46;
 
 /**
  * O `drop-shadow(0 6px 10px <cor>55)` que o site põe na arte da pele: um halo

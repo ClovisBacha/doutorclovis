@@ -4,13 +4,8 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { Animated, LayoutAnimation, Platform, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAviso } from "~/componentes/aviso";
-import {
-  Carregando,
-  NaoConsegueLer,
-  sucesso,
-  useFimDaRolagem,
-  useFolgaDaBarra,
-} from "~/componentes/base";
+import { NaoConsegueLer, sucesso, useFimDaRolagem, useFolgaDaBarra } from "~/componentes/base";
+import { BolhaNaEspera } from "~/componentes/bolha/na-espera";
 import { BotaoDoPerfil } from "~/componentes/botao-do-perfil";
 import { CEUS, sombraDoTexto, useCeuDasAbas } from "~/componentes/ceu-vivo";
 import { FundoDeLuz } from "~/componentes/luz";
@@ -58,6 +53,10 @@ import { cor, escala, espaco, fonte, luz, margem } from "~/tema";
  * estado vazio, onde convida; com amigas, ela sai (era um texto de vitrine no
  * melhor lugar de uma aba de uso diário). O título rola junto, e o alto da
  * tela se desfaz na cor do céu, como na aba do bebê.
+ *
+ * 19/11/2026 (a Bolha guia): no vazio e na espera, quem fala é a Bolha
+ * ("Me apresenta as suas amigas?", "Chamando as suas amigas…"). A leitura
+ * que falha continua sendo `NaoConsegueLer`; no luto, nem Bolha nem convite.
  *
  * Desempenho: a aba relê no foco só se a última leitura tiver mais de 60 s, e
  * depois da transição; uma leitura igual à anterior não redesenha nada; o
@@ -191,13 +190,13 @@ export default function Amigas() {
     if (leitura === "carregando")
       return (
         <Painel>
-          <Carregando texto="Carregando as suas amigas…" />
+          <BolhaNaEspera pose="apaixonado" texto="Chamando as suas amigas…" />
         </Painel>
       );
     if (!leitura)
       return (
         <NaoConsegueLer
-          sossego="As suas amigas continuam aqui. Só a leitura não veio agora."
+          sossego="As suas amigas continuam aqui. Só a leitura não veio agora, e eu tento de novo quando você tocar."
           aoTentar={recarregar}
         />
       );
@@ -343,7 +342,7 @@ export default function Amigas() {
  * O ESTADO VAZIO (sem amigas e sem pedidos): a bolha apaixonada convida, num
  * painel (o texto sai de cima do céu, onde não segurava contraste). Logo
  * abaixo vem o painel de chamar uma amiga. No pós-parto, sem a frase da
- * dupla, que lá não existe.
+ * dupla, que lá não existe. O título é a Bolha pedindo (19/11/2026).
  */
 function EstadoVazio({ pos }: { pos: boolean }) {
   return (
@@ -352,6 +351,7 @@ function EstadoVazio({ pos }: { pos: boolean }) {
       <Text
         accessibilityRole="header"
         style={{
+          marginTop: -espaco.md,
           textAlign: "center",
           ...fonte.display,
           ...escala.titulo2,
@@ -359,7 +359,7 @@ function EstadoVazio({ pos }: { pos: boolean }) {
           color: cor.texto,
         }}
       >
-        Traga as suas amigas
+        Me apresenta as suas amigas?
       </Text>
       <Text
         style={{
@@ -371,8 +371,8 @@ function EstadoVazio({ pos }: { pos: boolean }) {
         }}
       >
         {pos
-          ? "Quem entra pelo seu convite aparece aqui, e vocês visitam o Cantinho uma da outra."
-          : `Quem entra pelo seu convite aparece aqui. Juntas, vocês formam uma dupla: cada dia em que as duas aparecem vale ${BONUS_DA_DUPLA} sementinhas para cada uma.`}
+          ? "Quem entrar pelo seu convite aparece aqui comigo, e vocês visitam o Cantinho uma da outra."
+          : `Quem entrar pelo seu convite aparece aqui comigo. Juntas, vocês formam uma dupla: cada dia em que as duas aparecem vale ${BONUS_DA_DUPLA} sementinhas para cada uma.`}
       </Text>
     </Painel>
   );

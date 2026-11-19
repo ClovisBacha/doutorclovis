@@ -7,7 +7,7 @@
  *     no dia em que ela já fechou o dia (cinco cuidados na gestação, três no
  *     pós-parto). Hoje, o texto sabe onde ela está (a chama, quantos faltam);
  *     nos dias seguintes, ele fala do que o dia traz (a aula, o desafio);
- *   · a SEMANA NOVA, às 9h do dia em que ela começa ("Semana 25 começou! 🌱",
+ *   · a SEMANA NOVA, às 9h do dia em que ela começa ("Semana 25 começou!",
  *     o push semanal do site) — e, no pós-parto, cada semana de vida, com a
  *     primeira frase do texto da semana.
  *
@@ -85,13 +85,25 @@ export function primeiraFrase(texto: string): string {
   return m ? m[1] : texto.trim();
 }
 
+/* O Modo Cuidado não tem a Bolha guia (a tela do luto é outra): o lembrete
+   fala baixo, sem personagem, sem bebê e sem contagem. */
 const CUIDADO: readonly [string, string][] = [
-  ["Um minuto para você 💜", "Respirar ou escrever uma linha — no seu tempo."],
-  ["Um momento seu 💜", "Sem placar e sem pressa. Só um momento seu."],
-  ["Estou aqui 💜", "Hoje, cuidar de você já basta."],
+  ["Um minuto para você", "Respirar ou escrever uma linha, no seu tempo."],
+  ["Um momento seu", "Sem placar e sem pressa. Só um momento seu."],
+  ["Estou aqui", "Hoje, cuidar de você já basta."],
 ];
 
-/** O texto do cuidado de hoje para o dia `mais` dias à frente (0 = hoje). */
+/** O assunto da aula com o ponto final, sem dobrar a reticência do título cortado. */
+const comPonto = (s: string) => (/[.!?…]$/.test(s.trim()) ? s.trim() : `${s.trim()}.`);
+
+/**
+ * O texto do cuidado de hoje para o dia `mais` dias à frente (0 = hoje).
+ *
+ * 19/11/2026 (a Bolha guia): o lembrete é a Bolha chamando, em primeira
+ * pessoa ("Separei a aula de hoje…", "eu te espero"), e não o app avisando.
+ * Sem emoji no título, sem travessão, e nada de "o bebê agradece": o cuidado
+ * é dela, e nenhum aviso promete efeito.
+ */
 export function textoDoCuidado(
   c: ContextoDoLembrete,
   mais: number,
@@ -104,64 +116,77 @@ export function textoDoCuidado(
   }
   if (c.modo === "sem-data" || c.D == null) {
     return {
-      titulo: "O cuidado de hoje 💜",
-      corpo: "Um momento seu: respirar, mexer ou escrever uma linha.",
+      titulo: "Oi, é a Bolha",
+      corpo: "Um momento seu: respirar, mexer o corpo ou guardar uma coisa boa. Eu te espero.",
     };
   }
   const D = c.D + mais;
   const hoje = mais === 0;
+  const faltam = Math.max(0, c.totalDoDia - c.feitosHoje);
   if (c.modo === "pos") {
     const idade = (c.idadeDias ?? c.D - 7) + mais;
     if (idade > ULTIMA_IDADE_DA_TRILHA) {
       return {
-        titulo: "Um minuto para você 💜",
-        corpo: `Respirar, um momento com ${quem} ou uma coisa boa — quando der.`,
+        titulo: "Um minuto para você",
+        corpo: `Respirar, um momento com ${quem} ou uma coisa boa guardada. Quando der, eu estou aqui.`,
       };
     }
     if (hoje && c.feitosHoje > 0) {
       return {
-        titulo: "Falta pouco para fechar o dia ✨",
-        corpo: `${c.feitosHoje} de ${c.totalDoDia} feitos. Sem pressa.`,
+        titulo: "Falta pouco para fechar o dia",
+        corpo: `${c.feitosHoje} de ${c.totalDoDia} feitos. Sem pressa, eu te espero.`,
       };
     }
     if (hoje && c.chama >= 2) {
       return {
-        titulo: `🔥 ${c.chama} dias seguidos`,
-        corpo: "Um gesto de hoje mantém a chama acesa. No seu ritmo 💜",
+        titulo: `${c.chama} dias seguidos`,
+        corpo: "Um gesto hoje e a chama continua acesa. No seu ritmo.",
       };
     }
     const desafio = c.desafio(D);
     return {
-      titulo: "Como você está hoje? 💜",
+      titulo: "Como você está hoje?",
       corpo: desafio
-        ? `Desafio de hoje: ${desafio}`
+        ? `O desafio de hoje: ${desafio}`
         : "Três gestos, no seu ritmo: o check-in, o desafio e a leitura da semana.",
     };
   }
   /* Gestação. */
   if (hoje && c.feitosHoje > 0) {
     return {
-      titulo: "Falta pouco para fechar o dia ✨",
-      corpo: `${c.feitosHoje} de ${c.totalDoDia} cuidados feitos. Mais um gesto e o dia fecha.`,
+      titulo: "Falta pouco para fechar o dia",
+      corpo:
+        faltam === 1
+          ? `Você já fez ${c.feitosHoje} de ${c.totalDoDia} cuidados. Só mais um e eu acendo a última estrela.`
+          : `Você já fez ${c.feitosHoje} de ${c.totalDoDia} cuidados. Faltam ${faltam}, e eu te espero aqui.`,
     };
   }
   if (hoje && c.chama >= 2) {
     return {
-      titulo: `🔥 ${c.chama} dias seguidos`,
-      corpo: `Um cuidado de hoje mantém a chama acesa. ${maiuscula(quem)} agradece 💜`,
+      titulo: `${c.chama} dias seguidos`,
+      corpo: "Um cuidado hoje e a chama continua acesa. Passa aqui rapidinho?",
     };
   }
   const aula = c.aula?.(D);
   if (aula) {
-    return {
-      titulo: "O cuidado de hoje 💜",
-      corpo: `Aula de hoje: ${aula}. Uns minutinhos para você e ${quem}.`,
-    };
+    const [titulo, corpo] = (
+      [
+        ["Oi, é a Bolha", `Separei a aula de hoje: ${comPonto(aula)} Dois minutinhos comigo?`],
+        ["A aula de hoje chegou", `${comPonto(aula)} Eu te espero na trilha.`],
+        [
+          "Tenho uma aula nova para você",
+          `Hoje o assunto é este: ${comPonto(aula)} Vem ver comigo?`,
+        ],
+      ] as const
+    )[((D % 3) + 3) % 3]!;
+    return { titulo, corpo };
   }
   const desafio = c.desafio(D);
   return {
-    titulo: "O cuidado de hoje 💜",
-    corpo: desafio ? `Desafio de hoje: ${desafio}` : `5 minutinhos para você e ${quem}.`,
+    titulo: "Oi, é a Bolha",
+    corpo: desafio
+      ? `O desafio de hoje: ${desafio}`
+      : `Cinco minutinhos para você e ${quem}? Eu te espero aqui.`,
   };
 }
 
@@ -178,7 +203,7 @@ export function textoDaSemanaNova(
     const bebe = bebeDaSemana(semana);
     const quem = c.nomeDoBebe?.trim() || "Seu bebê";
     return {
-      titulo: `Semana ${semana} começou! 🌱`,
+      titulo: `Semana ${semana} começou!`,
       corpo: `${quem} agora tem o tamanho de ${bebe.fruit.toLowerCase()}. ${bebe.desc}`,
     };
   }
@@ -189,7 +214,7 @@ export function textoDaSemanaNova(
     const quem = c.nomeDoBebe?.trim() || "O bebê";
     const semanaDeVida = Math.min(12, semanas + 1);
     return {
-      titulo: `${quem} completa ${semanas} ${semanas === 1 ? "semana" : "semanas"} 💜`,
+      titulo: `${quem} completa ${semanas} ${semanas === 1 ? "semana" : "semanas"}`,
       corpo: primeiraFrase(nestaSemanaDoPos(semanaDeVida)),
     };
   }

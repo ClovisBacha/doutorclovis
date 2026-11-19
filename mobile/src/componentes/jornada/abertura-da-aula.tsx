@@ -1,30 +1,32 @@
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef } from "react";
-import { Animated, Easing, Platform, Pressable, View } from "react-native";
-import { Emoji, Moeda3D } from "~/componentes/caminho/pecas";
+import { Animated, Easing, Platform, Pressable } from "react-native";
+import { Bolha } from "~/componentes/jornada/pecas";
 import { useMovimentoReduzido } from "~/componentes/movimento";
+import { ABERTURA_DA_AULA } from "~/lib/bolha/falas-do-jogo";
 import { coresDaSemana } from "~/lib/jornada/caminho";
 import { comAlfa } from "~/lib/cor";
 import { cor, escala, fonte } from "~/tema";
-import { figurinhaDaSemana } from "~/lib/bebe-da-semana";
 
 /**
  * A ABERTURA DA AULA — 1,5 s na cor da semana antes da lição, o `QuizIntro`
- * do site: a moeda salta, dois anéis se abrem, "Semana 24 · Aula de hoje" e
- * "2 minutinhos por Helena" sobem, e a tela se desfaz. Um toque pula.
+ * do site: a Bolha estudiosa salta, "Semana 24 · Aula de hoje" e o convite
+ * dela ("Dois minutinhos comigo?") sobem, e a tela se desfaz. Um toque pula.
  *
  * É o "agora é a aula" que a trilha do site dava (o Duolingo faz o mesmo): o
  * banco de aulas desce por baixo dela, e a lição aparece pronta.
  *
- * Na moeda, a fruta da SEMANA, e não o emoji que gira pelo dia da semana: as
- * aulas não seguem esse ritmo, e um 🥗 numa aula sobre o TOTG diria outra coisa.
  * Com "Reduzir movimento", nada salta nem pulsa — a tela aparece e se vai.
  *
  * 18/11/2026 (a vistoria): o degradê ia do pálido à cor, e o branco no meio
  * dava 2,2:1. Agora vai da cor da semana ao lábio dela (o branco no lábio dá
  * 5,8:1 ou mais, semanas 4 a 42). Saiu o "toque para começar" — a tela some
  * sozinha, e o toque só pula — e o emoji do título.
+ *
+ * 19/11/2026 (a Bolha guia): no lugar da moeda com a fruta da semana, a Bolha
+ * estudiosa, que é quem dá a aula; os dois anéis que se abriam em volta da
+ * moeda saíram com ela (nada atrás da Bolha). O título é a fala dela.
  */
 
 const SAI_EM = 1250;
@@ -32,21 +34,17 @@ const TERMINA_EM = 1500;
 
 export function AberturaDaAula({
   semana,
-  nomeDoBebe,
   aoComecarASair,
   aoTerminar,
 }: {
   semana: number;
-  nomeDoBebe: string | null;
   /** A cortina começou a se desfazer: a lição embaixo já pode entrar. */
   aoComecarASair?: () => void;
   aoTerminar: () => void;
 }) {
   const reduzido = useMovimentoReduzido();
   const tom = coresDaSemana(semana);
-  const moeda = useRef(new Animated.Value(reduzido ? 1 : 0)).current;
-  const anel1 = useRef(new Animated.Value(0)).current;
-  const anel2 = useRef(new Animated.Value(0)).current;
+  const pulo = useRef(new Animated.Value(reduzido ? 1 : 0)).current;
   const texto = useRef(new Animated.Value(reduzido ? 1 : 0)).current;
   const sub = useRef(new Animated.Value(reduzido ? 1 : 0)).current;
   const tela = useRef(new Animated.Value(1)).current;
@@ -74,24 +72,14 @@ export function AberturaDaAula({
   useEffect(() => {
     if (!reduzido) {
       Animated.sequence([
-        Animated.timing(moeda, {
+        Animated.timing(pulo, {
           toValue: 0.6,
           duration: 370,
           easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
-        Animated.spring(moeda, { toValue: 1, friction: 5, tension: 120, useNativeDriver: true }),
+        Animated.spring(pulo, { toValue: 1, friction: 5, tension: 120, useNativeDriver: true }),
       ]).start();
-      const anel = (v: Animated.Value, atraso: number) =>
-        Animated.timing(v, {
-          toValue: 1,
-          duration: 900,
-          delay: atraso,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
-        }).start();
-      anel(anel1, 0);
-      anel(anel2, 220);
       const subir = (v: Animated.Value, atraso: number) =>
         Animated.timing(v, {
           toValue: 1,
@@ -120,21 +108,11 @@ export function AberturaDaAula({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* A moeda: de 20 % a 118 % (com o giro de −14° a 4°) e assenta em 100 %. */
-  const escalaDaMoeda = moeda.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0.2, 1.18, 1] });
-  const giro = moeda.interpolate({
+  /* A Bolha: de 20 % a 118 % (com o giro de −14° a 4°) e assenta em 100 %. */
+  const escalaDaBolha = pulo.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0.2, 1.18, 1] });
+  const giro = pulo.interpolate({
     inputRange: [0, 0.6, 1],
     outputRange: ["-14deg", "4deg", "0deg"],
-  });
-  const estiloDoAnel = (v: Animated.Value, alfa: number) => ({
-    position: "absolute" as const,
-    width: 128,
-    height: 128,
-    borderRadius: 64,
-    borderWidth: 4,
-    borderColor: comAlfa(cor.branco, alfa),
-    opacity: v.interpolate({ inputRange: [0, 1], outputRange: [reduzido ? 0 : 0.75, 0] }),
-    transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.5, 2.1] }) }],
   });
   const subindo = (v: Animated.Value) => ({
     opacity: v,
@@ -155,7 +133,7 @@ export function AberturaDaAula({
     >
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Semana ${semana}. Abrindo a aula de hoje`}
+        accessibilityLabel={`Semana ${semana}. A Bolha abre a aula de hoje`}
         accessibilityHint="Toque para pular"
         onPress={() => sair(180)}
         style={{ flex: 1 }}
@@ -165,19 +143,13 @@ export function AberturaDaAula({
           locations={[0, 0.8]}
           style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 }}
         >
-          <View style={{ alignItems: "center", justifyContent: "center", width: 140, height: 140 }}>
-            <Animated.View pointerEvents="none" style={estiloDoAnel(anel1, 0.5)} />
-            <Animated.View pointerEvents="none" style={estiloDoAnel(anel2, 0.3)} />
-            <Animated.View style={{ transform: [{ scale: escalaDaMoeda }, { rotate: giro }] }}>
-              <Moeda3D tamanho={112} tom={tom} labio={10} claro={0.45} escuro={0.8} meio={0.6}>
-                <Emoji tamanho={50}>{figurinhaDaSemana(semana)}</Emoji>
-              </Moeda3D>
-            </Animated.View>
-          </View>
+          <Animated.View style={{ transform: [{ scale: escalaDaBolha }, { rotate: giro }] }}>
+            <Bolha humor="estudiosa" tamanho={168} />
+          </Animated.View>
           <Animated.Text
             style={[
               {
-                marginTop: 32,
+                marginTop: 20,
                 ...fonte.forte,
                 ...escala.nota,
                 letterSpacing: 1.6,
@@ -203,7 +175,7 @@ export function AberturaDaAula({
               subindo(sub),
             ]}
           >
-            {nomeDoBebe ? `2 minutinhos por ${nomeDoBebe}` : "2 minutinhos pelo bebê"}
+            {ABERTURA_DA_AULA}
           </Animated.Text>
         </LinearGradient>
       </Pressable>

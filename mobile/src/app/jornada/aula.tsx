@@ -24,15 +24,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { isMultiQuestion, type DailyQuiz } from "@/lib/daily-quizzes";
 import { carregarAulaDoDia } from "~/lib/jornada/aulas-do-app";
-import {
-  Cartao,
-  Carregando,
-  NaoConsegueLer,
-  selecao,
-  Sobrelinha,
-  sucesso,
-  T,
-} from "~/componentes/base";
+import { Cartao, NaoConsegueLer, selecao, Sobrelinha, sucesso, T } from "~/componentes/base";
 import { BotaoDaAtividade } from "~/componentes/jornada/atividade";
 import { FundoDeLuz } from "~/componentes/luz";
 import {
@@ -47,8 +39,15 @@ import { pagarAula } from "~/componentes/jornada/economia";
 import { useBalanco, useQuique } from "~/componentes/jornada/efeitos";
 import { BarraDoTopo, Bolha, BolhaFalando, voltarParaJornada } from "~/componentes/jornada/pecas";
 import { AberturaDaAula } from "~/componentes/jornada/abertura-da-aula";
+import { BolhaNaEspera } from "~/componentes/bolha/na-espera";
 import { useAtividade, useJornada } from "~/componentes/jornada/usarJornada";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
+import {
+  AULA_JA_FEITA,
+  falaDaLicao,
+  falaDoFimDaAula,
+  tituloDoVeredito,
+} from "~/lib/bolha/falas-do-jogo";
 import {
   comecarPerguntas,
   continuar,
@@ -99,6 +98,11 @@ import { AvisoMedico } from "~/componentes/aviso-medico";
  * bolha reagindo dentro dela, onde ela está olhando. Sair no meio pergunta
  * antes (pelo X, pelo gesto de voltar ou pelo voltar do Android).
  *
+ * 19/11/2026 (a Bolha guia): o que o cromo da aula diz é fala da Bolha
+ * (`lib/bolha/falas-do-jogo.ts`): a abertura, o recado em cima da lição, o
+ * título do veredito e o balão do fim. A lição, as perguntas e os porquês
+ * são o conteúdo da aula e não mudam.
+ *
  * Bancada: /jornada/aula?bancada=1 (com a abertura)
  *   [&etapa=licao|pergunta|verificada|fim|feita]
  *   [&acertou=1 (o veredito certo)] [&acertos=0 (o fim com 0)] [&espera=1 (o fim somando)]
@@ -124,7 +128,6 @@ export default function Aula() {
       {(abertura === "mostrando" || abertura === "saindo") && dia.modo === "gestacao" ? (
         <AberturaDaAula
           semana={dia.semana}
-          nomeDoBebe={(dia.perfil.baby_name ?? "").trim() || null}
           aoComecarASair={() => setAbertura("saindo")}
           aoTerminar={() => setAbertura("feita")}
         />
@@ -319,7 +322,7 @@ function AulaDoDia({ cortina }: { cortina: boolean }) {
   if (!at.pronto) {
     return (
       <CascaDaAula refDaRolagem={rolagem} topo={topoSimples}>
-        <Carregando texto="Abrindo a aula…" />
+        <BolhaNaEspera pose="estudiosa" texto="Estou abrindo a aula…" />
       </CascaDaAula>
     );
   }
@@ -334,7 +337,7 @@ function AulaDoDia({ cortina }: { cortina: boolean }) {
         aoMedirPe={aoMedirPe}
       >
         <T>
-          A aula do dia acompanha as semanas da gestação. Os outros momentos do dia continuam
+          A aula do dia acompanha as semanas da gestação. Os outros cuidados do dia continuam
           abertos.
         </T>
       </CascaDaAula>
@@ -361,7 +364,7 @@ function AulaDoDia({ cortina }: { cortina: boolean }) {
         }
         aoMedirPe={aoMedirPe}
       >
-        <BolhaFalando humor="estudiosa" fala="Você já fez a aula de hoje. Amanhã tem outra." />
+        <BolhaFalando humor="estudiosa" fala={AULA_JA_FEITA} />
         {quiz && quiz !== "carregando" ? <Licao quiz={quiz} /> : null}
       </CascaDaAula>
     );
@@ -370,7 +373,7 @@ function AulaDoDia({ cortina }: { cortina: boolean }) {
   if (quiz === "carregando") {
     return (
       <CascaDaAula refDaRolagem={rolagem} topo={topoSimples}>
-        <Carregando texto="Preparando a aula de hoje…" />
+        <BolhaNaEspera pose="estudiosa" texto="Separando a aula de hoje…" />
       </CascaDaAula>
     );
   }
@@ -379,7 +382,7 @@ function AulaDoDia({ cortina }: { cortina: boolean }) {
     return (
       <CascaDaAula refDaRolagem={rolagem} topo={topoSimples}>
         <NaoConsegueLer
-          sossego="A aula deste dia não abriu. Tente de novo em instantes."
+          sossego="A aula de hoje não abriu desta vez. Tente de novo em instantes."
           aoTentar={() => setTentativa((t) => t + 1)}
         />
       </CascaDaAula>
@@ -404,6 +407,7 @@ function AulaDoDia({ cortina }: { cortina: boolean }) {
       <CascaDaFesta>
         <FimDoMomento
           titulo={titulo}
+          falaDaBolha={falaDoFimDaAula({ acertos: e.acertos, total, D })}
           momento="aula"
           acertos={{ feitos: e.acertos, total }}
           arte={
@@ -434,15 +438,12 @@ function AulaDoDia({ cortina }: { cortina: boolean }) {
      verificada é mais um. Nunca aparece vazia. */
   const passo = licao ? 1 : e.indice + 1 + (e.verificada ? 1 : 0);
 
-  const tituloDoVeredito = revisando
+  /* O veredito é a Bolha reagindo (na revisão, só o gabarito). */
+  const tituloDaFolha = revisando
     ? multi
       ? "As respostas certas"
       : "A resposta certa"
-    : e.acertou
-      ? "Isso mesmo!"
-      : multi
-        ? "As certas estão em verde"
-        : "A certa está em verde";
+    : tituloDoVeredito({ acertou: !!e.acertou, multi, indice: e.indice, D });
 
   /* O pé: UM botão, que só troca de rótulo (e acende quando pode). */
   const botao = licao
@@ -465,7 +466,7 @@ function AulaDoDia({ cortina }: { cortina: boolean }) {
             else toqueMacio();
             if (Platform.OS === "android") {
               AccessibilityInfo.announceForAccessibility(
-                `${x.acertou ? "Isso mesmo!" : multi ? "As certas estão em verde" : "A certa está em verde"}. ${q.why}`,
+                `${tituloDoVeredito({ acertou: !!x.acertou, multi, indice: e.indice, D })} ${q.why}`,
               );
             }
             setE(x);
@@ -498,7 +499,7 @@ function AulaDoDia({ cortina }: { cortina: boolean }) {
           <FolhaDoVeredito
             visivel={e.verificada}
             acertou={!!e.acertou}
-            titulo={tituloDoVeredito}
+            titulo={tituloDaFolha}
             porque={q.why}
             alturaDoPe={alturaDoPe}
             aoMedir={aoMedirFolha}
@@ -511,10 +512,7 @@ function AulaDoDia({ cortina }: { cortina: boolean }) {
         /* Quando a cortina da abertura se desfaz, a lição entra subindo (e não
            aparece parada por baixo dela). */
         <Entrada key={cortina ? "atras" : "licao"} deslocamento={16} estilo={{ gap: espaco.md }}>
-          <BolhaFalando
-            humor="estudiosa"
-            fala={`Leia com calma. Depois vêm ${total} perguntas, e você tem uma chance em cada.`}
-          />
+          <BolhaFalando humor="estudiosa" fala={falaDaLicao({ D, total, semana: at.semana })} />
           <Licao quiz={quiz} />
           <AvisoMedico curto />
         </Entrada>

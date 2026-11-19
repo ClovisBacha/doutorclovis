@@ -1,5 +1,6 @@
 import { Redirect } from "expo-router";
-import { Carregando, NaoConsegueLer, T, Tela } from "~/componentes/base";
+import { NaoConsegueLer, T, Tela } from "~/componentes/base";
+import { BolhaNaEspera } from "~/componentes/bolha/na-espera";
 import { useJornada } from "~/componentes/jornada/usarJornada";
 import { JornadaDaGestacao, JornadaDoPosParto } from "~/app/(abas)/jornada";
 
@@ -16,6 +17,8 @@ import { JornadaDaGestacao, JornadaDoPosParto } from "~/app/(abas)/jornada";
  * No Modo Cuidado e sem a data da gestação não há trilha: a aba some da
  * barra, e quem chegar aqui por um link volta para a aba do meio.
  *
+ * Enquanto o dia carrega, a Bolha avisa que está abrindo a trilha (19/11/2026).
+ *
  * Bancada: /trilha?bancada=1 (os mesmos parâmetros da tela do bebê) [&pos=1&idade=20]
  */
 export default function AbaDaTrilha() {
@@ -23,7 +26,7 @@ export default function AbaDaTrilha() {
   if (dia.modo === "carregando")
     return (
       <Tela>
-        <Carregando texto="Abrindo a sua trilha…" />
+        <BolhaNaEspera texto="Estou abrindo a sua trilha…" />
       </Tela>
     );
   if (dia.modo === "falhou")
@@ -31,7 +34,7 @@ export default function AbaDaTrilha() {
       <Tela>
         <T tipo="titulo">Sua trilha</T>
         <NaoConsegueLer
-          sossego="Tudo o que você já fez na trilha continua guardado."
+          sossego="Tudo o que você já fez na trilha continua guardado comigo."
           aoTentar={dia.tentar}
         />
       </Tela>

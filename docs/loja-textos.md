@@ -1,12 +1,41 @@
 # A loja — o que se preenche no App Store Connect
 
-Reescrito em 11/11/2026 para o app de HOJE (decisão do dono: "um Duolingo para
-gestantes", o mais simples possível para lançar): o React Native de `mobile/`,
-um jogo para aprender sobre a gestação — uma trilha com uma aula curta por dia,
-sementinhas, conquistas e amigas —, com o acompanhamento do bebê. Sem
-orientação médica, sem SOS, sem Comunidade (feed), sem assistente com IA e sem
-nada à venda. As versões anteriores deste texto (com o SOS e a Comunidade)
-estão no git — e a Apple compara o que a loja promete com o que o app faz.
+> **RASCUNHO DE 19/11/2026 — o app de bem-estar materno, com a Bolha guia.**
+> O dono, em 19/11: "a mãe esperta é também aquela que cuida da saúde [...]
+> um aplicativo de bem-estar materno [...] o bebê bolha será esse guia neste
+> caminho". Este texto reposiciona a loja: de "um Duolingo para gestantes"
+> (um jogo de aprender) para **bem-estar materno** (aprender, respirar, mexer
+> o corpo, criar vínculo e guardar o que foi bom), com a Bolha como guia.
+>
+> **O que mudou em relação à versão de 11/11** (cada campo mudado traz a
+> marca **[NOVO 19/11]** e o valor anterior logo abaixo, para comparar):
+>
+> 1. **Nome na loja**: `Mãe Esperta: Bem-estar Materno` (antes, `Mãe Esperta:
+Aula da Gravidez`). Ver a nota sobre o `CLAUDE.md` na tabela.
+> 2. **Categoria**: Saúde e fitness passa a primária, Educação vira a
+>    secundária (antes, o contrário). O porquê está logo abaixo da tabela.
+> 3. **Subtítulo, palavras-chave, texto promocional e descrição** reescritos
+>    para o bem-estar, com a Bolha e os cinco pilares.
+> 4. **Sai o "Duolingo"** do texto promocional e da descrição: a diretriz
+>    2.3.7 proíbe nome de outro app nos metadados, e era um motivo de recusa
+>    à toa.
+> 5. **As capturas** mudam de ordem e ganham legenda; sai a captura do bebê
+>    ilustrado (a ilustração saiu do app em 19/11).
+> 6. **As notas para a revisão**: só o parágrafo "O QUE O APP É", para casar
+>    com a descrição nova. O resto (a conta de demonstração, a falta de
+>    orientação médica, as Amigas, a conta, as compras) ficou igual.
+>
+> **O que NÃO mudou**: a classificação etária, o questionário de privacidade
+> inteiro, as URLs de suporte, privacidade e termos, a lista de "antes de
+> apertar enviar" e o lugar onde as páginas estão hospedadas.
+
+Escrito em 11/11/2026 para o app de HOJE (o React Native de `mobile/`) e
+reposicionado em 19/11/2026: um app de bem-estar para a gestação, com uma
+aula curta por dia, pausas para respirar, movimentos leves, histórias para o
+bebê e gratidão, guiado pela Bolha, com o acompanhamento do bebê, a trilha,
+as sementinhas e as amigas. Sem orientação médica, sem SOS, sem Comunidade
+(feed), sem assistente com IA e sem nada à venda. As versões anteriores deste
+texto estão no git, e a Apple compara o que a loja promete com o que o app faz.
 
 Tudo aqui é para copiar e colar. Nada depende de código: depende da conta
 Apple, que é sua. Os campos com limite de caracteres foram contados.
@@ -14,6 +43,16 @@ Apple, que é sua. Os campos com limite de caracteres foram contados.
 > **Antes de tudo:** o app abre numa tela de LOGIN. App atrás de login sem conta
 > de demonstração é devolvido sem o revisor abrir a segunda tela. Veja "Notas
 > para a revisão" no fim.
+
+> **Saúde sem promessa (a Apple e o CFM).** Bem-estar não é conselho médico.
+> Em nenhum campo: "reduz a ansiedade", "melhora o sono", "fortalece",
+> "previne", "alivia", "faz bem para o bebê", "saudável", "recomendado". A
+> Apple reprova metadado que promete efeito de saúde sem prova (diretrizes
+> 1.4.1 e 2.3.1), e a publicidade ligada a um médico não pode prometer
+> resultado (Resolução CFM 2.336/2023). Se um dia o texto citar o Dr. Clóvis,
+> que seja como quem escreveu as aulas, nunca como garantia. O que pode:
+> "uma pausa para respirar", "movimentos leves, no seu ritmo", "desacelerar",
+> "cuidar de você".
 
 ---
 
@@ -28,21 +67,49 @@ pessoa não o vê, e trocá-lo seria outro app na loja).
 | campo                | valor                                                          |
 | -------------------- | -------------------------------------------------------------- |
 | Bundle ID            | `br.com.obstetrica.app`                                        |
-| Nome na loja         | `Mãe Esperta: Aula da Gravidez` (29 de 30)                     |
+| Nome na loja         | **[NOVO 19/11]** `Mãe Esperta: Bem-estar Materno` (30 de 30)   |
+|                      | antes: `Mãe Esperta: Aula da Gravidez` (29 de 30)              |
 | Nome no iPhone       | Mãe Esperta (o `name` do `app.json`)                           |
-| Categoria primária   | **Educação**                                                   |
-| Categoria secundária | **Saúde e fitness**                                            |
+| Categoria primária   | **[NOVO 19/11]** **Saúde e fitness** (antes, Educação)         |
+| Categoria secundária | **[NOVO 19/11]** **Educação** (antes, Saúde e fitness)         |
 | Idioma principal     | Português (Brasil)                                             |
 | Preço                | Grátis, sem compras dentro do app (as sementinhas são do jogo) |
 | URL de suporte       | `https://clovisbacha.github.io/doutorclovis/`                  |
 | URL da privacidade   | `https://clovisbacha.github.io/doutorclovis/privacidade.html`  |
 
-**Por que Educação.** O app agora é um jogo de aprendizado (a trilha com uma
-aula por dia), como o Duolingo, que está em Educação. Medicina é a categoria do
-escrutínio mais duro (diretriz 1.4.1) e prometeria o que o app não faz; Redes
-sociais deixou de servir quando a Comunidade saiu. Saúde e fitness, como
-secundária, é onde as gestantes procuram. A descrição continua tendo de dizer
-que o app não orienta.
+**O nome na loja.** "Bem-estar Materno" diz em duas palavras o que o app
+virou, e vale para a gestação e para as 12 semanas depois do parto. A palavra
+que as gestantes digitam na busca ("gravidez") vai nas palavras-chave. Se o
+dono preferir a palavra da busca no nome, a alternativa é
+`Mãe Esperta: Gravidez Leve` (26 de 30), com "bem-estar" no subtítulo. O nome
+pode mudar até a primeira submissão sem custo; depois, só com versão nova.
+⚠️ O `CLAUDE.md` da raiz cita o nome antigo da loja (`Mãe Esperta: Aula da
+Gravidez`): quem aprovar o nome novo atualiza a linha lá também.
+
+**[NOVO 19/11] Por que Saúde e fitness passa a primária** (antes, Educação):
+
+- **O que o app promete mudou.** Em 11/11 ele era "um jogo para aprender",
+  como o Duolingo, que mora em Educação. Agora a promessa é bem-estar:
+  aprender, mas também respirar, desacelerar, mexer o corpo, criar vínculo e
+  guardar o que foi bom. É o que se acha em Saúde e fitness (os apps de
+  meditação e os de gestação moram lá), e é lá que a gestante procura.
+- **A loja compara a categoria com o app.** Um app cuja descrição abre com
+  respiração e meditação, na categoria Educação, soa desencontrado para o
+  revisor e para quem navega.
+- **Não aumenta o escrutínio.** A Apple olha a saúde pelo conteúdo, não pela
+  categoria: o que reprova é promessa de efeito e orientação, e o texto não
+  tem nenhuma das duas. Medicina continua fora (diretriz 1.4.1: é a
+  categoria de quem orienta, e o app não orienta).
+- **O custo.** Saúde e fitness é mais disputada que Educação, então subir
+  nas listas da categoria é mais difícil. Para um app novo, o que traz gente
+  é a busca, e a busca não depende da categoria. Educação fica como
+  secundária, porque a aula do dia continua no centro.
+
+**Antes (11/11), para comparar:** "O app agora é um jogo de aprendizado (a
+trilha com uma aula por dia), como o Duolingo, que está em Educação. Medicina
+é a categoria do escrutínio mais duro (diretriz 1.4.1) e prometeria o que o
+app não faz; Redes sociais deixou de servir quando a Comunidade saiu. Saúde e
+fitness, como secundária, é onde as gestantes procuram."
 
 **Classificação etária.** Os Termos do app exigem 18 anos, e o cadastro e o
 aceite pedem a confirmação. No questionário, responda o que o app tem: nenhum
@@ -56,66 +123,99 @@ escolha **18+**, para casar com os Termos.
 
 ## Textos
 
-**Subtítulo** (30 caracteres; este tem 30)
+**[NOVO 19/11] Subtítulo** (30 caracteres; este tem 29)
 
 ```
-Sua gestação, uma aula por dia
+Uma aula e um respiro por dia
 ```
 
-**Palavras-chave** (100 caracteres; estas têm 98 — sem espaço depois da vírgula,
-e sem repetir o que já está no nome e no subtítulo, que a loja já indexa)
+> antes: `Sua gestação, uma aula por dia` (30). O conhecimento e a paz, os dois
+> lados do bem-estar que o dono descreveu, numa frase.
+
+**[NOVO 19/11] Palavras-chave** (100 caracteres; estas têm 95, sem espaço
+depois da vírgula e sem repetir o que já está no nome e no subtítulo, que a
+loja já indexa: mãe, esperta, bem-estar, materno, aula, respiro, dia)
 
 ```
-grávida,gestante,bebê,semanas,aprender,jogo,maternidade,pós-parto,meditação,mamãe,gratidão,cuidado
+gravidez,gestante,grávida,gestação,bebê,semanas,meditação,respiração,relaxar,gratidão,pós-parto
 ```
 
-**Texto promocional** (170 caracteres; este tem 145 — muda sem nova revisão)
+> antes: `grávida,gestante,bebê,semanas,aprender,jogo,maternidade,pós-parto,meditação,mamãe,gratidão,cuidado`
+> (98). Saem "jogo" e "aprender" (o app não se vende mais como jogo), e
+> "maternidade", "mamãe" e "cuidado" (perto demais de "materno" e "mãe", que
+> o nome já cobre). Entram "gravidez" e "gestação" (as buscas mais comuns,
+> que o nome antigo cobria), "respiração" e "relaxar".
+
+**[NOVO 19/11] Texto promocional** (170 caracteres; este tem 155, e muda sem
+nova revisão)
 
 ```
-Uma aula curta por dia sobre a sua semana de gestação, sementinhas a cada passo e amigas jogando junto com você. Como um Duolingo para gestantes.
+Com a Bolha como guia: uma aula curta sobre a sua semana, uma pausa para respirar, movimentos leves e uma coisa boa guardada. Ser esperta é cuidar de você.
 ```
 
-**Descrição**
+> antes: "Uma aula curta por dia sobre a sua semana de gestação, sementinhas a
+> cada passo e amigas jogando junto com você. Como um Duolingo para
+> gestantes." (145). O "Duolingo" saiu: nome de outro app nos metadados é
+> motivo de recusa (diretriz 2.3.7).
+
+**[NOVO 19/11] Descrição**
 
 ```
-O Mãe Esperta é um jogo para aprender sobre a gestação, um pouco por dia —
-como um Duolingo para gestantes.
+O Mãe Esperta é um app de bem-estar para a gestação. Ser esperta é cuidar de você, e cuidar de você é cuidar de vocês dois.
 
-A TRILHA
+Quem guia é a Bolha, uma bolha de sabão curiosa e carinhosa. Todo dia ela pergunta como você está e sugere o próximo passo, no seu ritmo.
+
+APRENDER
 • Uma aula curtinha por dia, escrita para a semana em que você está
-• O cuidado do dia: um momento para respirar, uma história lida para o bebê,
-  uma coisa boa guardada e um movimento leve — no seu ritmo
+• Perguntas rápidas no fim, com o porquê de cada resposta
 • A gestação inteira numa trilha, com o álbum de cada semana
 
-O JOGO
-• Sementinhas a cada passo, conquistas e a chama dos dias seguidos
-• O seu Cantinho para enfeitar com o que você conquistar
+RESPIRAR E DESACELERAR
+• Pausas guiadas para respirar e meditar, de poucos minutos
+• Sons para a noite, como chuva e mar, para descansar
 
-AS AMIGAS
-• Convide as suas amigas e veja o progresso de cada uma
-• Formem uma dupla e segurem juntas a mesma chama
+MEXER O CORPO
+• Movimentos leves, no seu ritmo, e você pula o que quiser
 
-O BEBÊ
+VÍNCULO
+• Histórias curtinhas para ler em voz alta para o bebê
+• Para vocês dois: da 28ª semana em diante, um momento com quem vai estar com você, para respirarem juntos e combinarem um gesto e uma palavra
+
+GRATIDÃO
+• Uma coisa boa guardada por dia, que vira uma carta para depois
+
+A SUA SEMANA
 • A semana a semana, do tamanho de uma semente ao dia de conhecer
 • Os movimentos do bebê, no seu tempo
 • A agenda das suas consultas, com lembrete na véspera
 • O contato de quem acompanha a sua gestação, sempre à mão
 • Depois do nascimento, as 12 primeiras semanas de vocês
 
+O JOGO E AS AMIGAS
+• Sementinhas a cada cuidado, conquistas e a chama dos dias seguidos
+• Convide as suas amigas e formem uma dupla para manter a chama juntas
+• O seu Cantinho, para enfeitar com o que você conquistar
+
 MODO CUIDADO
-• Para quando a gestação não seguiu: o app para de falar do bebê, e o
-  acolhimento continua
+• Para quando a gestação não seguiu: o app para de falar do bebê, e o acolhimento continua
 
 IMPORTANTE
-O Mãe Esperta não dá orientação médica: não faz diagnóstico, não indica
-tratamento, exame, remédio ou dieta e não substitui consulta. Quem orienta é
-quem acompanha a sua gestação. Em emergência, ligue 192.
+O Mãe Esperta é um app de bem-estar e aprendizado e não dá orientação médica: não faz diagnóstico, não indica tratamento, exame, remédio ou dieta e não substitui consulta. Quem orienta é quem acompanha a sua gestação. Em emergência, ligue 192.
 ```
+
+> **O que mudou na descrição:** abre pelo bem-estar e pela Bolha (antes, "um
+> jogo para aprender sobre a gestação [...] como um Duolingo para
+> gestantes"); os cinco pilares viram as seções (aprender, respirar, mexer,
+> vínculo, gratidão); o jogo e as amigas descem para depois do que ela faz
+> por si. Cada linha descreve o que o app TEM, sem efeito prometido: "pausas
+> para respirar", e nunca "para reduzir a ansiedade". O parágrafo final é o
+> mesmo, com "app de bem-estar e aprendizado" na frente.
 
 > **Por que o parágrafo final não é opcional.** As diretrizes 1.4.1 e 5.1.1
 > põem app que toca em saúde numa fila de escrutínio, e o que reprova é texto
 > que soe como conduta. "Não dá orientação médica" e "em emergência, ligue 192"
-> precisam estar na descrição, não só dentro do app.
+> precisam estar na descrição, não só dentro do app. Com a categoria Saúde e
+> fitness, isso vale ainda mais.
 
 **Novidades desta versão** (primeira submissão)
 
@@ -130,17 +230,28 @@ Primeira versão do Mãe Esperta.
 A App Store pede as de 6,9" (iPhone 16 Pro Max / 17 Pro Max) — e aceita usá-las
 para os tamanhos menores. O app não declara iPad (`supportsTablet: false`).
 
-As cinco que contam a história, nesta ordem:
+**[NOVO 19/11]** As que contam a história, nesta ordem, cada uma com a legenda
+que vai em cima do print (as três primeiras são as que aparecem na busca):
 
-1. **A Trilha** — a aba que abre o app, com a chama e as sementinhas no topo.
-2. **A aula do dia** — uma pergunta da semana, com as sementinhas ganhas.
-3. **As atividades de hoje** — os cinco momentos do dia.
-4. **As Amigas** — a dupla com a chama e os rostos das amigas.
-5. **O Bebê** — a semana a semana.
+| #   | o que mostra                                                      | legenda                                  |
+| --- | ----------------------------------------------------------------- | ---------------------------------------- |
+| 1   | A aba do Bebê: o céu com o número da semana e a Bolha conversando | Conheça a Bolha, a sua guia na gestação  |
+| 2   | A aula do dia: uma pergunta, com a Bolha no veredito              | Uma aula curta sobre a sua semana        |
+| 3   | Meditar: a pausa para respirar                                    | Uma pausa para respirar, quando quiser   |
+| 4   | Mexer: um movimento leve                                          | Movimentos leves, no seu ritmo           |
+| 5   | Ler para o bebê, ou a carta da gratidão                           | Uma história na sua voz, e o que foi bom |
+| 6   | A trilha, com a Bolha no nó de hoje e a chama no topo             | Cada dia vira um passo da sua trilha     |
+| 7   | As Amigas: a dupla com a chama                                    | Chame as amigas para a sua dupla         |
 
-> Tire os prints com a conta de demonstração povoada, nunca com dados reais.
-> Print com nome de gestante de verdade é vazamento publicado — e as Amigas
-> mostram rostos e nomes de outras pessoas.
+> antes: 1. a Trilha; 2. a aula do dia; 3. as atividades de hoje; 4. as
+> Amigas; 5. o Bebê, a semana a semana (sem legenda). A semana a semana saiu
+> da lista porque a ilustração do bebê saiu do app (19/11); o céu com o
+> número da semana e a Bolha, na aba do Bebê, é a vitrine nova.
+
+> Legenda é descrição, nunca promessa: "uma pausa para respirar", e não
+> "durma melhor". Tire os prints com a conta de demonstração povoada, nunca
+> com dados reais. Print com nome de gestante de verdade é vazamento
+> publicado — e as Amigas mostram rostos e nomes de outras pessoas.
 
 ---
 
@@ -194,6 +305,11 @@ Privacidade e os Termos estão hospedados", no fim.
 
 Cole no campo "App Review Information → Notes".
 
+> **[NOVO 19/11]** Só o parágrafo "O QUE O APP É" mudou, para casar com a
+> descrição nova. Antes ele dizia: "Um jogo para aprender sobre a gestação, um
+> pouco por dia: uma trilha com uma aula curta por dia, de acordo com a semana
+> da gestação, sementinhas e conquistas."
+
 ```
 CONTA DE DEMONSTRAÇÃO
 E-mail: (crie uma conta de teste povoada e coloque aqui)
@@ -202,10 +318,12 @@ A conta já tem a gestação configurada, alguns dias de trilha, amigas e uma
 dupla, para que todas as telas possam ser abertas.
 
 O QUE O APP É (diretriz 1.4.1)
-Um jogo para aprender sobre a gestação, um pouco por dia: uma trilha com uma
-aula curta por dia, de acordo com a semana da gestação, sementinhas e
-conquistas. O app NÃO dá orientação médica: não faz diagnóstico, não indica
-tratamento, exame, remédio ou dieta, e diz isso no app (Perfil e Bebê), nos
+Um app de bem-estar para a gestação, guiado por uma personagem (a Bolha): uma
+aula curta por dia, de acordo com a semana da gestação, pausas para respirar
+e meditar, movimentos leves, histórias para ler para o bebê e uma coisa boa
+guardada por dia, numa trilha com sementinhas e conquistas. O app NÃO dá
+orientação médica: não faz diagnóstico, não indica tratamento, exame, remédio
+ou dieta, não promete efeito de saúde, e diz isso no app (Perfil e Bebê), nos
 Termos e nesta descrição. Em emergência, o app orienta a ligar 192.
 
 AMIGAS (diretriz 1.2)
