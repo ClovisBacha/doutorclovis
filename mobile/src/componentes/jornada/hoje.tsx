@@ -34,16 +34,11 @@ import { Painel, RAIO_DENTRO_DO_PAINEL } from "~/componentes/painel";
 import { CeuDoBebe, SaudacaoNoCeu, useAlturaDoCeu } from "~/componentes/jornada/ceu-do-bebe";
 import { GrupoDeAtalhos } from "~/componentes/jornada/atalhos";
 import { corJornada, corDaAtividade } from "~/componentes/jornada/cores";
-import {
-  ArteDaBolha,
-  useMovimentoReduzido,
-  useParalaxe,
-  type HumorDaArte,
-} from "~/componentes/movimento";
+import { ArteDaBolha, useMovimentoReduzido, useParalaxe } from "~/componentes/movimento";
 import { CompartilharASemana, type DadosDoCartao } from "~/componentes/jornada/cartao-da-semana";
 import { Confete } from "~/componentes/jornada/pecas";
 import { parametroDaBancada } from "~/lib/bancada";
-import { arteDoBebe } from "~/componentes/jornada/arte-do-bebe";
+import { BOLHA } from "~/componentes/artes";
 import { clarear, comAlfa, escurecer } from "~/lib/cor";
 import type { ChaveDoCuidado, Cuidado } from "~/lib/jornada/hoje";
 import { cor, curva, escala, espaco, fonte, luz, margem, ouro, sombra } from "~/tema";
@@ -230,8 +225,7 @@ export function TelaDeHoje({
   faltam,
   hora,
   cuidados,
-  recado,
-  humor,
+  bolha,
   chama,
   reguaUsada = false,
   avisos,
@@ -257,9 +251,8 @@ export function TelaDeHoje({
   faltam: number | null;
   hora: number;
   cuidados: readonly Cuidado[];
-  /** A fala da bolha (`recadoDaBolha`). */
-  recado: string;
-  humor: HumorDaArte;
+  /** A Bolha guia (`ConversaComABolha`): o primeiro painel, logo abaixo do céu. */
+  bolha?: ReactNode;
   chama: number;
   /** Ela já arrastou a régua do céu: a dica não aparece mais. */
   reguaUsada?: boolean;
@@ -383,6 +376,13 @@ export function TelaDeHoje({
           style={{ paddingHorizontal: margem.tela, paddingTop: 6, gap: 14 }}
         >
           {avisos}
+          {/* A Bolha guia: a primeira coisa depois do céu (19/11/2026, o dono:
+              "o bebê bolha será esse guia neste caminho"). */}
+          {bolha ? (
+            <Entrar atraso={40}>
+              <Painel>{bolha}</Painel>
+            </Entrar>
+          ) : null}
           {acompanhamento ? (
             <Entrar atraso={80}>
               <Painel>{acompanhamento}</Painel>
@@ -400,31 +400,12 @@ export function TelaDeHoje({
                   <View style={{ flex: 1, gap: 2 }}>
                     <TituloDaSecao>O cuidado de hoje</TituloDaSecao>
                     <Text style={{ ...fonte.media, ...escala.legenda, color: cor.textoCorpo }}>
-                      5 minutinhos para você e {quem}
+                      Cuidar de você é cuidar de {quem}
                     </Text>
                   </View>
                   <Animated.View style={{ transform: [{ scale: pulso }] }}>
                     <AnelDoDia feitos={feitos} />
                   </Animated.View>
-                </View>
-
-                {/* A bolha, pequena: a personagem que acompanha, e não a dona da tela. */}
-                <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
-                  <ArteDaBolha humor={humor} tamanho={58} />
-                  <View
-                    style={{
-                      flex: 1,
-                      borderRadius: RAIO_DENTRO_DO_PAINEL,
-                      borderTopLeftRadius: 6,
-                      paddingHorizontal: 14,
-                      paddingVertical: 11,
-                      ...MATERIAL,
-                    }}
-                  >
-                    <Text style={{ ...fonte.media, ...escala.legenda, color: cor.textoCorpo }}>
-                      {recado}
-                    </Text>
-                  </View>
                 </View>
 
                 <Entrar key={proximo?.chave ?? "cheio"}>
@@ -580,11 +561,7 @@ function BarraQueNasce({
               paddingVertical: 5,
             }}
           >
-            <Image
-              source={arteDoBebe(semana)}
-              style={{ width: 34, height: 34 }}
-              contentFit="contain"
-            />
+            <Image source={BOLHA.feliz} style={{ width: 34, height: 34 }} contentFit="contain" />
             <Text style={{ ...fonte.forte, ...escala.legenda, color: cor.texto }}>
               {nomeDoBebe ?? "O bebê"}
             </Text>

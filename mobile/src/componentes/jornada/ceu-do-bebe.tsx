@@ -33,8 +33,7 @@ import {
 import Svg, { Defs, Ellipse, RadialGradient, Stop } from "react-native-svg";
 import { selecao, Tocavel, toque } from "~/componentes/base";
 import { sombraDoTexto, type Ceu } from "~/componentes/ceu-vivo";
-import { arteDoBebe } from "~/componentes/jornada/arte-do-bebe";
-import { Brilho } from "~/componentes/jornada/atividade";
+import { BOLHA } from "~/componentes/artes";
 import { corJornada } from "~/componentes/jornada/cores";
 import { Flutuar, useMovimentoReduzido } from "~/componentes/movimento";
 import { bebeDaSemana } from "~/lib/bebe-da-semana";
@@ -57,8 +56,16 @@ import {
 } from "~/tema";
 
 /**
- * O BEBÊ NO CÉU — o topo da tela do bebê, em CAMADAS (16/11/2026, o dono:
+ * A BOLHA NO CÉU — o topo da tela do bebê, em CAMADAS (16/11/2026, o dono:
  * "efeito Apple 3D caro [...] algo ainda melhor e imersivo").
+ *
+ * ⚠️ 19/11/2026, decisão do dono: "nosso principal personagem agora será o
+ * bebê bolha. Eu quero tirar as imagens dos bebês [...] o número 24 ali estava
+ * muito bacana". A ilustração do bebê saiu do céu: na frente do número fica
+ * a BOLHA, a guia do app, que não cresce com as semanas (quem cresce é o
+ * número). Tocar nela dá o pulinho com as faíscas; viajando pela régua, ela
+ * faz cara de surpresa. Nada atrás dela (sem brilho nem disco: a regra da
+ * bolha, CLAUDE.md).
  *
  * A profundidade é a da tela de bloqueio do iPhone, em que o relógio fica
  * ATRÁS da pessoa da foto: aqui o número da semana, gigante, fica atrás do
@@ -111,24 +118,19 @@ export function useAlturaDoCeu(topo: number, embaixo: number): number {
 /** Ela já arrastou a régua uma vez: a dica "arraste para…" não volta. */
 export const CHAVE_REGUA_USADA = "dc-path-regua-usada";
 
-/** O lado da arte do bebê, na semana 40 e no céu mais alto (antes disso ele é menor: ele cresce). */
-const BEBE = 224;
+/** O lado da Bolha no céu mais alto (no céu baixo, ela encolhe junto). */
+const BEBE = 212;
 
 /** As semanas da régua (as que `bebeDaSemana` conta, da 4 à 42). */
 const PRIMEIRA = 4;
 const ULTIMA = 42;
-/** O bebê para de crescer na 40 (a arte da 40 é a última). */
-const ULTIMA_DO_TAMANHO = 40;
 /** A distância entre uma semana e a seguinte, na régua. */
 const PASSO = 15;
 
 const prender = (s: number) => Math.min(ULTIMA, Math.max(PRIMEIRA, s));
 
-/** O bebê cresce com as semanas: de 70% do tamanho, na 4, a 100%, na 40. */
-const escalaDoBebe = (s: number) =>
-  0.7 +
-  (0.3 * (Math.min(ULTIMA_DO_TAMANHO, Math.max(PRIMEIRA, s)) - PRIMEIRA)) /
-    (ULTIMA_DO_TAMANHO - PRIMEIRA);
+/* A Bolha não cresce com as semanas (19/11/2026): quem conta o tempo é o número. */
+const escalaDoBebe = (_s: number) => 1;
 
 type ControleDaRegua = { irPara: (semana: number) => void };
 type EstiloAnimado = Animated.WithAnimatedValue<ViewStyle>;
@@ -419,21 +421,18 @@ export const CeuDoBebe = memo(function CeuDoBebe({
           <SombraDeContato largura={Math.round(190 * k)} />
         </Animated.View>
         <Animated.View pointerEvents="box-none" style={camadas.bebeChegando}>
-          <View pointerEvents="none">
-            <Brilho tamanho={Math.round(320 * k)} />
-          </View>
           <Faiscas gatilho={faiscas} lado={lado} />
           {/* O Flutuar dá três voltas ao aparecer e descansa (`vaivemQueDescansa`). */}
           <Flutuar>
             <Animated.View style={camadas.crescendo}>
               <Pressable
                 accessibilityRole="imagebutton"
-                accessibilityLabel={`${quem} com ${vista} semanas`}
-                accessibilityHint="Toque para um carinho"
+                accessibilityLabel={`A Bolha, a sua guia. Semana ${vista}`}
+                accessibilityHint="Toque para ela dar um pulinho"
                 onPress={aoTocarNoBebe}
               >
                 <Image
-                  source={arteDoBebe(vista)}
+                  source={viajando ? BOLHA.surpresa : BOLHA.feliz}
                   style={{ width: lado, height: lado }}
                   contentFit="contain"
                   transition={reduzido ? 0 : 180}
@@ -799,7 +798,7 @@ export const ReguaDoTempo = memo(function ReguaDoTempo({
     <View
       accessible
       accessibilityRole="adjustable"
-      accessibilityLabel={`Semana da gestação: arraste para ver ${quem} crescer`}
+      accessibilityLabel={`Semana da gestação: arraste para ver como ${quem} está em cada semana`}
       accessibilityValue={{ min: PRIMEIRA, max: ULTIMA, now: vista, text: `Semana ${vista}` }}
       accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
       onAccessibilityAction={(e) =>
@@ -824,7 +823,7 @@ export const ReguaDoTempo = memo(function ReguaDoTempo({
             ...sombraDoPe(ceu),
           }}
         >
-          arraste para ver {quem} crescer
+          arraste para viajar pelas semanas
         </Text>
       ) : null}
     </View>

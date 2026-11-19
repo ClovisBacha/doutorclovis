@@ -86,6 +86,8 @@ import {
 } from "~/lib/jornada/hoje";
 import { primeiroNome } from "~/lib/gestacao";
 import { recadoDaBolhaNoApp } from "~/lib/recado-da-bolha";
+import { ConversaComABolha } from "~/componentes/bolha/conversa";
+import type { ContextoDaBolha, Destino } from "~/lib/bolha/conversa";
 import { BarraDoTopo, voltarParaJornada } from "~/componentes/jornada/pecas";
 import { FundoDeLuz } from "~/componentes/luz";
 import { CEUS, sombraDoTexto, useCeuDasAbas, type Ceu } from "~/componentes/ceu-vivo";
@@ -485,6 +487,29 @@ export function JornadaDaGestacao({
     },
     [D, hoje],
   );
+  /* ── A Bolha guia (19/11/2026): o contexto do momento e para onde ela leva ── */
+  const humorDeHoje = marcouHumorHoje(checkin, hoje) ? (checkin.mood ?? null) : null;
+  const feitosDeHoje = cuidados.filter((c) => c.feito).map((c) => c.chave);
+  const contextoDaBolha = useMemo<ContextoDaBolha>(
+    () => ({
+      hora: horaDaTela(),
+      D,
+      modo: "gestacao",
+      nomeDela: primeiroNome(perfil.display_name),
+      nomeDoBebe,
+      semana,
+      feitos: feitosDeHoje,
+      humor: humorDeHoje,
+      chama: diasDeChama,
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [D, perfil.display_name, nomeDoBebe, semana, feitosDeHoje.join(","), humorDeHoje, diasDeChama],
+  );
+  const aoAbrirDaBolha = useCallback((d: Destino) => {
+    if (d === "dormir") ir("/jornada/dormir");
+    else if (d === "trilha") irParaAba("/trilha");
+    else ir(ROTA_DO_CUIDADO[d]);
+  }, []);
   const aoAbrirDia = useCallback((d: number) => ir(`/jornada/dia?D=${d}`), []);
   /* A figurinha da semana é guardada pela tela da semana (`semana.tsx`), e
      não aqui antes de navegar: guardada aqui, a semana nunca via a primeira
@@ -521,17 +546,13 @@ export function JornadaDaGestacao({
           faltam={faltam}
           hora={hora}
           cuidados={cuidados}
-          recado={recadoDaBolhaNoApp({
-            feitos,
-            total: 5,
-            dia: D,
-            hora,
-            bebe: nomeDoBebe ?? undefined,
-            semana,
-            posParto: false,
-            careMode: false,
-          })}
-          humor={feitos >= 5 ? "orgulhosa" : feitos >= 4 ? "surpresa" : "feliz"}
+          bolha={
+            <ConversaComABolha
+              contexto={contextoDaBolha}
+              aoAbrir={aoAbrirDaBolha}
+              aoMarcarHumor={aoMarcarHumor}
+            />
+          }
           chama={diasDeChama}
           reguaUsada={loja.blob[CHAVE_REGUA_USADA] === true}
           avisos={avisos}
