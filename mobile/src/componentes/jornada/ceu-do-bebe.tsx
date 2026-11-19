@@ -181,6 +181,8 @@ export type PropsDoCeu = {
   semData?: boolean;
   /** A semana que a régua mostra, a cada troca (o semana a semana acompanha embaixo). */
   aoVer?: (semana: number) => void;
+  /** Tocar na Bolha do céu também a chama para conversar (a tela rola até ela). */
+  aoTocarNaBolha?: () => void;
 };
 
 export const CeuDoBebe = memo(function CeuDoBebe({
@@ -200,6 +202,7 @@ export const CeuDoBebe = memo(function CeuDoBebe({
   modo = "hoje",
   semData = false,
   aoVer,
+  aoTocarNaBolha,
 }: PropsDoCeu) {
   const reduzido = useMovimentoReduzido();
   const total = altura + topo;
@@ -280,6 +283,7 @@ export const CeuDoBebe = memo(function CeuDoBebe({
   const aoTocarNoBebe = useCallback(() => {
     toque();
     setFaiscas((n) => n + 1);
+    if (aoTocarNaBolha) setTimeout(aoTocarNaBolha, reduzido ? 0 : 380);
     if (reduzido) return;
     pulo.setValue(0);
     Animated.timing(pulo, {
@@ -288,7 +292,7 @@ export const CeuDoBebe = memo(function CeuDoBebe({
       easing: Easing.out(Easing.quad),
       useNativeDriver: true,
     }).start();
-  }, [reduzido, pulo]);
+  }, [reduzido, pulo, aoTocarNaBolha]);
 
   /* As camadas, criadas UMA vez por tamanho de tela (18/11/2026): criadas no
      corpo do desenho, cada semana que a régua passava desligava e religava os
@@ -428,7 +432,9 @@ export const CeuDoBebe = memo(function CeuDoBebe({
               <Pressable
                 accessibilityRole="imagebutton"
                 accessibilityLabel={`A Bolha, a sua guia. Semana ${vista}`}
-                accessibilityHint="Toque para ela dar um pulinho"
+                accessibilityHint={
+                  aoTocarNaBolha ? "Toque para conversar com ela" : "Toque para ela dar um pulinho"
+                }
                 onPress={aoTocarNoBebe}
               >
                 <Image

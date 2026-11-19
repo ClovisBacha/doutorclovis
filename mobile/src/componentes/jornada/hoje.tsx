@@ -322,6 +322,17 @@ export function TelaDeHoje({
     [topo],
   );
 
+  /* Tocar na Bolha do céu rola até a conversa com ela (o primeiro painel). */
+  const yDaBolha = useRef(0);
+  const irABolha = useCallback(
+    () =>
+      lista.current?.scrollTo({
+        y: Math.max(0, yDosPaineis.current + yDaBolha.current - topo - 48),
+        animated: true,
+      }),
+    [topo],
+  );
+
   /* O alto do céu não muda a cada leitura que chega: o herói não se redesenha. */
   const cabecalho = useMemo(
     () => (
@@ -366,6 +377,7 @@ export function TelaDeHoje({
           y={y}
           reguaUsada={reguaUsada}
           cabecalho={cabecalho}
+          aoTocarNaBolha={bolha ? irABolha : undefined}
         />
 
         {/* Os painéis, soltos sobre o céu, na margem da saudação. */}
@@ -379,9 +391,15 @@ export function TelaDeHoje({
           {/* A Bolha guia: a primeira coisa depois do céu (19/11/2026, o dono:
               "o bebê bolha será esse guia neste caminho"). */}
           {bolha ? (
-            <Entrar atraso={40}>
-              <Painel>{bolha}</Painel>
-            </Entrar>
+            <View
+              onLayout={(e: LayoutChangeEvent) => {
+                yDaBolha.current = e.nativeEvent.layout.y;
+              }}
+            >
+              <Entrar atraso={40}>
+                <Painel>{bolha}</Painel>
+              </Entrar>
+            </View>
           ) : null}
           {acompanhamento ? (
             <Entrar atraso={80}>
