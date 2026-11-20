@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="1024" height="1024">
+<!-- O SÍMBOLO, sem o fundo (a abertura e a frente do ícone do Android). O ícone do app Mãe Esperta (escolhido pelo dono em 20/11/2026): a Bolha de
+     capelo saindo do livro aberto, no céu da noite. Aprender (o livro e o
+     capelo) com leveza (a Bolha, a guia do app). Fonte de icon.png, das camadas
+     do Android, do favicon e da abertura: ver docs/diario, "20/11 — a marca". -->
+<defs>
+<radialGradient id="fundo" cx="50%" cy="34%" r="80%"><stop offset="0" stop-color="#3b2a85"/><stop offset="1" stop-color="#140d33"/></radialGradient>
+<radialGradient id="bolha" cx="40%" cy="36%" r="66%"><stop offset="0" stop-color="#fffaf4"/><stop offset=".5" stop-color="#ffe3d2"/><stop offset=".78" stop-color="#ffc6de"/><stop offset="1" stop-color="#c7b3ff"/></radialGradient>
+<linearGradient id="aro" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff9a6c"/><stop offset=".5" stop-color="#f4478f"/><stop offset="1" stop-color="#8f5cf7"/></linearGradient>
+<linearGradient id="paginaE" x1="1" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#f4478f"/><stop offset="1" stop-color="#ffc9a8"/></linearGradient>
+<linearGradient id="paginaD" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#f4478f"/><stop offset="1" stop-color="#b98bff"/></linearGradient>
+</defs>
+<path d="M50 84 C41 79.5 29 78 17 78.5 L17 74.5 C29 74 41 75.5 50 80 Z" fill="#a8164f"/>
+<path d="M50 84 C59 79.5 71 78 83 78.5 L83 74.5 C71 74 59 75.5 50 80 Z" fill="#6d3fc7"/>
+<path d="M50 80 C41 75.5 29 74 17 74.5 L17 63 C29 61.5 42 63.5 50 69 Z" fill="url(#paginaE)"/>
+<path d="M50 80 C59 75.5 71 74 83 74.5 L83 63 C71 61.5 58 63.5 50 69 Z" fill="url(#paginaD)"/>
+<path d="M50 69 L50 80" stroke="#2a1a4f" stroke-width="1.2" opacity=".35"/>
+<path d="M23 67.5 C31 66.5 39 67.5 45 70.5" stroke="#fff" stroke-width="1.3" stroke-linecap="round" fill="none" opacity=".6"/>
+<path d="M77 67.5 C69 66.5 61 67.5 55 70.5" stroke="#fff" stroke-width="1.3" stroke-linecap="round" fill="none" opacity=".6"/>
+<g transform="translate(50 43) scale(.68)">
+<circle cx="0" cy="0" r="30" fill="url(#bolha)" stroke="url(#aro)" stroke-width="2.4"/>
+<path d="M13 24.5 A27 27 0 0 0 27.2 6" stroke="#9fe3d6" stroke-width="3" stroke-linecap="round" fill="none" opacity=".75"/>
+<path d="M-19.5 -9.5 A21 21 0 0 1 -7 -23.5" stroke="#fff" stroke-width="3.4" stroke-linecap="round" fill="none"/>
+<path d="M-11.5 0 Q-7.8 -4.8 -4 0" stroke="#2a1a4f" stroke-width="2.7" stroke-linecap="round" fill="none"/>
+<path d="M4 0 Q7.8 -4.8 11.5 0" stroke="#2a1a4f" stroke-width="2.7" stroke-linecap="round" fill="none"/>
+<ellipse cx="-14" cy="6" rx="3.7" ry="2.3" fill="#f78fb3" opacity=".75"/>
+<ellipse cx="14" cy="6" rx="3.7" ry="2.3" fill="#f78fb3" opacity=".75"/>
+<path d="M-4.4 5.4 L4.4 5.4 Q0 12.6 -4.4 5.4 Z" fill="#2a1a4f"/>
+<ellipse cx="0" cy="8.4" rx="2.3" ry="1.3" fill="#f47aa5"/>
+</g>
+<g transform="translate(50 22.6) scale(.85) translate(-50 -32)"><g transform="rotate(-12 52 31)">
+<path d="M41 33 L41 38.5 Q52 43 63 38.5 L63 33 Z" fill="#a8164f"/>
+<path d="M52 22.5 L72 30 L52 37.5 L32 30 Z" fill="#cf2468"/>
+<path d="M52 30 L66 33.5 L66 42" stroke="#ffc9a8" stroke-width="1.3" stroke-linecap="round" fill="none"/>
+<circle cx="66" cy="43.3" r="1.9" fill="#ffc9a8"/>
+<circle cx="52" cy="30" r="1.4" fill="#ffc9a8"/>
+</g></g>
+<path transform="translate(80 18)" d="M0 -6 l1.6 4.4 4.4 1.6 -4.4 1.6 -1.6 4.4 -1.6 -4.4 -4.4 -1.6 4.4 -1.6z" fill="#ffd27a"/>
+<circle cx="21" cy="24" r="1.2" fill="#ffd27a" opacity=".8"/>
+</svg>

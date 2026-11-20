@@ -66,18 +66,19 @@ Esperta" é de 2014, de outra pessoa, na classe 45, e foi definitivamente
 arquivado: vale pedir o registro nas classes 9 e 41. O Bundle ID não muda (a
 pessoa não o vê, e trocá-lo seria outro app na loja).
 
-| campo                | valor                                                          |
-| -------------------- | -------------------------------------------------------------- |
-| Bundle ID            | `br.com.obstetrica.app`                                        |
-| Nome na loja         | **[NOVO 19/11]** `Mãe Esperta: Bem-estar Materno` (30 de 30)   |
-|                      | antes: `Mãe Esperta: Aula da Gravidez` (29 de 30)              |
-| Nome no iPhone       | Mãe Esperta (o `name` do `app.json`)                           |
-| Categoria primária   | **[NOVO 19/11]** **Saúde e fitness** (antes, Educação)         |
-| Categoria secundária | **[NOVO 19/11]** **Educação** (antes, Saúde e fitness)         |
-| Idioma principal     | Português (Brasil)                                             |
-| Preço                | Grátis, sem compras dentro do app (as sementinhas são do jogo) |
-| URL de suporte       | `https://clovisbacha.github.io/doutorclovis/`                  |
-| URL da privacidade   | `https://clovisbacha.github.io/doutorclovis/privacidade.html`  |
+| campo                | valor                                                             |
+| -------------------- | ----------------------------------------------------------------- |
+| Bundle ID            | `br.com.obstetrica.app`                                           |
+| Nome na loja         | **[NOVO 19/11]** `Mãe Esperta: Bem-estar Materno` (30 de 30)      |
+|                      | antes: `Mãe Esperta: Aula da Gravidez` (29 de 30)                 |
+| Nome no iPhone       | Mãe Esperta (o `name` do `app.json`)                              |
+| Ícone                | A Bolha de capelo saindo do livro aberto (`mobile/assets/marca/`) |
+| Categoria primária   | **[NOVO 19/11]** **Saúde e fitness** (antes, Educação)            |
+| Categoria secundária | **[NOVO 19/11]** **Educação** (antes, Saúde e fitness)            |
+| Idioma principal     | Português (Brasil)                                                |
+| Preço                | Grátis, sem compras dentro do app (as sementinhas são do jogo)    |
+| URL de suporte       | `https://clovisbacha.github.io/doutorclovis/`                     |
+| URL da privacidade   | `https://clovisbacha.github.io/doutorclovis/privacidade.html`     |
 
 **O nome na loja.** "Bem-estar Materno" diz em duas palavras o que o app
 virou, e vale para a gestação e para as 12 semanas depois do parto. A palavra

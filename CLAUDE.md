@@ -133,6 +133,15 @@ outro app na loja), o `slug` e o `scheme` `obstetrica` (links e login), o
 domínio `obstetrica.com.br` e o site, que não muda mais. Escreva "o app Mãe
 Esperta", nunca "a Mãe Esperta" (o app não é uma mãe).
 
+**O ícone (escolhido pelo dono em 20/11/2026): a Bolha de capelo saindo do
+livro aberto, no céu da noite** — aprender (o livro, o capelo) com leveza (a
+Bolha, a guia). A fonte é vetor, em `mobile/assets/marca/` (`icone.svg`,
+`simbolo.svg` sem fundo, `simbolo-mono.svg` de uma cor); dela saem `icon.png`
+(1024, sem alfa), as três camadas do Android, o `favicon.png`, a `abertura.png`
+(a splash) e `marca/instagram-perfil.png`. Mudou a marca? Mude o vetor e gere
+tudo de novo dele, nunca um PNG à mão. As propostas que não venceram estão no
+canvas "Logos Mãe Esperta" e no diário.
+
 ## O visual é "Amanhecer": vidro, luz e profundidade (pedido do dono, 16/11/2026)
 
 "Está com muita cara de feito no Claude [...] efeito Apple 3D caro [...]
