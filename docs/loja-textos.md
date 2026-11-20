@@ -112,13 +112,22 @@ trilha com uma aula por dia), como o Duolingo, que está em Educação. Medicina
 app não faz; Redes sociais deixou de servir quando a Comunidade saiu. Saúde e
 fitness, como secundária, é onde as gestantes procuram."
 
-**Classificação etária.** Os Termos do app exigem 18 anos, e o cadastro e o
-aceite pedem a confirmação. No questionário, responda o que o app tem: nenhum
-conteúdo gerado por usuárias além do nome e da foto de perfil, que só as amigas
-aceitas veem; nada de violência, sexo, apostas, compras ou navegação livre na
-web; "informação médica ou de tratamento": **nenhuma** (o app não orienta). Se
-a App Store Connect oferecer escolher uma classificação acima da calculada,
-escolha **18+**, para casar com os Termos.
+**Classificação etária** (decisão do dono, 20/11/2026: "a Apple calcula").
+Responda o questionário com o que o app tem, e **fique com a classificação que
+a Apple calcular, sem forçar uma mais alta**: nenhum conteúdo gerado por
+usuárias além do nome e da foto de perfil, que só as amigas aceitas veem; sem
+conversa nem mensagens entre usuárias; nada de violência, sexo, apostas,
+anúncios ou navegação livre na web; "informação médica ou de tratamento":
+**nenhuma** (o app não orienta); temas de saúde e bem-estar: sim (as aulas da
+gestação, a respiração, os movimentos leves).
+
+Por que não 18+: o selo "18+" na loja sugere conteúdo adulto, o que afasta e
+passa a ideia errada de um app de gestação e bem-estar (o Enxovaly, por
+exemplo, aparece com uma faixa mais baixa). A idade mínima continua nos
+**Termos** (maiores de 18 anos) e no cadastro, que pede a confirmação: os dados
+da gestação são dado de saúde (LGPD, art. 11), e abaixo de 18 anos o
+consentimento precisaria dos pais. Abrir para adolescentes é outra decisão, com
+Termos, Privacidade e consentimento novos.
 
 ---
 
