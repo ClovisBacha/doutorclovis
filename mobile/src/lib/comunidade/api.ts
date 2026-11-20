@@ -1,0 +1,305 @@
+import type { TipoDeReacao, Visibilidade } from "@/lib/rede-social";
+import { ehBancada, parametroDaBancada } from "~/lib/bancada";
+import * as B from "~/lib/comunidade/bancada";
+import { seguro } from "~/lib/comunidade/regras";
+import * as rede from "~/servidor/rede";
+import type { PerfilNaTela } from "~/servidor/rede";
+
+/**
+ * O caminho ÚNICO das telas da Comunidade até o servidor.
+ *
+ *  · tudo passa por `seguro` — a ponte que lança vira `{ok:false, motivo:"rede"}`;
+ *  · na BANCADA (web, `?bancada=1`) nada sai para a rede: cada função devolve
+ *    o dado de exemplo com a MESMA forma da resposta do servidor, e ele entra
+ *    nos mesmos estados da tela de produção.
+ *
+ * Parâmetros da bancada: `estado=vazio|instavel`, `recusa=1` (o servidor
+ * recusa publicar/comentar com o recado da triagem).
+ */
+
+const ok = <T extends object>(v: T) => Promise.resolve({ ok: true as const, ...v });
+
+/** A Atividade já aberta NESTA bancada: sem isto, o selo voltava ao recarregar. */
+let atividadeVistaNaBancada = false;
+
+/** O que "Editar perfil" salvou NESTA bancada (só memória): o Perfil o mostra ao voltar. */
+const salvoNaBancada: Partial<
+  Pick<PerfilNaTela, "nome" | "bio" | "publico" | "mostrarSemana" | "mostrarBebe" | "avatarUrl">
+> = {};
+
+function meuPerfilNaBancada(): PerfilNaTela {
+  return { ...B.perfilDaBancadaSocial(B.EU_NA_BANCADA), ...salvoNaBancada };
+}
+const okVazio = () => Promise.resolve({ ok: true as const });
+const estado = () => parametroDaBancada("estado");
+
+const RECADO_DE_EXEMPLO =
+  "Aqui a gente conta a própria experiência, sem dizer o que a outra deve fazer. Quem orienta é quem acompanha cada uma.";
+
+export const api = {
+  meuPerfilSocial() {
+    if (ehBancada()) {
+      return ok({
+        perfil: meuPerfilNaBancada(),
+        emCuidado: parametroDaBancada("luto") === "1",
+        pausada: false,
+        suspensa: false,
+        pedidos: B.pedidosDaBancada(),
+      });
+    }
+    return seguro(() => rede.meuPerfilSocial({}));
+  },
+
+  salvarPerfilSocial(entrada: Parameters<typeof rede.salvarPerfilSocial>[0] & object) {
+    if (ehBancada()) {
+      const { nome, bio, publico, mostrarSemana, mostrarBebe, avatar } = entrada;
+      Object.assign(salvoNaBancada, {
+        ...(nome !== undefined ? { nome } : {}),
+        ...(bio !== undefined ? { bio } : {}),
+        ...(publico !== undefined ? { publico } : {}),
+        ...(mostrarSemana !== undefined ? { mostrarSemana } : {}),
+        ...(mostrarBebe !== undefined ? { mostrarBebe } : {}),
+        ...(avatar !== undefined ? { avatarUrl: avatar } : {}),
+      });
+      return ok({ parcial: false });
+    }
+    return seguro(() => rede.salvarPerfilSocial(entrada));
+  },
+
+  /**
+   * `como` é o ESPELHO: o próprio perfil como uma estranha, uma seguidora ou
+   * uma amiga o veem. Só ele distingue "trancado" (a visitante não consegue
+   * abrir) de "indisponivel".
+   */
+  verPerfil(alvoId: string, antesDe?: string | null, como?: rede.ComoVisitante | null) {
+    if (ehBancada()) {
+      if (estado() === "indisponivel") {
+        return Promise.resolve({ ok: false as const, motivo: "indisponivel" as const });
+      }
+      const id = alvoId === "eu" ? B.EU_NA_BANCADA : alvoId;
+      const base = id === B.EU_NA_BANCADA ? meuPerfilNaBancada() : B.perfilDaBancadaSocial(id);
+      if (como && base.souEu) {
+        /* O perfil de exemplo é FECHADO: quem não segue não abre. */
+        if (como === "estranha" && !base.publico) {
+          return Promise.resolve({ ok: false as const, motivo: "trancado" as const });
+        }
+        const perfil = {
+          ...base,
+          souEu: false,
+          meuVinculo: como === "seguidora" ? ("ativo" as const) : null,
+        };
+        return ok({
+          perfil,
+          posts: antesDe ? [] : B.postsDoPerfilDaBancada(alvoId),
+          proximo: null,
+        });
+      }
+      return ok({
+        perfil: base,
+        posts: antesDe ? [] : B.postsDoPerfilDaBancada(alvoId),
+        proximo: null,
+      });
+    }
+    return seguro(() =>
+      rede.verPerfil({
+        alvoId,
+        antesDe: antesDe ?? null,
+        ...(como ? { comoVisitante: como } : {}),
+      }),
+    );
+  },
+
+  seguir(alvoId: string) {
+    if (ehBancada()) return ok({ estado: "pendente" as const });
+    return seguro(() => rede.seguir({ alvoId }));
+  },
+
+  deixarDeSeguir(alvoId: string) {
+    if (ehBancada()) return okVazio();
+    return seguro(() => rede.deixarDeSeguir({ alvoId }));
+  },
+
+  responderPedido(seguidorId: string, aceitar: boolean) {
+    if (ehBancada()) return okVazio();
+    return seguro(() => rede.responderPedido({ seguidorId, aceitar }));
+  },
+
+  publicarPost(entrada: {
+    texto: string | null;
+    imagem: string | null;
+    extras?: string[];
+    altTexto?: string | null;
+    sensivel?: boolean;
+    motivoSensivel?: string | null;
+    visibilidade: Visibilidade;
+  }) {
+    if (ehBancada()) {
+      if (parametroDaBancada("recusa") === "1") {
+        return Promise.resolve({
+          ok: false as const,
+          motivo: "clinica" as const,
+          recado: RECADO_DE_EXEMPLO,
+        });
+      }
+      return ok({ postId: "novo" });
+    }
+    return seguro(() => rede.publicarPost(entrada));
+  },
+
+  arquivarPost(postId: string) {
+    if (ehBancada()) return okVazio();
+    return seguro(() => rede.arquivarPost({ postId }));
+  },
+
+  meuFeed(antesDe?: string | null) {
+    if (ehBancada()) {
+      if (estado() === "instavel") {
+        return Promise.resolve({ ok: false as const, motivo: "instavel" as const });
+      }
+      const vazio = estado() === "vazio" || parametroDaBancada("luto") === "1";
+      return ok({ posts: vazio || antesDe ? [] : B.postsDaBancada(), proximo: null });
+    }
+    return seguro(() => rede.meuFeed({ antesDe: antesDe ?? null }));
+  },
+
+  /** `mesmaFase`: o filtro que ELA liga (nunca por padrão — `fase-parecida.ts`). */
+  sugestoesDoFeed(mesmaFase = false) {
+    if (ehBancada()) {
+      if (estado() === "vazio" || parametroDaBancada("luto") === "1") {
+        return ok({ posts: [], sugeridos: [] as string[], pessoas: [] });
+      }
+      const s = B.sugestoesDaBancada();
+      /* Com o filtro, menos gente — e `&fasevazia=1` mostra o vazio que explica a régua. */
+      const pessoas = mesmaFase
+        ? parametroDaBancada("fasevazia") === "1"
+          ? []
+          : s.pessoas.filter((_, i) => i !== 1)
+        : s.pessoas;
+      const posts = mesmaFase ? s.posts.slice(0, 1) : s.posts;
+      return ok({ posts, sugeridos: posts.map((p) => p.id), pessoas });
+    }
+    return seguro(() => rede.sugestoesDoFeed(mesmaFase ? { mesmaFase: true } : {}));
+  },
+
+  reagir(postId: string, tipo: TipoDeReacao | null) {
+    if (ehBancada()) return okVazio();
+    return seguro(() => rede.reagir({ postId, tipo }));
+  },
+
+  bloquear(alvoId: string, bloquear: boolean) {
+    if (ehBancada()) return okVazio();
+    return seguro(() => rede.bloquear({ alvoId, bloquear }));
+  },
+
+  buscarPerfis(termo: string) {
+    if (ehBancada()) {
+      if (estado() === "instavel") {
+        return Promise.resolve({ ok: false as const, motivo: "instavel" as const });
+      }
+      return ok({ perfis: estado() === "vazio" ? [] : B.buscaDaBancada(termo) });
+    }
+    return seguro(() => rede.buscarPerfis({ termo }));
+  },
+
+  verPost(postId: string) {
+    if (ehBancada()) {
+      if (estado() === "indisponivel") {
+        return Promise.resolve({ ok: false as const, motivo: "indisponivel" as const });
+      }
+      const todos = [...B.postsDaBancada(), ...B.sugestoesDaBancada().posts];
+      const p = todos.find((x) => x.id === postId) ?? todos[0];
+      return ok({ post: p });
+    }
+    return seguro(() => rede.verPost({ postId }));
+  },
+
+  minhaAtividade() {
+    if (ehBancada()) {
+      if (estado() === "instavel") {
+        return Promise.resolve({ ok: false as const, motivo: "instavel" as const });
+      }
+      if (estado() === "vazio") return ok({ itens: [], novas: 0 });
+      const a = B.atividadeDaBancada();
+      return ok(
+        atividadeVistaNaBancada
+          ? { itens: a.itens.map((i) => ({ ...i, visto: true })), novas: 0 }
+          : a,
+      );
+    }
+    return seguro(() => rede.minhaAtividade({}));
+  },
+
+  marcarAtividadeVista() {
+    if (ehBancada()) {
+      atividadeVistaNaBancada = true;
+      return okVazio();
+    }
+    return seguro(() => rede.marcarAtividadeVista({}));
+  },
+
+  denunciarPost(postId: string, motivo: string) {
+    if (ehBancada()) return okVazio();
+    return seguro(() => rede.denunciarPost({ postId, motivo }));
+  },
+
+  denunciarPerfil(alvoId: string, motivo: string) {
+    if (ehBancada()) return okVazio();
+    return seguro(() => rede.denunciarPerfil({ alvoId, motivo }));
+  },
+
+  meusBloqueados() {
+    if (ehBancada()) return ok({ pessoas: B.bloqueadosDaBancada() });
+    return seguro(() => rede.meusBloqueados({}));
+  },
+
+  salvarPost(postId: string, salvar: boolean) {
+    if (ehBancada()) return okVazio();
+    return seguro(() => rede.salvarPost({ postId, salvar }));
+  },
+
+  comentariosDoPost(postId: string) {
+    if (ehBancada()) {
+      return ok({
+        comentarios: B.comentariosDaBancada(),
+        abertos: true,
+        souADona: false,
+        possoComentar: true,
+      });
+    }
+    return seguro(() => rede.comentariosDoPost({ postId }));
+  },
+
+  comentar(postId: string, texto: string, respondeA?: string) {
+    if (ehBancada()) {
+      if (parametroDaBancada("recusa") === "1") {
+        return Promise.resolve({
+          ok: false as const,
+          motivo: "clinico" as const,
+          recado: RECADO_DE_EXEMPLO,
+        });
+      }
+      return okVazio();
+    }
+    return seguro(() => rede.comentar({ postId, texto, ...(respondeA ? { respondeA } : {}) }));
+  },
+
+  apagarComentario(id: string) {
+    if (ehBancada()) return okVazio();
+    return seguro(() => rede.apagarComentario({ id }));
+  },
+
+  denunciarComentario(id: string, motivo: string) {
+    if (ehBancada()) return okVazio();
+    return seguro(() => rede.denunciarComentario({ id, motivo }));
+  },
+
+  curtirComentario(comentarioId: string, curtir: boolean) {
+    if (ehBancada()) return okVazio();
+    return seguro(() => rede.curtirComentario({ comentarioId, curtir }));
+  },
+
+  escolherHandle(handle: string) {
+    if (ehBancada()) return ok({ handle: handle.trim().toLowerCase() });
+    return seguro(() => rede.escolherHandle({ handle }));
+  },
+};

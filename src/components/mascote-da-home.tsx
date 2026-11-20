@@ -64,8 +64,12 @@ export function MascoteDaHome({
   onAbrirRecados,
   careMode = false,
   calado = false,
+  destacado = false,
   tamanho = 44,
 }: {
+  /** Tutorial: o cartão "Dúvida às três da manhã?" acende o personagem com a
+   *  mesma pulsação da barra (`dc-nav-destaque`). */
+  destacado?: boolean;
   humor?: Humor;
   /** Recados não lidos. Zero = ele fica quieto. */
   recados?: number;
@@ -106,8 +110,11 @@ export function MascoteDaHome({
 
   const oQueEleDiz = oQueOMascoteDiz(fala, recados);
   const emblema = emblemaDeRecados(recados);
+  /* A fala que promete um lugar (o "Você sabia?") manda no toque do balão;
+     depois vêm os recados; por fim o personagem. */
   const aoTocarNoBalao =
-    oBalaoAbreOsRecados(fala, recados) && onAbrirRecados ? onAbrirRecados : onAbrir;
+    fala?.aoTocar ??
+    (oBalaoAbreOsRecados(fala, recados) && onAbrirRecados ? onAbrirRecados : onAbrir);
 
   /* O balão espera, e o personagem CUTUCA no mesmo instante em que fala.
      Sem o cutucão o balão aparece sozinho e lê como aviso de sistema; com ele,
@@ -127,7 +134,7 @@ export function MascoteDaHome({
   }, [oQueEleDiz?.texto]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="relative z-20 shrink-0">
+    <div className={`relative shrink-0 ${destacado ? "z-[39]" : "z-20"}`}>
       <button
         type="button"
         onClick={onAbrir}
@@ -137,7 +144,7 @@ export function MascoteDaHome({
            recados" num botão que abre outra coisa. Quem descreve o recado é o
            balão, que é o botão que leva até ele. */
         aria-label="Falar com a bolha"
-        className="press relative flex items-center justify-center"
+        className={`press relative flex items-center justify-center rounded-full ${destacado ? "dc-nav-destaque" : ""}`}
         style={{ width: tamanho, height: tamanho }}
       >
         <Bolha ref={bolha} humor={humor} tamanho={tamanho} careMode={careMode} />
@@ -148,7 +155,7 @@ export function MascoteDaHome({
         {emblema && (
           <span
             aria-hidden
-            className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white/85"
+            className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-rose-700 px-1 text-xs font-bold leading-none text-white ring-2 ring-white/85"
           >
             {emblema}
           </span>

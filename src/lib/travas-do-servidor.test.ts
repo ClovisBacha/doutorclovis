@@ -261,8 +261,17 @@ describe("o que não dá para exercitar, mas não pode regredir", () => {
     const codigo = codigoDe("src/lib/conta.functions.ts");
     const i = codigo.indexOf("export const apagarMinhasConversas");
     expect(i).toBeGreaterThan(-1);
-    const janela = codigo.slice(i, i + 900);
-    expect(janela).toContain('["chat_messages", "chat_memory"]');
+    /* ⚠️ A janela vai até a PRÓXIMA função, nunca um número de caracteres: a
+       de 900 ficou vermelha no dia em que a lista ganhou uma terceira tabela
+       — a armadilha de distância pela enésima vez. */
+    const janela = codigo.slice(i, codigo.indexOf("export const", i + 1));
+    /* ⚠️ A GARANTIA, e não a grafia: a lista já foi um array de nomes e virou
+       pares [tabela, coluna] no dia em que a conversa da NUTRICIONISTA entrou
+       (ela é apontada por `user_id`, não por `patient_id`). O que não pode
+       sumir é nenhuma das três. */
+    for (const t of ["chat_messages", "chat_memory", "nutricao_mensagens"]) {
+      expect(janela).toContain(`"${t}"`);
+    }
     // E não pode dizer "apagamos" sem ter apagado — a mentira que a exclusão
     // de conta contava por meses.
     expect(janela).toContain('motivo: "falhou"');

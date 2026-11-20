@@ -60,11 +60,28 @@ export const exportarMeusDados = createServerFn({ method: "POST" })
               .eq(f.coluna, uid)
               .limit(LIMITE_POR_FONTE);
             if (error) {
-              /* ⚠️ Tabela ausente é NORMAL num banco atrás das migrations, e não
-               é falha do export: não há o que levar. Qualquer outro erro é dado
-               dela que ficou para trás, e tem de aparecer. */
               const code = (error as { code?: string }).code;
-              if (code !== "42P01" && code !== "42703") falhas.push(f.tabela);
+              /**
+               * ⚠️ **TABELA AUSENTE E COLUNA AUSENTE NÃO SÃO A MESMA COISA — e
+               * juntá-las apagava dado dela em silêncio.**
+               *
+               * `42P01` (tabela não existe) é normal num banco atrás das
+               * migrations: a tabela não está lá, então não há o que levar.
+               * Isso não é falha do export.
+               *
+               * `42703` (coluna não existe) é o OPOSTO: a tabela está lá, com o
+               * que ela escreveu dentro, e o `select` é que pediu errado — uma
+               * coluna renomeada, ou uma que só nasce num `APLICAR_` que o dono
+               * ainda não rodou. O bloco inteiro sumia do arquivo e `falhas`
+               * voltava vazio: ela baixava um export que PARECE completo, sem
+               * o perfil (ou o diário, ou as consultas), apagava a conta
+               * confiando nele, e o que faltou some junto.
+               *
+               * Um export silenciosamente incompleto é pior que nenhum. Agora
+               * ele entra em `falhas`, com o nome da tabela — a tela avisa em
+               * vez de fingir completude.
+               */
+              if (code !== "42P01") falhas.push(f.tabela);
               return;
             }
             dados[f.chave] = (linhas ?? []) as ValorJson[];

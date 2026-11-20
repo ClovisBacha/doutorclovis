@@ -185,7 +185,7 @@ export function FaixaDeConvite({
           {fraseDoConvite(quem)}
         </p>
         <p
-          className={`mt-0.5 text-[12px] leading-snug ${
+          className={`mt-0.5 text-xs leading-snug ${
             claro ? "text-muted-foreground" : "text-white/70"
           }`}
         >

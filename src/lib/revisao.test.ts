@@ -26,7 +26,14 @@ function codigoDe(caminho: string): string {
 
 const fn = codigoDe("src/lib/secondbrain.functions.ts");
 const cerebro = codigoDe("src/lib/secondbrain.server.ts");
-const app = codigoDe("src/routes/_authenticated/minha-conta.tsx");
+/* ⚠️ O chat (ChatTab, WABubble, buildPatientContext…) saiu de minha-conta.tsx
+   para src/components/chat-tab.tsx em set/2026. Este teste confere coisas dos
+   DOIS arquivos, então lê os dois juntos — uma asserção que procura texto do
+   chat aqui continua encontrando. */
+const app =
+  codigoDe("src/routes/_authenticated/minha-conta.tsx") +
+  "\n" +
+  codigoDe("src/components/chat-tab.tsx");
 const painel = readFileSync("src/routes/_authenticated/painel.tsx", "utf8");
 const sql = readFileSync("supabase/APLICAR_REVISAO.sql", "utf8").replace(/^\s*--.*$/gm, "");
 

@@ -273,13 +273,11 @@ export function OfertaPremium({
           <div className="mb-4 overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-fuchsia-600 to-rose-500 p-4 text-white shadow-lg">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/85">
-                  Plano anual
-                </p>
+                <p className="font-serif text-[15px] font-semibold text-white/85">Plano anual</p>
                 <p className="mt-0.5 font-serif text-3xl leading-none">
                   {oferta.descontoAnualPct}% OFF
                 </p>
-                <p className="mt-1 text-[12px] text-white/90">comparado a pagar mês a mês</p>
+                <p className="mt-1 text-xs text-white/90">comparado a pagar mês a mês</p>
               </div>
             </div>
             {/* O riscado EM CIMA, o preço EMBAIXO — o olho lê de cima para
@@ -291,7 +289,7 @@ export function OfertaPremium({
                 referência" que o CDC proíbe. Com a legenda é comparação
                 verdadeira; sem ela é propaganda enganosa. */}
             <div className="mt-3 rounded-xl bg-white/15 px-3 py-2.5">
-              <p className="text-[12px] leading-tight text-white/75">
+              <p className="text-xs leading-tight text-white/75">
                 <span className="whitespace-nowrap line-through">
                   {brl(oferta.referenciaCentavos)}
                 </span>{" "}
@@ -308,13 +306,13 @@ export function OfertaPremium({
                   E "equivale a", nunca "×12": R$ 9,16 × 12 = R$ 109,92, dois
                   centavos ACIMA do cobrado. Quem fizer a conta encontra o texto
                   certo em vez de uma diferença inexplicada. */}
-              <p className="mt-0.5 text-[12px] text-white/85">
+              <p className="mt-0.5 text-xs text-white/85">
                 cobrado uma vez · equivale a{" "}
                 <span className="whitespace-nowrap font-semibold">
                   {brl(oferta.anualMensalEquivCentavos)}/mês
                 </span>
               </p>
-              <p className="mt-1.5 text-[12px] font-semibold text-white/95">
+              <p className="mt-1.5 text-xs font-semibold text-white/95">
                 você economiza{" "}
                 <span className="whitespace-nowrap">{brl(oferta.economiaCentavos)}</span> no ano
               </p>
@@ -357,16 +355,14 @@ export function OfertaPremium({
                 : "border-border bg-background"
             }`}
           >
-            <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+            <span className="block font-serif text-[15px] font-semibold text-muted-foreground">
               Mensal
             </span>
             <span className="mt-0.5 block font-serif text-lg tabular-nums">
               {oferta ? brl(oferta.mensalCentavos) : "—"}
             </span>
-            <span className="block text-[11px] text-muted-foreground">por mês</span>
-            <span className="mt-1 block text-[10px] text-muted-foreground">
-              cancela quando quiser
-            </span>
+            <span className="block text-xs text-muted-foreground">por mês</span>
+            <span className="mt-1 block text-xs text-muted-foreground">cancela quando quiser</span>
           </button>
           <button
             onClick={() => setPlano("annual")}
@@ -377,7 +373,7 @@ export function OfertaPremium({
                 : "border-border bg-background"
             }`}
           >
-            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-primary">
+            <span className="flex items-center gap-1.5 font-serif text-[15px] font-semibold text-primary">
               Anual
               {oferta && (
                 <span className="rounded-full bg-violet-600 px-1.5 py-px text-[9px] text-white">
@@ -390,7 +386,7 @@ export function OfertaPremium({
                 comparação, nunca como preço: decisão do dono. */}
             {oferta ? (
               <>
-                <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                <span className="mt-0.5 block text-xs text-muted-foreground">
                   <span className="whitespace-nowrap line-through">
                     {brl(oferta.referenciaCentavos)}
                   </span>{" "}
@@ -399,7 +395,7 @@ export function OfertaPremium({
                 <span className="block whitespace-nowrap font-serif text-2xl leading-tight tabular-nums text-violet-700">
                   {brl(oferta.anualCentavos)}
                 </span>
-                <span className="block text-[11px] text-muted-foreground">
+                <span className="block text-xs text-muted-foreground">
                   cobrado uma vez · equivale a{" "}
                   <span className="whitespace-nowrap">
                     {brl(Math.round(oferta.anualCentavos / 12))}/mês
@@ -460,7 +456,7 @@ export function OfertaPremium({
             não desconto —, então o que resta a avisar é o essencial: o preço é
             o mesmo na renovação. */}
         {oferta && plano === "annual" && (
-          <p className="mt-2 text-center text-[11px] leading-relaxed text-muted-foreground">
+          <p className="mt-2 text-center text-xs leading-relaxed text-muted-foreground">
             Cobrança única de {brl(oferta.anualCentavos)}, renovada a cada 12 meses pelo mesmo
             valor. Você pode cancelar quando quiser.
           </p>

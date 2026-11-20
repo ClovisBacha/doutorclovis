@@ -355,8 +355,59 @@ self.addEventListener("push", (event) => {
   );
 });
 
+/**
+ * PARA ONDE UM AVISO LEVA.
+ *
+ * ⚠️ **Esta é a SEGUNDA implementação de `src/lib/destino-do-push.ts`, e ela
+ * existe porque este arquivo não é um módulo** — ele é servido cru de
+ * `public/`, sem passar pelo empacotador, então não há como importar dali. O
+ * que impede as duas de divergirem é `destino-do-push.test.ts`: ele extrai
+ * ESTA função do worker e roda a MESMA tabela de casos nas duas. Mexendo aqui
+ * sem mexer lá, ele fica vermelho.
+ *
+ * A régua é fechada: só caminho relativo da própria origem. O corpo do push é
+ * montado pelo servidor, mas chega ao aparelho pelo serviço da Apple/Google
+ * como dado arbitrário — navegar para o que vier de lá sem conferir abre a
+ * porta para `javascript:` (execução na origem do app, com a sessão dela
+ * dentro) e para `https://outro.site` (uma tela que PARECE o app pedindo a
+ * senha dela).
+ */
+function caminhoSeguroDoPush(cru) {
+  const padrao = "/minha-conta";
+  if (typeof cru !== "string") return padrao;
+  const t = cru.trim();
+  if (!t) return padrao;
+  /* `//outro.site` é endereço absoluto sem esquema — o caso que uma checagem
+     ingênua de "começa com /" deixa passar. */
+  if (!t.startsWith("/") || t.startsWith("//")) return padrao;
+  if (t.split(/[?#]/)[0].includes(":")) return padrao;
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f\u007f\s]/.test(t)) return padrao;
+  if (t.includes("..")) return padrao;
+  return t;
+}
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || "/minha-conta";
-  event.waitUntil(clients.openWindow(url));
+  const url = caminhoSeguroDoPush(event.notification.data && event.notification.data.url);
+  /**
+   * ⚠️ ABRIR UMA JANELA NOVA COM O APP JÁ ABERTO É O DEFEITO, não a correção.
+   *
+   * `openWindow` cru dava, no melhor caso, uma segunda aba do mesmo app — e no
+   * app instalado ele não abre nada: a paciente tocava no aviso e via a tela
+   * em que já estava. Procurar a janela existente, focá-la e NAVEGAR nela é o
+   * que faz "sua consulta é amanhã" abrir a consulta.
+   */
+  event.waitUntil(
+    clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((abertas) => {
+        const janela = abertas.find((c) => "navigate" in c && "focus" in c);
+        if (janela) {
+          return janela.focus().then(() => janela.navigate(url).catch(() => {}));
+        }
+        return clients.openWindow(url);
+      })
+      .catch(() => clients.openWindow(url)),
+  );
 });

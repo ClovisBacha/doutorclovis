@@ -13,6 +13,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { faltaNoBanco } from "@/lib/postgrest";
 
 /**
  * Retrato clínico congelado no instante do disparo.
@@ -93,14 +94,30 @@ async function medicoDaSessao(accessToken: string) {
  * A linha continua no banco: retenção de prontuário é obrigação legal (CFM),
  * e guardar não é a mesma coisa que renderizar no painel todo dia. O que se
  * corta é a leitura pela interface, não o registro.
+ *
+ * ⚠️ `supabase-js` não lança: devolve `{ data, error }`, e esta leitura
+ * ignorava o `error` — um array vazio significa duas coisas opostas: "este
+ * médico não tem paciente vinculada" e "não consegui ler quais são". Um
+ * timeout aqui fazia `listarAcionamentos`/`acionamentosDaPaciente` devolverem
+ * `vazio` (com `ok: true`), e o painel de SOS — o único caminho pelo qual o
+ * médico sabe que uma paciente apertou o botão de emergência, com a
+ * localização e a ficha clínica congelada — dizia "nenhuma emergência"
+ * quando o que houve foi "não consegui olhar". Mesma classe que
+ * `clinical.functions.ts` (`pacientesAtuaisComEstado`) e
+ * `secondbrain.functions.ts` (`listUnansweredQuestions`) já fecharam para a
+ * fila de perguntas e a lista de eventos clínicos. `id`/`doctor_id` em
+ * `patient_profiles` são colunas da primeira migration — não há "coluna
+ * ausente" legítima aqui, só falha de leitura de verdade.
  */
-async function pacientesAtuais(doctorId: string): Promise<string[]> {
+async function pacientesAtuaisComEstado(
+  doctorId: string,
+): Promise<{ ids: string[]; falhou: boolean }> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data } = await (supabaseAdmin as any)
+  const { data, error } = await (supabaseAdmin as any)
     .from("patient_profiles")
     .select("id")
     .eq("doctor_id", doctorId);
-  return ((data ?? []) as { id: string }[]).map((p) => p.id);
+  return { ids: ((data ?? []) as { id: string }[]).map((p) => p.id), falhou: !!error };
 }
 
 /**
@@ -124,8 +141,13 @@ export const listarAcionamentos = createServerFn({ method: "POST" })
     const user = await medicoDaSessao(data.accessToken);
     if (!user) return { ok: false as const, acionamentos: [] as AcionamentoSos[] };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const falhouAoOlhar = { ok: false as const, acionamentos: [] as AcionamentoSos[] };
     try {
-      const atuais = await pacientesAtuais(user.id);
+      const { ids: atuais, falhou: vinculoFalhou } = await pacientesAtuaisComEstado(user.id);
+      if (vinculoFalhou) {
+        console.error("[acionamentos] vínculo não carregou; painel de SOS não é confiável");
+        return falhouAoOlhar;
+      }
       if (atuais.length === 0) return vazio;
       /* EM LOTES DE 100: `.in()` viaja na query string, e uma lista longa
          estoura o buffer do proxy — devolvendo 414, que aqui viraria "nenhuma
@@ -144,8 +166,16 @@ export const listarAcionamentos = createServerFn({ method: "POST" })
           .limit(data.limite);
         if (data.apenasPendentes) q = q.is("atendido_em", null);
         const { data: parte, error } = await q;
-        // Migração pendente: lista vazia em vez de painel quebrado.
-        if (error) return vazio;
+        /* Coluna/tabela ausente (migração ainda não chegou a este banco):
+           lista vazia em vez de painel quebrado — degradação legítima.
+           Qualquer OUTRO erro (timeout, RLS, rede) é falha de verdade, e
+           dizer "nenhuma emergência" sobre ela é o mesmo defeito que o
+           vínculo tinha: "não consegui olhar" com a cara de "não há nada". */
+        if (error) {
+          if (faltaNoBanco(error)) return vazio;
+          console.error("[acionamentos] panic_events não carregou", error);
+          return falhouAoOlhar;
+        }
         rows.push(...((parte ?? []) as Record<string, unknown>[]));
       }
       rows.sort((a, b) => (String(a.created_at) < String(b.created_at) ? 1 : -1));
@@ -179,8 +209,12 @@ export const listarAcionamentos = createServerFn({ method: "POST" })
           channels: r.channels ?? null,
         })) as AcionamentoSos[],
       };
-    } catch {
-      return vazio;
+    } catch (e) {
+      /* Uma exceção não pega (rede caiu no meio do laço, por exemplo) é a
+         MESMA falha de verdade que o `if (error)` acima — nunca "nenhuma
+         emergência". */
+      console.error("[acionamentos] exceção ao montar a lista de SOS", e);
+      return falhouAoOlhar;
     }
   });
 
@@ -216,13 +250,18 @@ export const acionamentosDaPaciente = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const vazio = { ok: true as const, acionamentos: [] as AcionamentoSos[] };
+    const falhouAoOlhar = { ok: false as const, acionamentos: [] as AcionamentoSos[] };
     const user = await medicoDaSessao(data.accessToken);
     if (!user) return { ok: false as const, acionamentos: [] as AcionamentoSos[] };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     try {
       /* Vínculo atual antes de qualquer leitura: depois de encerrado o
          acompanhamento, esta consulta não devolve mais nada. */
-      const atuais = await pacientesAtuais(user.id);
+      const { ids: atuais, falhou: vinculoFalhou } = await pacientesAtuaisComEstado(user.id);
+      if (vinculoFalhou) {
+        console.error("[acionamentos] vínculo não carregou; ficha de SOS não é confiável");
+        return falhouAoOlhar;
+      }
       if (!atuais.includes(data.pacienteId)) return vazio;
       const { data: rows, error } = await (supabaseAdmin as any)
         .from("panic_events")
@@ -232,7 +271,11 @@ export const acionamentosDaPaciente = createServerFn({ method: "POST" })
         .eq("doctor_id", user.id)
         .order("created_at", { ascending: false })
         .limit(50);
-      if (error) return vazio;
+      if (error) {
+        if (faltaNoBanco(error)) return vazio;
+        console.error("[acionamentos] panic_events da paciente não carregou", error);
+        return falhouAoOlhar;
+      }
       return {
         ok: true as const,
         acionamentos: (rows ?? []).map((r: any) => ({
@@ -249,7 +292,8 @@ export const acionamentosDaPaciente = createServerFn({ method: "POST" })
           channels: r.channels ?? null,
         })) as AcionamentoSos[],
       };
-    } catch {
-      return vazio;
+    } catch (e) {
+      console.error("[acionamentos] exceção ao montar o SOS da paciente", e);
+      return falhouAoOlhar;
     }
   });

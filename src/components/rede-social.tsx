@@ -28,9 +28,20 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  HANDLE_MAX,
+  JANELA_DE_TROCA_DIAS,
+  QUEM_MENCIONA_PADRAO,
+  RESERVA_DO_ANTIGO_DIAS,
+  TROCAS_POR_JANELA,
+  normalizarHandle,
+  recusaDoHandle,
+  type QuemMenciona,
+} from "@/lib/mencoes";
+import { PALAVRA_OCULTA_MAX, limparPalavrasOcultas } from "@/lib/comentarios";
 import { TEXTO_PERFIL_PUBLICO } from "@/lib/chaves-do-perfil";
 import { linkDaVitrine } from "@/lib/perfil-publico";
-import { LIMITE_DA_BIO } from "@/lib/rede-social";
+import { AVISOS_QUE_ELA_DESLIGA, LIMITE_DA_BIO } from "@/lib/rede-social";
 import type { PerfilNaTela } from "@/lib/rede-social.functions";
 
 function Avatar({
@@ -73,6 +84,10 @@ function Avatar({
 export type BancadaDaRede = {
   perfil?: PerfilNaTela;
   pedidos?: { id: string; nome: string; avatarUrl: string | null }[];
+  /** ⚠️ Só a bancada: a pausa nasce do servidor e exige sessão. */
+  pausada?: boolean;
+  /** ⚠️ Só a bancada: as preferências nascem do servidor e exigem sessão. */
+  avisosDesligados?: string[];
 };
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -126,6 +141,204 @@ function ChaveDoPerfil({
   );
 }
 
+/**
+ * O `@` DA PACIENTE, E QUEM PODE MENCIONÁ-LA.
+ *
+ * ⚠️ **A REGRA DA TROCA É A DO INSTAGRAM, por decisão do dono** ("faça
+ * exatamente como o Instagram faz hoje"): duas trocas por 14 dias, e o apelido
+ * antigo fica RESERVADO por mais 14 — ninguém o toma no dia seguinte e passa a
+ * responder pelas menções antigas dela. A régua e os números moram em
+ * `mencoes.ts`; quem os aplica é `escolherHandle`.
+ *
+ * ⚠️ **A DISPONIBILIDADE NÃO É CONFERIDA AQUI.** Entre uma leitura de "está
+ * livre" e a gravação cabe outra paciente pedindo o mesmo `@` — quem decide é
+ * o índice único do banco, e a tela mostra o veredito dele. Uma segunda régua
+ * no cliente diria "livre" sobre um apelido que o servidor recusaria.
+ */
+function ArrobaDoPerfil({
+  handle,
+  quemPodeMencionar,
+  aoTrocar,
+  bancada,
+}: {
+  handle: string | null;
+  quemPodeMencionar: QuemMenciona;
+  aoTrocar: (h: string | null, q: QuemMenciona) => void;
+  bancada: boolean;
+}) {
+  const [editando, setEditando] = useState(false);
+  const [campo, setCampo] = useState(handle ?? "");
+  const [ocupado, setOcupado] = useState(false);
+
+  /* A recusa é calculada no CAMPO, e serve só para desabilitar o botão e
+     explicar — o veredito continua sendo o do servidor. */
+  const recusa = campo.trim() ? recusaDoHandle(campo) : null;
+
+  async function salvarHandle() {
+    if (ocupado || recusa) return;
+    if (bancada) {
+      aoTrocar(normalizarHandle(campo), quemPodeMencionar);
+      setEditando(false);
+      return;
+    }
+    setOcupado(true);
+    try {
+      const s = await supabase.auth.getSession();
+      const token = s.data.session?.access_token;
+      if (!token) return;
+      const { escolherHandle } = await import("@/lib/mencoes.functions");
+      const r = await escolherHandle({ data: { accessToken: token, handle: campo } });
+      if (r.ok) {
+        aoTrocar(r.handle ?? null, quemPodeMencionar);
+        setEditando(false);
+        toast.success("Pronto 💛");
+        return;
+      }
+      /* ⚠️ Cada recusa diz O QUE FAZER. "Não deu" num campo de apelido faz ela
+         tentar o mesmo texto de novo, indefinidamente. */
+      toast.error(
+        r.motivo === "ocupado"
+          ? "Esse @ já é de outra pessoa. Tente uma variação."
+          : r.motivo === "reservado"
+            ? "Esse @ está guardado. Escolha outro."
+            : r.motivo === "muitas_trocas"
+              ? `Você já trocou ${TROCAS_POR_JANELA} vezes nos últimos ${JANELA_DE_TROCA_DIAS} dias.`
+              : r.motivo === "sessao" || r.motivo === "banco"
+                ? "Não deu para salvar."
+                : `Use letras, números, ponto e _ (até ${HANDLE_MAX}).`,
+      );
+    } catch {
+      toast.error("Não deu para salvar.");
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  async function salvarQuem(q: QuemMenciona) {
+    aoTrocar(handle, q);
+    if (bancada) return;
+    try {
+      const s = await supabase.auth.getSession();
+      const token = s.data.session?.access_token;
+      if (!token) return;
+      const { salvarQuemMenciona } = await import("@/lib/mencoes.functions");
+      await salvarQuemMenciona({ data: { accessToken: token, valor: q } });
+    } catch {
+      toast.error("Não deu para salvar.");
+    }
+  }
+
+  return (
+    <section className="rounded-3xl card-material p-4">
+      <h3 className="font-semibold">Seu @</h3>
+
+      {!editando ? (
+        <div className="mt-1 flex items-center justify-between gap-3">
+          <p className="min-w-0 truncate text-sm">
+            {handle ? (
+              <span className="font-semibold text-primary">@{handle}</span>
+            ) : (
+              <span className="text-muted-foreground">
+                Você ainda não escolheu — sem @, ninguém consegue te marcar.
+              </span>
+            )}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setCampo(handle ?? "");
+              setEditando(true);
+            }}
+            className="press min-h-[44px] shrink-0 rounded-full border border-border px-4 text-[13px] font-semibold"
+          >
+            {handle ? "Trocar" : "Escolher"}
+          </button>
+        </div>
+      ) : (
+        <div className="mt-2">
+          <div className="flex items-center gap-2 rounded-2xl border border-border px-3">
+            <span className="text-sm text-muted-foreground">@</span>
+            <input
+              value={campo}
+              onChange={(e) => setCampo(e.target.value)}
+              maxLength={HANDLE_MAX}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              placeholder="seunome"
+              aria-label="Escolher o seu @"
+              className="min-h-[44px] w-full bg-transparent text-sm outline-none"
+            />
+          </div>
+          {recusa && (
+            <p className="mt-1.5 text-xs leading-snug text-destructive">
+              {recusa === "curto"
+                ? "Muito curto."
+                : recusa === "longo"
+                  ? `No máximo ${HANDLE_MAX} caracteres.`
+                  : recusa === "reservado"
+                    ? "Esse @ é reservado ao consultório."
+                    : recusa === "so_pontos"
+                      ? "Precisa ter ao menos uma letra ou número."
+                      : "Use letras, números, ponto e _ ."}
+            </p>
+          )}
+          <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
+            Dá para trocar {TROCAS_POR_JANELA} vezes a cada {JANELA_DE_TROCA_DIAS} dias. O @ antigo
+            fica guardado por {RESERVA_DO_ANTIGO_DIAS} dias — ninguém assume o seu lugar.
+          </p>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              disabled={ocupado || !!recusa || !campo.trim()}
+              onClick={() => void salvarHandle()}
+              className="press min-h-[44px] flex-1 rounded-full bg-primary px-4 text-[14px] font-semibold text-primary-foreground disabled:opacity-50"
+            >
+              {ocupado ? "Salvando…" : "Salvar"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditando(false)}
+              className="press min-h-[44px] rounded-full border border-border px-4 text-[14px] font-semibold"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ⚠️ **As três opções são as do Instagram**, por decisão do dono:
+          todo mundo (padrão), só quem eu sigo, ninguém. */}
+      <div className="mt-4 border-t border-border pt-3">
+        <p className="text-[13px] font-semibold">Quem pode te marcar</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {(
+            [
+              ["todos", "Todo mundo"],
+              ["sigo", "Só quem eu sigo"],
+              ["ninguem", "Ninguém"],
+            ] as [QuemMenciona, string][]
+          ).map(([v, rotulo]) => (
+            <button
+              key={v}
+              type="button"
+              aria-pressed={quemPodeMencionar === v}
+              onClick={() => void salvarQuem(v)}
+              className={`press min-h-[44px] rounded-full border px-4 text-[13px] font-semibold ${
+                quemPodeMencionar === v
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border"
+              }`}
+            >
+              {rotulo}
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function ConfiguracoesDoPerfil({
   careMode = false,
   bancada,
@@ -171,6 +384,8 @@ export function ConfiguracoesDoPerfil({
         setPerfil(r.perfil);
         setBio(r.perfil.bio ?? "");
         setPedidos(r.pedidos as typeof pedidos);
+        setPausada(!!(r as { pausada?: boolean }).pausada);
+        setAvisosDesligados((r as { avisosDesligados?: string[] }).avisosDesligados ?? []);
       }
     } catch {
       /* Sem perfil a seção some. */
@@ -185,6 +400,79 @@ export function ConfiguracoesDoPerfil({
 
   const totalPedidos = useMemo(() => pedidos.length, [pedidos]);
 
+  /**
+   * ⚠️ **A PAUSA É ESTADO PRÓPRIO, e não um campo de `perfil`.** `PerfilNaTela`
+   * é o mesmo tipo que descreve o perfil de OUTRA pessoa — e a pausa de
+   * terceiro nunca viaja, de propósito: quem abre um perfil pausado recebe
+   * "indisponível" e nada mais. Um campo no tipo compartilhado seria a porta
+   * para ele vazar um dia.
+   */
+  const [pausada, setPausada] = useState(!!bancada?.pausada);
+
+  /**
+   * ⚠️ **ESTADO PRÓPRIO, e não um campo de `perfil`.** `PerfilNaTela` descreve
+   * também o perfil de OUTRA pessoa — e o que eu escolho receber não é da conta
+   * de ninguém.
+   */
+  const [avisosDesligados, setAvisosDesligados] = useState<string[]>(
+    bancada?.avisosDesligados ?? [],
+  );
+
+  async function mudarAviso(chave: string, ligar: boolean) {
+    const antes = avisosDesligados;
+    const depois = ligar ? antes.filter((c) => c !== chave) : [...antes, chave];
+    /* Pinta antes: é um interruptor, e esperar a rede o deixaria inerte. */
+    setAvisosDesligados(depois);
+    setSalvando(true);
+    try {
+      const s = await supabase.auth.getSession();
+      const token = s.data.session?.access_token;
+      if (!token) throw new Error("sem sessão");
+      const { salvarPerfilSocial } = await import("@/lib/rede-social.functions");
+      const r = await salvarPerfilSocial({
+        data: { accessToken: token, avisosDesligados: depois },
+      });
+      if (!r.ok) throw new Error("recusado");
+      /* ⚠️ `parcial` = o banco não tem a coluna, e o recuo salvou o resto.
+         Deixar a chave apagada aqui faria a tela afirmar que o aviso parou
+         enquanto ele continua chegando. */
+      if ("parcial" in r && r.parcial) {
+        setAvisosDesligados(antes);
+        toast.error("Essa preferência ainda não está pronta no servidor.");
+      }
+    } catch {
+      setAvisosDesligados(antes);
+      toast.error("Não deu para mudar agora.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function pausar(ligar: boolean) {
+    setSalvando(true);
+    /* Pinta antes: é um interruptor, e esperar a rede o deixaria inerte. */
+    setPausada(ligar);
+    try {
+      const s = await supabase.auth.getSession();
+      const token = s.data.session?.access_token;
+      if (!token) throw new Error("sem sessão");
+      const { pausarMinhaRede } = await import("@/lib/rede-social.functions");
+      const r = await pausarMinhaRede({ data: { accessToken: token, pausar: ligar } });
+      if (!r.ok) throw new Error("recusado");
+      toast.success(
+        ligar ? "Conta pausada. Ninguém te encontra por enquanto." : "Sua conta voltou 💛",
+      );
+    } catch {
+      /* ⚠️ **Desfaz na tela.** Dizer "pausado ✓" sobre uma conta que continua
+         visível é a pior mentira desta tela: ela publicaria achando que
+         ninguém está vendo. */
+      setPausada(!ligar);
+      toast.error("Não deu para mudar agora. Sua conta continua como estava.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
   if (careMode || !perfil) return null;
 
   async function salvar(mudanca: {
@@ -193,6 +481,7 @@ export function ConfiguracoesDoPerfil({
     mostrarSemana?: boolean;
     mostrarBebe?: boolean;
     vitrine?: boolean;
+    feedSoSeguindo?: boolean;
   }) {
     setSalvando(true);
     try {
@@ -202,7 +491,10 @@ export function ConfiguracoesDoPerfil({
       const { salvarPerfilSocial } = await import("@/lib/rede-social.functions");
       const r = await salvarPerfilSocial({ data: { accessToken: token, ...mudanca } });
       if (!r.ok) {
-        toast.error("Não deu para salvar.");
+        /* ⚠️ **O RECADO DA RÉGUA VENCE O GENÉRICO.** "Não deu para salvar"
+           sobre uma bio recusada por conteúdo clínico faria ela tentar de novo
+           com o mesmo texto, indefinidamente — e concluir que o app quebrou. */
+        toast.error(("recado" in r && r.recado) || "Não deu para salvar.");
         return;
       }
       /* ⚠️ **`parcial` existe e ninguém lia.** Quando o banco ainda não tem a
@@ -240,7 +532,7 @@ export function ConfiguracoesDoPerfil({
 
   return (
     <div className="space-y-4">
-      <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      <section className="rounded-3xl card-material p-4">
         <div className="flex items-center gap-3">
           <Avatar url={perfil.avatarUrl} nome={perfil.nome} tamanho={52} />
           <div className="min-w-0">
@@ -250,9 +542,9 @@ export function ConfiguracoesDoPerfil({
                 popularidade num momento em que ela já está sendo medida
                 clinicamente. */}
             <p className="text-xs text-muted-foreground">
-              {perfil.meusSeguidores === 1
+              {perfil.seguidores === 1
                 ? "1 pessoa te acompanha"
-                : `${perfil.meusSeguidores ?? 0} pessoas te acompanham`}
+                : `${perfil.seguidores ?? 0} pessoas te acompanham`}
             </p>
           </div>
         </div>
@@ -267,7 +559,7 @@ export function ConfiguracoesDoPerfil({
         />
       </section>
 
-      <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      <section className="rounded-3xl card-material p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h3 className="font-semibold">Perfil público</h3>
@@ -299,6 +591,65 @@ export function ConfiguracoesDoPerfil({
         </div>
       </section>
 
+      {/* ─── O @ E QUEM PODE MENCIONAR ──────────────────────────────────
+          ⚠️ **AS DUAS COISAS NO MESMO CARTÃO, e não em dois.** O `@` é o
+          endereço; a chave decide quem pode usá-lo. Separá-los faria a
+          paciente escolher um apelido sem nunca ver que existe controle sobre
+          quem a chama por ele. */}
+      <ArrobaDoPerfil
+        handle={perfil.handle ?? null}
+        quemPodeMencionar={perfil.quemPodeMencionar ?? QUEM_MENCIONA_PADRAO}
+        aoTrocar={(h, q) =>
+          setPerfil((pf) => (pf ? { ...pf, handle: h, quemPodeMencionar: q } : pf))
+        }
+        bancada={!!bancada}
+      />
+
+      {/* ⚠️ **O FILTRO MORA NAS CONFIGURAÇÕES, e não na tela de comentários.**
+          É uma decisão que vale para o app inteiro e que ela toma UMA vez —
+          embaixo de um comentário, ela a tomaria com raiva, sobre a palavra
+          daquele momento, e a lista viraria um histórico de brigas. */}
+      <FiltroDePalavras />
+
+      {/* ─── O FEED: misturado ou fechado ──────────────────────────────────
+          ⚠️ **O PADRÃO É O MISTURADO, e o interruptor existe para FECHAR.**
+          Uma rede social que só mostra quem ela já segue não tem como crescer,
+          e conta nova abre vazia — não há motivo nenhum para voltar no dia
+          seguinte. Quem prefere o círculo fechado liga aqui.
+
+          ⚠️ E o rótulo "Sugerido para você" continua em toda publicação de
+          fora, ligada ou desligada esta chave: misturar sem avisar é a única
+          versão disto que não se faz num app de gestação de alto risco. */}
+      <section className="rounded-3xl card-material p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="font-semibold">Só quem eu sigo</h3>
+            <p className="mt-1 text-xs leading-snug text-muted-foreground">
+              {perfil.feedSoSeguindo
+                ? "Seu feed mostra apenas quem você segue."
+                : "Seu feed mistura quem você segue com pessoas novas — sempre marcadas como sugestão."}
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={perfil.feedSoSeguindo}
+            aria-label="Mostrar só quem eu sigo"
+            disabled={salvando}
+            onClick={() => salvar({ feedSoSeguindo: !perfil.feedSoSeguindo })}
+            className={`press mt-0.5 h-7 w-12 shrink-0 rounded-full transition-colors ${
+              perfil.feedSoSeguindo ? "bg-primary" : "bg-muted"
+            }`}
+          >
+            <span
+              className={`block h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                perfil.feedSoSeguindo ? "translate-x-[22px]" : "translate-x-0.5"
+              }`}
+            />
+          </button>
+        </div>
+      </section>
+
       {/* ─── A VITRINE NA INTERNET ABERTA ────────────────────────────────
           ⚠️ **CHAVE PRÓPRIA, e ela nasceu de uma auditoria.** O interruptor de
           cima promete "qualquer pessoa NO APP"; `/p/<codigo>` abre FORA do app,
@@ -311,7 +662,7 @@ export function ConfiguracoesDoPerfil({
           o app não contava a ninguém: a página existia e nenhuma tela dizia
           onde. Uma vitrine que a dona não sabe achar não é vitrine. */}
       {perfil.publico && (
-        <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+        <section className="rounded-3xl card-material p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <h3 className="font-semibold">Uma página na internet</h3>
@@ -358,6 +709,95 @@ export function ConfiguracoesDoPerfil({
         </section>
       )}
 
+      {/* ─── O QUE VOCÊ QUER SABER ───────────────────────────────────────
+          ⚠️ **"OU TUDO, OU NADA" ERA A ÚNICA ESCOLHA.** Até aqui, parar de
+          receber aviso da Comunidade significava desligar a notificação do app
+          INTEIRO — o mesmo canal por onde chega o aviso de emergência e o
+          lembrete de consulta. Numa gestação de alto risco isso é uma escolha
+          que ninguém deveria ter de fazer.
+
+          ⚠️ **A lista só mostra o que MANDA push.** Reação e "começou a te
+          acompanhar" não aparecem porque nunca empurram nada — pôr um
+          interruptor desligado ao lado deles prometeria controle sobre um aviso
+          que não existe. */}
+      <section className="rounded-3xl card-material p-4">
+        <h3 className="font-semibold">Avisos da Comunidade</h3>
+        <p className="mt-1 text-xs leading-snug text-muted-foreground">
+          Só isto. Os avisos do seu médico, das consultas e da emergência não passam por aqui — e
+          continuam chegando de qualquer jeito.
+        </p>
+        <div className="mt-3 flex flex-col gap-2">
+          {AVISOS_QUE_ELA_DESLIGA.map((a) => {
+            const ligado = !avisosDesligados.includes(a.chave);
+            return (
+              <div key={a.chave} className="flex items-center justify-between gap-3">
+                <span className="min-w-0 flex-1 text-[13px] leading-snug">{a.rotulo}</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={ligado}
+                  aria-label={a.rotulo}
+                  disabled={salvando}
+                  onClick={() => void mudarAviso(a.chave, !ligado)}
+                  className={`press h-7 w-12 shrink-0 rounded-full transition-colors ${
+                    ligado ? "bg-primary" : "bg-muted"
+                  }`}
+                >
+                  <span
+                    className={`block h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                      ligado ? "translate-x-[22px]" : "translate-x-0.5"
+                    }`}
+                  />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* ─── PAUSAR A CONTA ──────────────────────────────────────────────
+          ⚠️ **O MEIO-TERMO QUE NÃO EXISTIA.** Havia apagar (a LGPD,
+          irreversível) e o Modo Cuidado, que é para o luto. Faltava o mais
+          comum: sumir por um tempo e voltar inteira.
+
+          ⚠️ **O texto diz o que NÃO acontece**, e é a parte que faz alguém usar
+          o botão: quem não tem certeza de que as fotos ficam não pausa — vai
+          embora de vez, ou fica sem descansar. */}
+      <section className="rounded-3xl card-material p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="font-semibold">Pausar a minha conta</h3>
+            <p className="mt-1 text-xs leading-snug text-muted-foreground">
+              {pausada
+                ? "Sua conta está pausada: ninguém te encontra e as suas publicações não aparecem para mais ninguém."
+                : "Você some da Comunidade por um tempo. Nada é apagado — fotos, stories, conversas e amizades ficam, e voltam do jeito que estavam."}
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={pausada}
+            aria-label="Pausar a minha conta"
+            disabled={salvando}
+            onClick={() => void pausar(!pausada)}
+            className={`press mt-0.5 h-7 w-12 shrink-0 rounded-full transition-colors ${
+              pausada ? "bg-primary" : "bg-muted"
+            }`}
+          >
+            <span
+              className={`block h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                pausada ? "translate-x-[22px]" : "translate-x-0.5"
+              }`}
+            />
+          </button>
+        </div>
+        {/* ⚠️ **NINGUÉM É AVISADO, e a tela diz isso.** Sem a frase, ela pausa
+            imaginando que a amiga vai receber "Fulana pausou" — e não pausa. */}
+        <p className="mt-2 text-xs leading-snug text-muted-foreground">
+          Ninguém é avisado. É só voltar aqui para reativar.
+        </p>
+      </section>
+
       {/* ─── O QUE O SEU PERFIL CONTA ────────────────────────────────────
           ⚠️ DUAS chaves, e nunca uma. Uma só obrigaria quem quer publicar o
           NOME do bebê a publicar junto a SEMANA, que é o dado clínico — são
@@ -367,7 +807,7 @@ export function ConfiguracoesDoPerfil({
           ⚠️ E o texto de cada uma diz o que aparece e para quem. A explicação é
           a defesa: "não podemos expor a paciente sem ela saber" só é verdade se
           ela puder ler, ali, o que ligar aquilo significa. */}
-      <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      <section className="rounded-3xl card-material p-4">
         <h3 className="font-semibold">O que o seu perfil conta</h3>
         <p className="mt-1 text-xs leading-snug text-muted-foreground">
           Hoje quem abre o seu perfil vê o seu nome, a sua foto, a sua descrição e o que você
@@ -409,7 +849,7 @@ export function ConfiguracoesDoPerfil({
       </section>
 
       {totalPedidos > 0 && (
-        <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+        <section className="rounded-3xl card-material p-4">
           <h3 className="font-semibold">
             {totalPedidos === 1 ? "1 pedido" : `${totalPedidos} pedidos`}
           </h3>
@@ -438,5 +878,182 @@ export function ConfiguracoesDoPerfil({
         </section>
       )}
     </div>
+  );
+}
+
+/**
+ * O FILTRO DE PALAVRAS — as expressões que ela não quer ler.
+ *
+ * ⚠️ **A LISTA É DELA, e o app NÃO sugere palavras.** Numa gestação de alto
+ * risco não existe lista universal: para uma é "perdi", para outra é o nome de
+ * um hospital, para outra é "aborto". Sugerir seria o app escrevendo na tela
+ * dela justamente as palavras que ela está tentando não ler — e o custo de
+ * errar aqui é alto demais para um palpite.
+ *
+ * ⚠️ **ESCONDE, NUNCA APAGA.** O comentário continua existindo para quem
+ * escreveu e para todo mundo; o que muda é a tela DELA. Apagar seria moderação
+ * feita por uma lista de palavras — e é assim que um filtro começa a censurar
+ * a conversa das outras.
+ */
+export function FiltroDePalavras({ bancada }: { bancada?: string[] }) {
+  const [palavras, setPalavras] = useState<string[]>(bancada ?? []);
+  const [campo, setCampo] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const [aberto, setAberto] = useState(!!bancada);
+
+  useEffect(() => {
+    if (bancada || !aberto) return;
+    let vivo = true;
+    void (async () => {
+      try {
+        const s = await supabase.auth.getSession();
+        const t = s.data.session?.access_token;
+        if (!t) return;
+        const { minhasPalavrasOcultas } = await import("@/lib/comentarios.functions");
+        const r = await minhasPalavrasOcultas({ data: { accessToken: t } });
+        if (vivo && r.ok) setPalavras(r.palavras);
+      } catch {
+        /* Sem a lista, o cartão abre vazio — o estado de quem nunca o usou. */
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [bancada, aberto]);
+
+  async function guardar(bruta: string[]) {
+    const antes = palavras;
+    /* ⚠️ **A PINTURA OTIMISTA PASSA PELA MESMA RÉGUA DO SERVIDOR.** Ela pintava
+       a lista CRUA: quem digitasse uma palavra repetida a via entrar e sumir
+       meio segundo depois, e quem colasse setenta via as setenta aparecerem e
+       o servidor devolver sessenta. A régua é `limparPalavrasOcultas`, a mesma
+       que o servidor roda — importada, nunca reescrita aqui, senão as duas
+       divergiriam e a tela passaria a discordar do banco. */
+    const nova = limparPalavrasOcultas(bruta);
+    setPalavras(nova);
+    setSalvando(true);
+    try {
+      if (bancada) return;
+      const s = await supabase.auth.getSession();
+      const t = s.data.session?.access_token;
+      if (!t) return;
+      const { salvarPalavrasOcultas } = await import("@/lib/comentarios.functions");
+      const r = await salvarPalavrasOcultas({ data: { accessToken: t, palavras: nova } });
+      /* ⚠️ **A LISTA QUE VOLTA É A DO SERVIDOR, e não a que eu mandei.** É lá
+         que a limpeza roda (repetida, vazia, teto) — pintar a minha deixaria a
+         tela mostrando uma entrada que o banco não guardou. */
+      if (r.ok) setPalavras(r.palavras);
+      else {
+        setPalavras(antes);
+        toast.error(
+          r.motivo === "sem_suporte"
+            ? "O filtro ainda não está pronto no servidor."
+            : "Não deu para salvar.",
+        );
+      }
+    } catch {
+      setPalavras(antes);
+      toast.error("Não deu para salvar.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  function acrescentar() {
+    /* ⚠️ Aceita vírgula e quebra de linha: ela cola uma lista de uma vez, e
+       exigir uma por vez faria o recurso custar dez toques. */
+    const novas = campo
+      .split(/[,\n]/)
+      .map((x) => x.trim())
+      .filter(Boolean);
+    if (!novas.length) return;
+    setCampo("");
+    void guardar([...palavras, ...novas]);
+  }
+
+  return (
+    <section className="rounded-3xl card-material p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="font-semibold">Palavras que você não quer ler</h3>
+          <p className="mt-1 text-xs leading-snug text-muted-foreground">
+            Comentários com essas palavras ficam escondidos <strong>de você</strong>. Ninguém é
+            avisado, e nada é apagado.
+          </p>
+        </div>
+        {!aberto && (
+          <button
+            type="button"
+            onClick={() => setAberto(true)}
+            className="press min-h-[44px] shrink-0 rounded-full border border-border px-4 text-[13px] font-semibold"
+          >
+            Abrir
+          </button>
+        )}
+      </div>
+
+      {aberto && (
+        <>
+          <div className="mt-3 flex items-end gap-2">
+            <input
+              value={campo}
+              onChange={(e) => setCampo(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  acrescentar();
+                }
+              }}
+              placeholder="uma palavra ou frase"
+              aria-label="Palavra a esconder"
+              maxLength={PALAVRA_OCULTA_MAX}
+              className="min-h-[44px] flex-1 rounded-2xl border border-border bg-background px-3 text-sm"
+            />
+            <button
+              type="button"
+              disabled={!campo.trim() || salvando}
+              onClick={acrescentar}
+              className="press min-h-[44px] shrink-0 rounded-full bg-primary px-4 text-[14px] font-semibold text-primary-foreground disabled:opacity-50"
+            >
+              Somar
+            </button>
+          </div>
+
+          {palavras.length === 0 ? (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Sua lista está vazia. Nada está sendo escondido.
+            </p>
+          ) : (
+            <ul className="mt-3 flex flex-wrap gap-1.5">
+              {palavras.map((p) => (
+                <li key={p}>
+                  <button
+                    type="button"
+                    disabled={salvando}
+                    onClick={() => void guardar(palavras.filter((x) => x !== p))}
+                    aria-label={`Tirar "${p}" da lista`}
+                    className="press flex min-h-[36px] items-center gap-1.5 rounded-full bg-muted px-3 text-[13px] disabled:opacity-50"
+                  >
+                    <span className="max-w-[180px] truncate">{p}</span>
+                    <span aria-hidden className="text-muted-foreground">
+                      ×
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {/* ⚠️ **DIZ QUE CASA PALAVRA INTEIRA.** Sem esta linha, ela esconde
+              "mal" e estranha que "mala" continue aparecendo — ou o contrário,
+              espera que "parto" esconda "departamento". A régua é
+              `temPalavraOculta`, e a tela a explica em uma frase. */}
+          <p className="mt-3 text-xs leading-snug text-muted-foreground">
+            Casa a palavra inteira: “parto” não esconde “departamento”. Você pode escrever uma
+            frase, e ela é escondida como frase.
+          </p>
+        </>
+      )}
+    </section>
   );
 }
