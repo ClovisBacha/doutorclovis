@@ -71,3 +71,20 @@ export const SOS_NO_APP = false;
  * Privacidade e a loja voltam a descrever a Comunidade.
  */
 export const COMUNIDADE_NO_APP = false;
+
+/**
+ * A ASSINATURA NO APP — DESLIGADA (20/11/2026, o dono: o plano completo, com
+ * anual, mensal e vitalício, vendido pela Apple).
+ *
+ * Desligada, nada muda para quem usa o app: todas as atividades abrem, nenhum
+ * portão aparece, a rota `/assinatura` segue para o destino seguinte, o Perfil
+ * não mostra o plano e o StoreKit nunca é chamado. O que é grátis e o que é do
+ * plano completo mora numa lista só (`lib/assinatura/plano.ts`).
+ *
+ * O código fica todo no lugar. Para ligar: `true` aqui — DEPOIS de criar os
+ * três produtos no App Store Connect (os IDs em `lib/assinatura/plano.ts`) e
+ * de reescrever junto os Termos, a Privacidade e o texto da loja (a Apple e o
+ * Código de Defesa do Consumidor cobram que o texto diga o que se vende, o
+ * preço, a renovação e como cancelar). `assinatura.test.ts` cobra os Termos.
+ */
+export const ASSINATURA_NO_APP = false;

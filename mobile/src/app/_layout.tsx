@@ -6,6 +6,8 @@ import { useEffect, useRef } from "react";
 import { Platform } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { CEUS } from "~/componentes/ceu-vivo";
+import { ASSINATURA_NO_APP } from "~/config";
+import { VigiaDoPlano } from "~/lib/assinatura/usar-plano";
 import { ProvedorDeSessao, usePerfilConfirmado, useSessao } from "~/lib/sessao";
 import { cor } from "~/tema";
 
@@ -35,6 +37,8 @@ export default function Raiz() {
         <GuardaDaSessao />
         {Platform.OS !== "web" ? <ToqueNaNotificacao /> : null}
         {Platform.OS !== "web" ? <VigiaDosLembretes /> : null}
+        {/* A App Store só é chamada com a assinatura ligada (`ASSINATURA_NO_APP`). */}
+        {ASSINATURA_NO_APP && Platform.OS === "ios" ? <VigiaDoPlano /> : null}
         {/* A barra de status das telas claras. As que ficam sobre um céu
             escuro (as abas, a entrada, as telas da noite) põem a delas por
             cima, e ao sair esta volta sozinha. */}
@@ -87,6 +91,12 @@ export default function Raiz() {
           {/* Folha (pageSheet), como a Central de Emergência do site: a tela
               de trás aparece escurecida em cima, e arrastar para baixo fecha. */}
           <Stack.Screen name="sos" options={{ presentation: "modal" }} />
+          {/* O plano completo sobe de baixo e só sai pelos botões dele (o
+              voltar e o "Agora não" levam ao destino combinado, `depois`). */}
+          <Stack.Screen
+            name="assinatura"
+            options={{ animation: "slide_from_bottom", gestureEnabled: false }}
+          />
         </Stack>
       </ProvedorDeSessao>
     </SafeAreaProvider>
@@ -135,8 +145,10 @@ function SegurarAbertura() {
  * SOS fica fora de propósito: ele funciona sem conta e sem rede. Os Termos e a
  * Privacidade também: o cadastro pede que ela os leia ANTES de ter conta, e
  * mandá-la ao login no meio do cadastro apagava o que ela já tinha escrito.
+ * E o plano completo (`/assinatura`): o funil de perguntas termina nele, antes
+ * do cadastro — a compra é da conta da Apple, e não precisa da nossa.
  */
-const ABERTAS = new Set(["(entrada)", "sos", "termos", "privacidade"]);
+const ABERTAS = new Set(["(entrada)", "sos", "termos", "privacidade", "assinatura"]);
 
 function GuardaDaSessao() {
   const { sessao, carregandoSessao } = useSessao();

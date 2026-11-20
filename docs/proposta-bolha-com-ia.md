@@ -1,5 +1,12 @@
 # Proposta — a Bolha com IA de verdade
 
+> **DECIDIDO PELO DONO EM 20/11/2026** ("bora faz o recomendado"): a
+> recomendação do fim deste texto. O app é lançado com a Bolha de hoje, sem
+> IA (`IA_NO_APP` continua desligada). A IA fica para uma segunda fase, só para
+> perguntas sobre o conteúdo das aulas. Para começar essa fase ainda faltam
+> três coisas do dono: dizer que é hora, escolher o provedor e aprovar os
+> textos novos de Termos e Privacidade.
+
 Escrita em 19/11/2026, na noite em que a Bolha virou a guia do app (decisão do
 dono: "o bebê bolha vai ser aquele personagem que vai conversar com a mãe [...]
 ele tem que ser algo inteligente"). **É uma proposta para o dono decidir, não

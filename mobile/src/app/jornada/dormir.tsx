@@ -47,6 +47,7 @@ import { VOZ_DA_NOITE } from "~/lib/audio/vozes";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { FALA_DOS_SONS } from "~/lib/jornada/bolha-nos-cuidados";
 import { ALVO_MINIMO, canto, curva, escala, espaco, fonte, margem } from "~/tema";
+import { PortaoDoPlano } from "~/componentes/assinatura/portao";
 
 /**
  * SÓ SONS, PARA DORMIR — o `SonsParaDormir` do app antigo, para quem acorda às
@@ -83,7 +84,16 @@ const ARTE_DA_HISTORIA: Record<string, number> = {
 /** Muitas cópias na fila: a de dormir pode tocar a noite inteira, e a fila só soluça ao se refazer. */
 const COPIAS_DA_NOITE = 120;
 
-export default function Dormir() {
+/** O portão do plano completo (com a chave da assinatura desligada, abre direto). */
+export default function TelaDosSons() {
+  return (
+    <PortaoDoPlano recurso="sons">
+      <Dormir />
+    </PortaoDoPlano>
+  );
+}
+
+function Dormir() {
   const dia = useDiaDaJornada();
   const cuidado = dia.modo !== "carregando" && dia.modo !== "falhou" && dia.cuidado;
   const [som, setSom] = useState<SomKey | null>(null);

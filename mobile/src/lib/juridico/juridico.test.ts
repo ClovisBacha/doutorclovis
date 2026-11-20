@@ -186,7 +186,10 @@ describe("o aceite na porta do app", () => {
     const porta = fonte(join("app", "index.tsx"));
     expect(porta).toContain("precisaAceitar(sessao.user.user_metadata)");
     expect(porta).toContain('<Redirect href="/aceite" />');
-    expect(porta.indexOf('href="/aceite"')).toBeLessThan(porta.indexOf('href="/ritual"'));
+    /* O aceite vem antes do ritual e do guardar o plano (o funil de 20/11/2026). */
+    expect(porta.indexOf('href="/aceite"')).toBeGreaterThan(-1);
+    expect(porta.indexOf('href="/aceite"')).toBeLessThan(porta.indexOf('"/ritual"'));
+    expect(porta.indexOf('href="/aceite"')).toBeLessThan(porta.indexOf('"/guardar-plano"'));
   });
 
   test("o cadastro grava a versão aceita e pede o consentimento do dado de saúde, destacado", () => {

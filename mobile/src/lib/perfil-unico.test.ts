@@ -49,13 +49,17 @@ describe("um perfil só", () => {
     const editar = fonte(join("app", "perfil", "editar.tsx"));
     expect(editar).toContain("api.salvarPerfilSocial({");
     expect(editar).toContain("ehOfensivo(nome)");
-    /* Fora do ritual (o primeiro nome, no cadastro), nenhuma tela grava o nome direto. */
+    /* Fora do ritual e do guardar o plano (o primeiro nome, no cadastro: o
+       funil de 20/11/2026 pergunta o nome antes da conta e o grava logo
+       depois dela), nenhuma tela grava o nome direto. */
     const gravamONome = FONTES.filter(
       (f) =>
         /\bdisplay_name\s*(?::|=(?!=))/.test(f.codigo) &&
         /gravarPerfil|\.from\(\s*["']patient_profiles["']\s*\)/.test(f.codigo),
     ).map((f) => f.arquivo);
-    expect(gravamONome).toEqual([join("app", "ritual.tsx")]);
+    expect([...gravamONome].sort()).toEqual(
+      [join("app", "guardar-plano.tsx"), join("app", "ritual.tsx")].sort(),
+    );
   });
 
   test("a foto dela no topo das abas leva ao Perfil", () => {

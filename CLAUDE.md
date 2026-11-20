@@ -46,9 +46,48 @@ conversa.tsx` a desenha (balão, a resposta dela do lado, os botões). É o
   calma", "movimentos leves, no seu ritmo"; nunca "reduz a ansiedade",
   "melhora o sono", "faz bem ao bebê", "você deve". A regra de 21/10 abaixo
   continua inteira.
-- Ainda não há IA de verdade na Bolha (`IA_NO_APP` desligada): ligar um chat
-  pede Termos, Privacidade e consentimento novos, e guarda-corpos contra
-  conduta — é decisão do dono.
+- **A Bolha é lançada SEM IA (decisão do dono, 20/11/2026)**: a guia que lê o
+  momento, nos botões, sem nada sair do aparelho (`IA_NO_APP` desligada). A IA
+  fica para uma segunda fase, só para perguntas sobre o conteúdo das aulas, com
+  portão de cobertura e recusa de conduta (`docs/proposta-bolha-com-ia.md`).
+  Ligar um chat pede Termos, Privacidade e consentimento novos.
+
+## ⚠️ QUEM CHEGA MONTA O PLANO ANTES DA CONTA (pedido do dono, 20/11/2026)
+
+Nas palavras dele, ao mandar as telas de um app que converte muito bem: "um
+processo [...] onde a pessoa fica preenchendo informações, muitas informações.
+O aplicativo demonstra informações ali, validando que o aplicativo é bom".
+
+- **O funil** (`app/(entrada)/plano.tsx`, regras em `lib/plano/`): o último
+  slide da entrada leva a "Montar o meu plano"; a Bolha pergunta o nome, a
+  fase, a data, o bebê, como ela está, o que a preocupa, o que quer cultivar,
+  o tempo e o momento do dia, e mostra a cada tanto (a semana em letras
+  grandes, o "você não está sozinha", as horas de cuidado somadas, a
+  montagem, a diferença, o plano pronto). Salvar o plano é criar a conta.
+- Depois do cadastro, a porta (`app/index.tsx`) leva a `app/guardar-plano.tsx`
+  (grava o perfil, o lembrete na hora escolhida, "o que muda", a revelação);
+  quem não montou o plano continua no ritual.
+- ⚠️ **Todo número do funil se conta** (`lib/plano/numeros.ts`): os dias até
+  a data provável, as aulas desses dias, os minutos que ela escolheu, o
+  conteúdo que existe no app. A referência tinha "junte-se a 58.364 mães",
+  "4,8 · 1.148 avaliações" e "economiza R$ 1.500": o app não tem esses
+  números, e inventá-los é propaganda enganosa (CDC, art. 37) e recusa na
+  Apple (2.3.1, 5.6). `plano.test.ts` proíbe nas telas do funil.
+- O que ela sente e o que a preocupa ficam SÓ no aparelho (`dc-plano:<uid>`,
+  apagado no sair). Para o perfil vão só o nome, a data e o bebê.
+- **A assinatura (o plano completo: anual, mensal e vitalício) está pronta e
+  DESLIGADA** pela chave `ASSINATURA_NO_APP` em `mobile/src/config.ts`. Com
+  ela ligada, a venda aparece no fim do funil (depois de "o que muda"), nos
+  portões das atividades pagas (meditar, sons, Mexer, ler para o bebê, "Para
+  vocês dois": o default export de cada tela) e no Perfil. O que é grátis e o
+  que é pago mora numa lista só, `lib/assinatura/plano.ts`. Contrato:
+  `router.replace({ pathname: "/assinatura", params: { depois, origem } })`.
+  Só `lib/assinatura/loja.ts` fala com o StoreKit (`expo-iap` 6.4.3, exato);
+  preço só do StoreKit, nunca escrito à mão (`loja-da-apple.test.ts`); nunca
+  venda no Modo Cuidado. Ligar pede os produtos no App Store Connect, a
+  `VERSAO_DOS_TERMOS` nova e o passo a passo de `docs/loja-textos.md`,
+  "Quando a assinatura ligar". O direito vem do StoreKit no aparelho (sem
+  servidor): o plano segue a conta da Apple, não a do app.
 
 ## ⚠️ O APP É UM DUOLINGO PARA GESTANTES (decisão do dono, 11/11/2026)
 
@@ -87,7 +126,8 @@ gamificação"). Exames ficaram para depois.
 
 Antes era Obstétrica. O nome aparece embaixo do ícone (`name` do
 `app.json`), na marca da entrada, nos cartões, nos documentos e na loja
-(`Mãe Esperta: Aula da Gravidez`); o Instagram é `@maeesperta.app`. Ficam como
+(`Mãe Esperta: Bem-estar Materno`, desde 20/11/2026; antes, `Aula da
+Gravidez`); o Instagram é `@maeesperta.app`. Ficam como
 estavam, de propósito: o Bundle ID `br.com.obstetrica.app` (trocá-lo seria
 outro app na loja), o `slug` e o `scheme` `obstetrica` (links e login), o
 domínio `obstetrica.com.br` e o site, que não muda mais. Escreva "o app Mãe

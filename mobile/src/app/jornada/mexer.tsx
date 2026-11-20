@@ -79,6 +79,7 @@ import {
 import { ALVO_MINIMO, canto, cor, curva, escala, espaco, fonte, luz, margem, sombra } from "~/tema";
 import { pedirSocorro, ROTULO_DO_SOCORRO } from "~/lib/socorro";
 import { SOS_NO_APP } from "~/config";
+import { PortaoDoPlano } from "~/componentes/assinatura/portao";
 
 /**
  * MEXER — a sessão montada pela régua do site (`sessaoDoDia`): pela fase da
@@ -132,7 +133,16 @@ const ehUmaDuracao = (n: number): n is DuracaoMexer =>
 
 type Etapa = "escolha" | "sessao" | "fim";
 
-export default function Mexer() {
+/** O portão do plano completo (com a chave da assinatura desligada, abre direto). */
+export default function TelaDoMexer() {
+  return (
+    <PortaoDoPlano recurso="mexer">
+      <Mexer />
+    </PortaoDoPlano>
+  );
+}
+
+function Mexer() {
   const at = useAtividade("movement");
   const [minutos, setMinutos] = useState<DuracaoMexer>(DURACAO_PADRAO);
   const [energia, setEnergia] = useState<Energia | null>(null);

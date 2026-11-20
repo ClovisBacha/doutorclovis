@@ -1,6 +1,6 @@
 # Política de privacidade
 
-_Versão de 12 de novembro de 2026._
+_Versão de 20 de novembro de 2026._
 
 Guardamos o necessário para o app funcionar: a sua conta, a datação da gestação, os movimentos do bebê, a sua trilha e as suas amigas. Não vendemos dados, não usamos para publicidade e não rastreamos você em outros apps. Você pode baixar uma cópia dos seus dados e excluir tudo quando quiser, no Perfil.
 
@@ -26,6 +26,7 @@ O app não pede peso, altura, pressão, glicemia, exames, sintomas ou diagnósti
 - A sua sessão (o acesso à conta), no armazenamento do app.
 - Uma cópia da trilha, da agenda e do contato de quem acompanha a sua gestação, para o app funcionar sem internet.
 - Os lembretes: são notificações agendadas no próprio aparelho. O app não registra o seu aparelho para receber avisos do servidor.
+- As respostas do “Montar o meu plano”, quando você o monta antes de criar a conta: como você tem se sentido, o que ocupa a sua cabeça, o que quer cultivar, o tempo e o momento do dia que escolheu. Ficam só no aparelho, para o app e a Bolha falarem com você, e nunca vão para o servidor. Do plano, vão para a sua conta só o nome, a datação e o nome do bebê, como no cadastro.
 
 Ao sair da conta ou excluí-la, o app apaga essas cópias do aparelho.
 

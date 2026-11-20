@@ -1,6 +1,6 @@
 # Termos de uso
 
-_Versão de 12 de novembro de 2026._
+_Versão de 20 de novembro de 2026._
 
 O app Mãe Esperta é um jogo para aprender sobre a gestação, um pouco por dia — como um Duolingo para gestantes. Ele não dá orientação médica e não substitui quem acompanha a sua gestação. Usando o app, você concorda com estes termos e com a Política de privacidade.
 

@@ -33,6 +33,7 @@ import { blocosDoCasalNoApp, casalAberto, SEMANA_DO_CASAL } from "~/lib/jornada/
 import { FALA_DO_CASAL } from "~/lib/jornada/bolha-nos-cuidados";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { canto, curva, escala, espaco, fonte, margem } from "~/tema";
+import { PortaoDoPlano } from "~/componentes/assinatura/portao";
 
 /**
  * PARA VOCÊS DOIS — a sessão de dez minutos do app antigo (`SessaoDoCasal`):
@@ -74,7 +75,16 @@ const GESTOS: readonly { icone: typeof Wind; texto: string }[] = [
   { icone: MessageCircle, texto: "Uma palavra combinada, que vale no dia" },
 ];
 
-export default function Casal() {
+/** O portão do plano completo (com a chave da assinatura desligada, abre direto). */
+export default function TelaDoCasal() {
+  return (
+    <PortaoDoPlano recurso="casal">
+      <Casal />
+    </PortaoDoPlano>
+  );
+}
+
+function Casal() {
   const dia = useDiaDaJornada();
   const blocos = BLOCOS_DO_CASAL;
   const total = blocos.length;

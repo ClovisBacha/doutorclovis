@@ -61,6 +61,7 @@ import { gravarChave, useLoja } from "~/lib/jornada/loja";
 import { CHAVE_CARTAS_LIDAS } from "~/lib/jornada/momentos";
 import { supabase } from "~/servidor/supabase";
 import { ALVO_MINIMO, cor, escala, espaco, fonte, margem } from "~/tema";
+import { PortaoDoPlano } from "~/componentes/assinatura/portao";
 
 /**
  * A CARTA PARA O BEBÊ — o `BondingBlock` do app antigo: ela lê em voz alta,
@@ -110,7 +111,16 @@ const GRATIDOES_DA_BANCADA: Gratidao[] = [
 
 type Etapa = "intro" | "lista" | "leitura" | "fim";
 
-export default function Bebe() {
+/** O portão do plano completo (com a chave da assinatura desligada, abre direto). */
+export default function TelaDaLeitura() {
+  return (
+    <PortaoDoPlano recurso="ler">
+      <Bebe />
+    </PortaoDoPlano>
+  );
+}
+
+function Bebe() {
   const at = useAtividade("bonding");
   const loja = useLoja();
   const [etapa, setEtapa] = useState<Etapa>("intro");

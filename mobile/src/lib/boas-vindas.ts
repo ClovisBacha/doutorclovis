@@ -17,8 +17,8 @@
 export const FALA_NA_ENTRADA = {
   /** O primeiro slide: ela se apresenta e diz o que vocês vão fazer juntas. */
   ola: "Oi, eu sou a Bolha! Todo dia eu te chamo para aprender, respirar e mexer o corpo. Coisa de poucos minutos.",
-  /** O último slide, para quem vai criar a conta. */
-  conta: "Falta pouco! Crie a sua conta e eu te mostro o primeiro cuidado de hoje.",
+  /** O último slide, para quem chega: o convite para montar o plano (20/11/2026). */
+  conta: "Agora é a sua vez! Me conta um pouco de você, e eu monto um plano de cuidado só seu.",
   /** O último slide, para quem já entrou neste aparelho. */
   voltou: "Oi de novo! Entre e a gente continua de onde parou.",
 } as const;
@@ -44,7 +44,10 @@ export const SLIDES = {
     titulo: "A trilha, em dupla",
     texto: "Cada dia vira um passo. Feche o dia com uma amiga e as duas ganham sementinhas.",
   },
-  conta: { titulo: "Crie a sua conta" },
+  conta: {
+    titulo: "O seu plano",
+    texto: "Algumas perguntas rápidas, e a Bolha monta o seu cuidado de cada dia.",
+  },
   voltou: { titulo: "Que bom te ver de novo" },
 } as const satisfies Record<string, SlideDeBoasVindas>;
 

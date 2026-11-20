@@ -103,6 +103,7 @@ describe("o vidro e a luz", () => {
       ["o texto de apoio no véu da entrada", cor("textoNoVeu"), cor("fundoDoVeu")],
       ["o link no véu da entrada", cor("linkNoVeu"), cor("fundoDoVeu")],
       ["o erro no véu da entrada", cor("erroNoVeu"), cor("fundoDoVeu")],
+      ["o destaque de pêssego no véu (o funil)", cor("destaqueNoVeu"), cor("fundoDoVeu")],
     ];
     const fracos = pares
       .map(([onde, a, b]) => ({ onde, razao: Math.round(contraste(a, b) * 100) / 100 }))

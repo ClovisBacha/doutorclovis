@@ -121,6 +121,7 @@ import {
   margem,
   sombra,
 } from "~/tema";
+import { PortaoDoPlano } from "~/componentes/assinatura/portao";
 
 /**
  * MEDITAR — a meditação guiada do app antigo (`MeditationBlock` do site).
@@ -168,7 +169,16 @@ type SessaoEmCurso = { plano: Plano; minutos: number; programa: DiaDoPrograma | 
 
 const rotuloDoSom = (k: Som) => (k === "silencio" ? "Sem som" : ROTULO_DO_SOM_NO_APP[k].label);
 
-export default function Meditar() {
+/** O portão do plano completo (com a chave da assinatura desligada, abre direto). */
+export default function TelaDoMeditar() {
+  return (
+    <PortaoDoPlano recurso="meditar">
+      <Meditar />
+    </PortaoDoPlano>
+  );
+}
+
+function Meditar() {
   const at = useAtividade("meditation");
   const loja = useLoja();
   const temas = useMemo(

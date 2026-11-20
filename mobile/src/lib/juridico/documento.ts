@@ -22,6 +22,14 @@ export type DocumentoJuridico = {
   secoes: readonly Secao[];
 };
 
+/**
+ * Numera as seções na ordem ("1. Quem oferece o app"): uma seção que entra ou
+ * sai por uma chave (o plano completo) não deixa a numeração com buraco.
+ */
+export function numerarSecoes(secoes: readonly Secao[]): Secao[] {
+  return secoes.map((s, i) => ({ ...s, titulo: `${i + 1}. ${s.titulo}` }));
+}
+
 const escapar = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 

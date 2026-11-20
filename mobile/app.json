@@ -10,7 +10,7 @@
     "backgroundColor": "#2a1f9a",
     "ios": {
       "bundleIdentifier": "br.com.obstetrica.app",
-      "buildNumber": "52",
+      "buildNumber": "53",
       "appleTeamId": "8PL2X9F9PV",
       "supportsTablet": false,
       "usesAppleSignIn": true,
@@ -93,6 +93,7 @@
         }
       ],
       "./plugins/ciclo-de-cena",
+      "expo-iap",
       [
         "expo-audio",
         {

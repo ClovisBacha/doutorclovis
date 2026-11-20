@@ -1,5 +1,5 @@
-import { CONTATO_EMAIL } from "~/config";
-import type { DocumentoJuridico } from "~/lib/juridico/documento";
+import { ASSINATURA_NO_APP, CONTATO_EMAIL } from "~/config";
+import { numerarSecoes, type DocumentoJuridico } from "~/lib/juridico/documento";
 
 /**
  * A POLÍTICA DE PRIVACIDADE DO APP — escrita a partir do que o app coleta de
@@ -21,15 +21,15 @@ export const PRIVACIDADE: DocumentoJuridico = {
   titulo: "Política de privacidade",
   resumo:
     "Guardamos o necessário para o app funcionar: a sua conta, a datação da gestação, os movimentos do bebê, a sua trilha e as suas amigas. Não vendemos dados, não usamos para publicidade e não rastreamos você em outros apps. Você pode baixar uma cópia dos seus dados e excluir tudo quando quiser, no Perfil.",
-  secoes: [
+  secoes: numerarSecoes([
     {
-      titulo: "1. Quem cuida dos seus dados",
+      titulo: "Quem cuida dos seus dados",
       blocos: [
         `O controlador dos dados é Dr. Clóvis Bacha, ginecologista e obstetra (CRM-MG 22.333), que oferece o app Mãe Esperta. O encarregado pelo tratamento de dados pessoais atende em ${CONTATO_EMAIL}.`,
       ],
     },
     {
-      titulo: "2. O que o app guarda, e para quê",
+      titulo: "O que o app guarda, e para quê",
       blocos: [
         {
           lista: [
@@ -47,27 +47,33 @@ export const PRIVACIDADE: DocumentoJuridico = {
       ],
     },
     {
-      titulo: "3. O que fica no seu aparelho",
+      titulo: "O que fica no seu aparelho",
       blocos: [
         {
           lista: [
             "A sua sessão (o acesso à conta), no armazenamento do app.",
             "Uma cópia da trilha, da agenda e do contato de quem acompanha a sua gestação, para o app funcionar sem internet.",
             "Os lembretes: são notificações agendadas no próprio aparelho. O app não registra o seu aparelho para receber avisos do servidor.",
+            "As respostas do “Montar o meu plano”, quando você o monta antes de criar a conta: como você tem se sentido, o que ocupa a sua cabeça, o que quer cultivar, o tempo e o momento do dia que escolheu. Ficam só no aparelho, para o app e a Bolha falarem com você, e nunca vão para o servidor. Do plano, vão para a sua conta só o nome, a datação e o nome do bebê, como no cadastro.",
+            ...(ASSINATURA_NO_APP
+              ? [
+                  "Se você tem o plano completo, uma marca de que ele está ativo, para o app abrir sem esperar a Apple.",
+                ]
+              : []),
           ],
         },
         "Ao sair da conta ou excluí-la, o app apaga essas cópias do aparelho.",
       ],
     },
     {
-      titulo: "4. Dado de saúde e de gestação",
+      titulo: "Dado de saúde e de gestação",
       blocos: [
         "A datação da gestação, o nascimento, os movimentos do bebê e o Modo Cuidado são dados sensíveis (Lei Geral de Proteção de Dados, art. 5º, II). O app os trata com o seu consentimento, pedido de forma separada e destacada no cadastro (art. 11, I), para montar a trilha da sua semana e acompanhar o bebê.",
         "Esses dados nunca são usados para propaganda nem compartilhados para fins comerciais. Você pode retirar o consentimento quando quiser — como o app não funciona sem eles, retirar é excluir a conta (ou pedir pelo e-mail do encarregado).",
       ],
     },
     {
-      titulo: "5. As outras bases da lei",
+      titulo: "As outras bases da lei",
       blocos: [
         {
           lista: [
@@ -79,7 +85,7 @@ export const PRIVACIDADE: DocumentoJuridico = {
       ],
     },
     {
-      titulo: "6. Quem recebe os seus dados",
+      titulo: "Quem recebe os seus dados",
       blocos: [
         {
           lista: [
@@ -87,7 +93,9 @@ export const PRIVACIDADE: DocumentoJuridico = {
             "A embaixadora ou a médica, se você usar o código dela: o seu primeiro nome numa lista. Nada do seu acompanhamento.",
             "Se a sua conta foi vinculada a um médico pelo site (o app não faz esse vínculo): esse médico vê os movimentos do bebê e o que você registrou nos últimos dias, para o acompanhamento.",
             "A nossa equipe: pessoas autorizadas podem acessar dados para suporte e segurança, e esse acesso fica registrado.",
-            "Os serviços que fazem o app funcionar, só para isso: Supabase (banco de dados, autenticação, arquivos e os e-mails da conta), Vercel (os servidores do app) e Apple (se você entra com a Apple).",
+            ASSINATURA_NO_APP
+              ? "Os serviços que fazem o app funcionar, só para isso: Supabase (banco de dados, autenticação, arquivos e os e-mails da conta), Vercel (os servidores do app) e Apple (se você entra com a Apple, e as compras e assinaturas do plano completo, que são feitas e cobradas por ela: o app não recebe dados do seu cartão)."
+              : "Os serviços que fazem o app funcionar, só para isso: Supabase (banco de dados, autenticação, arquivos e os e-mails da conta), Vercel (os servidores do app) e Apple (se você entra com a Apple).",
             "Autoridades, quando a lei ou uma ordem judicial exigir.",
           ],
         },
@@ -96,20 +104,20 @@ export const PRIVACIDADE: DocumentoJuridico = {
       ],
     },
     {
-      titulo: "7. Onde os dados ficam",
+      titulo: "Onde os dados ficam",
       blocos: [
         "O banco de dados e os servidores do app ficam no Brasil (Supabase e Vercel, na região de São Paulo). Sai do país só o login com a Apple, se você o usar. Essa transferência segue o art. 33 da Lei Geral de Proteção de Dados, nos termos dos contratos e das políticas de proteção de dados da Apple.",
       ],
     },
     {
-      titulo: "8. Por quanto tempo",
+      titulo: "Por quanto tempo",
       blocos: [
         "Enquanto a sua conta existir.",
         "Ao excluir a conta (Perfil → Excluir minha conta), o seu perfil, a trilha, os dados de saúde, as amizades e a foto são apagados. Ficam só: os registros que a lei manda guardar, pelo prazo dela (como os de acesso, por 6 meses); o registro dos acessos da equipe; e as cópias de segurança, que se renovam sozinhas com o tempo.",
       ],
     },
     {
-      titulo: "9. Os seus direitos",
+      titulo: "Os seus direitos",
       blocos: [
         "Você pode, a qualquer momento (Lei Geral de Proteção de Dados, art. 18):",
         {
@@ -126,19 +134,19 @@ export const PRIVACIDADE: DocumentoJuridico = {
       ],
     },
     {
-      titulo: "10. Segurança",
+      titulo: "Segurança",
       blocos: [
         "As conexões são cifradas, cada usuária só acessa os próprios dados (regras de acesso no banco), a foto do perfil fica num local privado e abre por endereços temporários, e o acesso da equipe é registrado. Nenhum sistema é infalível: se acontecer um incidente que possa trazer risco a você, avisaremos você e a ANPD.",
       ],
     },
     {
-      titulo: "11. Menores de idade",
+      titulo: "Menores de idade",
       blocos: [
         "O app é para maiores de 18 anos. Os dados do bebê são informados pela mãe, só para o acompanhamento dentro do app.",
       ],
     },
     {
-      titulo: "12. As permissões do iPhone",
+      titulo: "As permissões do iPhone",
       blocos: [
         {
           lista: [
@@ -151,10 +159,10 @@ export const PRIVACIDADE: DocumentoJuridico = {
       ],
     },
     {
-      titulo: "13. Mudanças nesta política",
+      titulo: "Mudanças nesta política",
       blocos: [
         "Quando esta política mudar de forma relevante, o app avisa e pede o seu aceite de novo antes de continuar. A data da versão em vigor fica no topo.",
       ],
     },
-  ],
+  ]),
 };

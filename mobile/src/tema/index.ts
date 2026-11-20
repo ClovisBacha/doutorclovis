@@ -288,6 +288,20 @@ export const veu = {
   linkNoVeu: "#ffc6da",
   /** O erro sobre o véu (o vermelho do app não se lê no escuro). */
   erroNoVeu: "#ffbfcf",
+  /**
+   * O destaque sobre o véu: a luz de pêssego do amanhecer (20/11/2026, o funil
+   * "Montar o meu plano"): o número que importa, o nome dela, o ícone de uma
+   * opção. Nunca para agir (agir é a framboesa).
+   */
+  destaqueNoVeu: "#ffc9a8",
+  /**
+   * A SUPERFÍCIE sobre o véu (21/11/2026, "mais clean, de outro nível"): uma
+   * só, discreta, para tudo o que agrupa conteúdo no funil — no lugar dos
+   * blocos brancos, que cortavam o céu. Escolhida, ela acende um pouco.
+   */
+  superficie: "rgba(255,255,255,0.07)",
+  superficieBorda: "rgba(255,255,255,0.11)",
+  superficieAcesa: "rgba(255,255,255,0.16)",
   campo: "rgba(255,255,255,0.1)",
   campoBorda: "rgba(255,255,255,0.3)",
   campoFoco: "rgba(255,255,255,0.85)",

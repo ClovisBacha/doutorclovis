@@ -1,7 +1,9 @@
 # A loja — o que se preenche no App Store Connect
 
-> **RASCUNHO DE 19/11/2026 — o app de bem-estar materno, com a Bolha guia.**
-> O dono, em 19/11: "a mãe esperta é também aquela que cuida da saúde [...]
+> **APROVADO PELO DONO EM 20/11/2026** ("bora faz o recomendado"): é este o
+> texto que vai para o App Store Connect. Escrito em 19/11 como rascunho.
+>
+> **O app de bem-estar materno, com a Bolha guia.** O dono, em 19/11: "a mãe esperta é também aquela que cuida da saúde [...]
 > um aplicativo de bem-estar materno [...] o bebê bolha será esse guia neste
 > caminho". Este texto reposiciona a loja: de "um Duolingo para gestantes"
 > (um jogo de aprender) para **bem-estar materno** (aprender, respirar, mexer
@@ -79,12 +81,10 @@ pessoa não o vê, e trocá-lo seria outro app na loja).
 
 **O nome na loja.** "Bem-estar Materno" diz em duas palavras o que o app
 virou, e vale para a gestação e para as 12 semanas depois do parto. A palavra
-que as gestantes digitam na busca ("gravidez") vai nas palavras-chave. Se o
-dono preferir a palavra da busca no nome, a alternativa é
-`Mãe Esperta: Gravidez Leve` (26 de 30), com "bem-estar" no subtítulo. O nome
-pode mudar até a primeira submissão sem custo; depois, só com versão nova.
-⚠️ O `CLAUDE.md` da raiz cita o nome antigo da loja (`Mãe Esperta: Aula da
-Gravidez`): quem aprovar o nome novo atualiza a linha lá também.
+que as gestantes digitam na busca ("gravidez") vai nas palavras-chave. A
+alternativa que ficou de fora era `Mãe Esperta: Gravidez Leve` (26 de 30). O
+nome pode mudar até a primeira submissão sem custo; depois, só com versão nova.
+O `CLAUDE.md` da raiz já cita o nome novo.
 
 **[NOVO 19/11] Por que Saúde e fitness passa a primária** (antes, Educação):
 
@@ -343,6 +343,63 @@ atividades, sem valor em dinheiro.
 ```
 
 ---
+
+## Quando a assinatura ligar (o plano completo, 20/11/2026)
+
+O app já tem a venda pronta: a tela do plano completo (anual, mensal e
+vitalício, pela Apple), os portões nas atividades pagas e a compra pelo
+StoreKit, tudo atrás da chave `ASSINATURA_NO_APP` (desligada). Enquanto ela
+estiver desligada, valem os textos acima ("sem compras dentro do app"). No dia
+de ligar, nesta ordem:
+
+1. **No App Store Connect** (Negócios): aceitar o **Contrato de Apps Pagos** e
+   preencher os dados bancários e fiscais.
+2. **Os produtos** (Monetização):
+   - grupo de assinaturas **"Plano Mãe Esperta"**, com
+     `br.com.obstetrica.app.plano.anual` (1 ano, R$ 99,90) e
+     `br.com.obstetrica.app.plano.mensal` (1 mês, R$ 34,90); o anual no nível
+     mais alto do grupo;
+   - não consumível `br.com.obstetrica.app.plano.vitalicio` (R$ 249,90);
+   - em cada um, o nome e a descrição em português e uma captura da tela de
+     venda para a revisão;
+   - se quiser, a oferta introdutória do anual (Teste gratuito, 1 semana): a
+     tela mostra sozinha, e só para quem tem direito.
+3. **No código**: `ASSINATURA_NO_APP = true` em `mobile/src/config.ts`,
+   `VERSAO_DOS_TERMOS` nova (a catraca cobra), `bun mobile/scripts/gerar-juridico.ts`
+   e um build novo. Os Termos ganham sozinhos a seção "O plano completo", e a
+   Privacidade, a compra pela Apple.
+4. **Os produtos vão JUNTO com esse build** na primeira revisão.
+5. **Os textos da loja**:
+   - Preço: "Grátis, com compras dentro do app".
+   - Na descrição, antes de "IMPORTANTE":
+
+```
+GRÁTIS PARA COMEÇAR
+A semana do bebê, a Bolha, a aula do dia, a trilha, a gratidão e as amigas.
+
+O PLANO COMPLETO
+Libera as pausas para respirar e meditar, os sons da noite, o Mexer, as leituras para o bebê e o Para vocês dois. Anual, mensal ou vitalício, pela Apple. As assinaturas se renovam sozinhas até você cancelar, nos Ajustes do iPhone, até 24 horas antes da renovação.
+
+Termos de uso: https://clovisbacha.github.io/doutorclovis/termos.html
+Privacidade: https://clovisbacha.github.io/doutorclovis/privacidade.html
+```
+
+- Nas notas para a revisão, trocar o parágrafo COMPRAS por:
+
+```
+COMPRAS
+O plano completo é vendido pela Apple: br.com.obstetrica.app.plano.anual e br.com.obstetrica.app.plano.mensal (assinaturas do grupo "Plano Mãe Esperta") e br.com.obstetrica.app.plano.vitalicio (compra única). A tela de venda aparece no fim do cadastro e ao tocar em Respirar, Sons, Mexer, Ler para o bebê ou "Para vocês dois"; também pelo Perfil, em "Plano completo". "Restaurar compras" fica na própria tela. As sementinhas continuam sendo pontos do jogo, sem valor em dinheiro.
+```
+
+- O questionário de privacidade não muda: a compra é processada pela
+  Apple, e o app guarda no aparelho só a marca de que o plano está ativo.
+
+**Para decidir antes de ligar** (o diário, "20/11 (noite)", tem o porquê):
+quem já usa o app perde respirar, sons e Mexer no dia em que a chave ligar
+(vale um período de cortesia); sem o plano, ela faz 2 dos 5 cuidados do dia
+(a aula e a gratidão) e não fecha o dia; o lembrete "Vamos respirar?" cai no
+convite para quem não assina; e o plano segue a conta da Apple, não a do app,
+até existir a validação da compra no servidor.
 
 ## Antes de apertar "enviar" (o que só o dono destrava)
 

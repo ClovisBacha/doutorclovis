@@ -22,12 +22,19 @@ import {
   T,
   Tocavel,
 } from "~/componentes/base";
+import { SecaoDoPlano } from "~/componentes/assinatura/no-perfil";
 import { TelaDaPilha } from "~/componentes/cabecalho";
 import { useAviso } from "~/componentes/comunidade/folha";
 import { Avatar } from "~/componentes/comunidade/imagem";
 import { rota } from "~/componentes/jornada/bancada";
 import { usePreferenciaDosLembretes } from "~/componentes/jornada/lembretes";
-import { COMUNIDADE_NO_APP, CONTATO_EMAIL, IA_NO_APP, SOS_NO_APP } from "~/config";
+import {
+  ASSINATURA_NO_APP,
+  COMUNIDADE_NO_APP,
+  CONTATO_EMAIL,
+  IA_NO_APP,
+  SOS_NO_APP,
+} from "~/config";
 import { limparRastrosLocais } from "~/lib/armazem";
 import { ehBancada } from "~/lib/bancada";
 import { api } from "~/lib/comunidade/api";
@@ -308,6 +315,9 @@ export default function Perfil() {
           />
         ) : null}
       </SecaoDeAjustes>
+
+      {/* O plano completo: só com a assinatura ligada, e nunca no Modo Cuidado. */}
+      {ASSINATURA_NO_APP && !cuidadoDaSessao ? <SecaoDoPlano /> : null}
 
       {IA_NO_APP ? <CartaoDaPermissaoDeIA /> : null}
 

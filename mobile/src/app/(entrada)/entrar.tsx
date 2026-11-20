@@ -182,15 +182,25 @@ export default function BoasVindas() {
       acoes: (
         <>
           {erro ? <ErroNoVeu>{erro}</ErroNoVeu> : null}
+          {/* Quem chega monta o plano primeiro (20/11/2026): as perguntas, a
+              semana dela, o plano pronto, e só então a conta, no fim do funil
+              (`app/(entrada)/plano.tsx`). Quem já tem conta entra aqui. */}
+          {!voltou ? (
+            <>
+              <Botao
+                rotulo="Montar o meu plano"
+                tamanho="grande"
+                aoTocar={() => router.push("/plano")}
+                estilo={{ minHeight: 56 }}
+              />
+              <LinkNoVeu rotulo="Já tenho conta" aoTocar={() => setModo("voltou")} />
+            </>
+          ) : null}
           {/* A Apple pede o botão dela com o mesmo destaque das outras formas
               de entrar: ele vem primeiro, do mesmo tamanho. */}
-          {comApple ? (
+          {voltou && comApple ? (
             <AppleAuthentication.AppleAuthenticationButton
-              buttonType={
-                voltou
-                  ? AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
-                  : AppleAuthentication.AppleAuthenticationButtonType.CONTINUE
-              }
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
               buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
               cornerRadius={28}
               style={{ height: 56 }}
@@ -204,18 +214,10 @@ export default function BoasVindas() {
                 aoTocar={() => router.push("/email")}
                 estilo={{ minHeight: 56 }}
               />
-              <LinkNoVeu rotulo="Criar uma conta" aoTocar={() => router.push("/cadastro")} />
+              {/* Quem é nova monta o plano antes de criar a conta. */}
+              <LinkNoVeu rotulo="Sou nova aqui" aoTocar={() => router.push("/plano")} />
             </>
-          ) : (
-            <>
-              <Botao
-                rotulo={comApple ? "Criar conta com e-mail" : "Criar minha conta"}
-                aoTocar={() => router.push("/cadastro")}
-                estilo={{ minHeight: 56 }}
-              />
-              <LinkNoVeu rotulo="Já tenho conta" aoTocar={() => setModo("voltou")} />
-            </>
-          )}
+          ) : null}
         </>
       ),
     },
