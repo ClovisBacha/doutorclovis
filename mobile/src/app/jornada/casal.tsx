@@ -25,11 +25,15 @@ import {
   TrocaDeEtapa,
 } from "~/componentes/jornada/atividade";
 import { corNoite } from "~/componentes/jornada/cores";
+import { FiguraParada } from "~/componentes/jornada/figura-movimento";
 import { useDiaDaJornada } from "~/componentes/jornada/usarJornada";
 import { useMovimentoReduzido } from "~/componentes/movimento";
 import { pararCanal, tocarVoz } from "~/lib/audio/voz";
 import { VOZ_DA_NOITE } from "~/lib/audio/vozes";
 import { blocosDoCasalNoApp, casalAberto, SEMANA_DO_CASAL } from "~/lib/jornada/casal";
+import { escurecer } from "~/lib/cor";
+import { desenhoDoCasal } from "~/lib/jornada/figura-casal";
+import { coresDaFigura } from "~/lib/jornada/figura-cores";
 import { FALA_DO_CASAL } from "~/lib/jornada/bolha-nos-cuidados";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { canto, curva, escala, espaco, fonte, margem } from "~/tema";
@@ -410,6 +414,25 @@ const DY = (ALTURA - 90 * ESCALA_DO_DESENHO) / 2;
 const TRACO = { stroke: "rgba(255,255,255,0.5)", strokeWidth: 1.6, fill: "none" } as const;
 
 /**
+ * A personagem na noite: a blusa é o lilás da noite como ele é (no dia, a cor
+ * da atividade é aberta em pastel; aqui ela já é clara), e o resto é o do
+ * Mexer — a legging lilás e o cabelo castanho aparecem bem no escuro.
+ */
+const CORES_DA_NOITE = {
+  ...coresDaFigura(corNoite.lilas),
+  roupa: corNoite.lilas,
+  roupaSombra: escurecer(corNoite.lilas, 0.16),
+  apoio: "rgba(255,255,255,0.24)",
+  apoioSombra: "rgba(255,255,255,0.16)",
+  alvo: corNoite.alvoDaFigura,
+};
+
+const DESENHOS_DO_CASAL = {
+  "mao-no-sacro": desenhoDoCasal("mao-no-sacro"),
+  "mao-na-barriga": desenhoDoCasal("mao-na-barriga"),
+} as const;
+
+/**
  * Uma das duas respirações (`dc-casal-respira`): 0,9 → 1,08 → 0,9 em 7 s, com
  * o `ease-in-out` do CSS, no motor nativo. A de trás segue a da frente com
  * 0,35 s. É a respiração guiada: o laço não para enquanto o bloco está na
@@ -494,6 +517,18 @@ const Figura = memo(function Figura({
 }) {
   if (!tipo) return null;
   const alvo = corNoite.alvoDaFigura;
+  /* As duas com gente são a personagem do Mexer, de lado no banquinho. */
+  if (tipo === "mao-no-sacro" || tipo === "mao-na-barriga")
+    return (
+      <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        <FiguraParada
+          desenho={DESENHOS_DO_CASAL[tipo]}
+          cores={CORES_DA_NOITE}
+          largura={LARGURA}
+          altura={ALTURA}
+        />
+      </View>
+    );
   return (
     <View
       style={{ width: LARGURA, height: ALTURA }}
@@ -517,28 +552,6 @@ const Figura = memo(function Figura({
           <>
             <Circle cx={44} cy={45} r={3} fill={alvo} />
             <Circle cx={78} cy={45} r={3} fill="rgba(255,255,255,0.45)" />
-          </>
-        ) : null}
-        {tipo === "mao-no-sacro" ? (
-          <>
-            {/* De costas: ela sentada à frente, a mão de quem acompanha na base da coluna. */}
-            <Path d="M52 20a9 9 0 1 1 .1 0Z" {...TRACO} />
-            <Path d="M44 34c0 14-3 26-3 38h24c0-12-3-24-3-38" {...TRACO} />
-            <Path d="M41 72h26" {...TRACO} />
-            <Circle cx={54} cy={62} r={7} fill={alvo} opacity={0.85} />
-            <Path d="M82 58c-6 2-14 3-20 4" {...TRACO} />
-            <Path d="M84 52a7 7 0 1 1 .1 0Z" {...TRACO} />
-          </>
-        ) : null}
-        {tipo === "mao-na-barriga" ? (
-          <>
-            {/* De perfil: a barriga e as duas mãos apoiadas, uma de cada lado. */}
-            <Path d="M46 18a9 9 0 1 1 .1 0Z" {...TRACO} />
-            <Path d="M40 32c-2 12-2 20 0 30" {...TRACO} />
-            <Path d="M40 40c14-2 22 6 22 14 0 8-8 14-22 12" {...TRACO} />
-            <Circle cx={54} cy={48} r={5} fill={alvo} opacity={0.85} />
-            <Circle cx={57} cy={62} r={5} fill={alvo} opacity={0.85} />
-            <Path d="M74 44c-6 2-10 3-14 4M76 66c-6-2-10-3-14-4" {...TRACO} />
           </>
         ) : null}
         {tipo === "palavra" ? (

@@ -821,8 +821,8 @@ function Sessao({
             alignItems: "center",
           }}
         >
-          {/* A figura DEMONSTRANDO, dentro do anel que conta o tempo, num
-              palco claro: a figura de traço precisa de chão claro. */}
+          {/* A personagem DEMONSTRANDO, dentro do anel que conta o tempo, num
+              palco claro (a parede, o tapete e o chão terminam no vão do anel). */}
           <View
             style={{
               marginTop: espaco.lg,
