@@ -90,8 +90,12 @@ export const AULA_JA_FEITA = "Você já fez a aula de hoje. Amanhã eu trago out
 
 /**
  * O título do veredito, na folha que sobe com a Bolha. No acerto ela festeja;
- * no erro ela fica por perto e mostra onde está a certa, sem repreender.
- * Varia de uma pergunta para a outra (e de um dia para o outro).
+ * no erro ela fica por perto, sem repreender. Varia de uma pergunta para a
+ * outra (e de um dia para o outro).
+ *
+ * 23/11/2026, o dono: "não precisa colocar 'as certas estão em verde', isso é
+ * óbvio; vamos deixar mais clean que nem o Duolingo". O título é só o
+ * veredito; o porquê fica atrás do botão "Explicar o erro" (`aula.tsx`).
  */
 export function tituloDoVeredito(o: {
   acertou: boolean;
@@ -108,8 +112,7 @@ export function tituloDoVeredito(o: {
       n,
     );
   }
-  const onde = o.multi ? "As certas estão em verde." : "A certa está em verde.";
-  return `${doDia(["Quase!", "Essa engana.", "Eu também ia nessa."], n)} ${onde}`;
+  return doDia(["Quase!", "Essa engana.", "Eu também ia nessa."], n);
 }
 
 /**
@@ -119,8 +122,7 @@ export function tituloDoVeredito(o: {
 export function falaDoFimDaAula(o: { acertos: number; total: number; D: number }): string {
   if (o.total > 0 && o.acertos >= o.total)
     return doDia(["Quase estourei de orgulho.", "Fiquei toda colorida de orgulho."], o.D);
-  if (o.acertos > 0 && o.acertos === o.total - 1)
-    return "Só uma escapou, e o porquê já ficou com você.";
+  if (o.acertos > 0 && o.acertos === o.total - 1) return "Só uma escapou. Amanhã eu trago mais.";
   if (o.acertos > 0)
     return doDia(
       [

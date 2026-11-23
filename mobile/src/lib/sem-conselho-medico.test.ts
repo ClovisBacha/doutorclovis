@@ -133,12 +133,43 @@ describe("o app não dá conselho médico", () => {
     expect(ondeAparece(/5-1-1|o esperado são 10|Chegou a 10/)).toEqual([]);
   });
 
-  test("os movimentos do bebê têm a linha fixa do socorro, e nenhuma meta", () => {
+  test("os movimentos do bebê não têm meta", () => {
     const chutes = FONTES.find((f) => f.arquivo === "app/saude/chutes.tsx")!.codigo;
-    expect(chutes).toContain("Sentiu o bebê diferente?");
-    /* O SOS, com ele no app; o 192, sem ele (`lib/socorro.ts`). */
-    expect(chutes).toContain("pedirSocorro()");
     expect(chutes).not.toMatch(/de 10\b/);
+  });
+
+  test("o dia a dia não lembra de emergência: nenhum 'sentiu algo? ligue 192' (23/11/2026)", () => {
+    /* O dono: "tirar essas mensagens de sentiu algo estranho, ligar para tal
+       número [...] isso lembra a pessoa de ficar preocupada, o app é de
+       bem-estar e de tranquilidade". O 192 continua onde se vai para lê-lo
+       ou onde ela pede ajuda: os Termos e a Privacidade, a nota completa do
+       Perfil, o Modo Cuidado (o luto) e o apoio de quando ela diz "Triste".
+       E nas telas do SOS e da comunidade, desligadas por chave. */
+    const PODEM = [
+      "lib/juridico/",
+      "lib/aviso-medico.ts",
+      "lib/socorro.ts",
+      "lib/kit-sos.ts",
+      "lib/nutricao/",
+      "lib/ia/",
+      "lib/comunidade/",
+      "lib/ritual.ts",
+      "componentes/jornada/cuidado.tsx",
+      "componentes/jornada/hoje-pos.tsx",
+      "componentes/nutricao/",
+      "componentes/sos.tsx",
+      "componentes/cabecalho.tsx",
+      "app/sos.tsx",
+      "app/(abas)/_layout.tsx",
+      "config.ts",
+    ];
+    expect(
+      ondeAparece(
+        /[Ss]entiu algo estranho|bebê diferente|ligue 192|Ligar 192|pronto-socorro/,
+        PODEM,
+      ),
+    ).toEqual([]);
+    expect(ondeAparece(/\b(pedirSocorro|ROTULO_DO_SOCORRO|SE_PRECISAR)\b/, PODEM)).toEqual([]);
   });
 
   test("o cronômetro de contrações mora no SOS e não diz quando ligar", () => {

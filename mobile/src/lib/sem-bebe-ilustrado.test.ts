@@ -97,6 +97,9 @@ describe("o app não desenha o bebê: a Bolha é a personagem", () => {
     expect(cartao).toMatch(/Mãe Esperta/);
     expect(cartao).toMatch(/@maeesperta\.app/);
     expect(cartao).not.toMatch(/<Brilho\b/);
+    /* O céu do cartão é o da hora (23/11/2026), e não o pôr do sol fixo. */
+    expect(cartao).toMatch(/useCeuDasAbas\(\)/);
+    expect(cartao).not.toMatch(/CEUS\.tarde/);
     /* O semana a semana é o céu da aba (a Bolha na frente do número). */
     expect(de(join("app", "bebe.tsx"))).toMatch(/<CeuDoBebe[\s\S]*modo="semanas"/);
   });

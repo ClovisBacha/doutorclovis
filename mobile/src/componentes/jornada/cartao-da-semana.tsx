@@ -8,7 +8,7 @@ import { memo, useState, type ReactNode } from "react";
 import { Text, View } from "react-native";
 import { BOLHA } from "~/componentes/artes";
 import { Botao } from "~/componentes/base";
-import { CEUS } from "~/componentes/ceu-vivo";
+import { CEUS, faseDeAgora, useCeuDasAbas, type Ceu } from "~/componentes/ceu-vivo";
 import { LinhaDoAtalho } from "~/componentes/jornada/atalhos";
 import { FolhaDeCompartilhar } from "~/componentes/jornada/compartilhar";
 import { parametroDaBancada } from "~/lib/bancada";
@@ -36,8 +36,17 @@ import { canto, cor, curva, escala, fonte, fonteDoNumero, sombra, veu } from "~/
  * cuidado e a chama, e a assinatura do app com o @ dele. Nada atrás da Bolha.
  */
 
-/** O céu do cartão: o pôr do sol, sempre (é a marca, e não a hora). */
-const CEU = CEUS.tarde;
+/**
+ * O céu do cartão: o da HORA, o mesmo que ela vê no app (23/11/2026, o dono:
+ * "o cartão de compartilhar deve ser gerado na mesma arte de fundo de como
+ * está o dia no momento"). Antes era o pôr do sol, sempre. Nas abas, o céu
+ * delas; fora (a festa da semana), o da hora em que o cartão abriu.
+ */
+function useCeuDoCartao(): Ceu {
+  const dasAbas = useCeuDasAbas();
+  const [fase] = useState(faseDeAgora);
+  return CEUS[dasAbas?.fase ?? fase];
+}
 
 export type DadosDoCartao = {
   semana: number;
@@ -63,6 +72,7 @@ const ENCAIXE = 24;
 const MINIATURA = 0.15;
 
 export function CartaoDaSemana({ d }: { d: DadosDoCartao }) {
+  const CEU = useCeuDoCartao();
   const bebe = bebeDaSemana(d.semana);
   const nome = d.nomeDoBebe?.trim() || null;
   const tamanhoDoNumero = d.semana >= 10 ? 200 : 220;
@@ -82,9 +92,22 @@ export function CartaoDaSemana({ d }: { d: DadosDoCartao }) {
         style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }}
         contentFit="cover"
       />
+      {/* O véu do pé, onde mora o texto branco. No céu claro (o amanhecer) ele
+          sobe mais e escurece mais: o pé lilás e rosa apagava o branco. */}
       <LinearGradient
-        colors={[veu.tinta(0), veu.tinta(0.5)]}
-        style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: ALTURA * 0.5 }}
+        colors={
+          CEU.claro
+            ? [veu.tinta(0), veu.tinta(0.4), veu.tinta(0.62)]
+            : [veu.tinta(0), veu.tinta(0.25), veu.tinta(0.5)]
+        }
+        locations={[0, 0.4, 1]}
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: ALTURA * (CEU.claro ? 0.62 : 0.5),
+        }}
       />
 
       {/* O número da semana, gigante, atrás da Bolha. */}
@@ -113,6 +136,7 @@ export function CartaoDaSemana({ d }: { d: DadosDoCartao }) {
       {/* A Bolha, na frente do número. */}
       <Image
         source={BOLHA.feliz}
+        allowDownscaling={false}
         style={{
           position: "absolute",
           top: ALTO_DA_BOLHA,
@@ -133,7 +157,7 @@ export function CartaoDaSemana({ d }: { d: DadosDoCartao }) {
             ...escala.nota,
             letterSpacing: 1.6,
             textTransform: "uppercase",
-            color: comAlfa(cor.branco, 0.9),
+            color: CEU.claro ? comAlfa(CEU.tinta, 0.86) : comAlfa(cor.branco, 0.9),
           }}
         >
           {nome ? `${nome} está a caminho` : "Um bebê a caminho"}

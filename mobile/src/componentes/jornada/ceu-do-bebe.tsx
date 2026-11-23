@@ -441,12 +441,13 @@ export const CeuDoBebe = memo(function CeuDoBebe({
                 accessibilityRole="imagebutton"
                 accessibilityLabel={`A Bolha, a sua guia. Semana ${vista}`}
                 accessibilityHint={
-                  aoTocarNaBolha ? "Toque para conversar com ela" : "Toque para ela dar um pulinho"
+                  aoTocarNaBolha ? "Toque para abrir o quartinho" : "Toque para ela dar um pulinho"
                 }
                 onPress={aoTocarNoBebe}
               >
                 <Image
                   source={viajando ? BOLHA.surpresa : BOLHA.feliz}
+                  allowDownscaling={false}
                   style={{ width: lado, height: lado }}
                   contentFit="contain"
                   transition={reduzido ? 0 : 180}

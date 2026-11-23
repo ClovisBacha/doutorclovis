@@ -57,6 +57,50 @@ export function instanteNoTempo(segundos: number): Instante {
   };
 }
 
+/**
+ * A VIBRAÇÃO DA RESPIRAÇÃO (23/11/2026, o dono: "deixar tremendo enquanto
+ * respira, que nem a Apple faz no modo dela de respirar"). Como no Respirar
+ * do Apple Watch, ela SENTE o ritmo e pode respirar de olhos fechados:
+ *
+ * - inspire: toques que vão apertando o passo (de 420 ms a 150 ms entre um e
+ *   outro) e ganhando força — o peito enchendo;
+ * - segure: nada (a pausa é o silêncio);
+ * - solte: toques macios que vão espaçando (de 240 ms a 820 ms) — o ar saindo.
+ *
+ * `ms` conta do começo da fase. Sem react-native aqui: é testado pelo bun.
+ */
+export type ForcaDoToque = "macio" | "leve" | "medio";
+export type ToqueDoRespiro = { ms: number; forca: ForcaDoToque };
+
+const PASSO_DO_TOQUE: Record<Exclude<Fase, "segure">, readonly [number, number]> = {
+  inspire: [420, 150],
+  solte: [240, 820],
+};
+
+export function toquesDaFase(fase: Fase): ToqueDoRespiro[] {
+  if (fase === "segure") return [];
+  const dur = DURACAO_DA_FASE[fase] * 1000;
+  const [de, ate] = PASSO_DO_TOQUE[fase];
+  const fora: ToqueDoRespiro[] = [];
+  /* O último toque cai antes do fim: a fase seguinte começa com o dela. */
+  for (let t = 0; t < dur - 120; ) {
+    const p = t / dur;
+    const forca: ForcaDoToque =
+      fase === "inspire"
+        ? p < 0.45
+          ? "macio"
+          : p < 0.85
+            ? "leve"
+            : "medio"
+        : p < 0.3
+          ? "leve"
+          : "macio";
+    fora.push({ ms: Math.round(t), forca });
+    t += de + (ate - de) * p;
+  }
+  return fora;
+}
+
 /** A sessão inteira, em segundos: ciclos inteiros, nunca cortada no meio. */
 export function segundosDaSessao(totalCiclos: number): number {
   return Math.max(1, totalCiclos) * CICLO;

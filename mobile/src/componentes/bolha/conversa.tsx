@@ -7,7 +7,10 @@ import {
   StyleSheet,
   Text,
   View,
+  type StyleProp,
+  type ViewStyle,
 } from "react-native";
+import type { ReactNode } from "react";
 import { selecao, Tocavel } from "~/componentes/base";
 import { ArteDaBolha, useMovimentoReduzido } from "~/componentes/movimento";
 import {
@@ -20,7 +23,7 @@ import {
   type Resposta,
 } from "~/lib/bolha/conversa";
 import { HUMORES } from "~/lib/jornada/caminho";
-import { canto, cor, curva, escala, espaco, fonte, luz, sombra } from "~/tema";
+import { brilhoDe, canto, cor, curva, escala, espaco, fonte, veu } from "~/tema";
 
 /**
  * A CONVERSA COM A BOLHA (19/11/2026) — a Bolha guia na tela.
@@ -34,6 +37,14 @@ import { canto, cor, curva, escala, espaco, fonte, luz, sombra } from "~/tema";
  *
  * Tocar na Bolha recomeça a conversa. Movimento: os três pontinhos uma vez por
  * fala, e nada com "reduzir movimento".
+ *
+ * O DESENHO (23/11/2026, o dono: "o chat do bebê bolha deve ficar mais clean
+ * [...] manter esse design mais moderno que estamos fazendo; esse fundo branco
+ * ficou ruim no chat"): a conversa é o funil "Montar o meu plano" continuando
+ * — o vidro de ameixa-noite solto sobre o céu (`PainelDaBolha`), a fala dela
+ * em branco num balão de vidro discreto, a resposta dela numa pílula rosa
+ * clara e as respostas em pílulas de contorno. O convite principal é a
+ * framboesa, a única cor cheia. Nada de bloco branco.
  */
 export const ConversaComABolha = memo(function ConversaComABolha({
   contexto,
@@ -118,7 +129,7 @@ export const ConversaComABolha = memo(function ConversaComABolha({
           rotulo="A Bolha. Toque para recomeçar a conversa"
           profundidade={0.92}
         >
-          <ArteDaBolha humor={fala.pose} tamanho={64} />
+          <ArteDaBolha humor={fala.pose} tamanho={60} />
         </Tocavel>
         <View
           accessibilityLiveRegion="polite"
@@ -127,18 +138,17 @@ export const ConversaComABolha = memo(function ConversaComABolha({
             borderRadius: canto.dentro,
             borderBottomLeftRadius: 6,
             ...curva,
-            paddingHorizontal: 14,
+            paddingHorizontal: 15,
             paddingVertical: 12,
-            backgroundColor: cor.cartao,
+            backgroundColor: veu.superficieAcesa,
             borderWidth: StyleSheet.hairlineWidth,
-            borderColor: "rgba(255,255,255,0.95)",
-            ...sombra,
+            borderColor: veu.superficieBorda,
           }}
         >
           {digitando ? (
             <Digitando />
           ) : (
-            <Text style={{ ...fonte.media, ...escala.corpo, color: cor.texto }}>{fala.texto}</Text>
+            <Text style={{ ...fonte.media, ...escala.corpo, color: cor.branco }}>{fala.texto}</Text>
           )}
         </View>
       </View>
@@ -182,7 +192,7 @@ const Respostas = memo(function Respostas({
   aoResponder: (r: Resposta) => void;
 }) {
   return (
-    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: espaco.sm, paddingLeft: 72 }}>
+    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: espaco.sm, paddingLeft: 68 }}>
       {respostas.map((r, i) => {
         const cheio = r.tipo === "abrir" && i === 0;
         const emoji = r.tipo === "humor" ? (r.emoji ?? EMOJI_DO_HUMOR[r.humor]) : null;
@@ -193,16 +203,17 @@ const Respostas = memo(function Respostas({
             rotulo={r.rotulo}
             folga={4}
             estilo={{
-              minHeight: 40,
-              paddingHorizontal: 14,
+              minHeight: 42,
+              paddingHorizontal: 15,
               borderRadius: canto.pilula,
               ...curva,
               flexDirection: "row",
               alignItems: "center",
               gap: 6,
-              backgroundColor: cheio ? cor.primaria : luz.cartao,
+              backgroundColor: cheio ? cor.primaria : veu.superficie,
               borderWidth: cheio ? 0 : 1,
-              borderColor: cor.borda,
+              borderColor: "rgba(255,255,255,0.3)",
+              ...(cheio ? brilhoDe(cor.primaria, 0.5) : null),
             }}
           >
             {emoji ? <Text style={{ fontSize: 16 }}>{emoji}</Text> : null}
@@ -210,7 +221,7 @@ const Respostas = memo(function Respostas({
               style={{
                 ...fonte.forte,
                 ...escala.legenda,
-                color: cheio ? cor.branco : cor.texto,
+                color: cor.branco,
               }}
             >
               {r.rotulo}
@@ -258,11 +269,44 @@ function Digitando() {
             width: 8,
             height: 8,
             borderRadius: 4,
-            backgroundColor: cor.textoApagado,
+            backgroundColor: cor.branco,
             opacity: o,
           }}
         />
       ))}
+    </View>
+  );
+}
+
+/**
+ * O PAINEL DA BOLHA: o vidro de ameixa-noite da conversa, solto sobre o céu
+ * (o mesmo desenho do funil). No lugar do `Painel` branco das outras seções.
+ */
+export function PainelDaBolha({
+  children,
+  estilo,
+}: {
+  children: ReactNode;
+  estilo?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <View
+      style={[
+        {
+          borderRadius: canto.painel,
+          ...curva,
+          paddingHorizontal: 14,
+          paddingVertical: 16,
+          gap: espaco.md,
+          backgroundColor: veu.vidroDaConversa,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: veu.vidroDaConversaBorda,
+          boxShadow: "0px 22px 44px -22px rgba(20,12,60,0.6)",
+        },
+        estilo,
+      ]}
+    >
+      {children}
     </View>
   );
 }

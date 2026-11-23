@@ -95,6 +95,7 @@ export function CartaoDaChegada({
         <View style={{ marginTop: 14, alignItems: "center", justifyContent: "center" }}>
           <Image
             source={BOLHA.comemorando}
+            allowDownscaling={false}
             style={{ width: 200, height: 200 }}
             contentFit="contain"
           />
@@ -407,6 +408,7 @@ export function PortaDoNascimento({
       <View style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}>
         <Image
           source={BOLHA.surpresa}
+          allowDownscaling={false}
           style={{ width: 52, height: 52 }}
           contentFit="contain"
           accessible={false}

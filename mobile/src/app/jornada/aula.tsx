@@ -466,7 +466,7 @@ function AulaDoDia({ cortina }: { cortina: boolean }) {
             else toqueMacio();
             if (Platform.OS === "android") {
               AccessibilityInfo.announceForAccessibility(
-                `${tituloDoVeredito({ acertou: !!x.acertou, multi, indice: e.indice, D })} ${q.why}`,
+                tituloDoVeredito({ acertou: !!x.acertou, multi, indice: e.indice, D }),
               );
             }
             setE(x);
@@ -501,6 +501,7 @@ function AulaDoDia({ cortina }: { cortina: boolean }) {
             acertou={!!e.acertou}
             titulo={tituloDaFolha}
             porque={q.why}
+            explicacaoAberta={revisando}
             alturaDoPe={alturaDoPe}
             aoMedir={aoMedirFolha}
             refDoTexto={refDoVeredito}
@@ -670,12 +671,19 @@ function CascaDaFesta({ children }: { children: ReactNode }) {
  * nativo) por trás do botão, na cor do resultado — o verde do acerto ou o
  * "quase", âmbar e sem alarme. A bolha reage aqui dentro: festeja o acerto e,
  * no erro, só fica por perto, feliz, sem comentário.
+ *
+ * NO JEITO DO DUOLINGO (23/11/2026, o dono: "não precisa colocar 'quase, as
+ * certas estão em verde', isso é óbvio; vamos deixar mais clean que nem o
+ * Duolingo e colocar o botão de explicar o erro"): a folha diz só o veredito,
+ * numa palavra, e o porquê mora atrás de um botão — "Explicar o erro" no erro,
+ * "Ver o porquê" no acerto. Na revisão ele já vem aberto: rever é ler o porquê.
  */
 function FolhaDoVeredito({
   visivel,
   acertou,
   titulo,
   porque,
+  explicacaoAberta,
   alturaDoPe,
   aoMedir,
   refDoTexto,
@@ -684,6 +692,8 @@ function FolhaDoVeredito({
   acertou: boolean;
   titulo: string;
   porque: string;
+  /** A explicação já aberta (a revisão). */
+  explicacaoAberta: boolean;
   alturaDoPe: number;
   /** A altura que a folha cobre do miolo (acima do pé). */
   aoMedir: (altura: number) => void;
@@ -691,6 +701,7 @@ function FolhaDoVeredito({
 }) {
   const reduzido = useMovimentoReduzido();
   const [altura, setAltura] = useState(0);
+  const [explicando, setExplicando] = useState(explicacaoAberta);
   const v = useRef(new Animated.Value(0)).current;
   /* O que a folha mostra fica preso ao último veredito: ao descer, ela não
      troca para o porquê da pergunta seguinte. */
@@ -698,6 +709,8 @@ function FolhaDoVeredito({
   if (visivel) ultimo.current = { acertou, titulo, porque };
   useEffect(() => {
     if (visivel) {
+      /* Cada veredito novo chega fechado (ou aberto, na revisão). */
+      setExplicando(explicacaoAberta);
       if (reduzido) return v.setValue(1);
       v.setValue(0);
       Animated.spring(v, { toValue: 1, speed: 14, bounciness: 4, useNativeDriver: true }).start();
@@ -709,9 +722,10 @@ function FolhaDoVeredito({
       easing: Easing.in(Easing.quad),
       useNativeDriver: true,
     }).start();
-  }, [visivel, reduzido, v]);
+  }, [visivel, reduzido, v, explicacaoAberta]);
   const c = ultimo.current;
   const fora = (altura || 480) + 24;
+  const tinta = c?.acertou ? cor.sementinha : cor.quase;
   return (
     <Animated.View
       pointerEvents={visivel ? "auto" : "none"}
@@ -738,38 +752,90 @@ function FolhaDoVeredito({
     >
       {c ? (
         <View
-          ref={refDoTexto}
-          accessible
-          accessibilityLabel={`${c.titulo}. ${c.porque}`}
-          accessibilityLiveRegion="polite"
           /* O quanto a folha cobre do miolo: o texto dela, acima do pé. */
           onLayout={(ev) => aoMedir(TOPO_DA_FOLHA + ev.nativeEvent.layout.height + espaco.xs)}
-          style={{ gap: espaco.sm }}
+          style={{ gap: espaco.md }}
         >
-          <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.md }}>
-            <ArteDaBolha humor={c.acertou ? "comemorando" : "feliz"} tamanho={64} />
-            <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 6 }}>
-              {c.acertou ? (
-                <Check size={22} color={cor.sementinha} strokeWidth={3} />
-              ) : (
-                <Lightbulb size={20} color={cor.quase} strokeWidth={2.4} />
-              )}
-              <Text
-                style={{
-                  flex: 1,
-                  ...fonte.forte,
-                  ...escala.titulo3,
-                  color: c.acertou ? cor.sementinha : cor.quase,
-                }}
-              >
+          <View
+            ref={refDoTexto}
+            accessible
+            accessibilityRole="header"
+            accessibilityLabel={c.titulo}
+            accessibilityLiveRegion="polite"
+            style={{ flexDirection: "row", alignItems: "center", gap: espaco.md }}
+          >
+            <ArteDaBolha humor={c.acertou ? "comemorando" : "feliz"} tamanho={56} />
+            <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8 }}>
+              {c.acertou ? <Check size={24} color={tinta} strokeWidth={3} /> : null}
+              <Text style={{ flex: 1, ...fonte.forte, ...escala.titulo2, color: tinta }}>
                 {c.titulo}
               </Text>
             </View>
           </View>
-          <Text style={{ ...fonte.normal, ...escala.corpo, color: cor.texto }}>{c.porque}</Text>
+          {explicando ? (
+            <Entrada deslocamento={6}>
+              <Text
+                accessibilityLiveRegion="polite"
+                style={{ ...fonte.normal, ...escala.corpo, color: cor.texto }}
+              >
+                {c.porque}
+              </Text>
+            </Entrada>
+          ) : (
+            <BotaoDeExplicar
+              rotulo={c.acertou ? "Ver o porquê" : "Explicar o erro"}
+              tinta={tinta}
+              aoTocar={() => {
+                selecao();
+                setExplicando(true);
+              }}
+            />
+          )}
         </View>
       ) : null}
     </Animated.View>
+  );
+}
+
+/** O botão que abre o porquê: uma pílula clara, contornada na cor do veredito. */
+function BotaoDeExplicar({
+  rotulo,
+  tinta,
+  aoTocar,
+}: {
+  rotulo: string;
+  tinta: string;
+  aoTocar: () => void;
+}) {
+  const { escala: mola, aoPressionar, aoSoltar } = useMolaDeToque(0.96);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={rotulo}
+      onPressIn={aoPressionar}
+      onPressOut={aoSoltar}
+      onPress={aoTocar}
+      style={{ alignSelf: "flex-start" }}
+    >
+      <Animated.View
+        style={{
+          minHeight: ALVO_MINIMO,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+          paddingHorizontal: espaco.lg,
+          borderRadius: canto.pilula,
+          ...curva,
+          borderWidth: 1.5,
+          borderColor: comAlfa(tinta, 0.32),
+          backgroundColor: "rgba(255,255,255,0.7)",
+          transform: [{ scale: mola }],
+        }}
+      >
+        <Lightbulb size={18} color={tinta} strokeWidth={2.4} />
+        <Text style={{ ...fonte.forte, ...escala.legenda, color: tinta }}>{rotulo}</Text>
+      </Animated.View>
+    </Pressable>
   );
 }
 

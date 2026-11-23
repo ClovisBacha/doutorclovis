@@ -21,6 +21,7 @@ import * as Haptics from "expo-haptics";
    `undefined`. */
 import { IsFocusedContext } from "expo-router/build/react-navigation/core/useIsFocused";
 import { parametroDaBancada } from "~/lib/bancada";
+import { BOLHA } from "~/componentes/artes";
 
 /**
  * O MOVIMENTO DO APP — um lugar só para tudo que se mexe.
@@ -149,18 +150,18 @@ export function vaivemQueDescansa(
 /* ── A bolha viva ─────────────────────────────────────────────────────── */
 
 const ARTES = {
-  feliz: require("../../../src/assets/bolha/feliz.webp"),
-  comemorando: require("../../../src/assets/bolha/comemorando.webp"),
-  dormindo: require("../../../src/assets/bolha/dormindo.webp"),
-  estudiosa: require("../../../src/assets/bolha/estudiosa.webp"),
-  exercicio: require("../../../src/assets/bolha/exercicio.webp"),
-  apaixonado: require("../../../src/assets/bolha/apaixonado.webp"),
-  orgulhosa: require("../../../src/assets/bolha/orgulhosa.webp"),
+  feliz: BOLHA.feliz,
+  comemorando: BOLHA.comemorando,
+  dormindo: BOLHA.dormindo,
+  estudiosa: BOLHA.estudiosa,
+  exercicio: BOLHA.exercicio,
+  apaixonado: BOLHA.apaixonado,
+  orgulhosa: BOLHA.orgulhosa,
   /* Os três da gamificação usam a arte mais próxima, com o enfeite por cima
      (as estrelas em órbita, o presente, a chama): ver `EnfeiteDoHumor`. */
-  estrelas: require("../../../src/assets/bolha/comemorando.webp"),
-  presente: require("../../../src/assets/bolha/feliz.webp"),
-  chama: require("../../../src/assets/bolha/orgulhosa.webp"),
+  estrelas: BOLHA.comemorando,
+  presente: BOLHA.feliz,
+  chama: BOLHA.orgulhosa,
 } as const;
 
 export type HumorDaBolha = keyof typeof ARTES;
@@ -177,6 +178,7 @@ export function ArteDaBolha({ humor, tamanho }: { humor: HumorDaArte; tamanho: n
     <Flutuar>
       <Image
         source={fonte}
+        allowDownscaling={false}
         style={{ width: tamanho, height: tamanho }}
         contentFit="contain"
         accessible={false}
@@ -185,7 +187,7 @@ export function ArteDaBolha({ humor, tamanho }: { humor: HumorDaArte; tamanho: n
   );
 }
 
-const ARTE_SURPRESA = require("../../../src/assets/bolha/surpresa.webp");
+const ARTE_SURPRESA = BOLHA.surpresa;
 
 /**
  * A BOLHA VIVA: a arte da bolha, solta sobre qualquer fundo (o céu, um cartão,
@@ -239,6 +241,7 @@ export function BolhaViva({
       >
         <Image
           source={ARTES[humor]}
+          allowDownscaling={false}
           style={{ width: tamanho * 0.94, height: tamanho * 0.94 }}
           contentFit="contain"
         />

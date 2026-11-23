@@ -6,10 +6,9 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Redirect } from "expo-router";
 import CloudOff from "lucide-react-native/icons/cloud-off";
 import Minus from "lucide-react-native/icons/minus";
-import Phone from "lucide-react-native/icons/phone";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Pressable, Text, View } from "react-native";
-import { Grupo, Ladrilho, Seta } from "~/componentes/ajustes";
+import { Grupo } from "~/componentes/ajustes";
 import { Botao, Carregando, NaoConsegueLer, TituloDaSecao, toque } from "~/componentes/base";
 import { BotaoDeVidro, TelaDaPilha } from "~/componentes/cabecalho";
 import { useAviso } from "~/componentes/comunidade/folha";
@@ -40,7 +39,6 @@ import { usarRelogio, usarRetorno, usarTelaAcesa } from "~/lib/saude/usar-retorn
 import { useSessao } from "~/lib/sessao";
 import { supabase } from "~/servidor/supabase";
 import { cor, escala, espaco, fonte, fonteDoNumero, margem } from "~/tema";
-import { pedirSocorro, ROTULO_DO_SOCORRO } from "~/lib/socorro";
 
 type Contagem = SessaoDeChutes & { id: string; strength?: number | null };
 
@@ -301,8 +299,6 @@ export default function Chutes() {
         </View>
       ) : null}
 
-      <LinhaDoSos />
-
       {estado === "carregando" ? <Carregando texto="Lendo suas contagens…" /> : null}
       {estado === "falhou" ? (
         <NaoConsegueLer
@@ -558,43 +554,3 @@ const Historico = memo(function Historico({ todas }: { todas: readonly Contagem[
     </Grupo>
   );
 });
-
-/**
- * A LINHA FIXA: o que o app diz a quem sente o bebê diferente. Sem número, sem
- * régua — abre o SOS, onde moram os sinais de alerta e o socorro; com o SOS
- * desligado, liga para o 192 (`lib/socorro.ts`).
- */
-function LinhaDoSos() {
-  return (
-    <Grupo>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Sentiu o bebê diferente? ${ROTULO_DO_SOCORRO}`}
-        onPress={() => {
-          toque();
-          pedirSocorro();
-        }}
-        style={({ pressed }) => ({
-          flexDirection: "row",
-          alignItems: "center",
-          gap: espaco.md,
-          minHeight: 60,
-          paddingHorizontal: margem.tela,
-          paddingVertical: espaco.sm + 2,
-          backgroundColor: pressed ? cor.apagado : "transparent",
-        })}
-      >
-        <Ladrilho Icone={Phone} tinta={cor.urgente} />
-        <View style={{ flex: 1, gap: 1 }}>
-          <Text style={{ ...fonte.normal, ...escala.legenda, color: cor.texto }}>
-            Sentiu o bebê diferente?
-          </Text>
-          <Text numberOfLines={1} style={{ ...fonte.forte, ...escala.legenda, color: cor.urgente }}>
-            {ROTULO_DO_SOCORRO}
-          </Text>
-        </View>
-        <Seta />
-      </Pressable>
-    </Grupo>
-  );
-}

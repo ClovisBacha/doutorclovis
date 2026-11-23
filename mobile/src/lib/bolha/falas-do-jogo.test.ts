@@ -118,13 +118,15 @@ describe("a voz da Bolha no jogo", () => {
     }
   });
 
-  test("o veredito diz onde está a certa no erro, e muda de uma pergunta para a outra", () => {
-    expect(tituloDoVeredito({ acertou: false, multi: false, indice: 0, D: 0 })).toMatch(
-      /A certa está em verde\.$/,
-    );
-    expect(tituloDoVeredito({ acertou: false, multi: true, indice: 1, D: 0 })).toMatch(
-      /As certas estão em verde\.$/,
-    );
+  test("o veredito é só o veredito (o Duolingo), e muda de uma pergunta para a outra", () => {
+    /* 23/11/2026, o dono: "as certas estão em verde" é óbvio — sai; o porquê
+       fica atrás do botão "Explicar o erro". */
+    for (const multi of [false, true])
+      for (let indice = 0; indice < 5; indice++) {
+        const t = tituloDoVeredito({ acertou: false, multi, indice, D: 0 });
+        expect(t).not.toMatch(/verde|certa|certas/i);
+        expect(t.length).toBeLessThanOrEqual(22);
+      }
     const titulos = [0, 1, 2].map((indice) =>
       tituloDoVeredito({ acertou: true, multi: false, indice, D: 7 }),
     );
@@ -176,6 +178,9 @@ describe("a Bolha nas telas do jogo (catraca do fonte)", () => {
     const aula = fonte("app", "jornada", "aula.tsx");
     expect(aula).toMatch(/falaDaLicao\(/);
     expect(aula).toMatch(/tituloDoVeredito\(/);
+    /* O porquê mora atrás de um botão, como no Duolingo (23/11/2026). */
+    expect(aula).toContain('"Explicar o erro"');
+    expect(aula).toMatch(/explicando \? \(/);
     expect(aula).toMatch(/falaDoFimDaAula\(/);
     expect(aula).toMatch(/AULA_JA_FEITA/);
     const abertura = fonte("componentes", "jornada", "abertura-da-aula.tsx");

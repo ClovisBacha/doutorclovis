@@ -270,6 +270,26 @@ export const luz = {
 } as const;
 
 /**
+ * A FLOR DO RESPIRO (23/11/2026, o dono: "uma outra arte mais 3D, com
+ * movimentos, assim como a Apple faz"): as seis pétalas da tela de respirar
+ * são bolhas de sabão furta-cor, como a Bolha — o tom do corpo e o brilho da
+ * borda de cada uma. Elas se somam (`mixBlendMode: "screen"`) sobre a noite.
+ * Enfeite: nenhum texto em cima delas.
+ */
+export const florDoRespiro = {
+  petalas: [
+    { tom: "#ff7eb6", brilho: "#ffd3e7" },
+    { tom: "#b49bff", brilho: "#e7deff" },
+    { tom: "#7fb6ff", brilho: "#d8e9ff" },
+    { tom: "#74dcca", brilho: "#d6faf3" },
+    { tom: "#ffbd85", brilho: "#ffe9d4" },
+    { tom: "#ff9bd0", brilho: "#ffe1f1" },
+  ],
+  /** O halo atrás da flor, que acende quando ela inspira. */
+  halo: "#a98bff",
+} as const;
+
+/**
  * O VÉU DA ENTRADA (17/11/2026, o dono: "esse fundo branco aí no cadastro do
  * e-mail [...] não gosto disso"). A entrada não tem mais folha branca: escreve
  * direto sobre o céu da hora, com um véu de ameixa-noite que escurece o pé da
@@ -300,6 +320,15 @@ export const veu = {
    * blocos brancos, que cortavam o céu. Escolhida, ela acende um pouco.
    */
   superficie: "rgba(255,255,255,0.07)",
+  /**
+   * O VIDRO DA CONVERSA (23/11/2026, o dono: "o chat da Bolha deve ficar mais
+   * clean [...] esse fundo branco ficou ruim no chat"): a conversa com a Bolha
+   * é o funil continuando, um vidro de ameixa-noite solto sobre o céu, com o
+   * texto branco. A 62% ele segura 4,5:1 com o branco até sobre um céu
+   * branco (`vidro-e-luz.test.ts` mede).
+   */
+  vidroDaConversa: "rgba(28,20,66,0.62)",
+  vidroDaConversaBorda: "rgba(255,255,255,0.2)",
   superficieBorda: "rgba(255,255,255,0.11)",
   superficieAcesa: "rgba(255,255,255,0.16)",
   campo: "rgba(255,255,255,0.1)",

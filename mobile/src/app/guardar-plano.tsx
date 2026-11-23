@@ -325,7 +325,7 @@ export default function GuardarOPlano() {
           style={{ ...fonte.media, ...escala.nota, color: veu.textoNoVeu, textAlign: "center" }}
         >
           O app Mãe Esperta é bem-estar e aprendizado, e não dá orientação médica. Quem orienta é
-          quem acompanha você. Em emergência, ligue 192.
+          quem acompanha você.
         </Text>
       </MolduraDoPasso>
     </FundoDaEntrada>

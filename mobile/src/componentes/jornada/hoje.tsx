@@ -1,5 +1,5 @@
 import { Image } from "expo-image";
-import { useScrollToTop } from "expo-router";
+import { router, useScrollToTop } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
@@ -42,6 +42,7 @@ import { BOLHA } from "~/componentes/artes";
 import { clarear, comAlfa, escurecer } from "~/lib/cor";
 import type { ChaveDoCuidado, Cuidado } from "~/lib/jornada/hoje";
 import { cor, curva, escala, espaco, fonte, luz, margem, ouro, sombra } from "~/tema";
+import { PainelDaBolha } from "~/componentes/bolha/conversa";
 
 export { Selo } from "~/componentes/jornada/ceu-do-bebe";
 /* O céu da hora mora em `ceu-vivo.tsx` (é também o fundo da entrada); o
@@ -322,16 +323,11 @@ export function TelaDeHoje({
     [topo],
   );
 
-  /* Tocar na Bolha do céu rola até a conversa com ela (o primeiro painel). */
+  /* Tocar na Bolha do céu abre o QUARTINHO DO BEBÊ (23/11/2026, o dono:
+     "quando clica no bebê bolha abre um quartinho que ela consegue decorar").
+     Antes o toque rolava até a conversa, que continua logo abaixo do céu. */
   const yDaBolha = useRef(0);
-  const irABolha = useCallback(
-    () =>
-      lista.current?.scrollTo({
-        y: Math.max(0, yDosPaineis.current + yDaBolha.current - topo - 48),
-        animated: true,
-      }),
-    [topo],
-  );
+  const abrirOQuartinho = useCallback(() => router.push("/quartinho"), []);
 
   /* O alto do céu não muda a cada leitura que chega: o herói não se redesenha. */
   const cabecalho = useMemo(
@@ -377,7 +373,7 @@ export function TelaDeHoje({
           y={y}
           reguaUsada={reguaUsada}
           cabecalho={cabecalho}
-          aoTocarNaBolha={bolha ? irABolha : undefined}
+          aoTocarNaBolha={abrirOQuartinho}
         />
 
         {/* Os painéis, soltos sobre o céu, na margem da saudação. */}
@@ -397,7 +393,7 @@ export function TelaDeHoje({
               }}
             >
               <Entrar atraso={40}>
-                <Painel>{bolha}</Painel>
+                <PainelDaBolha>{bolha}</PainelDaBolha>
               </Entrar>
             </View>
           ) : null}
@@ -579,7 +575,12 @@ function BarraQueNasce({
               paddingVertical: 5,
             }}
           >
-            <Image source={BOLHA.feliz} style={{ width: 34, height: 34 }} contentFit="contain" />
+            <Image
+              source={BOLHA.feliz}
+              allowDownscaling={false}
+              style={{ width: 34, height: 34 }}
+              contentFit="contain"
+            />
             <Text style={{ ...fonte.forte, ...escala.legenda, color: cor.texto }}>
               {nomeDoBebe ?? "O bebê"}
             </Text>

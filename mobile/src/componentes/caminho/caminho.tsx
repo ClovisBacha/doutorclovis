@@ -1139,6 +1139,7 @@ const FaixaDoHumor = memo(function FaixaDoHumor({
         <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
           <Image
             source={BOLHA[reacao?.pose ?? "feliz"]}
+            allowDownscaling={false}
             accessible={false}
             contentFit="contain"
             style={{ width: 44, height: 44, marginVertical: -4 }}

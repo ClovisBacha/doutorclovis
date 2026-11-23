@@ -3,7 +3,6 @@ import { useKeepAwake } from "expo-keep-awake";
 import BatteryLow from "lucide-react-native/icons/battery-low";
 import BedDouble from "lucide-react-native/icons/bed-double";
 import Hand from "lucide-react-native/icons/hand";
-import Phone from "lucide-react-native/icons/phone";
 import Play from "lucide-react-native/icons/play";
 import SkipForward from "lucide-react-native/icons/skip-forward";
 import Sparkles from "lucide-react-native/icons/sparkles";
@@ -77,8 +76,6 @@ import {
   type Trecho,
 } from "~/lib/jornada/mexer";
 import { ALVO_MINIMO, canto, cor, curva, escala, espaco, fonte, luz, margem, sombra } from "~/tema";
-import { pedirSocorro, ROTULO_DO_SOCORRO } from "~/lib/socorro";
-import { SOS_NO_APP } from "~/config";
 import { PortaoDoPlano } from "~/componentes/assinatura/portao";
 
 /**
@@ -365,44 +362,12 @@ function Abertura({
             pós-parto e no Modo Cuidado a régua já o tirou sozinha. */}
         {temChao ? <SemChao ligado={semChao} aoTocar={aoTrocarChao} /> : null}
 
-        {/* Sinal de alerta mora num lugar só: o SOS (21/10/2026). Aqui, uma
-            linha que leva até ele — ou ao 192, com o SOS desligado. Ela LIGA,
-            e por isso tem o telefone, e não a seta de quem navega. */}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Sentiu algo estranho? Pare. ${ROTULO_DO_SOCORRO}`}
-          onPress={() => {
-            toque();
-            pedirSocorro();
-          }}
-          style={({ pressed }) => ({
-            marginTop: 28,
-            minHeight: ALVO_MINIMO + 8,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: espaco.md,
-            borderRadius: canto.dentro,
-            ...curva,
-            backgroundColor: cor.atencaoClaro,
-            paddingHorizontal: espaco.lg,
-            paddingVertical: espaco.sm,
-            opacity: pressed ? 0.85 : 1,
-          })}
-        >
-          <Text style={{ flex: 1, ...fonte.normal, ...escala.legenda, color: cor.atencaoTexto }}>
-            Sentiu algo estranho?{" "}
-            <Text style={{ ...fonte.forte }}>
-              {SOS_NO_APP ? "Pare e abra o SOS." : "Pare e, se precisar, ligue 192."}
-            </Text>
-          </Text>
-          <Ficha fundo={cor.atencaoFundo} tamanho={34}>
-            <Phone size={17} color={cor.atencaoTexto} strokeWidth={2.2} />
-          </Ficha>
-        </Pressable>
-
+        {/* Sem "sentiu algo estranho? ligue 192" (23/11/2026, o dono: "isso
+            lembra a pessoa de ficar preocupada, o app é de bem-estar e de
+            tranquilidade"). Fica o convite a ir no ritmo dela. */}
         <Text
           style={{
-            marginTop: espaco.lg,
+            marginTop: 28,
             ...fonte.normal,
             ...escala.nota,
             color: cor.textoApagado,

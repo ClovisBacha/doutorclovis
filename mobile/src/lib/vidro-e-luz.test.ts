@@ -109,8 +109,28 @@ describe("o vidro e a luz", () => {
       .map(([onde, a, b]) => ({ onde, razao: Math.round(contraste(a, b) * 100) / 100 }))
       .filter((x) => x.razao < 4.5);
     expect(fracos).toEqual([]);
+    /* A conversa da Bolha (23/11/2026): texto branco no vidro de ameixa-noite.
+       O pior céu possível é o branco: o vidro por cima dele ainda segura 4,5:1. */
+    const m = /vidroDaConversa: "rgba\((\d+),(\d+),(\d+),([\d.]+)\)"/.exec(tema);
+    expect(m).not.toBeNull();
+    const [r, g, b, a] = m!.slice(1).map(Number);
+    const sobreOBranco = [r!, g!, b!].map((c) => Math.round(c * a! + 255 * (1 - a!)));
+    const hex = `#${sobreOBranco.map((c) => c.toString(16).padStart(2, "0")).join("")}`;
+    expect(contraste("#ffffff", hex)).toBeGreaterThanOrEqual(4.5);
     /* E a paleta antiga — o creme e o vinho do site, a "cara de Claude" — não volta. */
     expect(tema).not.toMatch(/#fffaf6|#ab5e5c|#8f4b49/i);
+  });
+
+  test("a conversa da Bolha é o vidro do funil, e não um bloco branco (23/11/2026)", () => {
+    const conversa = de(join("componentes", "bolha", "conversa.tsx"));
+    expect(conversa).toMatch(/export function PainelDaBolha/);
+    expect(conversa).toMatch(/veu\.vidroDaConversa/);
+    expect(conversa).not.toMatch(/cor\.cartao|luz\.cartao/);
+    for (const aba of [
+      join("componentes", "jornada", "hoje.tsx"),
+      join("componentes", "jornada", "hoje-pos.tsx"),
+    ])
+      expect({ aba, usa: /<PainelDaBolha>/.test(de(aba)) }).toEqual({ aba, usa: true });
   });
 
   test("o número gigante atrás do bebê é enfeite: o leitor de tela não o lê, e a semana segue em texto", () => {

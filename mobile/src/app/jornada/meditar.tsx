@@ -3,6 +3,7 @@ import { Image } from "expo-image";
 import { useKeepAwake } from "expo-keep-awake";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import Bell from "lucide-react-native/icons/bell";
 import ChevronDown from "lucide-react-native/icons/chevron-down";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
@@ -14,15 +15,16 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import {
   Animated,
   AppState,
+  Dimensions,
   Easing,
   Platform,
   Pressable,
   ScrollView,
+  StyleSheet,
   Text,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Svg, { Circle, Defs, RadialGradient, Stop } from "react-native-svg";
 import {
   CHAVE_DO_PROGRAMA,
   diaDoPrograma,
@@ -36,6 +38,9 @@ import { ROTULO_DO_SOM_NO_APP } from "~/lib/jornada/sons";
 import { casalAberto } from "~/lib/jornada/casal";
 import { toque } from "~/componentes/base";
 import { BolhaViva } from "~/componentes/movimento";
+import { CEUS } from "~/componentes/ceu-vivo";
+import { FlorDeBolhas } from "~/componentes/jornada/flor-de-bolhas";
+import { corNoite } from "~/componentes/jornada/cores";
 import {
   ArteDaLinha,
   BolhaComBalao,
@@ -63,7 +68,7 @@ import {
   TopoDaAtividade,
   TrocaDeEtapa,
 } from "~/componentes/jornada/atividade";
-import { clarear, comAlfa, escurecer, misturar } from "~/lib/cor";
+import { clarear, comAlfa, escurecer } from "~/lib/cor";
 import { corDaAtividade } from "~/componentes/jornada/cores";
 import { concluirMomento, FimDoMomento, type Desfecho } from "~/componentes/jornada/fim";
 import { FolhaDeSons } from "~/componentes/jornada/folha-de-sons";
@@ -107,7 +112,14 @@ import {
   type DuracaoMeditar,
 } from "~/lib/jornada/meditacao";
 import { CHAVE_LOG_MEDITACAO } from "~/lib/jornada/momentos";
-import { CICLO, DURACAO_DA_FASE, instanteNoTempo, ROTULO_DA_FASE } from "~/lib/jornada/respiracao";
+import {
+  CICLO,
+  DURACAO_DA_FASE,
+  instanteNoTempo,
+  ROTULO_DA_FASE,
+  toquesDaFase,
+  type ForcaDoToque,
+} from "~/lib/jornada/respiracao";
 import {
   ALVO_MINIMO,
   brilhoDe,
@@ -153,8 +165,6 @@ import { PortaoDoPlano } from "~/componentes/assinatura/portao";
 const PALETA = corDaAtividade.meditar;
 const MATERIAL = materialDe(PALETA);
 
-const BOLHA_DORMINDO = require("../../../../src/assets/bolha/dormindo.webp");
-
 /** A flor de lótus, nas artes 3D do app: no cartão do programa e no fim da sessão. */
 const ARTE_LOTUS = require("../../../../src/assets/grades/meditacoes.webp");
 /** As portas para as outras atividades: os fones com a lua, o coração na almofada. */
@@ -191,6 +201,8 @@ function Meditar() {
   const [minutos, setMinutos] = useState<DuracaoMeditar>(DURACAO_PADRAO_MEDITAR);
   const [som, setSom] = useState<Som>("pad");
   const [voz, setVoz] = useState(true);
+  /* A vibração no ritmo (23/11/2026): ligada, como no Respirar da Apple. */
+  const [vibrar, setVibrar] = useState(true);
   const [densidade, setDensidade] = useState<Densidade>("guiada");
   const [menuAberto, setMenuAberto] = useState(false);
   const [folhaDoSom, setFolhaDoSom] = useState(false);
@@ -390,6 +402,7 @@ function Meditar() {
       <Sessao
         plano={sessao.plano}
         voz={voz}
+        vibrar={vibrar}
         aoTrocarVoz={() => setVoz((v) => !v)}
         som={som}
         aoEscolherSom={escolherSom}
@@ -561,6 +574,11 @@ function Meditar() {
                     rotulo="Voz"
                     valor={DENSIDADES.find((d) => d.chave === densidade)?.rotulo ?? ""}
                     aoTocar={() => setFolhaDaVoz(true)}
+                  />
+                  <LinhaDeResumo
+                    rotulo="Vibrar no ritmo"
+                    valor={vibrar ? "Ligada" : "Desligada"}
+                    aoTocar={() => setVibrar((v) => !v)}
                   />
                 </GrupoDeResumo>
               </View>
@@ -1147,7 +1165,7 @@ function TempoQueFalta({
         textAlign: "right",
         ...fonte.forte,
         ...escala.nota,
-        color: cor.textoApagado,
+        color: corNoite.textoApagado,
         fontVariant: ["tabular-nums"],
       }}
     >
@@ -1159,6 +1177,7 @@ function TempoQueFalta({
 function Sessao({
   plano,
   voz,
+  vibrar,
   aoTrocarVoz,
   som,
   aoEscolherSom,
@@ -1170,6 +1189,8 @@ function Sessao({
 }: {
   plano: Plano;
   voz: boolean;
+  /** Os toques no ritmo da respiração (`toquesDaFase`). */
+  vibrar: boolean;
   aoTrocarVoz: () => void;
   som: Som;
   aoEscolherSom: (k: Som) => void;
@@ -1279,8 +1300,6 @@ function Sessao({
       respiro.setValue(ESCALA_RESPIRO.solte);
       return;
     }
-    if (Platform.OS !== "web")
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     Animated.timing(respiro, {
       toValue: ESCALA_RESPIRO[inst.fase],
       duration: Math.max(150, DURACAO_DA_FASE[inst.fase] * (1 - inst.progresso) * 1000),
@@ -1289,6 +1308,19 @@ function Sessao({
     }).start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inst.fase, inst.ciclo, pausada, retomada]);
+
+  /* A VIBRAÇÃO NO RITMO (23/11/2026, o dono: "deixar tremendo enquanto
+     respira, que nem a Apple faz"): os toques da fase, do ponto em que ela
+     está até o fim dela. Pausar, trocar de fase ou desligar cancela tudo. */
+  useEffect(() => {
+    if (pausada || !vibrar || Platform.OS === "web") return;
+    const passado = inst.progresso * DURACAO_DA_FASE[inst.fase] * 1000;
+    const ids = toquesDaFase(inst.fase)
+      .filter((t) => t.ms >= passado - 40)
+      .map((t) => setTimeout(() => vibrarNoRitmo(t.forca), Math.max(0, t.ms - passado)));
+    return () => ids.forEach(clearTimeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inst.fase, inst.ciclo, pausada, retomada, vibrar]);
 
   /* A fala gravada do ciclo, no canal da guia. */
   useEffect(() => {
@@ -1320,8 +1352,13 @@ function Sessao({
 
   return (
     <View style={{ flex: 1 }}>
+      {/* A sessão respira na NOITE do app (23/11/2026): a flor acende sobre o
+          escuro, como a do Respirar da Apple. */}
+      <FundoDaSessao />
+      <StatusBar style="light" animated />
       {Platform.OS !== "web" && !pausada ? <MantemAcesa /> : null}
       <TopoDaAtividade
+        escuro
         aoFechar={() => aoEncerrar(inst.ciclo)}
         meio={
           <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
@@ -1343,12 +1380,29 @@ function Sessao({
             paddingBottom: 96,
           }}
         >
-          <Circulo escala={respiro} rotulo={ROTULO_DA_FASE[inst.fase]} oculto={pausada} />
+          <FlorDeBolhas respiro={respiro} lado={LADO_DA_FLOR} apagada={pausada} />
+          <Text
+            accessibilityLiveRegion="polite"
+            style={{
+              marginTop: espaco.md,
+              /* Pausada, a palavra da fase some: ela vazaria por trás do "Pausado". */
+              opacity: pausada ? 0 : 1,
+              ...fonte.forte,
+              fontSize: 15,
+              lineHeight: 20,
+              letterSpacing: 2.4,
+              textTransform: "uppercase",
+              color: corNoite.textoForte,
+            }}
+          >
+            {ROTULO_DA_FASE[inst.fase]}
+          </Text>
           <Text
             key={inst.ciclo}
             style={{
-              marginTop: 36,
-              minHeight: 90,
+              marginTop: 22,
+              /* Quatro linhas de altura fixa: a fala muda e a flor não pula. */
+              minHeight: 124,
               maxWidth: 360,
               textAlign: "center",
               ...fonte.display,
@@ -1356,7 +1410,7 @@ function Sessao({
               lineHeight: 30,
               fontWeight: "400",
               letterSpacing: -0.2,
-              color: falaAgora ? cor.texto : cor.textoApagado,
+              color: falaAgora ? corNoite.texto : corNoite.textoApagado,
             }}
           >
             {falaAgora?.texto ?? RESPIRA_COMIGO}
@@ -1409,7 +1463,7 @@ function BarraQueAnda({ valor }: { valor: Animated.Value }) {
         flex: 1,
         height: 4,
         borderRadius: 2,
-        backgroundColor: cor.trilho,
+        backgroundColor: corNoite.trilho,
         overflow: "hidden",
       }}
     >
@@ -1418,7 +1472,7 @@ function BarraQueAnda({ valor }: { valor: Animated.Value }) {
           height: 4,
           width: "100%",
           borderRadius: 2,
-          backgroundColor: PALETA.acao,
+          backgroundColor: corNoite.textoForte,
           opacity: largura > 0 ? 1 : 0,
           transform: [
             { translateX: valor.interpolate({ inputRange: [0, 1], outputRange: [-largura, 0] }) },
@@ -1429,84 +1483,46 @@ function BarraQueAnda({ valor }: { valor: Animated.Value }) {
   );
 }
 
-/* O círculo: a luz da meditação por dentro, com um aro da ação. */
-const CIRCULO = {
-  halo: misturar(PALETA.luz, PALETA.acao, 0.12),
-  claro: "rgba(255,255,255,0.95)",
-  escuro: comAlfa(misturar(PALETA.luz, PALETA.acao, 0.28), 0.85),
-  aro: comAlfa(PALETA.acao, 0.22),
-} as const;
+/** A flor ocupa a largura útil, até 320 pt. */
+const LADO_DA_FLOR = Math.min(320, Dimensions.get("window").width - 2 * margem.foco);
 
-/** O halo, o círculo e a bolha dormindo, respirando juntos na mesma escala. */
-function Circulo({
-  escala: s,
-  rotulo,
-  oculto,
-}: {
-  escala: Animated.Value;
-  rotulo: string;
-  oculto: boolean;
-}) {
+/** Cada força de toque no motor do iPhone. */
+const ESTILO_DO_TOQUE: Record<ForcaDoToque, Haptics.ImpactFeedbackStyle> = {
+  macio: Haptics.ImpactFeedbackStyle.Soft,
+  leve: Haptics.ImpactFeedbackStyle.Light,
+  medio: Haptics.ImpactFeedbackStyle.Medium,
+};
+
+function vibrarNoRitmo(forca: ForcaDoToque) {
+  void Haptics.impactAsync(ESTILO_DO_TOQUE[forca]).catch(() => {});
+}
+
+/** O fundo da sessão: o céu da noite do app, parado, com o véu que fecha embaixo. */
+function FundoDaSessao() {
+  const area = useSafeAreaInsets();
   return (
-    <View style={{ width: 224, height: 224, alignItems: "center", justifyContent: "center" }}>
-      <Animated.View style={{ position: "absolute", transform: [{ scale: s }] }} accessible={false}>
-        <Svg width={224} height={224}>
-          <Defs>
-            <RadialGradient id="halo-da-meditacao" cx="50%" cy="50%" r="50%">
-              <Stop offset="0.35" stopColor={CIRCULO.halo} stopOpacity={0.55} />
-              <Stop offset="1" stopColor={CIRCULO.halo} stopOpacity={0} />
-            </RadialGradient>
-          </Defs>
-          <Circle cx={112} cy={112} r={112} fill="url(#halo-da-meditacao)" />
-        </Svg>
-      </Animated.View>
-      <Animated.View
+    <View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        left: 0,
+        right: 0,
+        top: -area.top,
+        bottom: -area.bottom,
+        backgroundColor: corNoite.historia,
+      }}
+    >
+      <Image
+        source={CEUS.noite.arte}
+        contentFit="cover"
+        style={StyleSheet.absoluteFill}
         accessible={false}
-        style={{
-          position: "absolute",
-          width: 160,
-          height: 160,
-          borderRadius: 80,
-          borderWidth: 2,
-          borderColor: CIRCULO.aro,
-          overflow: "hidden",
-          transform: [{ scale: s }],
-        }}
-      >
-        <LinearGradient
-          colors={[CIRCULO.claro, CIRCULO.escuro]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={{ flex: 1 }}
-        />
-      </Animated.View>
-      <View style={{ alignItems: "center", gap: espaco.sm }}>
-        {/* Pausada, a Bolha sai do círculo e vai para o véu (falar da pausa):
-            as duas, uma atrás da outra, viravam um fantasma. */}
-        <Animated.View style={{ opacity: oculto ? 0 : 1, transform: [{ scale: s }] }}>
-          <Image
-            source={BOLHA_DORMINDO}
-            style={{ width: 96, height: 96 }}
-            contentFit="contain"
-            accessible={false}
-          />
-        </Animated.View>
-        <Text
-          accessibilityLiveRegion="polite"
-          style={{
-            /* Pausada, a palavra da fase some: ela vazaria por trás do "Pausado". */
-            opacity: oculto ? 0 : 1,
-            ...fonte.forte,
-            fontSize: 15,
-            lineHeight: 20,
-            letterSpacing: 1.6,
-            textTransform: "uppercase",
-            color: PALETA.acao,
-          }}
-        >
-          {rotulo}
-        </Text>
-      </View>
+      />
+      <LinearGradient
+        colors={[...corNoite.veu]}
+        locations={[0, 0.45, 1]}
+        style={StyleSheet.absoluteFill}
+      />
     </View>
   );
 }
@@ -1529,7 +1545,7 @@ function VeuDaPausa({ motivo }: { motivo: Pausa }) {
         justifyContent: "center",
         paddingHorizontal: margem.foco + espaco.sm,
         paddingBottom: 96,
-        backgroundColor: comAlfa(luz.base, 0.9),
+        backgroundColor: comAlfa(corNoite.historia, 0.84),
       }}
     >
       <BolhaViva humor="dormindo" tamanho={88} />
@@ -1540,7 +1556,7 @@ function VeuDaPausa({ motivo }: { motivo: Pausa }) {
           ...fonte.display,
           ...escala.titulo1,
           letterSpacing: -0.2,
-          color: cor.texto,
+          color: corNoite.texto,
         }}
       >
         Pausado
@@ -1552,7 +1568,7 @@ function VeuDaPausa({ motivo }: { motivo: Pausa }) {
           textAlign: "center",
           ...fonte.normal,
           ...escala.legenda,
-          color: cor.textoApagado,
+          color: corNoite.textoCorpo,
         }}
       >
         {falaDaPausa(motivo)}

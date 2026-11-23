@@ -62,7 +62,7 @@ describe("o pós-parto e o nascimento sem bebê ilustrado", () => {
     expect(pos).toContain('modo: "pos"');
     expect(pos).not.toMatch(/function ComoVoceEsta|<ComoVoceEsta/);
     /* O apoio (CVV e 192) aparece junto da Bolha quando ela diz "Triste". */
-    expect(pos).toMatch(/humorPedeApoio\(humorDeHoje\) \? <Apoio \/> : null\}\s*<\/Painel>/);
+    expect(pos).toMatch(/humorPedeApoio\(humorDeHoje\) \? <Apoio \/> : null\}\s*<\/PainelDaBolha>/);
     /* A ponte do pós: nenhum destino da Bolha é lido cru. */
     expect(pos).toContain("destinoNoPos(d)");
   });

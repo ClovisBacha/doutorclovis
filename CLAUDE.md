@@ -114,13 +114,20 @@ gamificação"). Exames ficaram para depois.
 
 - **O SOS e a Comunidade estão desligados por chave, não apagados**:
   `SOS_NO_APP` e `COMUNIDADE_NO_APP` em `mobile/src/config.ts` (o padrão do
-  `IA_NO_APP`). Cada tela deles redireciona quando a chave está desligada, e
-  onde o app dizia "abra o SOS" ele oferece ligar 192 (`lib/socorro.ts`).
+  `IA_NO_APP`). Cada tela deles redireciona quando a chave está desligada.
   ⚠️ Religar uma chave obriga a reescrever junto os Termos, a Privacidade, o
   consentimento e a loja — `juridico.test.ts` e `barra.test.ts` cobram que
   as duas estão desligadas enquanto os textos dizem isso.
-- A regra de 21/10 abaixo continua valendo, com uma troca: sem o SOS, o sinal
-  de alerta vira "ligue 192"; o app segue sem conduta nenhuma.
+- A regra de 21/10 abaixo continua valendo; o app segue sem conduta nenhuma.
+- ⚠️ **O dia a dia não lembra de emergência (decisão do dono, 23/11/2026)**:
+  "tirar essas mensagens de sentiu algo estranho, ligar para tal número [...]
+  isso lembra a pessoa de ficar preocupada, o app é de bem-estar e de
+  tranquilidade". Saíram o "Sentiu algo estranho? Ligue 192" do Mexer, o
+  "Sentiu o bebê diferente?" dos movimentos, o botão do SAMU da reta final e o
+  192 da linha curta do aviso médico (o pé da aula e do bebê). O 192 fica só
+  onde se vai para lê-lo ou onde ela pede ajuda: os Termos e a Privacidade, a
+  nota completa do Perfil, o Modo Cuidado (o luto) e o apoio de quando ela diz
+  "Triste" (o CVV). `sem-conselho-medico.test.ts` cobra.
 
 ## O app se chama Mãe Esperta (decisão do dono, 12/11/2026)
 
@@ -175,7 +182,35 @@ ERA a paleta do Claude; não volte a ela.
   soltos sobre ele (`componentes/painel.tsx`).
 - **A bolha** (`BolhaViva`, em `movimento.tsx`): a arte de fundo transparente,
   animada por código. NADA a acompanha — sem vídeo, sem disco, sem brilho atrás
-  ("vamos tirar esse fundo rosa", o dono).
+  ("vamos tirar esse fundo rosa", o dono). Toda imagem dela leva
+  `allowDownscaling={false}`: o `expo-image` reduzia a arte ao tamanho da vista,
+  e a Bolha, que flutua e inclina, saía desfocada (23/11/2026). A apaixonada e
+  a estudiosa vinham cortadas no alto: foram refeitas das ORIGINAIS do Drive
+  (pasta "Imagens Obstétrica") por `mobile/scripts/bolha-do-drive.mjs`, que
+  não corta enfeite solto, e moram em `mobile/assets/bolha/`. Arte nova da
+  Bolha sai das originais por esse script, nunca retocada à mão; o mapa é um
+  só, `componentes/artes.ts` (`artes-da-bolha.test.ts`).
+- **A conversa da Bolha é o vidro do funil** (`PainelDaBolha`, em
+  `componentes/bolha/conversa.tsx`, 23/11/2026, o dono: "esse fundo branco
+  ficou ruim no chat"): ameixa-noite translúcido (`veu.vidroDaConversa`), a
+  fala em branco num balão de vidro discreto, as respostas em pílulas de
+  contorno e só o convite principal em framboesa. Nada de bloco branco.
+- **Respirar é a flor de bolhas na noite** (`componentes/jornada/
+flor-de-bolhas.tsx`, 23/11/2026, o dono: "uma arte mais 3D, com movimentos,
+  assim como a Apple faz", "deixar tremendo enquanto respira"): seis bolhas de
+  sabão que abrem em flor ao inspirar e se recolhem na Bolha ao soltar, no
+  mesmo valor da respiração; o celular vibra no ritmo (`toquesDaFase`, em
+  `lib/jornada/respiracao.ts`), com "Vibrar no ritmo" no menu.
+- **O cartão da semana segue o céu da hora** (`cartao-da-semana.tsx`,
+  23/11/2026): o mesmo céu que ela vê no app, e não mais o pôr do sol fixo.
+- **O quartinho do bebê** (`app/quartinho.tsx`, regras em
+  `lib/quartinho/quarto.ts`, 23/11/2026, primeira versão): abre ao tocar na
+  Bolha do céu. O quarto vazio e cada item são arte do Higgsfield
+  (`assets/quartinho/`), cada item num lugar FIXO; a posse dos itens da
+  lojinha é a da lojinha (sem moeda nova). A noite é um azul em
+  `mixBlendMode: "multiply"` com o vidro da janela da noite por cima — nunca
+  `filter: brightness`, que no iOS pinta névoa cinza. Modo Cuidado não abre.
+  O que falta está em `docs/proposta-quartinho-e-itens.md`.
 - **Profundidade** (`componentes/jornada/ceu-do-bebe.tsx`): o número da semana
   atrás do bebê, em camadas que andam com o celular (`useParalaxe`) e com a
   rolagem; a régua do tempo (arrastar para ver o bebê crescer, com os dados de

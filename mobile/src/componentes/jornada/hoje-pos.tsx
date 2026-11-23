@@ -23,7 +23,7 @@ import { Animated, Pressable, StyleSheet, Text, View, type ScrollView } from "re
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BOLHA } from "~/componentes/artes";
 import { Botao, TituloDaSecao, toque, useFimDaRolagem } from "~/componentes/base";
-import { ConversaComABolha } from "~/componentes/bolha/conversa";
+import { ConversaComABolha, PainelDaBolha } from "~/componentes/bolha/conversa";
 import {
   CEUS,
   ceuDaHora,
@@ -324,7 +324,7 @@ export function TelaDoQuartoTrimestre({
               yDaBolha.current = e.nativeEvent.layout.y;
             }}
           >
-            <Painel>
+            <PainelDaBolha>
               <ConversaComABolha
                 key={bolha.chave}
                 contexto={bolha.contexto}
@@ -332,7 +332,7 @@ export function TelaDoQuartoTrimestre({
                 aoMarcarHumor={aoMarcarHumor}
               />
               {humorPedeApoio(humorDeHoje) ? <Apoio /> : null}
-            </Painel>
+            </PainelDaBolha>
           </View>
 
           {formou ? (
@@ -872,6 +872,7 @@ function BarraDoColo({
           >
             <Image
               source={BOLHA.apaixonado}
+              allowDownscaling={false}
               style={{ width: 34, height: 34 }}
               contentFit="contain"
               accessible={false}

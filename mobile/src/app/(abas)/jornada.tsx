@@ -136,7 +136,6 @@ import {
   sombra,
   vidro,
 } from "~/tema";
-import { pedirSocorro, ROTULO_DO_SOCORRO, SE_PRECISAR } from "~/lib/socorro";
 
 /**
  * A ABA JORNADA — o coração do app: um dia de cada vez, cinco momentos por dia.
@@ -1251,26 +1250,8 @@ function AlertaDas42Semanas({ nomeDoBebe }: { nomeDoBebe: string | null }) {
           </Text>
           <Text style={{ ...fonte.normal, fontSize: 14, lineHeight: 22, color: cor.texto }}>
             Falta pouquíssimo para vocês se encontrarem. A trilha, as figurinhas e tudo o que vocês
-            viveram até aqui estão guardados. {SE_PRECISAR}
+            viveram até aqui estão guardados.
           </Text>
-          <View style={{ marginTop: espaco.sm, flexDirection: "row" }}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={pedirSocorro}
-              style={({ pressed }) => ({
-                minHeight: ALVO_MINIMO,
-                paddingHorizontal: espaco.xl,
-                borderRadius: 999,
-                backgroundColor: cor.urgente,
-                justifyContent: "center",
-                opacity: pressed ? 0.85 : 1,
-              })}
-            >
-              <Text style={{ ...fonte.forte, fontSize: 14, color: cor.branco }}>
-                {ROTULO_DO_SOCORRO}
-              </Text>
-            </Pressable>
-          </View>
         </View>
         <View
           style={{
