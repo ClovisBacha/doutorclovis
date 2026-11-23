@@ -5,7 +5,9 @@ import { CANTINHO_BY_ID } from "@/lib/cantinho";
 import { semComentarios } from "@/lib/sem-comentarios";
 import {
   alternar,
+  APOIO,
   CHAVE_DO_QUARTINHO,
+  decorarAoAcaso,
   cumprirSePronta,
   ehNoiteNoQuarto,
   emOrdemDeDesenho,
@@ -17,6 +19,7 @@ import {
   MISSOES,
   presenteDaMissao,
   QUARTO_INICIAL,
+  REGUA_DA_LUZ,
   situacaoDoItem,
   type Quartinho,
 } from "./quarto";
@@ -37,7 +40,7 @@ describe("o quartinho: os itens", () => {
         i: i.id,
         tem: existsSync(join(RAIZ, "assets", "quartinho", `${i.id}.webp`)),
       }).toEqual({ i: i.id, tem: true });
-    for (const q of ["quarto-dia", "janela-noite"])
+    for (const q of ["quarto-dia", "quarto-noite", "estrelas-noite"])
       expect(existsSync(join(RAIZ, "assets", "quartinho", `${q}.webp`))).toBe(true);
   });
 
@@ -61,6 +64,34 @@ describe("o quartinho: os itens", () => {
     }
     const ordem = emOrdemDeDesenho(["ursinho", "berco", "prateleira", "tapete"]).map((i) => i.id);
     expect(ordem).toEqual(["prateleira", "tapete", "berco", "ursinho"]);
+  });
+});
+
+describe("o quartinho: a luz de cada item", () => {
+  test("todo item declara a sua luz (ou que não tem), num degrau da régua", () => {
+    const degraus = new Set<number>(Object.values(REGUA_DA_LUZ));
+    for (const i of ITENS) {
+      /* `undefined` é item novo sem a ficha: a régua é obrigatória. */
+      expect({ i: i.id, declarou: i.luz !== undefined }).toEqual({ i: i.id, declarou: true });
+      if (!i.luz) continue;
+      expect({ i: i.id, naRegua: degraus.has(i.luz.potencia) }).toEqual({ i: i.id, naRegua: true });
+      expect(i.luz.tom).toMatch(/^#[0-9a-f]{6}$/i);
+      for (const f of i.luz.de) {
+        expect(f).toBeGreaterThanOrEqual(0);
+        expect(f).toBeLessThanOrEqual(1);
+      }
+      /* Só quem ilumina de verdade lança luz no chão. */
+      if (i.luz.chao) expect(i.luz.potencia).toBeGreaterThanOrEqual(REGUA_DA_LUZ.luzNoturna);
+    }
+  });
+
+  test("a proporção é a da vida real: a lâmpada manda, e o que não acende fica apagado", () => {
+    expect(ITEM_POR_ID.luminaria.luz?.potencia).toBe(REGUA_DA_LUZ.lampada);
+    expect(ITEM_POR_ID.mobile.luz?.potencia).toBe(REGUA_DA_LUZ.brilhaNoEscuro);
+    for (const id of ["poltrona", "ursinho", "coelhinho", "berco", "comoda", "tapete"] as const)
+      expect(ITEM_POR_ID[id].luz).toBeNull();
+    const degraus = Object.values(REGUA_DA_LUZ);
+    expect([...degraus].sort((a, b) => b - a)).toEqual(degraus);
   });
 });
 
@@ -147,6 +178,17 @@ describe("o quartinho: as missões", () => {
       { dia: "2026-11-22", postos: ["comoda"] },
       { dia: "2026-11-23", postos: ["comoda", "ursinho", "berco"] },
     ]);
+  });
+
+  test("decorar ao acaso: só o que ela pode pôr, e o móbile só com o berço", () => {
+    const livres = ["comoda", "prateleira", "ursinho", "mobile", "tapete"] as const;
+    /* Sorteio que tira o berço (não está livre) e deixa o resto: o móbile sai. */
+    const q = decorarAoAcaso(quarto(["berco"]), livres, () => 0.1);
+    expect(q.postos).toEqual(["comoda", "prateleira", "ursinho", "tapete"]);
+    /* Um sorteio que não põe quase nada ainda deixa o quarto mobiliado. */
+    expect(decorarAoAcaso(quarto([]), livres, () => 0.99).postos.length).toBeGreaterThanOrEqual(3);
+    /* Todo item tem onde se apoiar (é o que decide a sombra dele). */
+    for (const i of ITENS) expect(APOIO[i.id]).toBeDefined();
   });
 
   test("a noite do quarto é a do céu do app", () => {

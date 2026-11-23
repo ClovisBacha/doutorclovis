@@ -6,9 +6,9 @@
  * os itens [...] vamos fazer ficar o mais próximo dessas imagens". A proposta
  * inteira está em `docs/proposta-quartinho-e-itens.md`.
  *
- * - O QUARTO é uma arte só, vazia (`assets/quartinho/quarto-dia.webp`); a
- *   noite é ela mesma sob um azul que multiplica, com o vidro da janela da
- *   noite por cima (`janela-noite.webp`, tirado dela por código). Cada ITEM
+ * - O QUARTO é uma arte vazia de dia (`assets/quartinho/quarto-dia.webp`) e
+ *   a mesma, pintada de noite (`quarto-noite.webp`: o luar, a lua na janela
+ *   e as estrelinhas da parede acesas). Cada ITEM
  *   é uma arte à parte, com um lugar FIXO no quarto: decorar é escolher o
  *   que fica, e o quarto sai sempre
  *   bonito — sem arrastar, girar nem zoom ("eu não deixaria a experiência
@@ -52,6 +52,48 @@ export type IdDaMissao = "ursinho" | "parede" | "leitura" | "tapete" | "mobile";
  */
 export type Lugar = { x: number; base: number; largura: number; camada: number; achatar?: number };
 
+/**
+ * A RÉGUA DA LUZ (23/11/2026, o dono: "cada um deve ter seu brilho
+ * proporcional à realidade, e deixe isso claro para depois, quando formos
+ * criar mais itens, eles já virem com essa configuração").
+ *
+ * A potência vai de 0 a 1, e a lâmpada do abajur é o 1. TODO item novo
+ * escolhe um degrau daqui (ou `luz: null`, se não emite luz nenhuma): não
+ * invente um número solto, para o quarto continuar coerente.
+ *
+ *   lampada         1     abajur, luminária de chão: ilumina o quarto e o chão
+ *   luzNoturna      0,5   estrela-abajur, luz de tomada, lua de mesa
+ *   luzinhas        0,35  varal de luzinhas, pisca-pisca, vela de LED
+ *   brilhaNoEscuro  0,2   plástico que brilha no escuro (móbile, adesivos)
+ *   tintaQueBrilha  0,1   detalhe pintado com tinta fosforescente
+ *
+ * O que NÃO emite luz fica em `null`, por mais claro que seja: almofada,
+ * pelúcia, móvel branco, espelho (reflete, não acende).
+ */
+export const REGUA_DA_LUZ = {
+  lampada: 1,
+  luzNoturna: 0.5,
+  luzinhas: 0.35,
+  brilhaNoEscuro: 0.2,
+  tintaQueBrilha: 0.1,
+} as const;
+
+/**
+ * A FICHA DE LUZ de um item. A tela (`app/quartinho.tsx`, `LuzDoItem`) tira
+ * tudo daqui: o tamanho e a força do clarão saem da `potencia`; à noite o
+ * item escurece menos quanto mais luz ele tem.
+ */
+export type Luz = {
+  /** Um degrau de `REGUA_DA_LUZ`. */
+  potencia: number;
+  /** A cor da luz (quente para lâmpada, esverdeada ou azulada para o que brilha no escuro). */
+  tom: string;
+  /** De onde a luz sai, em frações da arte do item: [0, 0] é o canto de cima à esquerda. */
+  de: readonly [number, number];
+  /** Lança uma poça de luz no chão. Só para quem ilumina de verdade (`luzNoturna` para cima). */
+  chao?: boolean;
+};
+
 export type ItemDoQuarto = {
   id: IdDoItem;
   nome: string;
@@ -63,6 +105,8 @@ export type ItemDoQuarto = {
   lojinha?: string;
   /** A missão que dá este item de presente. */
   missao?: IdDaMissao;
+  /** A luz que ele emite à noite, pela `REGUA_DA_LUZ`. OBRIGATÓRIO: `null` é "não emite". */
+  luz: Luz | null;
 };
 
 export const ITENS: readonly ItemDoQuarto[] = [
@@ -73,6 +117,7 @@ export const ITENS: readonly ItemDoQuarto[] = [
     categoria: "moveis",
     proporcao: 337 / 515,
     lugar: { x: 0.66, base: 0.267, largura: 0.3, camada: 1 },
+    luz: null,
   },
   {
     id: "quadro-urso",
@@ -80,6 +125,7 @@ export const ITENS: readonly ItemDoQuarto[] = [
     categoria: "decoracao",
     proporcao: 351 / 353,
     lugar: { x: 0.47, base: 0.352, largura: 0.14, camada: 1 },
+    luz: null,
     lojinha: "objeto-quadrinho",
   },
   {
@@ -88,6 +134,8 @@ export const ITENS: readonly ItemDoQuarto[] = [
     categoria: "decoracao",
     proporcao: 351 / 351,
     lugar: { x: 0.69, base: 0.352, largura: 0.14, camada: 1 },
+    /* A lua do quadro é pintada com tinta que brilha: quase nada. */
+    luz: { potencia: REGUA_DA_LUZ.tintaQueBrilha, tom: "#c3ccff", de: [0.48, 0.5] },
     missao: "ursinho",
   },
   /* O chão, do fundo para a frente. */
@@ -97,6 +145,7 @@ export const ITENS: readonly ItemDoQuarto[] = [
     categoria: "tapetes",
     proporcao: 321 / 583,
     lugar: { x: 0.56, base: 0.742, largura: 0.78, camada: 2, achatar: 0.62 },
+    luz: null,
     lojinha: "objeto-tapete",
   },
   {
@@ -105,6 +154,7 @@ export const ITENS: readonly ItemDoQuarto[] = [
     categoria: "plantas",
     proporcao: 430 / 392,
     lugar: { x: 0.085, base: 0.52, largura: 0.16, camada: 3 },
+    luz: null,
     lojinha: "planta-vaso",
   },
   {
@@ -113,6 +163,7 @@ export const ITENS: readonly ItemDoQuarto[] = [
     categoria: "moveis",
     proporcao: 435 / 397,
     lugar: { x: 0.85, base: 0.54, largura: 0.25, camada: 3 },
+    luz: null,
   },
   {
     id: "berco",
@@ -120,6 +171,7 @@ export const ITENS: readonly ItemDoQuarto[] = [
     categoria: "moveis",
     proporcao: 417 / 471,
     lugar: { x: 0.585, base: 0.565, largura: 0.42, camada: 3 },
+    luz: null,
     lojinha: "objeto-berco",
   },
   {
@@ -128,6 +180,8 @@ export const ITENS: readonly ItemDoQuarto[] = [
     categoria: "decoracao",
     proporcao: 393 / 460,
     lugar: { x: 0.505, base: 0.392, largura: 0.22, camada: 4 },
+    /* A estrela e a lua do móbile são do plástico que brilha no escuro. */
+    luz: { potencia: REGUA_DA_LUZ.brilhaNoEscuro, tom: "#ffe58f", de: [0.6, 0.62] },
     lojinha: "objeto-mobile",
   },
   {
@@ -136,6 +190,7 @@ export const ITENS: readonly ItemDoQuarto[] = [
     categoria: "brinquedos",
     proporcao: 448 / 293,
     lugar: { x: 0.855, base: 0.392, largura: 0.11, camada: 4 },
+    luz: null,
     lojinha: "bicho-coelho",
   },
   {
@@ -144,6 +199,8 @@ export const ITENS: readonly ItemDoQuarto[] = [
     categoria: "moveis",
     proporcao: 519 / 240,
     lugar: { x: 0.335, base: 0.578, largura: 0.12, camada: 4 },
+    /* A lâmpada: o 1 da régua. Ilumina a parede, o chão e o que está perto. */
+    luz: { potencia: REGUA_DA_LUZ.lampada, tom: "#ffb45e", de: [0.5, 0.14], chao: true },
     lojinha: "objeto-luminaria",
   },
   {
@@ -152,6 +209,7 @@ export const ITENS: readonly ItemDoQuarto[] = [
     categoria: "moveis",
     proporcao: 481 / 456,
     lugar: { x: 0.165, base: 0.645, largura: 0.32, camada: 5 },
+    luz: null,
     lojinha: "objeto-poltrona",
   },
   {
@@ -160,6 +218,7 @@ export const ITENS: readonly ItemDoQuarto[] = [
     categoria: "brinquedos",
     proporcao: 490 / 410,
     lugar: { x: 0.905, base: 0.665, largura: 0.19, camada: 5 },
+    luz: null,
     lojinha: "objeto-cestinho",
   },
   /* Os brinquedos, em cima do tapete. */
@@ -169,6 +228,7 @@ export const ITENS: readonly ItemDoQuarto[] = [
     categoria: "brinquedos",
     proporcao: 409 / 347,
     lugar: { x: 0.3, base: 0.728, largura: 0.14, camada: 6 },
+    luz: null,
   },
   {
     id: "cavalinho",
@@ -176,6 +236,7 @@ export const ITENS: readonly ItemDoQuarto[] = [
     categoria: "brinquedos",
     proporcao: 436 / 484,
     lugar: { x: 0.47, base: 0.712, largura: 0.2, camada: 6 },
+    luz: null,
     missao: "parede",
   },
   {
@@ -184,6 +245,7 @@ export const ITENS: readonly ItemDoQuarto[] = [
     categoria: "brinquedos",
     proporcao: 444 / 346,
     lugar: { x: 0.635, base: 0.684, largura: 0.085, camada: 6 },
+    luz: null,
     missao: "leitura",
   },
   {
@@ -192,6 +254,7 @@ export const ITENS: readonly ItemDoQuarto[] = [
     categoria: "brinquedos",
     proporcao: 387 / 370,
     lugar: { x: 0.765, base: 0.704, largura: 0.12, camada: 6 },
+    luz: null,
     missao: "tapete",
   },
 ];
@@ -369,6 +432,47 @@ export function cumprirSePronta(
 /** O presente que uma missão libera (o item que tem `missao` igual a ela). */
 export const presenteDaMissao = (m: Missao): ItemDoQuarto | undefined =>
   ITENS.find((i) => i.missao === m.id);
+
+/**
+ * Onde o item se apoia: decide a SOMBRA dele (a profundidade do quarto). No
+ * chão, a sombra de contato embaixo; na parede, a sombra projetada atrás; o
+ * tapete é o próprio chão, e o que fica sobre um móvel não projeta no chão.
+ */
+export type Apoio = "chao" | "parede" | "tapete" | "movel";
+export const APOIO: Readonly<Record<IdDoItem, Apoio>> = {
+  berco: "chao",
+  poltrona: "chao",
+  comoda: "chao",
+  luminaria: "chao",
+  planta: "chao",
+  cesto: "chao",
+  ursinho: "chao",
+  cavalinho: "chao",
+  argolas: "chao",
+  cubos: "chao",
+  prateleira: "parede",
+  "quadro-urso": "parede",
+  "quadro-lua": "parede",
+  tapete: "tapete",
+  mobile: "movel",
+  coelhinho: "movel",
+};
+
+/**
+ * "Decorar aleatoriamente" (o botão do dado, dos mockups): sorteia entre o
+ * que ela PODE pôr (`livres`), sempre com pelo menos três itens, e o móbile
+ * só entra com o berço. `sorteio` devolve um número em [0, 1).
+ */
+export function decorarAoAcaso(
+  q: Quartinho,
+  livres: readonly IdDoItem[],
+  sorteio: () => number,
+): Quartinho {
+  let postos = livres.filter(() => sorteio() < 0.7);
+  if (postos.length < Math.min(3, livres.length)) postos = [...livres];
+  if (!postos.includes("berco")) postos = postos.filter((p) => p !== "mobile");
+  return { ...q, postos };
+}
 
 /** Os itens na ordem de desenho: a parede atrás, os brinquedos na frente. */
 export function emOrdemDeDesenho(postos: readonly IdDoItem[]): ItemDoQuarto[] {

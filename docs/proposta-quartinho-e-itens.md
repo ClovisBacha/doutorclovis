@@ -36,6 +36,12 @@ lado no simulador):
 - O quarto grava em `dc-path-quartinho` (o blob da jornada, que já sobe para o
   servidor). Modo Cuidado não abre o quarto.
 
+**Refeito no mesmo dia** (o dono: "degradês meio Liquid Glass [...] mais
+profundidade [...] bastante ênfase na iluminação"): o vidro lilás em tudo o que
+flutua, a noite pintada (o quinto crédito), as sombras dos itens, o sol e o
+luar por cima deles, a luminária acesa, as estrelinhas piscando e os botões
+"Desfazer" e "Decorar aleatoriamente". Ver o diário, "o quartinho refeito".
+
 **Diferenças deliberadas dos mockups**: sementinha no lugar de "estrelinhas" e
 sem o "+" de comprar moeda (sementinha só se ganha); sem girar, zoom nem
 arrastar (lugares fixos); a missão dá item, não moeda (quem paga é o servidor
@@ -45,6 +51,41 @@ e o quadro "Sonhe alto" não vieram (são arte de um próximo lote).
 **O que falta para lançar**: comprar o item ali mesmo (hoje leva à lojinha);
 decidir se o Arrumar da trilha sai; mais itens (um lote de ~16 por 2 créditos,
 na mesma cartela); a retrospectiva com as memórias; a Bolha vestida (ideia 2).
+
+## Como criar um item novo do quartinho (a receita)
+
+Todo item novo entra em `mobile/src/lib/quartinho/quarto.ts`, na lista `ITENS`,
+com a ficha inteira. O teste `quarto.test.ts` reprova o item que vier sem ela.
+
+1. **A arte**: fundo transparente, no estilo da cartela (a mesma câmera, de
+   frente e um pouco de cima), em `mobile/assets/quartinho/<id>.webp`, e a
+   linha dela no mapa `ARTE` de `app/quartinho.tsx`.
+2. **O lugar** (`lugar`): o centro, a linha da base, a largura e a camada, em
+   frações do quarto.
+3. **O apoio** (`APOIO`): `chao`, `parede`, `tapete` ou `movel`. Decide a
+   sombra.
+4. **A posse**: `lojinha` (o item da lojinha que ele é), `missao` (a missão que
+   o dá) ou nada (presente de saída).
+5. **A LUZ** (`luz`), obrigatória — o dono, em 23/11/2026: "cada um deve ter
+   seu brilho proporcional à realidade". Escolha um degrau da `REGUA_DA_LUZ`,
+   nunca um número solto:
+
+   | Degrau           | Potência | Para quê                                         |
+   | ---------------- | -------- | ------------------------------------------------ |
+   | `lampada`        | 1        | abajur, luminária: ilumina o quarto e o chão     |
+   | `luzNoturna`     | 0,5      | estrela-abajur, luz de tomada, lua de mesa       |
+   | `luzinhas`       | 0,35     | varal de luzinhas, pisca-pisca, vela de LED      |
+   | `brilhaNoEscuro` | 0,2      | plástico que brilha no escuro (móbile, adesivos) |
+   | `tintaQueBrilha` | 0,1      | detalhe pintado com tinta fosforescente          |
+   | `null`           | —        | não emite luz: almofada, pelúcia, móvel, espelho |
+
+   A ficha diz ainda a cor (`tom`), de onde a luz sai na arte (`de`) e se ela
+   cai no chão (`chao`, só de `luzNoturna` para cima). A tela desenha o resto
+   sozinha (`LuzDoItem`): o tamanho do clarão sai da potência, e à noite o item
+   escurece menos quanto mais luz tem. A luz só aparece à noite.
+
+Hoje acendem: a luminária (`lampada`), o móbile (`brilhaNoEscuro`) e o quadro
+da lua (`tintaQueBrilha`).
 
 Nas palavras dele: "será que não conseguiríamos criar também o quartinho do
 bebê, onde a pessoa, quando clica no bebê bolha, abre um quartinho que ela

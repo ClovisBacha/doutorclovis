@@ -1,39 +1,56 @@
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { Redirect, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import Check from "lucide-react-native/icons/check";
 import ChevronLeft from "lucide-react-native/icons/chevron-left";
+import Dices from "lucide-react-native/icons/dices";
 import Gift from "lucide-react-native/icons/gift";
 import Heart from "lucide-react-native/icons/heart";
 import Lock from "lucide-react-native/icons/lock";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Undo2 from "lucide-react-native/icons/undo-2";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Alert,
   Animated,
+  Easing,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
   View,
+  type StyleProp,
+  type ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Svg, { Circle, Defs, RadialGradient, Stop } from "react-native-svg";
+import Svg, {
+  Defs,
+  Ellipse,
+  LinearGradient as Degrade,
+  Polygon,
+  RadialGradient,
+  Rect,
+  Stop,
+} from "react-native-svg";
 import { CANTINHO_BY_ID } from "@/lib/cantinho";
 import { selecao, sucesso, toque } from "~/componentes/base";
-import { BotaoDaAtividade } from "~/componentes/jornada/atividade";
 import { corJornada } from "~/componentes/jornada/cores";
+import { useJornada } from "~/componentes/jornada/usarJornada";
 import { ArteDaBolha, useMovimentoReduzido, type HumorDaArte } from "~/componentes/movimento";
 import { lerOCantinho, type CantinhoOk } from "~/componentes/recompensas/economia-do-cantinho";
+import { TEM_VIDRO_DO_SISTEMA, Vidro } from "~/componentes/vidro";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
+import { clarear } from "~/lib/cor";
 import { ymdLocal } from "~/lib/gestacao";
-import { useJornada } from "~/componentes/jornada/usarJornada";
 import { gravarChave } from "~/lib/jornada/loja";
 import {
   alternar,
+  APOIO,
   CATEGORIAS,
   CHAVE_DO_QUARTINHO,
   cumprirSePronta,
+  decorarAoAcaso,
   ehNoiteNoQuarto,
   emOrdemDeDesenho,
   faltaOBerco,
@@ -53,40 +70,49 @@ import {
   type Situacao,
 } from "~/lib/quartinho/quarto";
 import { useSessao } from "~/lib/sessao";
-import {
-  ALVO_MINIMO,
-  canto,
-  cor,
-  curva,
-  escala,
-  espaco,
-  fonte,
-  sombra,
-  sombraFlutuante,
-} from "~/tema";
+import { ALVO_MINIMO, cor, curva, espaco, fonte } from "~/tema";
 
 /**
  * O QUARTINHO DO BEBÊ (23/11/2026) — a tela que abre ao tocar na Bolha do céu.
  *
- * O dono mandou dois mockups ("Seu quarto, do seu jeito!") e as ideias que
- * pediu ao ChatGPT, e pediu: "vamos fazer ficar o mais próximo dessas
- * imagens". O desenho é o do segundo mockup (o mais limpo), com o cartão da
- * missão do primeiro. As regras moram em `~/lib/quartinho/quarto.ts`.
+ * O dono mandou dois mockups de dia ("Seu quarto, do seu jeito!"), um de noite
+ * e as ideias que pediu ao ChatGPT: "vamos fazer ficar o mais próximo dessas
+ * imagens". Depois da primeira versão: "o fundo dos escritos não ser
+ * totalmente branco, e sim nesses degradês meio Liquid Glass [...] o quarto
+ * com um pouco mais de profundidade [...] bastante ênfase na iluminação, que
+ * é algo que faltou". As regras moram em `~/lib/quartinho/quarto.ts`.
  *
- * ARTE e DADO separados (a skill `/tela`): o quarto e cada item são arte (do
- * Higgsfield, no estilo dos mockups, em `assets/quartinho/`); o saldo, os
- * preços, a posse, a missão e a hora são dado. ⚠️ Diferenças deliberadas dos
- * mockups, e o porquê:
+ * ARTE e DADO separados (a skill `/tela`): o quarto (de dia e de noite) e
+ * cada item são arte do Higgsfield, no estilo dos mockups
+ * (`assets/quartinho/`); o saldo, os preços, a posse, a missão e a hora são
+ * dado.
+ *
+ * O VIDRO: tudo o que flutua sobre o quarto (o voltar, a fala da Bolha, o
+ * saldo, o presente, a bandeja) é vidro LILÁS em degradê (`VidroLilas`): o
+ * Liquid Glass do sistema com a tinta lilás por cima, e nunca um bloco branco.
+ *
+ * A PROFUNDIDADE: cada item projeta sombra (de contato, no chão; projetada, na
+ * parede), e os cantos do quarto escurecem de leve.
+ *
+ * A LUZ é o centro da tela. De dia: o sol que entra pela janela, quente, e a
+ * poeira dourada no ar. De noite, o quarto é uma pintura da noite (o luar
+ * desenhando a vidraça no chão, as estrelinhas da parede acesas); os itens
+ * escurecem cada um na sua forma, a luminária acende de verdade, o luar passa
+ * por cima deles, as estrelinhas piscam e vaga-lumes sobem devagar.
+ * ⚠️ Não use `filter: brightness` nos itens: no iOS ele pintou uma névoa
+ * cinza sobre o quarto inteiro (medido no simulador, 23/11/2026).
+ *
+ * ⚠️ Diferenças deliberadas dos mockups, e o porquê:
  * - a moeda é a sementinha do app (e não "estrelinhas"), e não há "+" para
  *   comprar moeda: sementinha só se ganha;
- * - sem arrastar, girar nem zoom: cada item tem o seu lugar, e o quarto sai
- *   sempre bonito ("eu não deixaria a experiência cheia de botões");
+ * - sem mover nem zoom: cada item tem o seu lugar, e o quarto sai sempre
+ *   bonito ("eu não deixaria a experiência cheia de botões");
  * - a missão não paga sementinhas (quem paga é o servidor do site, que não
  *   muda): ela dá um item de presente.
  *
  * Modo Cuidado: o quarto não abre (as telas param de falar do bebê).
  *
- * Bancada: rota=/quartinho [&hora=21] [&postos=berco,poltrona…]
+ * Bancada: rota=/quartinho [&hora=21] [&postos=berco,poltrona…] [&missao=1]
  *          [&missoes=ursinho,parede (cumpridas ontem)] [&itens=objeto-berco,… (da lojinha)]
  */
 
@@ -108,25 +134,21 @@ const ARTE: Record<IdDoItem, number> = {
   tapete: require("../../assets/quartinho/tapete.webp"),
   planta: require("../../assets/quartinho/planta.webp"),
 };
-const QUARTO = require("../../assets/quartinho/quarto-dia.webp");
-/**
- * A NOITE do quarto: o mesmo quarto (e os mesmos itens) sob um azul que
- * multiplica, igual para tudo; por cima, só o VIDRO da janela da noite (o céu
- * com estrelas e as árvores escuras), recortado da arte de dia por código.
- * ⚠️ Não use `filter: brightness` nos itens: no iOS ele pintou uma névoa
- * cinza sobre o quarto inteiro (medido no simulador, 23/11/2026).
- */
-const JANELA_DA_NOITE = require("../../assets/quartinho/janela-noite.webp");
-/** Onde o vidro da janela fica na arte (1536 × 2752), em pixels dela. */
-const VIDRO = { x: 100, y: 400, largura: 262, altura: 505 } as const;
-const AZUL_DA_NOITE = "#5c64a3";
+const QUARTO_DIA = require("../../assets/quartinho/quarto-dia.webp");
+const QUARTO_NOITE = require("../../assets/quartinho/quarto-noite.webp");
+/** O brilho das estrelinhas da parede (as mesmas da arte), para elas piscarem. */
+const ESTRELAS_DA_NOITE = require("../../assets/quartinho/estrelas-noite.webp");
 /** A arte do quarto tem 1536 × 2752. */
 const PROPORCAO_DO_QUARTO = 2752 / 1536;
 /** O chão que aparece embaixo da arte, se a tela for mais alta que ela. */
-const CHAO = { dia: "#e7ae73", noite: "#3c3355" } as const;
+const CHAO = { dia: "#e7ae73", noite: "#2a1f3d" } as const;
 
 const ROXO = corJornada.roxo;
-const LILAS_CLARO = "#f3eefc";
+/** A tinta sobre o vidro lilás (11:1 sobre ele). */
+const TINTA = corJornada.roxoEscuro;
+const OURO = "#f5c451";
+/** A sombra de cada item à noite: a forma dele, em azul-noite, por cima. */
+const SOMBRA_DA_NOITE = "#1c1466";
 
 const FALAS_AO_POR = ["Ficou lindo!", "Que fofura!", "Combinou demais!", "Amei esse cantinho!"];
 
@@ -169,7 +191,7 @@ function Quartinho() {
   const [categoria, setCategoria] = useState<Categoria>("moveis");
   const [cantinho, setCantinho] = useState<CantinhoOk | null | "lendo">("lendo");
   const [fala, setFala] = useState(
-    noite ? "Boa noite! O quartinho está quentinho." : "Seu quarto, do seu jeito!",
+    noite ? "Boa noite! Que quartinho gostoso." : "Seu quarto, do seu jeito!",
   );
   const [pose, setPose] = useState<HumorDaArte>(noite ? "dormindo" : "feliz");
   const [novo, setNovo] = useState<IdDoItem | null>(null);
@@ -177,6 +199,8 @@ function Quartinho() {
   /* O cartão da missão abre no presente (o mockup 2): fechado, ele não cobre
      a parede. Na bancada, `&missao=1` o abre. */
   const [missaoAberta, setMissaoAberta] = useState(() => parametroDaBancada("missao") === "1");
+  /* O que o "Desfazer" devolve: os quartos de antes, do mais velho ao mais novo. */
+  const [antes, setAntes] = useState<IdDoItem[][]>([]);
   const falas = useRef(0);
 
   /* O quarto guardado chega com a loja; a bancada entra pelo mesmo estado. */
@@ -202,8 +226,9 @@ function Quartinho() {
   const precoDaLojinha = useCallback((id: string) => CANTINHO_BY_ID[id]?.price, []);
 
   const mudar = useCallback(
-    (proximo: Quartinho) => {
+    (proximo: Quartinho, de: Quartinho) => {
       const { quarto: q, cumprida: m } = cumprirSePronta(proximo, hoje);
+      setAntes((h) => [...h.slice(-19), de.postos]);
       setQuarto(q);
       gravarChave(CHAVE_DO_QUARTINHO, q);
       if (m) {
@@ -251,7 +276,7 @@ function Quartinho() {
       }
       selecao();
       const tinha = quarto.postos.includes(item.id);
-      const m = mudar(alternar(quarto, item.id));
+      const m = mudar(alternar(quarto, item.id), quarto);
       if (!tinha) setNovo(item.id);
       if (!m) {
         setPose(noite ? "dormindo" : tinha ? "feliz" : "apaixonado");
@@ -275,6 +300,31 @@ function Quartinho() {
     setFala("Guardei o seu quarto. Ficou a sua cara!");
   }, [quarto, hoje]);
 
+  const desfazer = useCallback(() => {
+    if (!quarto || !antes.length) return;
+    const postos = antes[antes.length - 1]!;
+    setAntes((h) => h.slice(0, -1));
+    const q = { ...quarto, postos };
+    setQuarto(q);
+    gravarChave(CHAVE_DO_QUARTINHO, q);
+    setNovo(null);
+    setPose(noite ? "dormindo" : "feliz");
+    setFala("Voltei como estava.");
+  }, [quarto, antes, noite]);
+
+  const aoAcaso = useCallback(() => {
+    if (!quarto) return;
+    const livres = ITENS.filter(
+      (i) => situacaoDoItem(i, quarto, posse, precoDaLojinha).tipo === "livre",
+    ).map((i) => i.id);
+    const m = mudar(decorarAoAcaso(quarto, livres, Math.random), quarto);
+    setNovo(null);
+    if (!m) {
+      setPose(noite ? "dormindo" : "apaixonado");
+      setFala("Arrumei do meu jeito. Gostou?");
+    }
+  }, [quarto, posse, precoDaLojinha, mudar, noite]);
+
   const alturaDoQuarto = L * PROPORCAO_DO_QUARTO;
 
   return (
@@ -283,22 +333,20 @@ function Quartinho() {
       {/* O QUARTO: a arte, na largura da tela, e os itens nos lugares dela. */}
       <View style={{ position: "absolute", left: 0, top: 0, width: L, height: alturaDoQuarto }}>
         <Image
-          source={QUARTO}
+          source={noite ? QUARTO_NOITE : QUARTO_DIA}
           style={StyleSheet.absoluteFill}
-          contentFit="cover"
+          contentFit="fill"
           accessible
           accessibilityLabel={noite ? "O quartinho do bebê, à noite" : "O quartinho do bebê"}
         />
-        {quarto ? (
-          <ItensNoQuarto
-            postos={quarto.postos}
-            novo={novo}
-            noite={noite}
-            largura={L}
-            altura={alturaDoQuarto}
-            aoTocar={(id) => setCategoria(ITEM_POR_ID[id].categoria)}
-          />
-        ) : null}
+        <Cena
+          postos={quarto?.postos ?? []}
+          novo={novo}
+          noite={noite}
+          largura={L}
+          altura={alturaDoQuarto}
+          aoTocar={(id) => setCategoria(ITEM_POR_ID[id].categoria)}
+        />
       </View>
 
       {/* O alto: voltar, a Bolha falando, o saldo e a missão de hoje. */}
@@ -316,7 +364,7 @@ function Quartinho() {
           }}
         >
           <BotaoRedondo rotulo="Voltar" aoTocar={() => router.back()}>
-            <ChevronLeft size={24} color={cor.texto} strokeWidth={2.4} />
+            <ChevronLeft size={24} color={TINTA} strokeWidth={2.6} />
           </BotaoRedondo>
           <FalaDaBolha fala={fala} pose={pose} />
           <Saldo cantinho={cantinho} />
@@ -344,7 +392,7 @@ function Quartinho() {
         ) : null}
       </View>
 
-      {/* A bandeja: as abas, os itens e o salvar. */}
+      {/* A bandeja: as abas, os itens e, embaixo, desfazer, salvar e o dado. */}
       <View
         style={{
           position: "absolute",
@@ -356,17 +404,7 @@ function Quartinho() {
           gap: espaco.sm,
         }}
       >
-        <View
-          style={{
-            borderRadius: 30,
-            ...curva,
-            paddingVertical: espaco.sm,
-            backgroundColor: "rgba(255,255,255,0.94)",
-            borderWidth: StyleSheet.hairlineWidth,
-            borderColor: "rgba(255,255,255,1)",
-            ...sombraFlutuante,
-          }}
-        >
+        <VidroLilas raio={30} estilo={{ paddingVertical: espaco.sm }}>
           <Abas ativa={categoria} aoEscolher={setCategoria} />
           {quarto ? (
             <Bandeja
@@ -378,30 +416,157 @@ function Quartinho() {
               aoTocar={aoTocarNoItem}
             />
           ) : (
-            <View style={{ height: 104 }} />
+            <View style={{ height: 116 }} />
           )}
+        </VidroLilas>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
+          <BotaoRedondo rotulo="Desfazer" aoTocar={desfazer} apagado={!antes.length}>
+            <Undo2 size={22} color={TINTA} strokeWidth={2.6} />
+          </BotaoRedondo>
+          <BotaoDeSalvar aoTocar={salvar} desabilitado={!quarto} />
+          <BotaoRedondo rotulo="Decorar aleatoriamente" aoTocar={aoAcaso} apagado={!quarto}>
+            <Dices size={22} color={TINTA} strokeWidth={2.4} />
+          </BotaoRedondo>
         </View>
-        <BotaoDaAtividade
-          cor={ROXO}
-          rotulo="Salvar meu quarto"
-          icone={<Heart size={18} color={cor.branco} fill={cor.branco} strokeWidth={2} />}
-          aoTocar={salvar}
-          desabilitado={!quarto}
-          vibrar={false}
-        />
       </View>
     </View>
   );
 }
 
-/* ── O quarto ─────────────────────────────────────────────────────────── */
+/* ── O vidro lilás ────────────────────────────────────────────────────── */
 
-const ItensNoQuarto = memo(function ItensNoQuarto({
+/**
+ * O VIDRO LILÁS dos mockups: o `Vidro` do app (o Liquid Glass do sistema,
+ * quando há; só ele o chama, `vidro-e-luz.test.ts`) com um degradê lilás por
+ * cima, o fio de luz na borda e o brilho no alto. Sem o
+ * vidro do sistema, o degradê fica quase opaco, para o texto se ler igual.
+ */
+function VidroLilas({
+  children,
+  estilo,
+  raio = 999,
+}: {
+  children?: ReactNode;
+  estilo?: StyleProp<ViewStyle>;
+  raio?: number;
+}) {
+  return (
+    <Vidro
+      forma={raio}
+      tinta="#d9ccff"
+      flutua={false}
+      estilo={[
+        {
+          overflow: "hidden",
+          borderWidth: 1.5,
+          borderColor: "rgba(255,255,255,0.72)",
+          boxShadow: "0px 10px 26px -10px rgba(76,29,149,0.55), 0px 2px 6px rgba(76,29,149,0.14)",
+        },
+        estilo,
+      ]}
+    >
+      <LinearGradient
+        pointerEvents="none"
+        colors={
+          TEM_VIDRO_DO_SISTEMA
+            ? ["rgba(250,246,255,0.74)", "rgba(226,214,255,0.6)", "rgba(206,190,250,0.62)"]
+            : ["rgba(251,248,255,0.96)", "rgba(232,222,255,0.93)", "rgba(214,200,250,0.93)"]
+        }
+        locations={[0, 0.55, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+      {/* O brilho do alto: a luz que o vidro pega em cima. */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={["rgba(255,255,255,0.7)", "rgba(255,255,255,0)"]}
+        style={{ position: "absolute", left: 0, right: 0, top: 0, height: "46%" }}
+      />
+      {children}
+    </Vidro>
+  );
+}
+
+function BotaoRedondo({
+  rotulo,
+  aoTocar,
+  apagado,
+  children,
+}: {
+  rotulo: string;
+  aoTocar: () => void;
+  apagado?: boolean;
+  children: ReactNode;
+}) {
+  const lado = ALVO_MINIMO + 6;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={rotulo}
+      accessibilityState={{ disabled: !!apagado }}
+      disabled={apagado}
+      onPress={() => {
+        toque();
+        aoTocar();
+      }}
+      style={({ pressed }) => ({
+        opacity: apagado ? 0.55 : 1,
+        transform: [{ scale: pressed ? 0.93 : 1 }],
+      })}
+    >
+      <VidroLilas
+        estilo={{ width: lado, height: lado, alignItems: "center", justifyContent: "center" }}
+      >
+        {children}
+      </VidroLilas>
+    </Pressable>
+  );
+}
+
+function BotaoDeSalvar({ aoTocar, desabilitado }: { aoTocar: () => void; desabilitado: boolean }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Salvar meu quarto"
+      accessibilityState={{ disabled: desabilitado }}
+      disabled={desabilitado}
+      onPress={aoTocar}
+      style={({ pressed }) => ({
+        flex: 1,
+        opacity: desabilitado ? 0.6 : 1,
+        transform: [{ scale: pressed ? 0.97 : 1 }],
+      })}
+    >
+      <LinearGradient
+        colors={["#a487fb", "#7c4fe8", "#6431d6"]}
+        locations={[0, 0.55, 1]}
+        style={{
+          height: ALVO_MINIMO + 10,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+          borderRadius: 999,
+          ...curva,
+          borderWidth: 2,
+          borderColor: "rgba(226,214,255,0.85)",
+          boxShadow: "0px 10px 24px -8px rgba(100,49,214,0.8), 0px 0px 14px rgba(164,135,251,0.45)",
+        }}
+      >
+        <Text style={{ ...fonte.forte, fontSize: 17, color: cor.branco }}>Salvar meu quarto</Text>
+        <Heart size={18} color={cor.branco} fill={cor.branco} strokeWidth={2} />
+      </LinearGradient>
+    </Pressable>
+  );
+}
+
+/* ── O quarto: os itens, as sombras e a luz ───────────────────────────── */
+
+const Cena = memo(function Cena({
   postos,
   novo,
   noite,
-  largura,
-  altura,
+  largura: L,
+  altura: A,
   aoTocar,
 }: {
   postos: readonly IdDoItem[];
@@ -412,50 +577,101 @@ const ItensNoQuarto = memo(function ItensNoQuarto({
   aoTocar: (id: IdDoItem) => void;
 }) {
   const itens = emOrdemDeDesenho(postos);
-  const luminaria = postos.includes("luminaria") ? ITEM_POR_ID.luminaria : null;
-  const k = largura / 1536;
   return (
     <>
+      {/* As estrelinhas da parede piscam (por baixo dos itens: estão na parede). */}
+      {noite ? <EstrelasQuePiscam /> : null}
+
+      {/* As sombras de contato: é o que põe cada coisa NO chão. */}
+      {itens
+        .filter((i) => APOIO[i.id] === "chao")
+        .map((item) => (
+          <SombraNoChao key={item.id} item={item} noite={noite} largura={L} altura={A} />
+        ))}
+
       {itens.map((item) => (
         <ItemNoQuarto
           key={item.id}
           item={item}
           novo={novo === item.id}
-          largura={largura}
-          altura={altura}
+          noite={noite}
+          largura={L}
+          altura={A}
           aoTocar={aoTocar}
         />
       ))}
+
       {noite ? (
         <>
-          {/* A noite: o mesmo azul multiplica o quarto e os itens. */}
-          <View
-            pointerEvents="none"
-            style={[
-              StyleSheet.absoluteFill,
-              { backgroundColor: AZUL_DA_NOITE, mixBlendMode: "multiply" },
-            ]}
+          {/* O LUAR passa por cima dos itens: a faixa fria que vem da janela
+              e a poça de luz onde a vidraça cai no chão. */}
+          <Feixe
+            id="luar"
+            largura={L}
+            altura={A}
+            janela={JANELA}
+            chao={MANCHA_NO_CHAO}
+            tom="#b9c8ff"
+            forca={0.075}
           />
-          {/* O céu da noite na janela (por cima do azul: ele já é a noite). */}
-          <Image
-            source={JANELA_DA_NOITE}
-            style={{
-              position: "absolute",
-              left: VIDRO.x * k,
-              top: VIDRO.y * k,
-              width: VIDRO.largura * k,
-              height: VIDRO.altura * k,
-            }}
-            contentFit="fill"
-            accessible={false}
+          <Brilho
+            cx={0.46 * L}
+            cy={0.59 * A}
+            raio={0.4 * L}
+            achatar={0.4}
+            tom="#b4c4ff"
+            forca={0.3}
           />
-          {/* A luminária acesa espalha uma luz quente em volta. */}
-          {luminaria ? <LuzDaLuminaria item={luminaria} largura={largura} altura={altura} /> : null}
+          {/* A LUZ DOS ITENS: cada um acende pelo que a ficha dele diz
+              (`luz`, na `REGUA_DA_LUZ`): o abajur ilumina o quarto, o móbile
+              que brilha no escuro só acende de leve. */}
+          {itens.map((item) =>
+            item.luz ? <LuzDoItem key={item.id} item={item} largura={L} altura={A} /> : null,
+          )}
+          <Cantos largura={L} altura={A} tom="#070824" forca={0.5} />
+          <Cintilas noite largura={L} altura={A} />
         </>
-      ) : null}
+      ) : (
+        <>
+          {/* O SOL: o clarão na janela, a faixa quente que entra e a poeira
+              dourada no ar. */}
+          <Brilho cx={0.15 * L} cy={0.245 * A} raio={0.36 * L} tom="#fff3cf" forca={0.6} />
+          {/* O dourado da manhã, que toma o quarto inteiro a partir da janela. */}
+          <Brilho cx={0.3 * L} cy={0.36 * A} raio={0.95 * L} tom="#ffc98a" forca={0.22} />
+          <Feixe
+            id="sol"
+            largura={L}
+            altura={A}
+            janela={JANELA}
+            chao={MANCHA_NO_CHAO}
+            tom="#ffe6ad"
+            forca={0.07}
+          />
+          <Brilho
+            cx={0.46 * L}
+            cy={0.59 * A}
+            raio={0.4 * L}
+            achatar={0.4}
+            tom="#ffd99a"
+            forca={0.26}
+          />
+          <Cantos largura={L} altura={A} tom="#5a2a14" forca={0.2} />
+          <Cintilas largura={L} altura={A} />
+        </>
+      )}
     </>
   );
 });
+
+/** A diagonal do vidro da janela e a mancha da vidraça no chão, em frações da arte. */
+const JANELA = [
+  [0.27, 0.15],
+  [0.1, 0.33],
+] as const;
+const MANCHA_NO_CHAO = [
+  [0.2, 0.64],
+  [0.74, 0.55],
+] as const;
 
 function caixaDoItem(item: ItemDoQuarto, L: number, A: number) {
   const { x, base, largura, achatar } = item.lugar;
@@ -464,15 +680,58 @@ function caixaDoItem(item: ItemDoQuarto, L: number, A: number) {
   return { left: x * L - w / 2, top: base * A - h, width: w, height: h };
 }
 
+function SombraNoChao({
+  item,
+  noite,
+  largura,
+  altura,
+}: {
+  item: ItemDoQuarto;
+  noite: boolean;
+  largura: number;
+  altura: number;
+}) {
+  const c = caixaDoItem(item, largura, altura);
+  const w = c.width * 1.12;
+  const h = Math.max(12, c.width * 0.24);
+  const id = `sombra-${item.id}`;
+  const tom = noite ? "#05061c" : "#4a2412";
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        left: c.left + c.width / 2 - w / 2 + c.width * 0.04,
+        top: c.top + c.height - h * 0.58,
+        width: w,
+        height: h,
+      }}
+    >
+      <Svg width={w} height={h}>
+        <Defs>
+          <RadialGradient id={id} cx="50%" cy="50%" rx="50%" ry="50%">
+            <Stop offset="0" stopColor={tom} stopOpacity={noite ? 0.66 : 0.5} />
+            <Stop offset="0.6" stopColor={tom} stopOpacity={noite ? 0.3 : 0.2} />
+            <Stop offset="1" stopColor={tom} stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
+        <Ellipse cx={w / 2} cy={h / 2} rx={w / 2} ry={h / 2} fill={`url(#${id})`} />
+      </Svg>
+    </View>
+  );
+}
+
 function ItemNoQuarto({
   item,
   novo,
+  noite,
   largura,
   altura,
   aoTocar,
 }: {
   item: ItemDoQuarto;
   novo: boolean;
+  noite: boolean;
   largura: number;
   altura: number;
   aoTocar: (id: IdDoItem) => void;
@@ -485,6 +744,10 @@ function ItemNoQuarto({
     Animated.spring(v, { toValue: 1, speed: 14, bounciness: 12, useNativeDriver: true }).start();
   }, [novo, reduzido, v]);
   const caixa = caixaDoItem(item, largura, altura);
+  const naParede = APOIO[item.id] === "parede";
+  /* À noite cada item escurece na SUA forma (a mesma arte, tingida, por
+     cima), e menos quanto mais luz ele tem: a luminária quase nada. */
+  const escuro = noite ? 0.34 * (1 - 0.78 * (item.luz?.potencia ?? 0)) : 0;
   return (
     <Animated.View
       style={{
@@ -495,6 +758,12 @@ function ItemNoQuarto({
           { translateY: v.interpolate({ inputRange: [0, 1], outputRange: [-18, 0] }) },
           { scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) },
         ],
+        /* A sombra projetada segue a forma da arte: o que está na parede a
+           lança para baixo e para o lado; o resto, só um contorno macio. */
+        shadowColor: noite ? "#03041a" : "#3b1c10",
+        shadowOffset: naParede ? { width: 4, height: 7 } : { width: 2, height: 3 },
+        shadowOpacity: noite ? 0.55 : naParede ? 0.3 : 0.2,
+        shadowRadius: naParede ? 7 : 5,
       }}
     >
       <Pressable
@@ -505,120 +774,356 @@ function ItemNoQuarto({
         style={{ flex: 1 }}
       >
         <Image source={ARTE[item.id]} style={{ flex: 1 }} contentFit="fill" accessible={false} />
+        {escuro ? (
+          <Image
+            source={ARTE[item.id]}
+            tintColor={SOMBRA_DA_NOITE}
+            style={[StyleSheet.absoluteFill, { opacity: escuro }]}
+            contentFit="fill"
+            accessible={false}
+          />
+        ) : null}
       </Pressable>
     </Animated.View>
   );
 }
 
-function LuzDaLuminaria({
+/**
+ * A LUZ DE UM ITEM, tirada da ficha dele (`item.luz`): o miolo aceso, o
+ * clarão em volta e, para quem ilumina de verdade, a luz larga na parede e a
+ * poça no chão. Tudo sai da `potencia` (a lâmpada é o 1): um item novo só
+ * precisa da ficha no catálogo, e nada aqui muda.
+ */
+function LuzDoItem({
   item,
-  largura,
+  largura: L,
   altura,
 }: {
   item: ItemDoQuarto;
   largura: number;
   altura: number;
 }) {
-  const c = caixaDoItem(item, largura, altura);
-  const lado = largura * 0.62;
-  /* A cúpula fica no alto da arte da luminária. */
-  const cx = c.left + c.width / 2;
-  const cy = c.top + c.height * 0.12;
+  const luz = item.luz;
+  if (!luz) return null;
+  const p = luz.potencia;
+  const c = caixaDoItem(item, L, altura);
+  const cx = c.left + c.width * luz.de[0];
+  const cy = c.top + c.height * luz.de[1];
+  return (
+    <>
+      {/* A luz larga, na parede e nos objetos em volta: só de luz noturna para cima. */}
+      {p >= 0.5 ? (
+        <Brilho
+          cx={cx}
+          cy={cy + c.height * 0.3}
+          raio={L * (0.12 + 0.44 * p)}
+          tom={luz.tom}
+          forca={0.5 * p}
+        />
+      ) : null}
+      <Brilho cx={cx} cy={cy} raio={L * (0.06 + 0.18 * p)} tom={luz.tom} forca={0.15 + 0.55 * p} />
+      <Brilho
+        cx={cx}
+        cy={cy}
+        raio={L * (0.03 + 0.055 * p)}
+        tom={clarear(luz.tom, 0.55)}
+        forca={0.3 + 0.7 * p}
+      />
+      {luz.chao ? (
+        <Brilho
+          cx={cx}
+          cy={c.top + c.height}
+          raio={L * 0.3 * p}
+          achatar={0.36}
+          tom={luz.tom}
+          forca={0.5 * p}
+        />
+      ) : null}
+    </>
+  );
+}
+
+/** Uma luz redonda (ou achatada), somada ao quarto (`screen`). */
+function Brilho({
+  cx,
+  cy,
+  raio,
+  tom,
+  forca,
+  achatar = 1,
+}: {
+  cx: number;
+  cy: number;
+  raio: number;
+  tom: string;
+  forca: number;
+  achatar?: number;
+}) {
+  const w = raio * 2;
+  const h = w * achatar;
+  const id = `brilho-${tom.slice(1)}-${Math.round(raio)}-${Math.round(cy)}`;
   return (
     <View
       pointerEvents="none"
       style={{
         position: "absolute",
-        left: cx - lado / 2,
-        top: cy - lado / 2,
-        width: lado,
-        height: lado,
+        left: cx - w / 2,
+        top: cy - h / 2,
+        width: w,
+        height: h,
         mixBlendMode: "screen",
       }}
     >
-      <Svg width={lado} height={lado}>
+      <Svg width={w} height={h}>
         <Defs>
-          <RadialGradient id="luz-da-luminaria" cx="50%" cy="50%" r="50%">
-            <Stop offset="0" stopColor="#ffd59a" stopOpacity={0.75} />
-            <Stop offset="0.4" stopColor="#ffb870" stopOpacity={0.28} />
-            <Stop offset="1" stopColor="#ffb870" stopOpacity={0} />
+          <RadialGradient id={id} cx="50%" cy="50%" rx="50%" ry="50%">
+            <Stop offset="0" stopColor={tom} stopOpacity={forca} />
+            <Stop offset="0.42" stopColor={tom} stopOpacity={forca * 0.42} />
+            <Stop offset="1" stopColor={tom} stopOpacity={0} />
           </RadialGradient>
         </Defs>
-        <Circle cx={lado / 2} cy={lado / 2} r={lado / 2} fill="url(#luz-da-luminaria)" />
+        <Ellipse cx={w / 2} cy={h / 2} rx={w / 2} ry={h / 2} fill={`url(#${id})`} />
       </Svg>
     </View>
   );
 }
 
-/* ── O alto ───────────────────────────────────────────────────────────── */
-
-function BotaoRedondo({
-  rotulo,
-  aoTocar,
-  children,
+/**
+ * O feixe de luz da janela (o sol ou o luar): da diagonal do vidro até a
+ * mancha no chão, somado ao quarto. As bordas são CINCO camadas, cada uma
+ * mais estreita: a luz some aos poucos, sem a quina dura de um triângulo.
+ */
+function Feixe({
+  id,
+  largura: L,
+  altura: A,
+  janela,
+  chao,
+  tom,
+  forca,
 }: {
-  rotulo: string;
-  aoTocar: () => void;
-  children: React.ReactNode;
+  id: string;
+  largura: number;
+  altura: number;
+  janela: readonly (readonly [number, number])[];
+  chao: readonly (readonly [number, number])[];
+  tom: string;
+  forca: number;
 }) {
+  const camadas = [0, 0.12, 0.24, 0.36, 0.48];
+  const ponto = (a: readonly number[], b: readonly number[], t: number) =>
+    `${(a[0]! + (b[0]! - a[0]!) * t) * L},${(a[1]! + (b[1]! - a[1]!) * t) * A}`;
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={rotulo}
-      onPress={() => {
-        toque();
-        aoTocar();
-      }}
-      style={({ pressed }) => ({
-        width: ALVO_MINIMO + 4,
-        height: ALVO_MINIMO + 4,
-        borderRadius: (ALVO_MINIMO + 4) / 2,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "rgba(255,255,255,0.95)",
-        transform: [{ scale: pressed ? 0.94 : 1 }],
-        ...sombra,
-      })}
-    >
-      {children}
-    </Pressable>
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, { mixBlendMode: "screen" }]}>
+      <Svg width={L} height={A}>
+        <Defs>
+          <Degrade id={`feixe-${id}`} x1="0.16" y1="0.24" x2="0.5" y2="0.62">
+            <Stop offset="0" stopColor={tom} stopOpacity={forca} />
+            <Stop offset="0.7" stopColor={tom} stopOpacity={forca * 0.55} />
+            <Stop offset="1" stopColor={tom} stopOpacity={0} />
+          </Degrade>
+        </Defs>
+        {camadas.map((t) => (
+          <Polygon
+            key={t}
+            points={[
+              ponto(janela[0]!, janela[1]!, t / 2),
+              ponto(janela[0]!, janela[1]!, 1 - t / 2),
+              ponto(chao[0]!, chao[1]!, t / 2),
+              ponto(chao[0]!, chao[1]!, 1 - t / 2),
+            ].join(" ")}
+            fill={`url(#feixe-${id})`}
+          />
+        ))}
+      </Svg>
+    </View>
   );
 }
 
+/** O escuro dos cantos: dá fundo ao quarto, e a luz aparece contra ele. */
+function Cantos({
+  largura,
+  altura,
+  tom,
+  forca,
+}: {
+  largura: number;
+  altura: number;
+  tom: string;
+  forca: number;
+}) {
+  return (
+    <Svg width={largura} height={altura} style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Defs>
+        <RadialGradient id="cantos-do-quarto" cx="46%" cy="42%" rx="74%" ry="56%">
+          <Stop offset="0.5" stopColor={tom} stopOpacity={0} />
+          <Stop offset="1" stopColor={tom} stopOpacity={forca} />
+        </RadialGradient>
+      </Defs>
+      <Rect x={0} y={0} width={largura} height={altura} fill="url(#cantos-do-quarto)" />
+    </Svg>
+  );
+}
+
+/** As estrelinhas da parede acendem e apagam devagar, como as que brilham no escuro. */
+function EstrelasQuePiscam() {
+  const reduzido = useMovimentoReduzido();
+  const v = useRef(new Animated.Value(0.5)).current;
+  useEffect(() => {
+    if (reduzido) return;
+    const ir = (para: number, ms: number) =>
+      Animated.timing(v, {
+        toValue: para,
+        duration: ms,
+        easing: Easing.inOut(Easing.sin),
+        useNativeDriver: true,
+      });
+    const laco = Animated.loop(Animated.sequence([ir(1, 1700), ir(0.15, 2100)]));
+    laco.start();
+    return () => laco.stop();
+  }, [reduzido, v]);
+  return (
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, { mixBlendMode: "screen" }]}>
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: v }]}>
+        <Image
+          source={ESTRELAS_DA_NOITE}
+          style={StyleSheet.absoluteFill}
+          contentFit="fill"
+          accessible={false}
+        />
+      </Animated.View>
+    </View>
+  );
+}
+
+/* [x, y, tamanho, atraso em ms]: de dia, a poeira dourada na faixa do sol; de
+   noite, os vaga-lumes pelo quarto. */
+type Ponto = readonly [number, number, number, number];
+const CINTILAS_DO_DIA: readonly Ponto[] = [
+  [0.24, 0.27, 4, 0],
+  [0.33, 0.34, 3, 900],
+  [0.41, 0.42, 5, 1700],
+  [0.3, 0.46, 3, 2600],
+  [0.5, 0.5, 4, 400],
+  [0.57, 0.38, 3, 3100],
+  [0.2, 0.37, 3, 2100],
+  [0.46, 0.31, 3, 1300],
+];
+const CINTILAS_DA_NOITE: readonly Ponto[] = [
+  [0.14, 0.44, 4, 0],
+  [0.36, 0.3, 3, 1200],
+  [0.62, 0.47, 4, 2300],
+  [0.82, 0.3, 3, 700],
+  [0.9, 0.5, 4, 3000],
+  [0.5, 0.62, 3, 1800],
+  [0.27, 0.58, 3, 2700],
+  [0.72, 0.6, 4, 400],
+];
+
+function Cintilas({
+  noite,
+  largura,
+  altura,
+}: {
+  noite?: boolean;
+  largura: number;
+  altura: number;
+}) {
+  const reduzido = useMovimentoReduzido();
+  if (reduzido) return null;
+  return (
+    <>
+      {(noite ? CINTILAS_DA_NOITE : CINTILAS_DO_DIA).map(([x, y, t, atraso], i) => (
+        <Cintila
+          key={i}
+          x={x * largura}
+          y={y * altura}
+          tamanho={t}
+          atraso={atraso}
+          tom={noite ? "#ffe9a6" : "#fff6d6"}
+        />
+      ))}
+    </>
+  );
+}
+
+function Cintila({
+  x,
+  y,
+  tamanho,
+  atraso,
+  tom,
+}: {
+  x: number;
+  y: number;
+  tamanho: number;
+  atraso: number;
+  tom: string;
+}) {
+  const v = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const laco = Animated.loop(
+      Animated.sequence([
+        Animated.delay(atraso),
+        Animated.timing(v, {
+          toValue: 1,
+          duration: 4200,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    laco.start();
+    return () => laco.stop();
+  }, [atraso, v]);
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        left: x,
+        top: y,
+        width: tamanho,
+        height: tamanho,
+        borderRadius: tamanho,
+        backgroundColor: tom,
+        boxShadow: `0px 0px ${tamanho * 2}px ${tom}`,
+        opacity: v.interpolate({ inputRange: [0, 0.25, 0.7, 1], outputRange: [0, 0.95, 0.7, 0] }),
+        transform: [
+          { translateY: v.interpolate({ inputRange: [0, 1], outputRange: [8, -22] }) },
+          { translateX: v.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 5, -2] }) },
+        ],
+      }}
+    />
+  );
+}
+
+/* ── O alto ───────────────────────────────────────────────────────────── */
+
 function FalaDaBolha({ fala, pose }: { fala: string; pose: HumorDaArte }) {
   return (
-    <View
-      accessibilityLiveRegion="polite"
-      style={{
-        flex: 1,
-        minHeight: ALVO_MINIMO + 4,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 6,
-        paddingLeft: 4,
-        paddingRight: 12,
-        borderRadius: canto.pilula,
-        ...curva,
-        backgroundColor: "rgba(255,255,255,0.95)",
-        ...sombra,
-      }}
-    >
-      <View accessible={false} importantForAccessibility="no-hide-descendants">
-        <ArteDaBolha humor={pose} tamanho={36} />
-      </View>
-      <Text
-        numberOfLines={2}
-        style={{
-          flex: 1,
-          ...fonte.forte,
-          fontSize: 13,
-          lineHeight: 17,
-          color: corJornada.roxoEscuro,
+    <View accessibilityLiveRegion="polite" style={{ flex: 1 }}>
+      <VidroLilas
+        estilo={{
+          minHeight: ALVO_MINIMO + 6,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 6,
+          paddingLeft: 5,
+          paddingRight: 12,
         }}
       >
-        {fala}
-      </Text>
-      <Heart size={14} color={ROXO} fill={ROXO} strokeWidth={2} />
+        <View accessible={false} importantForAccessibility="no-hide-descendants">
+          <ArteDaBolha humor={pose} tamanho={40} />
+        </View>
+        <Text
+          numberOfLines={2}
+          style={{ flex: 1, ...fonte.forte, fontSize: 13, lineHeight: 17, color: TINTA }}
+        >
+          {fala}
+        </Text>
+        <Heart size={14} color={ROXO} fill={ROXO} strokeWidth={2} />
+      </VidroLilas>
     </View>
   );
 }
@@ -626,29 +1131,23 @@ function FalaDaBolha({ fala, pose }: { fala: string; pose: HumorDaArte }) {
 function Saldo({ cantinho }: { cantinho: CantinhoOk | null | "lendo" }) {
   if (!cantinho || cantinho === "lendo") return null;
   return (
-    <View
-      accessible
-      accessibilityLabel={`${cantinho.balance} sementinhas`}
-      style={{
-        minHeight: ALVO_MINIMO,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 3,
-        paddingHorizontal: 10,
-        borderRadius: canto.pilula,
-        ...curva,
-        backgroundColor: "rgba(255,255,255,0.95)",
-        ...sombra,
-      }}
-    >
-      <Text allowFontScaling={false} style={{ fontSize: 16 }}>
-        🌱
-      </Text>
-      <Text
-        style={{ ...fonte.forte, fontSize: 16, color: cor.texto, fontVariant: ["tabular-nums"] }}
+    <View accessible accessibilityLabel={`${cantinho.balance} sementinhas`}>
+      <VidroLilas
+        estilo={{
+          minHeight: ALVO_MINIMO + 6,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 3,
+          paddingHorizontal: 11,
+        }}
       >
-        {cantinho.balance}
-      </Text>
+        <Text allowFontScaling={false} style={{ fontSize: 16 }}>
+          🌱
+        </Text>
+        <Text style={{ ...fonte.forte, fontSize: 17, color: TINTA, fontVariant: ["tabular-nums"] }}>
+          {cantinho.balance}
+        </Text>
+      </VidroLilas>
     </View>
   );
 }
@@ -669,25 +1168,28 @@ function BotaoDaMissao({
   if (d.estado === "todas") return null;
   const espera = d.estado === "aberta";
   return (
-    <BotaoRedondo
-      rotulo={
-        aberta
-          ? "Fechar a missão de hoje"
-          : espera
-            ? "Missão de hoje, esperando"
-            : "Missão de hoje, cumprida"
-      }
-      aoTocar={aoTocar}
-    >
-      <Gift size={24} color={ROXO} strokeWidth={2.2} />
+    <View>
+      <BotaoRedondo
+        rotulo={
+          aberta
+            ? "Fechar a missão de hoje"
+            : espera
+              ? "Missão de hoje, esperando"
+              : "Missão de hoje, cumprida"
+        }
+        aoTocar={aoTocar}
+      >
+        <Gift size={24} color={ROXO} strokeWidth={2.2} />
+      </BotaoRedondo>
       {espera && !aberta ? (
         <View
+          pointerEvents="none"
           style={{
             position: "absolute",
-            top: 6,
-            right: 6,
-            width: 11,
-            height: 11,
+            top: 3,
+            right: 3,
+            width: 12,
+            height: 12,
             borderRadius: 6,
             backgroundColor: "#ef4444",
             borderWidth: 2,
@@ -695,7 +1197,7 @@ function BotaoDaMissao({
           }}
         />
       ) : null}
-    </BotaoRedondo>
+    </View>
   );
 }
 
@@ -723,58 +1225,66 @@ function CartaoDaMissao({
           ? `Missão de hoje cumprida: ${missao.texto}. Amanhã tem outra.`
           : `Sua missão de hoje: ${missao.texto}. ${feitos} de ${total}.`
       }
-      style={{
-        width: 208,
-        borderRadius: 18,
-        ...curva,
-        padding: 10,
-        gap: 6,
-        backgroundColor: "rgba(255,251,245,0.95)",
-        borderWidth: 1.5,
-        borderStyle: "dashed",
-        borderColor: acabouDeCumprir === missao.id ? "#f5c451" : "#efd9c3",
-        ...sombra,
-      }}
     >
-      <View style={{ flexDirection: "row", alignItems: "center" }}>
-        <Text style={{ flex: 1, ...fonte.forte, fontSize: 13, color: cor.texto }}>
-          {feita ? "Missão cumprida!" : "Sua missão de hoje:"}
-        </Text>
-        <Gift size={20} color={ROXO} strokeWidth={2.2} />
-      </View>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-        <Image source={ARTE[icone]} style={{ width: 34, height: 34 }} contentFit="contain" />
-        <Text
-          style={{ flex: 1, ...fonte.media, fontSize: 13, lineHeight: 17, color: cor.textoCorpo }}
-        >
-          {feita ? "Amanhã tem outra." : missao.texto}
-        </Text>
-      </View>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-        <View
-          style={{
-            flex: 1,
-            height: 6,
-            borderRadius: 3,
-            backgroundColor: "#efe6f8",
-            overflow: "hidden",
-          }}
-        >
+      <LinearGradient
+        colors={["rgba(255,250,243,0.97)", "rgba(255,236,220,0.95)"]}
+        style={{
+          width: 212,
+          borderRadius: 20,
+          ...curva,
+          padding: 11,
+          gap: 6,
+          borderWidth: 1.5,
+          borderStyle: "dashed",
+          borderColor: acabouDeCumprir === missao.id ? OURO : "#f0c7a6",
+          boxShadow: "0px 10px 24px -10px rgba(76,29,149,0.5)",
+        }}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <Text style={{ flex: 1, ...fonte.forte, fontSize: 13, color: cor.texto }}>
+            {feita ? "Missão cumprida!" : "Sua missão de hoje:"}
+          </Text>
+          <Gift size={20} color={ROXO} strokeWidth={2.2} />
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Image source={ARTE[icone]} style={{ width: 34, height: 34 }} contentFit="contain" />
+          <Text
+            style={{ flex: 1, ...fonte.media, fontSize: 13, lineHeight: 17, color: cor.textoCorpo }}
+          >
+            {feita ? "Amanhã tem outra." : missao.texto}
+          </Text>
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <View
             style={{
-              width: `${Math.round((feitos / total) * 100)}%`,
+              flex: 1,
               height: 6,
               borderRadius: 3,
-              backgroundColor: feita ? cor.sementinha : ROXO,
+              backgroundColor: "#f3dccb",
+              overflow: "hidden",
             }}
-          />
+          >
+            <View
+              style={{
+                width: `${Math.round((feitos / total) * 100)}%`,
+                height: 6,
+                borderRadius: 3,
+                backgroundColor: feita ? cor.sementinha : ROXO,
+              }}
+            />
+          </View>
+          <Text
+            style={{
+              ...fonte.forte,
+              fontSize: 13,
+              color: cor.texto,
+              fontVariant: ["tabular-nums"],
+            }}
+          >
+            {feitos} / {total}
+          </Text>
         </View>
-        <Text
-          style={{ ...fonte.forte, fontSize: 13, color: cor.texto, fontVariant: ["tabular-nums"] }}
-        >
-          {feitos} / {total}
-        </Text>
-      </View>
+      </LinearGradient>
     </View>
   );
 }
@@ -786,7 +1296,7 @@ function Abas({ ativa, aoEscolher }: { ativa: Categoria; aoEscolher: (c: Categor
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ gap: 6, paddingHorizontal: espaco.sm }}
+      contentContainerStyle={{ gap: 6, paddingHorizontal: espaco.sm, paddingVertical: 4 }}
     >
       {CATEGORIAS.map((c) => {
         const sim = c.id === ativa;
@@ -800,22 +1310,38 @@ function Abas({ ativa, aoEscolher }: { ativa: Categoria; aoEscolher: (c: Categor
               selecao();
               aoEscolher(c.id);
             }}
-            style={{
-              minWidth: 74,
-              minHeight: 52,
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 1,
-              paddingHorizontal: 8,
-              borderRadius: 16,
-              ...curva,
-              backgroundColor: sim ? ROXO : LILAS_CLARO,
-            }}
           >
-            <Image source={ARTE[c.icone]} style={{ width: 24, height: 24 }} contentFit="contain" />
-            <Text style={{ ...fonte.forte, fontSize: 13, color: sim ? cor.branco : cor.texto }}>
-              {c.nome}
-            </Text>
+            <LinearGradient
+              colors={
+                sim
+                  ? ["#a487fb", "#7c4fe8", "#6431d6"]
+                  : ["rgba(255,255,255,0.86)", "rgba(240,232,255,0.7)"]
+              }
+              style={{
+                minWidth: 74,
+                minHeight: 52,
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 1,
+                paddingHorizontal: 8,
+                borderRadius: 18,
+                ...curva,
+                borderWidth: 1.5,
+                borderColor: sim ? "rgba(226,214,255,0.9)" : "rgba(255,255,255,0.9)",
+                boxShadow: sim
+                  ? "0px 6px 14px -4px rgba(100,49,214,0.7), 0px 0px 10px rgba(164,135,251,0.5)"
+                  : "0px 3px 8px -4px rgba(76,29,149,0.25)",
+              }}
+            >
+              <Image
+                source={ARTE[c.icone]}
+                style={{ width: 24, height: 24 }}
+                contentFit="contain"
+              />
+              <Text style={{ ...fonte.forte, fontSize: 13, color: sim ? cor.branco : TINTA }}>
+                {c.nome}
+              </Text>
+            </LinearGradient>
           </Pressable>
         );
       })}
@@ -843,8 +1369,8 @@ function Bandeja({
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      style={{ marginTop: espaco.sm }}
-      contentContainerStyle={{ gap: espaco.sm, paddingHorizontal: espaco.sm }}
+      /* A folga em volta é para o brilho dourado do escolhido não ser cortado. */
+      contentContainerStyle={{ gap: espaco.sm, paddingHorizontal: espaco.sm, paddingVertical: 10 }}
     >
       {itens.map((item) => {
         const s = situacaoDoItem(item, quarto, posse, precoDaLojinha);
@@ -900,63 +1426,69 @@ function CartaoDoItem({
       }
       disabled={s === null}
       onPress={aoTocar}
-      style={({ pressed }) => ({
-        width: 86,
-        height: 96,
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 4,
-        borderRadius: 20,
-        ...curva,
-        backgroundColor: posto ? "#fbf6ff" : cor.branco,
-        borderWidth: posto ? 2 : 1,
-        borderColor: posto ? ROXO : "#efe9f6",
-        transform: [{ scale: pressed ? 0.96 : 1 }],
-        ...sombra,
-      })}
+      style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.95 : 1 }] })}
     >
-      <Image
-        source={ARTE[item.id]}
-        style={{ width: 60, height: 54, opacity: fechado ? 0.55 : 1 }}
-        contentFit="contain"
-        accessible={false}
-      />
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 3, minHeight: 18 }}>
-        {s?.tipo === "comprar" ? (
-          <Text allowFontScaling={false} style={{ fontSize: 13 }}>
-            🌱
+      <LinearGradient
+        colors={posto ? ["#fffdf6", "#fff1d6"] : ["#ffffff", "#f1e9ff"]}
+        style={{
+          width: 86,
+          height: 96,
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 4,
+          borderRadius: 20,
+          ...curva,
+          borderWidth: posto ? 2.5 : 1.5,
+          borderColor: posto ? OURO : "rgba(255,255,255,0.95)",
+          boxShadow: posto
+            ? "0px 0px 14px rgba(245,196,81,0.85), 0px 6px 12px -6px rgba(180,120,20,0.5)"
+            : "0px 6px 12px -6px rgba(76,29,149,0.35)",
+        }}
+      >
+        <Image
+          source={ARTE[item.id]}
+          style={{ width: 60, height: 54, opacity: fechado ? 0.55 : 1 }}
+          contentFit="contain"
+          accessible={false}
+        />
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 3, minHeight: 18 }}>
+          {s?.tipo === "comprar" ? (
+            <Text allowFontScaling={false} style={{ fontSize: 13 }}>
+              🌱
+            </Text>
+          ) : null}
+          {s?.tipo === "missao" ? (
+            <Lock size={13} color={cor.textoApagado} strokeWidth={2.4} />
+          ) : null}
+          <Text
+            style={{
+              ...fonte.forte,
+              fontSize: 13,
+              color: posto ? "#8a4f00" : fechado ? cor.textoApagado : TINTA,
+            }}
+          >
+            {rotulo}
           </Text>
-        ) : null}
-        {s?.tipo === "missao" ? (
-          <Lock size={13} color={cor.textoApagado} strokeWidth={2.4} />
-        ) : null}
-        <Text
-          style={{
-            ...fonte.forte,
-            fontSize: 13,
-            color: posto ? ROXO : fechado ? cor.textoApagado : cor.texto,
-          }}
-        >
-          {rotulo}
-        </Text>
-      </View>
+        </View>
+      </LinearGradient>
       {posto ? (
         <View
           style={{
             position: "absolute",
-            top: -6,
-            right: -6,
+            top: -5,
+            right: -5,
             width: 24,
             height: 24,
             borderRadius: 12,
             alignItems: "center",
             justifyContent: "center",
-            backgroundColor: "#f5c451",
+            backgroundColor: OURO,
             borderWidth: 2,
             borderColor: cor.branco,
+            boxShadow: "0px 2px 6px rgba(180,120,20,0.5)",
           }}
         >
-          <Check size={14} color={cor.branco} strokeWidth={3} />
+          <Check size={14} color={TINTA} strokeWidth={3.2} />
         </View>
       ) : null}
     </Pressable>

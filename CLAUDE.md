@@ -207,9 +207,15 @@ flor-de-bolhas.tsx`, 23/11/2026, o dono: "uma arte mais 3D, com movimentos,
   `lib/quartinho/quarto.ts`, 23/11/2026, primeira versão): abre ao tocar na
   Bolha do céu. O quarto vazio e cada item são arte do Higgsfield
   (`assets/quartinho/`), cada item num lugar FIXO; a posse dos itens da
-  lojinha é a da lojinha (sem moeda nova). A noite é um azul em
-  `mixBlendMode: "multiply"` com o vidro da janela da noite por cima — nunca
-  `filter: brightness`, que no iOS pinta névoa cinza. Modo Cuidado não abre.
+  lojinha é a da lojinha (sem moeda nova). O que flutua é vidro LILÁS em
+  degradê (`VidroLilas`), nunca bloco branco; cada item tem sombra (`APOIO`);
+  e a LUZ é o centro: de noite o quarto é uma pintura (`quarto-noite.webp`),
+  os itens escurecem pela própria forma (`tintColor`) e a luz passa por cima
+  — nunca `filter: brightness`, que no iOS pinta névoa cinza. Modo Cuidado
+  não abre. ⚠️ **Item novo do quartinho traz a ficha de LUZ** (`luz`, um
+  degrau da `REGUA_DA_LUZ`, ou `null`): "cada um deve ter seu brilho
+  proporcional à realidade" (o dono). A receita do item novo está em
+  `docs/proposta-quartinho-e-itens.md`, e `quarto.test.ts` cobra.
   O que falta está em `docs/proposta-quartinho-e-itens.md`.
 - **Profundidade** (`componentes/jornada/ceu-do-bebe.tsx`): o número da semana
   atrás do bebê, em camadas que andam com o celular (`useParalaxe`) e com a
