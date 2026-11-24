@@ -373,6 +373,12 @@ Passo a passo (uma vez):
 Depois disso, cada `git push` atualiza o site: a branch de produção vira a URL
 principal e as outras branches ganham uma URL de **preview** automática.
 
+> **Push só do app não monta o site (pedido do dono, 23/11/2026).** O
+> `ignoreCommand` do `vercel.json` compara o commit com o último deploy
+> (`VERCEL_GIT_PREVIOUS_SHA`) e pula o build quando só mudaram `mobile/`,
+> `docs/` ou o `CLAUDE.md`: o site no ar fica intocado. Qualquer outro arquivo
+> monta como antes, e na dúvida (commit que o clone não tem) também monta.
+
 > ⚠️ **MEDIDO EM AGO/2026: `www.obstetrica.com.br` ESTÁ SERVINDO A BRANCH DE
 > TRABALHO `claude/determined-edison-XSh9l`, e não a `main`.** Conferido contra
 > a fonte primária, e não deduzido do painel: `/pub/<CODIGO>` é uma rota que
