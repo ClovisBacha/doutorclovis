@@ -63,6 +63,68 @@ quando o quarto tiver onde pôr o que ela comprou.
 **O que falta para lançar**: mais itens (um lote de ~16 por 2 créditos,
 na mesma cartela); a retrospectiva com as memórias; a Bolha vestida (ideia 2).
 
+## A migração da lojinha para o quartinho (24/11/2026)
+
+O dono: "a trilha customizada não vai mais existir [...] o fundo será baseado
+no clima do dia [...] todos os itens que têm na nossa trilha, você deve tentar
+passar para o quartinho. O que não der, a gente vai excluir do nosso jogo [...]
+os itens de fato comprados têm que ser ali na aba do quartinho".
+
+**O que mudou no app**
+
+- A trilha sobe pelo céu da hora, sem enfeites, Arrumar, cenário, ar nem pele
+  das bolinhas. As sementinhas do placar levam ao quartinho (ou às conquistas,
+  quando há conquista para resgatar).
+- As Recompensas ficaram com a porta do quartinho, as conquistas e o "Ganhe
+  mais". O "Meu Cantinho" saiu.
+- O quartinho é a loja: ela compra ali mesmo. O perfil da amiga mostra a luz e
+  a Bolha (a cena do Cantinho dela saiu).
+- O "No ar" da lojinha virou o AR do quarto, desenhado por código (pétalas,
+  bolhinhas, peninhas, folhas, neve, poeira de estrelas), em rajadas.
+
+**O destino de cada um dos 111 itens** mora em
+`mobile/src/lib/quartinho/migracao.ts` (a catraca `migracao.test.ts` cobra
+que nenhum fique sem): 9 já estão no quarto, 6 viraram o ar, 57 vêm para o
+quarto quando tiverem arte, e 39 saem do jogo. Quem já comprou um item que
+saiu continua dona no servidor; o app só não o mostra.
+
+**Os 57 que vêm para o quarto** (cada um já com o nome no quarto, a
+categoria, o apoio e a ficha de luz):
+
+- **plantas** (11): Suculenta (era Suculenta); Girassol (era Girassol); Trevo (era Trevo); Tulipas (era Tulipa); Cerejeira (era Cerejeira); Bonsai (era Bonsai); Flores na janela (era Primavera); Hortelã (era Hortelã); Cactinho (era Cactinho); Roseira (era Roseira); Palmeirinha (era Palmeirinha).
+- **decoracao** (21): Estrelinhas no teto (era Estrelinhas, luz brilhaNoEscuro); Nuvem na parede (era Nuvem fofa); Borboletas (era Borboleta); Pote de vaga-lumes (era Vaga-lumes no pote, luz luzinhas); Quadro do sol (era Sol radiante); Luminária de lua (era Lua e estrelas, luz luzNoturna); Velinhas de LED (era Velinha, luz luzinhas); Lampião (era Lampião, luz luzNoturna); Varal de luzinhas (era Pisca-pisca, luz luzinhas); Lanterninha (era Lanterninha, luz luzNoturna); Passarinhos na parede (era Bando de passarinhos); Pipa (era Pipa); Balãozinho (era Balãozinho); Estrela cadente (era Cometa, luz tintaQueBrilha); Bule de chá (era Chá quentinho); Almofada (era Almofadinha); Chuva na janela (era Chuva mansa); Abajur de cogumelo (era Cogumelinho, luz luzNoturna); Cesta de tricô (era Novelo de linha); Espelho (era Espelhinho); Caixinha de som (era Fones de dormir).
+- **brinquedos** (25): Gatinho (era Gatinho); Passarinho (era Passarinho cantante); Arco-íris de madeira (era Arco-íris); Peixinho (era Peixinho); Golfinho (era Golfinho); Livrinhos (era Livrinho de história); Caixinha de música (era Caixinha de música); Joaninha (era Joaninha); Abelhinha (era Abelhinha); Tartaruguinha (era Tartaruguinha); Raposinha (era Raposinha); Sapinho (era Sapinho); Caranguejinho (era Caranguejinho); Patinho (era Patinho); Polvinho (era Polvinho); Cisne (era Cisne); Foquinha (era Foquinha); Caracol (era Caracol); Lagartinha (era Lagartinha); Esquilinho (era Esquilinho); Ouriço (era Ouriço); Ovelhinha (era Ovelhinha); Corujinha (era Corujinha); Matrioskas (era Matrioskas); Carrossel (era Carrossel).
+
+**Os 39 que saem do jogo, e por quê:**
+
+- era a pele das bolinhas da trilha, que não se personaliza mais: Bolinhas Jardim, Bolinhas Lótus, Bolinhas Origami, Bolinhas Pérolas, Bolinhas Constelação, Bolinhas Cristais, Bolinhas Planetas, Bolinhas Coração.
+- era o fundo da trilha, que agora é o céu da hora: Fundo Suave, Campo ao amanhecer, Quartinho aconchegante, Ondas do mar, Chuva de estrelas, Aurora boreal, Bosque tranquilo, Campo de lavanda, Fim de tarde no deserto, Manhã de neve, Beira do lago, Campo dourado, Entre as nuvens.
+- trocava o céu do site; no app não tinha efeito: Céu Clássico.
+- já estava fora de circulação: Balão de ar, Cascata, Estrela cadente, Arco-íris duplo.
+- a árvore que cresce era da trilha: Árvore que cresce.
+- o quarto já tem o dia e a noite de verdade: Ciclo dia/noite.
+- era uma estação da trilha: Outono, Natal, Boneco de neve.
+- uma poça não cabe num quarto: Pocinha.
+- uma fonte não cabe num quarto: Fontinha.
+- ficaria solta, sem lugar no quarto: Conchinha.
+- um recife não cabe num quarto: Recife de coral.
+- as carpas ao vento são do céu aberto: Carpas ao vento.
+- fogos de artifício não combinam com o quarto do bebê: Fogos de artifício.
+- um pavão não cabe num quarto: Pavão.
+- a Coroa era da coleção da lojinha da trilha: Coroa da Coleção.
+
+**A arte que falta (orçamento de 24/11/2026, sem gerar nada):** uma cartela
+4×4 em 2k custa 2 créditos (`gpt_image_2_6` ou `nano_banana_pro`, medido por
+`estimate_image_cost`). Os 57 cabem em 4 cartelas: **cerca de 8 créditos**, até
+12 com uma refação por cartela (saldo: 36,97). Depois da arte, cada item entra
+pela receita abaixo: o lugar, o apoio e a luz já estão na ficha do
+`migracao.ts`.
+
+⚠️ Com 57 itens a mais, o quarto precisa de VAGAS (um lugar por tipo: o chão
+perto do tapete, a prateleira, o peitoril, a parede de cima, a cômoda), em vez
+de um lugar fixo por item: pôr um item numa vaga ocupada troca o que estava
+lá. É a próxima decisão de desenho, junto com a arte.
+
 ## Como criar um item novo do quartinho (a receita)
 
 Todo item novo entra em `mobile/src/lib/quartinho/quarto.ts`, na lista `ITENS`,

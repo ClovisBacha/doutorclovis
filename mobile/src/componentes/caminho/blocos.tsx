@@ -582,7 +582,6 @@ function Balao({
           />
           <Image
             source={BOLHA[pose]}
-            allowDownscaling={false}
             accessible={false}
             contentFit="contain"
             style={{

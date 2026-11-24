@@ -25,3 +25,16 @@ export const BOLHA = {
   estudiosa: require("../../assets/bolha/estudiosa.webp"),
   exercicio: require("../../../src/assets/bolha/exercicio.webp"),
 } as const;
+
+/**
+ * A BOLHA DO CÉU da tela do bebê (24/11/2026), já no tamanho EXATO em que ela
+ * aparece (212 pt: 212, 424 e 636 px, o `@2x` e o `@3x` que o iOS escolhe),
+ * reduzida da arte de 960 com o filtro de alta qualidade
+ * (`mobile/assets/bolha/ceu/`). A de 960 na vista de 636 deixava o iOS
+ * reduzir na placa de vídeo, com o filtro trilinear, que mistura a arte com
+ * uma cópia pela metade: a Bolha saía desfocada (o dono, de novo, no build 56).
+ */
+export const BOLHA_DO_CEU = {
+  feliz: require("../../assets/bolha/ceu/feliz.webp"),
+  surpresa: require("../../assets/bolha/ceu/surpresa.webp"),
+} as const;

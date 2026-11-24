@@ -575,12 +575,7 @@ function BarraQueNasce({
               paddingVertical: 5,
             }}
           >
-            <Image
-              source={BOLHA.feliz}
-              allowDownscaling={false}
-              style={{ width: 34, height: 34 }}
-              contentFit="contain"
-            />
+            <Image source={BOLHA.feliz} style={{ width: 34, height: 34 }} contentFit="contain" />
             <Text style={{ ...fonte.forte, ...escala.legenda, color: cor.texto }}>
               {nomeDoBebe ?? "O bebê"}
             </Text>

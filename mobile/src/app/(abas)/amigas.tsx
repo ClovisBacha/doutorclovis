@@ -371,7 +371,7 @@ function EstadoVazio({ pos }: { pos: boolean }) {
         }}
       >
         {pos
-          ? "Quem entrar pelo seu convite aparece aqui comigo, e vocês visitam o Cantinho uma da outra."
+          ? "Quem entrar pelo seu convite aparece aqui comigo, e vocês acompanham a chama e os troféus uma da outra."
           : `Quem entrar pelo seu convite aparece aqui comigo. Juntas, vocês formam uma dupla: cada dia em que as duas aparecem vale ${BONUS_DA_DUPLA} sementinhas para cada uma.`}
       </Text>
     </Painel>

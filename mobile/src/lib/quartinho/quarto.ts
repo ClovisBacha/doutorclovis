@@ -25,6 +25,7 @@
 
 import { CANTINHO_BY_ID } from "@/lib/cantinho";
 import { quandoAbre, type ItemPorFase } from "~/lib/jornada/loja-por-fase";
+import { AR_DO_QUARTO, type IdDoAr } from "./migracao";
 
 export type Categoria = "moveis" | "decoracao" | "brinquedos" | "tapetes" | "plantas";
 
@@ -263,6 +264,11 @@ export const ITENS: readonly ItemDoQuarto[] = [
   },
 ];
 
+/** Os itens da lojinha que o quartinho vende (os ids do catálogo do site). */
+export const ITENS_A_VENDA_NO_QUARTO: ReadonlySet<string> = new Set(
+  ITENS.flatMap((i) => (i.lojinha ? [i.lojinha] : [])),
+);
+
 export const ITEM_POR_ID: Readonly<Record<IdDoItem, ItemDoQuarto>> = Object.fromEntries(
   ITENS.map((i) => [i.id, i]),
 ) as Record<IdDoItem, ItemDoQuarto>;
@@ -300,8 +306,9 @@ export const PRESENTES_DE_SAIDA: readonly IdDoItem[] = ["comoda", "prateleira", 
 export const CHAVE_DO_QUARTINHO = "dc-path-quartinho";
 
 /**
- * Uma MEMÓRIA do quarto: como ele estava no dia em que ela tocou em "Salvar
- * meu quarto". É o começo da retrospectiva do nascimento (a ideia 5: "como o
+ * Uma MEMÓRIA do quarto: como ele estava no fim de cada dia em que ela mexeu
+ * nele (desde 24/11/2026 o quarto se guarda sozinho; antes, no "Salvar meu
+ * quarto"). É o começo da retrospectiva do nascimento (a ideia 5: "como o
  * quarto foi montado, desde o primeiro objeto até a decoração completa"). Uma
  * por dia, a última do dia vale.
  */
@@ -315,6 +322,8 @@ export type Quartinho = {
   /** Missão cumprida → o dia (aaaa-mm-dd) em que ela cumpriu. */
   missoes: Partial<Record<IdDaMissao, string>>;
   memorias: Memoria[];
+  /** O AR do quarto (as pétalas, as bolhinhas caindo): um de cada vez, ou nenhum. */
+  ar?: IdDoAr | null;
 };
 
 /** O quarto da primeira vez: a cômoda e a prateleira, para não abrir vazio. */
@@ -333,7 +342,7 @@ const ehDia = (d: unknown): d is string => typeof d === "string" && /^\d{4}-\d{2
 export function lerQuartinho(v: unknown): Quartinho {
   if (!v || typeof v !== "object")
     return { ...QUARTO_INICIAL, postos: [...QUARTO_INICIAL.postos], memorias: [] };
-  const o = v as { postos?: unknown; missoes?: unknown; memorias?: unknown };
+  const o = v as { postos?: unknown; missoes?: unknown; memorias?: unknown; ar?: unknown };
   const postos = Array.isArray(o.postos) ? [...new Set(o.postos.filter(ehItem))] : [];
   const missoes: Quartinho["missoes"] = {};
   if (o.missoes && typeof o.missoes === "object")
@@ -348,7 +357,14 @@ export function lerQuartinho(v: unknown): Quartinho {
       if (ehDia(x?.dia) && Array.isArray(x.postos))
         memorias.push({ dia: x.dia, postos: [...new Set(x.postos.filter(ehItem))] });
     }
-  return { v: 1, postos, missoes, memorias: memorias.slice(-MAXIMO_DE_MEMORIAS) };
+  const ar = typeof o.ar === "string" && o.ar in AR_DO_QUARTO ? (o.ar as IdDoAr) : null;
+  return {
+    v: 1,
+    postos,
+    missoes,
+    memorias: memorias.slice(-MAXIMO_DE_MEMORIAS),
+    ...(ar ? { ar } : {}),
+  };
 }
 
 /** Guarda o quarto de hoje nas memórias (uma por dia: a de hoje é trocada). */
@@ -420,6 +436,32 @@ export function situacaoDoItem(
     return { tipo: "missao", missao: MISSOES.find((m) => m.id === item.missao)! };
   }
   return { tipo: "livre" };
+}
+
+/**
+ * Se o item da lojinha se vende no app ALGUM dia (agora ou numa fase que vem).
+ * O Premium que não está na loja por fase nunca se vende: mostrá-lo como "Em
+ * breve" seria prometer o que não vem.
+ */
+export function vendeAlgumDia(
+  lojinha: string,
+  porFase: ReadonlyMap<string, ItemPorFase> | null,
+): boolean {
+  const i = CANTINHO_BY_ID[lojinha];
+  if (!i || i.aposentado) return false;
+  return !i.premium || !!porFase?.has(lojinha);
+}
+
+/** O ar do quarto se vende como o item: o da lojinha, pela mesma regra da vitrine. */
+export function situacaoDoAr(a: IdDoAr, vitrine: VitrineDoQuarto): Situacao {
+  const lojinha = AR_DO_QUARTO[a].lojinha;
+  if (vitrine.posse?.has(lojinha)) return { tipo: "livre" };
+  return vendaNoQuarto(lojinha, vitrine.porFase, vitrine.semana);
+}
+
+/** Liga um ar (desligando o outro), ou desliga o que está ligado. */
+export function alternarAr(q: Quartinho, a: IdDoAr): Quartinho {
+  return { ...q, ar: q.ar === a ? null : a };
 }
 
 /** O que a Bolha diz do item que ainda não abriu (cabe nas duas linhas do balão). */

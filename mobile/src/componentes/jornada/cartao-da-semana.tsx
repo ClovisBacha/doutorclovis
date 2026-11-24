@@ -136,7 +136,6 @@ export function CartaoDaSemana({ d }: { d: DadosDoCartao }) {
       {/* A Bolha, na frente do número. */}
       <Image
         source={BOLHA.feliz}
-        allowDownscaling={false}
         style={{
           position: "absolute",
           top: ALTO_DA_BOLHA,

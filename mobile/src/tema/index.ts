@@ -214,19 +214,22 @@ export const curva = { borderCurve: "continuous" } as const;
 export const ALVO_MINIMO = 44;
 
 /**
- * A profundidade: três camadas, como a luz de um estúdio — o contato (junto
- * da borda), a chave (o corpo da sombra) e o ambiente (largo e fraco). Uma
- * sombra só, borrada, é o que denuncia o desenho genérico.
+ * A profundidade: duas camadas, como a luz de um estúdio — a chave (o corpo
+ * da sombra, junto da borda) e o ambiente (largo e fraco). Uma sombra só,
+ * borrada, é o que denuncia o desenho genérico.
+ *
+ * ⚠️ DESEMPENHO (24/11/2026): no iOS cada camada de `boxShadow` é uma passada
+ * fora da tela, refeita a cada quadro em que algo se mexe por perto (a
+ * rolagem, a inclinação). Eram três; a de contato (1 px, 4%) quase não se via
+ * e custava um terço. Não acrescente uma terceira.
  */
 export const sombra = {
-  boxShadow:
-    "0px 1px 1px rgba(35,25,66,0.04), 0px 4px 10px -2px rgba(35,25,66,0.06), 0px 18px 36px -12px rgba(35,25,66,0.16)",
+  boxShadow: "0px 4px 10px -2px rgba(35,25,66,0.08), 0px 18px 36px -12px rgba(35,25,66,0.16)",
 } as const;
 
 /** A sombra do que flutua (a barra, os botões soltos): mais alta e mais larga. */
 export const sombraFlutuante = {
-  boxShadow:
-    "0px 2px 4px rgba(35,25,66,0.06), 0px 12px 32px -8px rgba(35,25,66,0.22), 0px 28px 56px -20px rgba(35,25,66,0.20)",
+  boxShadow: "0px 12px 32px -8px rgba(35,25,66,0.24), 0px 28px 56px -20px rgba(35,25,66,0.20)",
 } as const;
 
 /** As sombras por papel (todas em `boxShadow`, desenhadas uma vez). */

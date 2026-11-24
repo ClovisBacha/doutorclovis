@@ -7,7 +7,7 @@ import { CompartilharConquista } from "~/componentes/jornada/cartao-de-conquista
 import { Folha } from "~/componentes/jornada/pecas";
 import { CHAMA_PARA_COMPARTILHAR, cartaoDaChama } from "~/lib/jornada/cartoes";
 import { BolhaViva } from "~/componentes/movimento";
-import { itensDaLoja } from "~/lib/jornada/enfeites";
+import { ITENS_A_VENDA_NO_QUARTO } from "~/lib/quartinho/quarto";
 import { explicacaoDaChama } from "~/lib/jornada/trilha";
 import { escadaDosTrofeus } from "~/lib/jornada/trofeus";
 import { canto, cor, curva, escala, espaco, fonte } from "~/tema";
@@ -180,8 +180,8 @@ function EscadaDosTrofeus({ trofeus }: { trofeus: number }) {
   );
 }
 
-/** O que a lojinha do app vende (sem a loja por fase): é onde o troféu destrava a Borboleta. */
-const ITENS_DA_LOJA_DO_APP = new Set(itensDaLoja([]).map((i) => i.id));
+/** O que o app vende (no quartinho, desde 24/11/2026): é onde um troféu destravaria um item. */
+const ITENS_DA_LOJA_DO_APP = ITENS_A_VENDA_NO_QUARTO;
 
 /** A arte do placar ao lado da primeira frase de uma folha (no lugar do emoji no título). */
 function ComArte({ arte, children }: { arte: ReactNode; children: ReactNode }) {

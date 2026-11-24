@@ -12,7 +12,6 @@ import { faltamTrofeus } from "@/lib/trofeus";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import {
   comprarDoCantinho,
-  equiparCenario,
   lerCantinho,
   type CompraDoCantinho,
   type LeituraDoCantinho,
@@ -177,21 +176,6 @@ export async function comprarItem(
     return daFase ? await comprarNaLojaPorFase(itemId) : await comprarDoCantinho({ itemId });
   } catch {
     return null;
-  }
-}
-
-/** Equipa (ou tira, com `null`) o cenário do Caminho. `false` = não gravou. */
-export async function equiparOCenario(fundoId: string | null): Promise<boolean> {
-  if (ehBancada()) {
-    await espera(300);
-    cantinhoDaBancada().equippedFundo = fundoId;
-    return true;
-  }
-  try {
-    const r = await equiparCenario({ fundoId });
-    return !!r && r.ok;
-  } catch {
-    return false;
   }
 }
 

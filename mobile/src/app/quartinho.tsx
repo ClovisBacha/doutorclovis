@@ -1,6 +1,6 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { Redirect, router } from "expo-router";
+import { Redirect, router, useNavigation } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import Check from "lucide-react-native/icons/check";
 import ChevronLeft from "lucide-react-native/icons/chevron-left";
@@ -35,7 +35,13 @@ import Svg, {
 import { selecao, sucesso, toque } from "~/componentes/base";
 import { corJornada } from "~/componentes/jornada/cores";
 import { useJornada } from "~/componentes/jornada/usarJornada";
-import { ArteDaBolha, useMovimentoReduzido, type HumorDaArte } from "~/componentes/movimento";
+import {
+  ArteDaBolha,
+  lacoQueDescansa,
+  rajada,
+  useMovimentoReduzido,
+  type HumorDaArte,
+} from "~/componentes/movimento";
 import {
   comprarItem,
   lerALojaPorFase,
@@ -67,7 +73,10 @@ import {
   missaoDoDia,
   MISSOES,
   presenteDaMissao,
+  alternarAr,
+  situacaoDoAr,
   situacaoDoItem,
+  vendeAlgumDia,
   type Categoria,
   type IdDaMissao,
   type IdDoItem,
@@ -76,6 +85,7 @@ import {
   type Situacao,
   type VitrineDoQuarto,
 } from "~/lib/quartinho/quarto";
+import { AR_DO_QUARTO, type IdDoAr } from "~/lib/quartinho/migracao";
 import { useSessao } from "~/lib/sessao";
 import { ALVO_MINIMO, cor, curva, espaco, fonte } from "~/tema";
 
@@ -121,7 +131,8 @@ import { ALVO_MINIMO, cor, curva, espaco, fonte } from "~/tema";
  *
  * Bancada: rota=/quartinho [&hora=21] [&postos=berco,poltrona…] [&missao=1]
  *          [&missoes=ursinho,parede (cumpridas ontem)] [&itens=objeto-berco,… (da lojinha)]
- *          [&comprar=luminaria (abre a compra)] [&saldo=N] [&semana=N]
+ *          [&comprar=luminaria|ar:bolhas (abre a compra)] [&saldo=N] [&semana=N]
+ *          [&aba=ar (a bandeja no ar)] [&ar=bolhas (o ar ligado)]
  */
 
 const ARTE: Record<IdDoItem, number> = {
@@ -142,6 +153,24 @@ const ARTE: Record<IdDoItem, number> = {
   tapete: require("../../assets/quartinho/tapete.webp"),
   planta: require("../../assets/quartinho/planta.webp"),
 };
+/**
+ * O AR DO QUARTO (24/11/2026, da lojinha da trilha, "No ar"): desenhado por
+ * código, sem arte de quarto. Na bandeja, o ícone que ela conhece da lojinha.
+ */
+const ARTE_DO_AR: Record<IdDoAr, number> = {
+  petalas: require("../../../src/assets/cantinho/clima-petalas.webp"),
+  bolhas: require("../../../src/assets/cantinho/clima-bolhas.webp"),
+  peninhas: require("../../../src/assets/cantinho/clima-peninhas.webp"),
+  folhas: require("../../../src/assets/cantinho/clima-folhas.webp"),
+  neve: require("../../../src/assets/cantinho/clima-neve.webp"),
+  poeira: require("../../../src/assets/cantinho/clima-poeira.webp"),
+};
+const ARES = Object.keys(AR_DO_QUARTO) as IdDoAr[];
+/** A bandeja: as categorias dos itens e o ar. */
+type Aba = Categoria | "ar";
+/** O que ela está comprando: um item do quarto ou um ar. */
+type ACompra = { tipo: "item"; id: IdDoItem } | { tipo: "ar"; id: IdDoAr };
+
 const QUARTO_DIA = require("../../assets/quartinho/quarto-dia.webp");
 const QUARTO_NOITE = require("../../assets/quartinho/quarto-noite.webp");
 /** O brilho das estrelinhas da parede (as mesmas da arte), para elas piscarem. */
@@ -177,7 +206,13 @@ function quartoDaBancada(q: Quartinho): Quartinho {
   const missoes = { ...q.missoes };
   for (const id of (parametroDaBancada("missoes") ?? "").split(","))
     if (MISSOES.some((m) => m.id === id.trim())) missoes[id.trim() as IdDaMissao] = ontem;
-  return { ...q, postos: postos.length ? postos : q.postos, missoes };
+  const ar = parametroDaBancada("ar") ?? "";
+  return {
+    ...q,
+    postos: postos.length ? postos : q.postos,
+    missoes,
+    ...(ar in AR_DO_QUARTO ? { ar: ar as IdDoAr } : {}),
+  };
 }
 
 export default function TelaDoQuartinho() {
@@ -196,14 +231,18 @@ function Quartinho() {
   const noite = ehNoiteNoQuarto(horaDaTela());
 
   const [quarto, setQuarto] = useState<Quartinho | null>(null);
-  const [categoria, setCategoria] = useState<Categoria>("moveis");
+  const [categoria, setCategoria] = useState<Aba>(() =>
+    parametroDaBancada("aba") === "ar" ? "ar" : "moveis",
+  );
   const [cantinho, setCantinho] = useState<CantinhoOk | null | "lendo">("lendo");
   /* A loja por fase do banco: `undefined` lendo, `null` sem a tabela. */
   const [porFase, setPorFase] = useState<ReadonlyMap<string, ItemPorFase> | null | undefined>();
   /* O item que ela está comprando ali mesmo (a folha de compra aberta). */
-  const [aComprar, setAComprar] = useState<IdDoItem | null>(() => {
-    const id = parametroDaBancada("comprar");
-    return id && id in ITEM_POR_ID ? (id as IdDoItem) : null;
+  const [aComprar, setAComprar] = useState<ACompra | null>(() => {
+    const id = parametroDaBancada("comprar") ?? "";
+    if (id in ITEM_POR_ID) return { tipo: "item", id: id as IdDoItem };
+    const ar = id.replace(/^ar:/, "");
+    return id.startsWith("ar:") && ar in AR_DO_QUARTO ? { tipo: "ar", id: ar as IdDoAr } : null;
   });
   const [comprando, setComprando] = useState(false);
   const [fala, setFala] = useState(
@@ -218,6 +257,29 @@ function Quartinho() {
   /* O que o "Desfazer" devolve: os quartos de antes, do mais velho ao mais novo. */
   const [antes, setAntes] = useState<IdDoItem[][]>([]);
   const falas = useRef(0);
+
+  /* O quarto se grava COM FOLGA (24/11/2026): cada gravação acorda a loja da
+     jornada inteira (e a tela do bebê, que está por baixo, se redesenhava a
+     cada toque). Grava 600 ms depois do último toque, e na saída. */
+  const aGravar = useRef<Quartinho | null>(null);
+  const relogio = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const gravarJa = useCallback(() => {
+    if (relogio.current) clearTimeout(relogio.current);
+    relogio.current = null;
+    if (aGravar.current) gravarChave(CHAVE_DO_QUARTINHO, aGravar.current);
+    aGravar.current = null;
+  }, []);
+  const guardar = useCallback(
+    (q: Quartinho) => {
+      aGravar.current = q;
+      if (relogio.current) clearTimeout(relogio.current);
+      relogio.current = setTimeout(gravarJa, 600);
+    },
+    [gravarJa],
+  );
+  useEffect(() => gravarJa, [gravarJa]);
+  /* O que é pesado de desenhar (as luzes, as cintilas) entra depois da entrada da tela. */
+  const acesa = useDepoisDaEntrada();
 
   /* O quarto guardado chega com a loja; a bancada entra pelo mesmo estado. */
   useEffect(() => {
@@ -254,10 +316,13 @@ function Quartinho() {
 
   const mudar = useCallback(
     (proximo: Quartinho, de: Quartinho) => {
-      const { quarto: q, cumprida: m } = cumprirSePronta(proximo, hoje);
+      /* O quarto se guarda sozinho a cada mudança (não há "Salvar"), e a
+         lembrança do dia é a última arrumação dele. */
+      const { quarto: cumprido, cumprida: m } = cumprirSePronta(proximo, hoje);
+      const q = guardarMemoria(cumprido, hoje);
       setAntes((h) => [...h.slice(-19), de.postos]);
       setQuarto(q);
-      gravarChave(CHAVE_DO_QUARTINHO, q);
+      guardar(q);
       if (m) {
         sucesso();
         setCumprida(m.id);
@@ -272,7 +337,7 @@ function Quartinho() {
       }
       return m;
     },
-    [hoje],
+    [hoje, guardar],
   );
 
   const aoTocarNoItem = useCallback(
@@ -287,7 +352,7 @@ function Quartinho() {
           setFala("Não consegui ver as suas sementinhas agora. Tenta de novo daqui a pouco?");
           return;
         }
-        setAComprar(item.id);
+        setAComprar({ tipo: "item", id: item.id });
         return;
       }
       if (s.tipo === "em-breve") {
@@ -323,14 +388,48 @@ function Quartinho() {
     [quarto, mudar, noite, cantinho],
   );
 
+  /** O ar do quarto: liga um (e desliga o outro), ou compra, como o item. */
+  const aoTocarNoAr = useCallback(
+    (a: IdDoAr, s: Situacao) => {
+      if (!quarto) return;
+      const nome = AR_DO_QUARTO[a].nome;
+      if (s.tipo === "comprar") {
+        toque();
+        if (cantinho === null) {
+          setPose("surpresa");
+          setFala("Não consegui ver as suas sementinhas agora. Tenta de novo daqui a pouco?");
+          return;
+        }
+        setAComprar({ tipo: "ar", id: a });
+        return;
+      }
+      if (s.tipo === "em-breve") {
+        toque();
+        setPose("feliz");
+        setFala(falaDoEmBreve(s.quando));
+        return;
+      }
+      selecao();
+      const q = alternarAr(quarto, a);
+      setQuarto(q);
+      guardar(q);
+      setPose(q.ar ? "apaixonado" : noite ? "dormindo" : "feliz");
+      setFala(q.ar ? `${nome} no ar. Que delícia!` : "Desliguei o ar do quarto.");
+    },
+    [quarto, cantinho, guardar, noite],
+  );
+
   /**
    * A COMPRA ALI MESMO (24/11/2026): a mesma compra da lojinha
-   * (`comprarItem`, com as mesmas recusas), e o item entra no quarto na hora.
+   * (`comprarItem`, com as mesmas recusas), e o item entra no quarto na hora
+   * (o ar, liga na hora).
    */
   const comprar = useCallback(async () => {
     if (!aComprar || comprando || !quarto) return;
-    const item = ITEM_POR_ID[aComprar];
-    const s = situacaoDoItem(item, quarto, vitrine);
+    const s =
+      aComprar.tipo === "item"
+        ? situacaoDoItem(ITEM_POR_ID[aComprar.id], quarto, vitrine)
+        : situacaoDoAr(aComprar.id, vitrine);
     if (s.tipo !== "comprar") return;
     setComprando(true);
     const r = await comprarItem(s.lojinha, s.daFase);
@@ -363,6 +462,15 @@ function Quartinho() {
     setAComprar(null);
     sucesso();
     const bonus = r.ok && r.bonusNovo ? ` E fechou um conjunto: +${r.bonusNovo} sementinhas!` : "";
+    if (aComprar.tipo === "ar") {
+      const q = { ...quarto, ar: aComprar.id };
+      setQuarto(q);
+      guardar(q);
+      setPose("comemorando");
+      setFala(`${AR_DO_QUARTO[aComprar.id].nome} no ar! É seu.${bonus}`);
+      return;
+    }
+    const item = ITEM_POR_ID[aComprar.id];
     if (faltaOBerco(quarto, item.id)) {
       setPose("comemorando");
       setFala(`O móbile é seu! Ele vai no berço.${bonus}`);
@@ -374,29 +482,19 @@ function Quartinho() {
       setPose("comemorando");
       setFala(`É seu! Já pus no quarto.${bonus}`);
     }
-  }, [aComprar, comprando, quarto, vitrine, mudar]);
-
-  const salvar = useCallback(() => {
-    if (!quarto) return;
-    const q = guardarMemoria(quarto, hoje);
-    setQuarto(q);
-    gravarChave(CHAVE_DO_QUARTINHO, q);
-    sucesso();
-    setPose("comemorando");
-    setFala("Guardei o seu quarto. Ficou a sua cara!");
-  }, [quarto, hoje]);
+  }, [aComprar, comprando, quarto, vitrine, mudar, guardar]);
 
   const desfazer = useCallback(() => {
     if (!quarto || !antes.length) return;
     const postos = antes[antes.length - 1]!;
     setAntes((h) => h.slice(0, -1));
-    const q = { ...quarto, postos };
+    const q = guardarMemoria({ ...quarto, postos }, hoje);
     setQuarto(q);
-    gravarChave(CHAVE_DO_QUARTINHO, q);
+    guardar(q);
     setNovo(null);
     setPose(noite ? "dormindo" : "feliz");
     setFala("Voltei como estava.");
-  }, [quarto, antes, noite]);
+  }, [quarto, antes, noite, hoje, guardar]);
 
   const aoAcaso = useCallback(() => {
     if (!quarto) return;
@@ -411,6 +509,12 @@ function Quartinho() {
     }
   }, [quarto, vitrine, mudar, noite]);
 
+  /* Estável: a Cena é `memo`, e uma seta nova a cada fala a redesenhava inteira. */
+  const aoTocarNoQuarto = useCallback(
+    (id: IdDoItem) => setCategoria(ITEM_POR_ID[id].categoria),
+    [],
+  );
+
   const alturaDoQuarto = L * PROPORCAO_DO_QUARTO;
 
   return (
@@ -420,6 +524,10 @@ function Quartinho() {
       <View style={{ position: "absolute", left: 0, top: 0, width: L, height: alturaDoQuarto }}>
         <Image
           source={noite ? QUARTO_NOITE : QUARTO_DIA}
+          /* A pintura chega do tamanho da tela (1320 de largura): sem a
+             redução que o expo-image faria no fio principal, no meio da
+             entrada da tela (24/11/2026). */
+          allowDownscaling={false}
           style={StyleSheet.absoluteFill}
           contentFit="fill"
           accessible
@@ -431,7 +539,9 @@ function Quartinho() {
           noite={noite}
           largura={L}
           altura={alturaDoQuarto}
-          aoTocar={(id) => setCategoria(ITEM_POR_ID[id].categoria)}
+          aoTocar={aoTocarNoQuarto}
+          acesa={acesa}
+          ar={quarto?.ar ?? null}
         />
       </View>
 
@@ -478,8 +588,11 @@ function Quartinho() {
         ) : null}
       </View>
 
-      {/* A bandeja: as abas, os itens e, embaixo, desfazer, salvar e o dado. */}
+      {/* A bandeja: desfazer e o dado soltos em cima, as abas e os itens. O
+          quarto se guarda sozinho: o "Salvar meu quarto" saiu (o dono,
+          24/11/2026). */}
       <View
+        pointerEvents="box-none"
         style={{
           position: "absolute",
           left: 0,
@@ -490,6 +603,22 @@ function Quartinho() {
           gap: espaco.sm,
         }}
       >
+        <View
+          pointerEvents="box-none"
+          style={{
+            flexDirection: "row",
+            justifyContent: "flex-end",
+            gap: espaco.sm,
+            paddingHorizontal: espaco.xs,
+          }}
+        >
+          <BotaoRedondo rotulo="Desfazer" aoTocar={desfazer} apagado={!antes.length}>
+            <Undo2 size={22} color={TINTA} strokeWidth={2.6} />
+          </BotaoRedondo>
+          <BotaoRedondo rotulo="Decorar aleatoriamente" aoTocar={aoAcaso} apagado={!quarto}>
+            <Dices size={22} color={TINTA} strokeWidth={2.4} />
+          </BotaoRedondo>
+        </View>
         <VidroLilas raio={30} estilo={{ paddingVertical: espaco.sm }}>
           <Abas ativa={categoria} aoEscolher={setCategoria} />
           {quarto ? (
@@ -499,29 +628,36 @@ function Quartinho() {
               vitrine={vitrine}
               lendo={lendo}
               aoTocar={aoTocarNoItem}
+              aoTocarNoAr={aoTocarNoAr}
             />
           ) : (
             <View style={{ height: 116 }} />
           )}
         </VidroLilas>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
-          <BotaoRedondo rotulo="Desfazer" aoTocar={desfazer} apagado={!antes.length}>
-            <Undo2 size={22} color={TINTA} strokeWidth={2.6} />
-          </BotaoRedondo>
-          <BotaoDeSalvar aoTocar={salvar} desabilitado={!quarto} />
-          <BotaoRedondo rotulo="Decorar aleatoriamente" aoTocar={aoAcaso} apagado={!quarto}>
-            <Dices size={22} color={TINTA} strokeWidth={2.4} />
-          </BotaoRedondo>
-        </View>
       </View>
 
       {aComprar && quarto ? (
         <FolhaDeCompra
-          item={ITEM_POR_ID[aComprar]}
-          situacao={situacaoDoItem(ITEM_POR_ID[aComprar], quarto, vitrine)}
+          nome={
+            aComprar.tipo === "item"
+              ? ITEM_POR_ID[aComprar.id].nome
+              : `${AR_DO_QUARTO[aComprar.id].nome} no ar`
+          }
+          arte={aComprar.tipo === "item" ? ARTE[aComprar.id] : ARTE_DO_AR[aComprar.id]}
+          acao={
+            aComprar.tipo === "ar"
+              ? "Comprar e ligar"
+              : faltaOBerco(quarto, aComprar.id)
+                ? "Comprar"
+                : "Comprar e pôr no quarto"
+          }
+          situacao={
+            aComprar.tipo === "item"
+              ? situacaoDoItem(ITEM_POR_ID[aComprar.id], quarto, vitrine)
+              : situacaoDoAr(aComprar.id, vitrine)
+          }
           saldo={saldo}
           comprando={comprando}
-          vaiProQuarto={!faltaOBerco(quarto, aComprar)}
           noite={noite}
           aoComprar={() => void comprar()}
           aoFechar={() => !comprando && setAComprar(null)}
@@ -530,6 +666,28 @@ function Quartinho() {
       ) : null}
     </View>
   );
+}
+
+/**
+ * `true` quando a tela terminou de entrar (o fim da transição da pilha), ou
+ * meio segundo depois, se o evento não vier (a bancada abre direto). Até lá,
+ * o quarto aparece sem as luzes: tudo de uma vez travava a entrada.
+ */
+function useDepoisDaEntrada(): boolean {
+  const navegacao = useNavigation() as {
+    addListener?: (evento: string, f: () => void) => () => void;
+  };
+  const [pronto, setPronto] = useState(false);
+  useEffect(() => {
+    if (pronto) return;
+    const t = setTimeout(() => setPronto(true), 500);
+    const tirar = navegacao.addListener?.("transitionEnd", () => setPronto(true));
+    return () => {
+      clearTimeout(t);
+      tirar?.();
+    };
+  }, [navegacao, pronto]);
+  return pronto;
 }
 
 /* ── O vidro lilás ────────────────────────────────────────────────────── */
@@ -559,7 +717,9 @@ function VidroLilas({
           overflow: "hidden",
           borderWidth: 1.5,
           borderColor: "rgba(255,255,255,0.72)",
-          boxShadow: "0px 10px 26px -10px rgba(76,29,149,0.55), 0px 2px 6px rgba(76,29,149,0.14)",
+          /* Uma camada só: são sete vidros na tela, e cada camada de sombra é
+             uma passada fora da tela (24/11/2026). */
+          boxShadow: "0px 10px 26px -10px rgba(76,29,149,0.6)",
         },
         estilo,
       ]}
@@ -621,43 +781,6 @@ function BotaoRedondo({
   );
 }
 
-function BotaoDeSalvar({ aoTocar, desabilitado }: { aoTocar: () => void; desabilitado: boolean }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="Salvar meu quarto"
-      accessibilityState={{ disabled: desabilitado }}
-      disabled={desabilitado}
-      onPress={aoTocar}
-      style={({ pressed }) => ({
-        flex: 1,
-        opacity: desabilitado ? 0.6 : 1,
-        transform: [{ scale: pressed ? 0.97 : 1 }],
-      })}
-    >
-      <LinearGradient
-        colors={["#a487fb", "#7c4fe8", "#6431d6"]}
-        locations={[0, 0.55, 1]}
-        style={{
-          height: ALVO_MINIMO + 10,
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 8,
-          borderRadius: 999,
-          ...curva,
-          borderWidth: 2,
-          borderColor: "rgba(226,214,255,0.85)",
-          boxShadow: "0px 10px 24px -8px rgba(100,49,214,0.8), 0px 0px 14px rgba(164,135,251,0.45)",
-        }}
-      >
-        <Text style={{ ...fonte.forte, fontSize: 17, color: cor.branco }}>Salvar meu quarto</Text>
-        <Heart size={18} color={cor.branco} fill={cor.branco} strokeWidth={2} />
-      </LinearGradient>
-    </Pressable>
-  );
-}
-
 /* ── A compra ali mesmo ───────────────────────────────────────────────── */
 
 /**
@@ -667,22 +790,24 @@ function BotaoDeSalvar({ aoTocar, desabilitado }: { aoTocar: () => void; desabil
  * era um alerta que mandava à lojinha.
  */
 function FolhaDeCompra({
-  item,
+  nome,
+  arte,
+  acao,
   situacao: s,
   saldo,
   comprando,
-  vaiProQuarto,
   noite,
   aoComprar,
   aoFechar,
   fundo,
 }: {
-  item: ItemDoQuarto;
+  nome: string;
+  arte: number;
+  /** O botão: "Comprar e pôr no quarto", "Comprar e ligar" ou só "Comprar" (o móbile sem berço). */
+  acao: string;
   situacao: Situacao;
   saldo: number | null;
   comprando: boolean;
-  /** `false`: o móbile sem o berço (compra, mas ainda não entra no quarto). */
-  vaiProQuarto: boolean;
   noite: boolean;
   aoComprar: () => void;
   aoFechar: () => void;
@@ -697,7 +822,7 @@ function FolhaDeCompra({
 
   if (s.tipo !== "comprar") return null;
   const conta = contaDaCompra(s.preco, saldo);
-  const rotulo = comprando ? "Comprando…" : vaiProQuarto ? "Comprar e pôr no quarto" : "Comprar";
+  const rotulo = comprando ? "Comprando…" : acao;
 
   return (
     <View style={StyleSheet.absoluteFill}>
@@ -740,7 +865,7 @@ function FolhaDeCompra({
               }}
             >
               <Image
-                source={ARTE[item.id]}
+                source={arte}
                 style={{ width: 72, height: 68 }}
                 contentFit="contain"
                 accessible={false}
@@ -748,7 +873,7 @@ function FolhaDeCompra({
             </LinearGradient>
             <View style={{ flex: 1, gap: 4 }}>
               <Text style={{ ...fonte.display, fontSize: 22, lineHeight: 26, color: TINTA }}>
-                {item.nome}
+                {nome}
               </Text>
               <View
                 accessible
@@ -772,9 +897,7 @@ function FolhaDeCompra({
               <Text style={{ ...fonte.media, fontSize: 15, lineHeight: 19, color: TINTA }}>
                 {conta.pode
                   ? conta.fica == null
-                    ? vaiProQuarto
-                      ? "Ele entra no quarto na hora."
-                      : "Depois é só pôr o berço."
+                    ? "É seu na hora."
                     : `Você fica com ${conta.fica} sementinhas.`
                   : `Faltam ${conta.faltam} sementinhas.`}
               </Text>
@@ -853,6 +976,8 @@ const Cena = memo(function Cena({
   largura: L,
   altura: A,
   aoTocar,
+  acesa,
+  ar,
 }: {
   postos: readonly IdDoItem[];
   novo: IdDoItem | null;
@@ -860,12 +985,16 @@ const Cena = memo(function Cena({
   largura: number;
   altura: number;
   aoTocar: (id: IdDoItem) => void;
+  /** A tela já entrou: as luzes e as cintilas podem acender. */
+  acesa: boolean;
+  /** O ar do quarto ligado (as pétalas, as bolhinhas), ou nenhum. */
+  ar: IdDoAr | null;
 }) {
   const itens = emOrdemDeDesenho(postos);
   return (
     <>
       {/* As estrelinhas da parede piscam (por baixo dos itens: estão na parede). */}
-      {noite ? <EstrelasQuePiscam /> : null}
+      {noite && acesa ? <EstrelasQuePiscam /> : null}
 
       {/* As sombras de contato: é o que põe cada coisa NO chão. */}
       {itens
@@ -886,7 +1015,7 @@ const Cena = memo(function Cena({
         />
       ))}
 
-      {noite ? (
+      {!acesa ? null : noite ? (
         <>
           {/* O LUAR passa por cima dos itens: a faixa fria que vem da janela
               e a poça de luz onde a vidraça cai no chão. */}
@@ -944,9 +1073,213 @@ const Cena = memo(function Cena({
           <Cintilas largura={L} altura={A} />
         </>
       )}
+
+      {/* O AR DO QUARTO, por cima de tudo (está no ar, entre ela e o quarto). */}
+      {acesa && ar ? <ArDoQuarto ar={ar} largura={L} altura={A} noite={noite} /> : null}
     </>
   );
 });
+
+/* ── O ar do quarto ───────────────────────────────────────────────────── */
+
+type Forma = "petala" | "bolha" | "pena" | "ponto" | "brilho";
+/**
+ * Como cada ar cai: a forma, as cores, o tamanho (pt), se SOBE (as
+ * bolhinhas) e quanto tempo leva para atravessar o quarto.
+ */
+const JEITO_DO_AR: Record<
+  IdDoAr,
+  {
+    forma: Forma;
+    cores: readonly string[];
+    tam: readonly [number, number];
+    sobe?: boolean;
+    ms: number;
+  }
+> = {
+  petalas: { forma: "petala", cores: ["#ffc1d9", "#ffd6e6", "#ffadc9"], tam: [9, 13], ms: 9000 },
+  bolhas: { forma: "bolha", cores: ["#ffffff"], tam: [12, 24], sobe: true, ms: 10000 },
+  peninhas: { forma: "pena", cores: ["#ffffff", "#fff4fb"], tam: [14, 20], ms: 12000 },
+  folhas: { forma: "petala", cores: ["#f4a259", "#e9845f", "#9cbf7f"], tam: [10, 14], ms: 9500 },
+  neve: { forma: "ponto", cores: ["#ffffff"], tam: [4, 7], ms: 11000 },
+  poeira: { forma: "brilho", cores: ["#ffe08a", "#fff1b8"], tam: [3, 5], ms: 13000 },
+};
+
+/* [x inicial (fração), atraso (ms), semente] de cada partícula: fixos, para o
+   quarto sair igual nas fotos e não sortear a cada desenho. */
+const PARTICULAS: readonly (readonly [number, number, number])[] = [
+  [0.08, 0, 0.2],
+  [0.22, 2600, 0.8],
+  [0.35, 900, 0.5],
+  [0.48, 4100, 0.1],
+  [0.6, 1700, 0.9],
+  [0.72, 5200, 0.4],
+  [0.86, 3300, 0.7],
+  [0.93, 6100, 0.3],
+  [0.15, 7000, 0.6],
+  [0.55, 7800, 0.05],
+];
+
+/**
+ * O AR DO QUARTO (24/11/2026): o "No ar" da lojinha da trilha, agora caindo
+ * (ou subindo) dentro do quarto. Dez partículas desenhadas por código, no fio
+ * nativo. ⚠️ Em RAJADAS: duas travessias e um descanso — um ar que nunca
+ * para redesenharia o vidro e as luzes a cada quadro (o travamento medido).
+ */
+function ArDoQuarto({
+  ar,
+  largura: L,
+  altura: A,
+  noite,
+}: {
+  ar: IdDoAr;
+  largura: number;
+  altura: number;
+  noite: boolean;
+}) {
+  const reduzido = useMovimentoReduzido();
+  if (reduzido) return null;
+  const j = JEITO_DO_AR[ar];
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      {PARTICULAS.map(([x, atraso, semente], i) => (
+        <Particula
+          key={`${ar}-${i}`}
+          forma={j.forma}
+          cor={j.cores[i % j.cores.length]!}
+          tamanho={j.tam[0] + (j.tam[1] - j.tam[0]) * semente}
+          x={x * L}
+          altura={A * 0.78}
+          sobe={!!j.sobe}
+          ms={j.ms * (0.85 + 0.3 * semente)}
+          atraso={atraso}
+          gira={j.forma === "petala" || j.forma === "pena"}
+          noite={noite}
+        />
+      ))}
+    </View>
+  );
+}
+
+function Particula({
+  forma,
+  cor: tom,
+  tamanho: t,
+  x,
+  altura,
+  sobe,
+  ms,
+  atraso,
+  gira,
+  noite,
+}: {
+  forma: Forma;
+  cor: string;
+  tamanho: number;
+  x: number;
+  altura: number;
+  sobe: boolean;
+  ms: number;
+  atraso: number;
+  gira: boolean;
+  noite: boolean;
+}) {
+  const v = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const laco = rajada(
+      Animated.sequence([
+        Animated.timing(v, { toValue: 0, duration: 0, useNativeDriver: true }),
+        Animated.delay(atraso),
+        Animated.timing(v, {
+          toValue: 1,
+          duration: ms,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+      ]),
+      2,
+      9000,
+    );
+    laco.start();
+    return () => laco.stop();
+  }, [v, atraso, ms]);
+  const balanco = t * 1.6;
+  const corpo: ViewStyle =
+    forma === "bolha"
+      ? {
+          width: t,
+          height: t,
+          borderRadius: t,
+          borderWidth: 1.2,
+          borderColor: "rgba(255,255,255,0.85)",
+          backgroundColor: "rgba(214,226,255,0.14)",
+        }
+      : forma === "pena"
+        ? { width: t * 0.34, height: t, borderRadius: t, backgroundColor: tom, opacity: 0.9 }
+        : forma === "petala"
+          ? { width: t, height: t * 0.62, borderRadius: t, backgroundColor: tom }
+          : { width: t, height: t, borderRadius: t, backgroundColor: tom };
+  return (
+    <Animated.View
+      style={{
+        position: "absolute",
+        left: x,
+        top: 0,
+        opacity: v.interpolate({
+          inputRange: [0, 0.06, 0.88, 1],
+          outputRange: [0, noite ? 0.75 : 0.95, noite ? 0.75 : 0.95, 0],
+        }),
+        transform: [
+          {
+            translateY: v.interpolate({
+              inputRange: [0, 1],
+              outputRange: sobe ? [altura, altura * 0.08] : [altura * 0.04, altura],
+            }),
+          },
+          {
+            translateX: v.interpolate({
+              inputRange: [0, 0.25, 0.5, 0.75, 1],
+              outputRange: [0, balanco, 0, -balanco, 0],
+            }),
+          },
+          ...(gira
+            ? [{ rotate: v.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "540deg"] }) }]
+            : []),
+        ],
+      }}
+    >
+      {forma === "brilho" ? (
+        <View
+          style={{
+            position: "absolute",
+            left: -t * 1.5,
+            top: -t * 1.5,
+            width: t * 4,
+            height: t * 4,
+            borderRadius: t * 4,
+            backgroundColor: tom,
+            opacity: 0.2,
+          }}
+        />
+      ) : null}
+      <View style={corpo}>
+        {forma === "bolha" ? (
+          <View
+            style={{
+              position: "absolute",
+              left: t * 0.2,
+              top: t * 0.16,
+              width: t * 0.26,
+              height: t * 0.18,
+              borderRadius: t,
+              backgroundColor: "rgba(255,255,255,0.9)",
+            }}
+          />
+        ) : null}
+      </View>
+    </Animated.View>
+  );
+}
 
 /** A diagonal do vidro da janela e a mancha da vidraça no chão, em frações da arte. */
 const JANELA = [
@@ -1043,14 +1376,28 @@ function ItemNoQuarto({
           { translateY: v.interpolate({ inputRange: [0, 1], outputRange: [-18, 0] }) },
           { scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) },
         ],
-        /* A sombra projetada segue a forma da arte: o que está na parede a
-           lança para baixo e para o lado; o resto, só um contorno macio. */
-        shadowColor: noite ? "#03041a" : "#3b1c10",
-        shadowOffset: naParede ? { width: 4, height: 7 } : { width: 2, height: 3 },
-        shadowOpacity: noite ? 0.55 : naParede ? 0.3 : 0.2,
-        shadowRadius: naParede ? 7 : 5,
       }}
     >
+      {/* A SOMBRA PROJETADA: a mesma arte, tingida de escuro e deslocada (o
+          que está na parede a lança para baixo e para o lado). ⚠️ Não use
+          `shadowColor`/`shadowRadius` numa vista sem fundo: o iOS recalcula a
+          forma pelos pixels, fora da tela, a cada quadro (o travamento medido
+          em 24/11/2026). */}
+      <Image
+        source={ARTE[item.id]}
+        tintColor={noite ? "#03041a" : "#3b1c10"}
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            opacity: noite ? 0.42 : naParede ? 0.22 : 0.14,
+            transform: naParede
+              ? [{ translateX: 4 }, { translateY: 7 }]
+              : [{ translateX: 2 }, { translateY: 3 }],
+          },
+        ]}
+        contentFit="fill"
+        accessible={false}
+      />
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${item.nome}, no quarto`}
@@ -1263,21 +1610,25 @@ function EstrelasQuePiscam() {
         easing: Easing.inOut(Easing.sin),
         useNativeDriver: true,
       });
-    const laco = Animated.loop(Animated.sequence([ir(1, 1700), ir(0.15, 2100)]));
+    /* Três piscadas e descansa acesa (24/11/2026: um laço eterno numa camada
+       da tela inteira redesenhava o vidro e as luzes a cada quadro). */
+    const laco = Animated.sequence([
+      lacoQueDescansa(Animated.sequence([ir(1, 1700), ir(0.15, 2100)]), 3),
+      ir(0.7, 1400),
+    ]);
     laco.start();
     return () => laco.stop();
   }, [reduzido, v]);
   return (
-    <View pointerEvents="none" style={[StyleSheet.absoluteFill, { mixBlendMode: "screen" }]}>
-      <Animated.View style={[StyleSheet.absoluteFill, { opacity: v }]}>
-        <Image
-          source={ESTRELAS_DA_NOITE}
-          style={StyleSheet.absoluteFill}
-          contentFit="fill"
-          accessible={false}
-        />
-      </Animated.View>
-    </View>
+    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: v }]}>
+      <Image
+        source={ESTRELAS_DA_NOITE}
+        allowDownscaling={false}
+        style={StyleSheet.absoluteFill}
+        contentFit="fill"
+        accessible={false}
+      />
+    </Animated.View>
   );
 }
 
@@ -1347,7 +1698,8 @@ function Cintila({
 }) {
   const v = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    const laco = Animated.loop(
+    /* Algumas subidas e descansa (a régua do app: enfeite não gira para sempre). */
+    const laco = lacoQueDescansa(
       Animated.sequence([
         Animated.delay(atraso),
         Animated.timing(v, {
@@ -1357,29 +1709,46 @@ function Cintila({
           useNativeDriver: true,
         }),
       ]),
+      3,
     );
     laco.start();
     return () => laco.stop();
   }, [atraso, v]);
+  const halo = tamanho * 4;
   return (
     <Animated.View
       pointerEvents="none"
       style={{
         position: "absolute",
-        left: x,
-        top: y,
-        width: tamanho,
-        height: tamanho,
-        borderRadius: tamanho,
-        backgroundColor: tom,
-        boxShadow: `0px 0px ${tamanho * 2}px ${tom}`,
+        left: x - halo / 2 + tamanho / 2,
+        top: y - halo / 2 + tamanho / 2,
+        width: halo,
+        height: halo,
+        alignItems: "center",
+        justifyContent: "center",
         opacity: v.interpolate({ inputRange: [0, 0.25, 0.7, 1], outputRange: [0, 0.95, 0.7, 0] }),
         transform: [
           { translateY: v.interpolate({ inputRange: [0, 1], outputRange: [8, -22] }) },
           { translateX: v.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 5, -2] }) },
         ],
       }}
-    />
+    >
+      {/* O brilho em volta é um círculo claro, e não um `boxShadow` (cada
+          sombra é uma passada fora da tela). */}
+      <View
+        style={{
+          position: "absolute",
+          width: halo,
+          height: halo,
+          borderRadius: halo,
+          backgroundColor: tom,
+          opacity: 0.18,
+        }}
+      />
+      <View
+        style={{ width: tamanho, height: tamanho, borderRadius: tamanho, backgroundColor: tom }}
+      />
+    </Animated.View>
   );
 }
 
@@ -1576,14 +1945,19 @@ function CartaoDaMissao({
 
 /* ── A bandeja ────────────────────────────────────────────────────────── */
 
-function Abas({ ativa, aoEscolher }: { ativa: Categoria; aoEscolher: (c: Categoria) => void }) {
+const ABAS: readonly { id: Aba; nome: string; arte: number }[] = [
+  ...CATEGORIAS.map((c) => ({ id: c.id, nome: c.nome, arte: ARTE[c.icone] })),
+  { id: "ar", nome: "No ar", arte: ARTE_DO_AR.bolhas },
+];
+
+function Abas({ ativa, aoEscolher }: { ativa: Aba; aoEscolher: (c: Aba) => void }) {
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={{ gap: 6, paddingHorizontal: espaco.sm, paddingVertical: 4 }}
     >
-      {CATEGORIAS.map((c) => {
+      {ABAS.map((c) => {
         const sim = c.id === ativa;
         return (
           <Pressable
@@ -1614,15 +1988,11 @@ function Abas({ ativa, aoEscolher }: { ativa: Categoria; aoEscolher: (c: Categor
                 borderWidth: 1.5,
                 borderColor: sim ? "rgba(226,214,255,0.9)" : "rgba(255,255,255,0.9)",
                 boxShadow: sim
-                  ? "0px 6px 14px -4px rgba(100,49,214,0.7), 0px 0px 10px rgba(164,135,251,0.5)"
+                  ? "0px 6px 14px -4px rgba(100,49,214,0.75)"
                   : "0px 3px 8px -4px rgba(76,29,149,0.25)",
               }}
             >
-              <Image
-                source={ARTE[c.icone]}
-                style={{ width: 24, height: 24 }}
-                contentFit="contain"
-              />
+              <Image source={c.arte} style={{ width: 24, height: 24 }} contentFit="contain" />
               <Text style={{ ...fonte.forte, fontSize: 13, color: sim ? cor.branco : TINTA }}>
                 {c.nome}
               </Text>
@@ -1640,13 +2010,47 @@ function Bandeja({
   vitrine,
   lendo,
   aoTocar,
+  aoTocarNoAr,
 }: {
-  categoria: Categoria;
+  categoria: Aba;
   quarto: Quartinho;
   vitrine: VitrineDoQuarto;
   lendo: boolean;
   aoTocar: (item: ItemDoQuarto, s: Situacao) => void;
+  aoTocarNoAr: (a: IdDoAr, s: Situacao) => void;
 }) {
+  if (categoria === "ar")
+    return (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{
+          gap: espaco.sm,
+          paddingHorizontal: espaco.sm,
+          paddingVertical: 10,
+        }}
+      >
+        {ARES.filter(
+          (a) =>
+            vitrine.posse?.has(AR_DO_QUARTO[a].lojinha) ||
+            vendeAlgumDia(AR_DO_QUARTO[a].lojinha, vitrine.porFase),
+        ).map((a) => {
+          const s = situacaoDoAr(a, vitrine);
+          return (
+            <CartaoDoItem
+              key={a}
+              nome={AR_DO_QUARTO[a].nome}
+              arte={ARTE_DO_AR[a]}
+              daLojinha
+              noLugar="No ar"
+              situacao={lendo ? null : s}
+              posto={quarto.ar === a}
+              aoTocar={() => aoTocarNoAr(a, s)}
+            />
+          );
+        })}
+      </ScrollView>
+    );
   const itens = ITENS.filter((i) => i.categoria === categoria);
   return (
     <ScrollView
@@ -1660,7 +2064,10 @@ function Bandeja({
         return (
           <CartaoDoItem
             key={item.id}
-            item={item}
+            nome={item.nome}
+            arte={ARTE[item.id]}
+            daLojinha={!!item.lojinha}
+            noLugar="No quarto"
             situacao={lendo && item.lojinha ? null : s}
             posto={quarto.postos.includes(item.id)}
             aoTocar={() => aoTocar(item, s)}
@@ -1672,12 +2079,20 @@ function Bandeja({
 }
 
 function CartaoDoItem({
-  item,
+  nome,
+  arte,
+  daLojinha,
+  noLugar,
   situacao: s,
   posto,
   aoTocar,
 }: {
-  item: ItemDoQuarto;
+  nome: string;
+  arte: number;
+  /** É da lojinha (o que ela tem diz "Seu"; o presente, "Grátis"). */
+  daLojinha: boolean;
+  /** O que o cartão diz quando está em uso ("No quarto", "No ar"). */
+  noLugar: string;
   /** `null`: ainda lendo a posse na lojinha. */
   situacao: Situacao | null;
   posto: boolean;
@@ -1694,8 +2109,8 @@ function CartaoDoItem({
           : s.tipo === "missao"
             ? "Missão"
             : posto
-              ? "No quarto"
-              : item.lojinha
+              ? noLugar
+              : daLojinha
                 ? "Seu"
                 : "Grátis";
   return (
@@ -1704,12 +2119,12 @@ function CartaoDoItem({
       accessibilityState={{ selected: posto, disabled: s === null }}
       accessibilityLabel={
         s?.tipo === "comprar"
-          ? `${item.nome}, ${s.preco} sementinhas. Toque para comprar`
+          ? `${nome}, ${s.preco} sementinhas. Toque para comprar`
           : s?.tipo === "em-breve"
-            ? `${item.nome}, ${s.quando.toLowerCase()} na lojinha`
+            ? `${nome}, ${s.quando.toLowerCase()} na lojinha`
             : s?.tipo === "missao"
-              ? `${item.nome}, presente da missão ${s.missao.texto}`
-              : `${item.nome}${posto ? ", no quarto. Toque para tirar" : ". Toque para pôr no quarto"}`
+              ? `${nome}, presente da missão ${s.missao.texto}`
+              : `${nome}${posto ? `, ${noLugar.toLowerCase()}. Toque para tirar` : ". Toque para pôr"}`
       }
       disabled={s === null}
       onPress={aoTocar}
@@ -1728,12 +2143,12 @@ function CartaoDoItem({
           borderWidth: posto ? 2.5 : 1.5,
           borderColor: posto ? OURO : "rgba(255,255,255,0.95)",
           boxShadow: posto
-            ? "0px 0px 14px rgba(245,196,81,0.85), 0px 6px 12px -6px rgba(180,120,20,0.5)"
+            ? "0px 0px 14px rgba(245,196,81,0.85)"
             : "0px 6px 12px -6px rgba(76,29,149,0.35)",
         }}
       >
         <Image
-          source={ARTE[item.id]}
+          source={arte}
           style={{ width: 60, height: 54, opacity: fechado ? 0.55 : 1 }}
           contentFit="contain"
           accessible={false}

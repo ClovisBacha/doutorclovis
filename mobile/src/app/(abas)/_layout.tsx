@@ -112,7 +112,10 @@ function CeuDasAbas({ children }: { children: ReactNode }) {
   const ceuDasAbas = useMemo(() => ({ fase, x, y }), [fase, x, y]);
   return (
     <View style={{ flex: 1, backgroundColor: CEUS[fase].chao }}>
-      <CeuVivo fase={fase} x={x} y={y} />
+      {/* O céu da tela inteira NÃO anda com o celular (24/11/2026): movê-lo
+          redesenhava a tela toda, o vidro e as sombras, 30 vezes por segundo.
+          A inclinação fica com o número e a Bolha (\`ceuDasAbas\`). */}
+      <CeuVivo fase={fase} />
       <BarraDeStatusDoCeu claro={CEUS[fase].claro} />
       <CeuCompartilhado.Provider value={ceuDasAbas}>{children}</CeuCompartilhado.Provider>
     </View>

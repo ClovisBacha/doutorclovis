@@ -7,12 +7,16 @@ import { semComentarios } from "@/lib/sem-comentarios";
  * AS ARTES DA BOLHA (23/11/2026, o dono: "o bebê bolha está ficando desfocada
  * na tela principal e a imagem dele de coração está ficando cortada em cima").
  *
- * - DESFOCADA: o `expo-image` reduz a arte ao tamanho da vista na hora de
- *   decodificar (`allowDownscaling`, ligado por padrão). A Bolha nunca fica
- *   parada — flutua, balança e, no céu, inclina com o celular —, e a arte
- *   reduzida, redesenhada girada e fora do pixel inteiro, borrava. Toda
- *   imagem da Bolha leva `allowDownscaling={false}`: a arte de 960 px inteira
- *   (e uma só na memória, para todas as telas).
+ * - DESFOCADA (refeito em 24/11/2026, medido no simulador): o iOS reduz a
+ *   arte na placa de vídeo com o filtro TRILINEAR, que mistura a imagem com
+ *   uma cópia pela metade. Com a arte de 960 inteira (`allowDownscaling={false}`,
+ *   a correção de 23/11) a Bolha pequena saía MAIS borrada que com a redução
+ *   do próprio expo-image, que entrega a arte no tamanho exato da vista
+ *   (comparadas lado a lado, ampliadas). Então: a Bolha do CÉU vem já no
+ *   tamanho exato (`BOLHA_DO_CEU`, 212/424/636 px, reduzida com o filtro de
+ *   alta qualidade) e não é reduzida de novo; todas as outras deixam o
+ *   expo-image reduzir (o padrão). E a Bolha para no pixel inteiro: o
+ *   `Flutuar` descansa em escala 1, e a inclinação tem uma zona morta.
  * - CORTADA: a apaixonada e a estudiosa vinham cortadas na borda de cima. As
  *   duas foram refeitas das originais do Drive, inteiras
  *   (`mobile/scripts/bolha-do-drive.mjs`), e moram no app
@@ -43,15 +47,43 @@ function imagens(): { arquivo: string; el: string }[] {
 }
 
 describe("as artes da Bolha", () => {
-  test("toda imagem da Bolha é desenhada com a arte inteira (nítida em movimento)", () => {
+  test("a Bolha do céu vem no tamanho exato; as outras, reduzidas pelo expo-image", () => {
     const daBolha = imagens().filter(({ el }) =>
-      /source=\{[^}]*\b(BOLHA|ARTE_SURPRESA|BOLHA_DORMINDO)\b|source=\{ARTES\[humor\]\}|source=\{fonte\}/.test(
+      /source=\{[^}]*\b(BOLHA|BOLHA_DO_CEU|ARTE_SURPRESA|BOLHA_DORMINDO)\b|source=\{ARTES\[humor\]\}|source=\{fonte\}/.test(
         el,
       ),
     );
     expect(daBolha.length).toBeGreaterThan(8);
-    const sem = daBolha.filter(({ el }) => !el.includes("allowDownscaling={false}"));
-    expect(sem.map((s) => s.arquivo)).toEqual([]);
+    const doCeu = daBolha.filter(({ el }) => /BOLHA_DO_CEU/.test(el));
+    expect(doCeu.map((d) => d.arquivo)).toEqual([
+      join("componentes", "jornada", "ceu-do-bebe.tsx"),
+    ]);
+    expect(doCeu[0]!.el).toContain("allowDownscaling={false}");
+    const outras = daBolha.filter(({ el }) => !/BOLHA_DO_CEU/.test(el));
+    expect(
+      outras.filter(({ el }) => el.includes("allowDownscaling={false}")).map((s) => s.arquivo),
+    ).toEqual([]);
+  });
+
+  test("a Bolha do céu tem as três escalas, no tamanho exato de 212 pt", () => {
+    const dir = join(RAIZ, "..", "assets", "bolha", "ceu");
+    for (const h of ["feliz", "surpresa"])
+      for (const [suf, px] of [
+        ["", 212],
+        ["@2x", 424],
+        ["@3x", 636],
+      ] as const) {
+        const arq = join(dir, `${h}${suf}.webp`);
+        expect(existsSync(arq)).toBe(true);
+        /* O cabeçalho VP8X do webp guarda a largura - 1 em 3 bytes (pos. 24). */
+        const b = readFileSync(arq);
+        expect({ arq: `${h}${suf}`, largura: b.readUIntLE(24, 3) + 1 }).toEqual({
+          arq: `${h}${suf}`,
+          largura: px,
+        });
+      }
+    const ceu = readFileSync(join(RAIZ, "componentes", "jornada", "ceu-do-bebe.tsx"), "utf8");
+    expect(ceu).toMatch(/const BEBE = 212;/);
   });
 
   test("a apaixonada e a estudiosa são as refeitas das originais, do app", () => {

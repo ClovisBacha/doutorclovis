@@ -187,7 +187,7 @@ export const LinhaDaAmiga = memo(function LinhaDaAmiga({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${a.nome}. ${quando}${trofeus ? `. ${trofeus}` : ""}. Abrir o Cantinho dela`}
+      accessibilityLabel={`${a.nome}. ${quando}${trofeus ? `. ${trofeus}` : ""}. Abrir o perfil dela`}
       onPress={() => aoAbrir(a.id)}
       style={({ pressed }) => ({
         flexDirection: "row",

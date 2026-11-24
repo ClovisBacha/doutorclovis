@@ -1,17 +1,7 @@
 import { Image } from "expo-image";
 import ShieldCheck from "lucide-react-native/icons/shield-check";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import {
-  Animated,
-  Easing,
-  Pressable,
-  Text,
-  View,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-  type TextStyle,
-} from "react-native";
-import { estadoDoNo as estadoDaPele, type TrilhaSkin } from "@/lib/trilha-skins";
+import { Animated, Easing, Pressable, Text, View, type TextStyle } from "react-native";
 import { BOLHA } from "~/componentes/artes";
 import { useAviso } from "~/componentes/aviso";
 import { NaoConsegueLer, selecao, toque, Tocavel, useFolgaDaBarra } from "~/componentes/base";
@@ -31,13 +21,6 @@ import {
   IconeSementinha,
   TrofeuParado,
 } from "~/componentes/caminho/pecas";
-import {
-  BarraDeArrumar,
-  BotaoDeArrumar,
-  EnfeiteNaTrilha,
-  FundoEAr,
-  type ArrumarEnfeite,
-} from "~/componentes/caminho/enfeites";
 import { CEUS, useCeuDasAbas } from "~/componentes/ceu-vivo";
 import { Folha } from "~/componentes/jornada/pecas";
 import { useMovimentoReduzido } from "~/componentes/movimento";
@@ -48,9 +31,7 @@ import {
   useEstavel,
 } from "~/componentes/caminho/rolagem";
 import { Vidro } from "~/componentes/vidro";
-import { parametroDaBancada } from "~/lib/bancada";
 import { falaDoNoDeHoje, PERGUNTA_DO_HUMOR, reacaoAoHumor } from "~/lib/bolha/falas-do-jogo";
-import { misturar } from "~/lib/cor";
 import {
   HUMORES,
   ligacoesDaTrilha,
@@ -61,23 +42,6 @@ import {
   type Fase,
   type PontoDaTrilha,
 } from "~/lib/jornada/caminho";
-import {
-  alturaNoSite,
-  bandeja as bandejaDe,
-  climasDela,
-  DECOR_MAX,
-  enfeitesPorBloco,
-  enfeitesVisiveis,
-  iniciosDasSemanas,
-  moverEnfeite,
-  novoEnfeite,
-  paradasDoDegrade,
-  semearNovos,
-  Y_INICIAL_DO_SITE,
-  type Decoracao,
-  type EnfeiteNoBloco,
-  type EnfeitePosto,
-} from "~/lib/jornada/enfeites";
 import type { Blob } from "~/lib/jornada/momentos";
 import { resumirSemanas, type EstadoDoNo, type ResumoDaSemana } from "~/lib/jornada/trilha";
 import { ALVO_MINIMO, canto, cor, escala, espaco, fonte, luz, margem } from "~/tema";
@@ -102,11 +66,14 @@ import { ALVO_MINIMO, canto, cor, escala, espaco, fonte, luz, margem } from "~/t
  * cabeçalho da lista também (só o espaço da camada de cima): a posição de hoje
  * sai de uma soma, e a lista NASCE nela (`contentOffset`), sem salto.
  *
- * O que ela compra no Cantinho mora aqui: os enfeites espalhados pela trilha
- * (nas posições do SITE — o layout é o mesmo nos dois, no blob da jornada), o
- * cenário e o ar atrás dela, e a pele das bolinhas. O lápis abre o Arrumar.
+ * A trilha NÃO se enfeita mais (decisão do dono, 24/11/2026: "a trilha
+ * customizada não vai mais existir [...] o fundo será baseado no clima do
+ * dia [...] os itens comprados têm que ser ali no quartinho"). Ela sobe pelo
+ * céu da hora (o das três abas), e o que ela compra mora no quartinho
+ * (`app/quartinho.tsx`). Saíram os enfeites espalhados, o modo Arrumar, o
+ * cenário, o ar e a pele das bolinhas.
  *
- * Bancada: `&topo=1` abre no alto da trilha; `&arrumar=1`, no modo Arrumar.
+ * Bancada: `&topo=1` abre no alto da trilha.
  */
 
 export type PropsDoCaminho = {
@@ -147,17 +114,6 @@ export type PropsDoCaminho = {
   nomeDoBebe?: string | null;
   /** @deprecated Idem. */
   aoContarNascimento?: () => void;
-  /** O layout dos enfeites (`dc-path-decor`), como está gravado. */
-  decoracao: Decoracao | null;
-  /** O que ela tem no Cantinho (`null` = ainda não sei: vale o layout gravado). */
-  possuidos: readonly string[] | null;
-  /** O cenário equipado (o degradê do catálogo), ou nenhum. */
-  cenario: string | null;
-  /** A pele das bolinhas, se ela equipou uma. */
-  pele: TrilhaSkin | null;
-  /** O blob da nuvem já chegou: só então se espalha enfeite novo. */
-  podeSemear: boolean;
-  aoGravarDecoracao: (d: Decoracao) => void;
 };
 
 export function Caminho(p: PropsDoCaminho) {
@@ -204,13 +160,11 @@ export function Caminho(p: PropsDoCaminho) {
   const aoAbrirLoja = useEstavel(p.aoAbrirLoja);
   const aoAbrirAmigas = useEstavel(p.aoAbrirAmigas);
   const aoAbrirFolha = useEstavel(p.aoAbrirFolha);
-  const aoGravarDecoracao = useEstavel(p.aoGravarDecoracao);
 
-  /* ── O movimento: parado com "reduzir movimento", fora de foco (as duas
-     coisas o `useMovimentoReduzido` já sabe) e enquanto ela arruma. ── */
+  /* ── O movimento: parado com "reduzir movimento" e fora de foco (as duas
+     coisas o `useMovimentoReduzido` já sabe). ── */
   const reduzido = useMovimentoReduzido();
-  const [arrumando, setArrumando] = useState(() => parametroDaBancada("arrumar") === "1");
-  const parado = reduzido || arrumando;
+  const parado = reduzido;
 
   /* ── Abrir em HOJE, sem salto (e voltar a ele): ver `rolagem.tsx` ── */
   const folga = useFolgaDaBarra();
@@ -229,156 +183,15 @@ export function Caminho(p: PropsDoCaminho) {
     longe,
     aoParar: avaliarAoParar,
     irParaHoje,
-    rolagemAgora,
   } = useAbrirEmHoje<Bloco>({ yDeHoje, indiceDeHoje, folga, reduzido });
   const largura = caixa?.largura ?? 0;
 
-  /* ── O Cantinho na trilha ── */
-  const alturas = useMemo(() => blocos.map((b) => b.altura), [blocos]);
-  const ehSemana = useMemo(() => blocos.map((b) => b.tipo === "semana"), [blocos]);
-  const alturaDaTrilha = useMemo(() => alturaNoSite(alturas), [alturas]);
-  const inicios = useMemo(() => iniciosDasSemanas(alturas, ehSemana), [alturas, ehSemana]);
-  const visiveis = useMemo(
-    () => enfeitesVisiveis(p.decoracao, p.possuidos),
-    [p.decoracao, p.possuidos],
-  );
-  /* No Arrumar, cada enfeite fica onde ela pôs; fora dele, o que cairia atrás
-     da barra da semana desce para baixo dela. A lista de um bloco que não
-     mudou continua a MESMA (o Cantinho é relido a cada foco da aba). */
-  const porBlocoAntes = useRef<EnfeiteNoBloco[][]>([]);
-  const porBloco = useMemo(() => {
-    const novo = enfeitesPorBloco(visiveis, alturas, arrumando ? undefined : ehSemana);
-    const antes = porBlocoAntes.current;
-    const fora = novo.map((lista, i) => {
-      const velha = antes[i];
-      return velha &&
-        velha.length === lista.length &&
-        velha.every((e, j) => e.p === lista[j]!.p && e.y === lista[j]!.y)
-        ? velha
-        : lista;
-    });
-    porBlocoAntes.current = fora;
-    return fora;
-  }, [visiveis, alturas, ehSemana, arrumando]);
-  const paradas = useMemo(() => (p.cenario ? paradasDoDegrade(p.cenario) : null), [p.cenario]);
-  /* O clima vem do que ela POSSUI, nunca de onde ele está: ele é o ar da
-     trilha, e não tem lugar (o defeito da Poeira de estrelas no site). */
-  const climas = useMemo(() => climasDela(p.possuidos ?? []), [p.possuidos]);
-  const bandeja = useMemo(() => bandejaDe(p.possuidos ?? []), [p.possuidos]);
-
   /* ── O céu atrás do topo: o degradê onde a trilha se desfaz ── */
   const dasAbas = useCeuDasAbas();
-  const corDoTopo = paradas?.length
-    ? misturar(luz.base, paradas[0]!.cor, 0.55)
-    : dasAbas
-      ? CEUS[dasAbas.fase].topo
-      : luz.base;
+  const corDoTopo = dasAbas ? CEUS[dasAbas.fase].topo : luz.base;
 
   /* ── O aviso do dia que ainda não abriu ── */
   const { avisar, aviso } = useAviso();
-
-  /* ── Espalhar o que ela comprou e a trilha ainda não viu ──
-     PERTO DE HOJE, onde o Caminho abre (a régua do app — `semearPertoDeHoje`):
-     ela compra no Cantinho, volta e encontra o enfeite na primeira tela. Só
-     depois do pull da nuvem, para não semear sobre um blob atrasado. */
-  const avisouCheia = useRef(false);
-  const { podeSemear, possuidos, decoracao } = p;
-  useEffect(() => {
-    if (!podeSemear || !possuidos) return;
-    const r = semearNovos(
-      decoracao,
-      possuidos,
-      alturaDaTrilha,
-      Y_INICIAL_DO_SITE + yDeHoje,
-      inicios,
-    );
-    if (r.esperando > 0 && !avisouCheia.current) {
-      avisouCheia.current = true;
-      avisar(`A trilha está cheia: são ${DECOR_MAX} enfeites. Os novos esperam no Arrumar.`);
-    }
-    if (r.decoracao) aoGravarDecoracao(r.decoracao);
-  }, [
-    podeSemear,
-    possuidos,
-    decoracao,
-    alturaDaTrilha,
-    yDeHoje,
-    inicios,
-    aoGravarDecoracao,
-    avisar,
-  ]);
-
-  /* ── O modo Arrumar ── */
-  const [selecionado, setSelecionado] = useState<string | null>(null);
-  const [arrastando, setArrastando] = useState(false);
-  const historico = useRef<EnfeitePosto[][]>([]);
-  const [passos, setPassos] = useState(0);
-  const rolagem = useRef(new Animated.Value(0)).current;
-
-  /* As mudanças valem sobre o layout INTEIRO gravado (inclusive o que não está
-     à vista), e cada uma guarda o estado anterior para o Desfazer. */
-  const gravar = useCallback(
-    (items: EnfeitePosto[]) => {
-      const atual = decoracao ?? { v: 1 as const, items: [], seen: [] };
-      historico.current = [...historico.current.slice(-39), atual.items];
-      setPassos(historico.current.length);
-      aoGravarDecoracao({ v: 1, items, seen: atual.seen });
-    },
-    [decoracao, aoGravarDecoracao],
-  );
-  const todos = useMemo(() => decoracao?.items ?? [], [decoracao]);
-
-  const arrumar = useMemo<Omit<ArrumarEnfeite, "selecionado"> | null>(
-    () =>
-      arrumando
-        ? {
-            aoSelecionar: setSelecionado,
-            aoArrastar: setArrastando,
-            aoMover: (k, dx, dy) =>
-              gravar(
-                todos.map((q) =>
-                  q.k === k
-                    ? moverEnfeite(q, (dx / Math.max(1, largura)) * 100, dy, alturaDaTrilha)
-                    : q,
-                ),
-              ),
-            aoRedimensionar: (k, s) => gravar(todos.map((q) => (q.k === k ? { ...q, s } : q))),
-            aoTirar: (k) => {
-              setSelecionado(null);
-              gravar(todos.filter((q) => q.k !== k));
-            },
-          }
-        : null,
-    [arrumando, gravar, todos, largura, alturaDaTrilha],
-  );
-
-  function porDaBandeja(id: string) {
-    if (todos.length >= DECOR_MAX) {
-      avisar(`A trilha já tem ${DECOR_MAX} enfeites. Tire um antes de pôr outro.`);
-      return;
-    }
-    /* Nasce no meio do que está à vista, para ela ver o item aparecer. */
-    const meio = rolagemAgora.current + (caixa?.altura ?? 0) / 2 - espacador + Y_INICIAL_DO_SITE;
-    const k = `u${Date.now().toString(36)}-${id}`;
-    gravar([...todos, novoEnfeite(id, meio, alturaDaTrilha, k)]);
-    setSelecionado(k);
-  }
-
-  function desfazer() {
-    const antes = historico.current.pop();
-    setPassos(historico.current.length);
-    if (!antes) return;
-    setSelecionado(null);
-    aoGravarDecoracao({ v: 1, items: antes, seen: decoracao?.seen ?? [] });
-  }
-
-  const comecarAArrumar = useCallback(() => {
-    /* Cada sessão de Arrumar começa com o Desfazer zerado: ele desfaz o que
-       ela acabou de fazer, nunca uma visita antiga. */
-    historico.current = [];
-    setPassos(0);
-    setArrumando(true);
-  }, []);
 
   /* ── O toque num nó: hoje e o que passou abrem a folha do dia; o que vem
      diz quando abre. ── */
@@ -396,19 +209,10 @@ export function Caminho(p: PropsDoCaminho) {
     [hojeD, avisar, aoAbrirDia],
   );
 
-  const pele = p.pele;
   const renderItem = useCallback(
     ({ item, index }: { item: Bloco; index: number }) => {
       /* Só dados (nada de elemento pronto) para os blocos `memo` compararem. */
-      const enfeites = {
-        enfeites: porBloco[index] ?? SEM_ENFEITES,
-        semanaAtual: p.semanaAtual,
-        arrumar,
-        selecionado,
-        parado,
-        arrumando,
-      };
-      if (item.tipo === "fase") return <BlocoDaFase bloco={item} {...enfeites} />;
+      if (item.tipo === "fase") return <BlocoDaFase bloco={item} />;
       return (
         <BlocoDaSemana
           bloco={item}
@@ -418,59 +222,11 @@ export function Caminho(p: PropsDoCaminho) {
           hojeD={hojeD}
           tocarNoDia={tocarNoDia}
           aoAbrirSemana={aoAbrirSemana}
-          pele={pele}
-          {...enfeites}
+          parado={parado}
         />
       );
     },
-    [
-      porBloco,
-      p.semanaAtual,
-      parado,
-      arrumar,
-      selecionado,
-      arrumando,
-      resumos,
-      proximos,
-      largura,
-      hojeD,
-      tocarNoDia,
-      aoAbrirSemana,
-      pele,
-    ],
-  );
-
-  /* ── A rolagem ──
-     O `rolagem` anda no fio nativo (o cenário desce com o começo da trilha).
-     O JS só fica sabendo da posição nas FRONTEIRAS (soltou o dedo, a rolagem
-     parou) — a não ser no Arrumar, que precisa do meio da tela para pôr um
-     enfeite da bandeja. */
-  const aoRolar = useMemo(
-    () =>
-      Animated.event([{ nativeEvent: { contentOffset: { y: rolagem } } }], {
-        useNativeDriver: true,
-      }),
-    [rolagem],
-  );
-  const aoRolarArrumando = useMemo(
-    () =>
-      Animated.event([{ nativeEvent: { contentOffset: { y: rolagem } } }], {
-        useNativeDriver: true,
-        listener: (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-          rolagemAgora.current = e.nativeEvent.contentOffset.y;
-        },
-      }),
-    [rolagem],
-  );
-  const [passoDoCenario, setPassoDoCenario] = useState(0);
-  const temCenario = !!paradas?.length;
-  const aoParar = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      avaliarAoParar(e);
-      if (temCenario)
-        setPassoDoCenario(Math.round(e.nativeEvent.contentOffset.y / PASSO_DO_CENARIO));
-    },
-    [avaliarAoParar, temCenario],
+    [parado, resumos, proximos, largura, hojeD, tocarNoDia, aoAbrirSemana],
   );
 
   const getItemLayout = useCallback(
@@ -482,10 +238,7 @@ export function Caminho(p: PropsDoCaminho) {
     [blocos, espacador, deslocamentos],
   );
   const cabecalhoDaLista = useMemo(() => <View style={{ height: espacador }} />, [espacador]);
-  const peDaLista = useMemo(
-    () => <View style={{ height: folga + espaco.xxl + (arrumando ? 150 : 0) }} />,
-    [folga, arrumando],
-  );
+  const peDaLista = useMemo(() => <View style={{ height: folga + espaco.xxl }} />, [folga]);
   /* ── A carteira que não carregou: a folha das sementinhas ── */
   const carteiraFalhou = !p.carregandoCarteira && p.saldo == null;
   const [folhaDaCarteira, setFolhaDaCarteira] = useState(false);
@@ -512,31 +265,15 @@ export function Caminho(p: PropsDoCaminho) {
   );
   const humorSumiu = useCallback(() => setHumorNaTela(false), []);
 
-  const mostrarLapis = !arrumando && bandeja.length > 0;
-
   return (
     <View style={{ flex: 1 }} onLayout={aoMedirCaixa}>
-      <FundoEAr
-        paradas={paradas}
-        climas={climas}
-        rolagem={rolagem}
-        passoDoCenario={passoDoCenario}
-        alturaDoTopo={espacador}
-        alturaDaLista={caixa?.altura ?? 0}
-        alturaDaTrilha={alturaDaTrilha}
-        largura={largura}
-        parado={parado}
-      />
       {pronto ? (
         <Animated.FlatList
           ref={lista as never}
           style={{ opacity: aVista ? 1 : 0 }}
           data={blocos}
-          onScroll={arrumando ? aoRolarArrumando : aoRolar}
-          scrollEventThrottle={16}
-          onScrollEndDrag={aoParar}
-          onMomentumScrollEnd={aoParar}
-          scrollEnabled={!arrastando}
+          onScrollEndDrag={avaliarAoParar}
+          onMomentumScrollEnd={avaliarAoParar}
           keyExtractor={chaveDoBloco}
           renderItem={renderItem}
           getItemLayout={getItemLayout}
@@ -591,10 +328,9 @@ export function Caminho(p: PropsDoCaminho) {
               parado={parado}
             />
           </View>
-          {mostrarLapis ? <BotaoDeArrumar aoTocar={comecarAArrumar} /> : null}
         </View>
       </View>
-      {humorNaTela && alturaDaCamada != null && !arrumando ? (
+      {humorNaTela && alturaDaCamada != null ? (
         <View
           pointerEvents="box-none"
           style={{
@@ -607,27 +343,12 @@ export function Caminho(p: PropsDoCaminho) {
           <FaixaDoHumor aoMarcar={marcarHumor} aoSumir={humorSumiu} />
         </View>
       ) : null}
-      {arrumando ? null : (
-        <PilulaDeHoje
-          visivel={longe.visivel && aVista}
-          acima={longe.acima}
-          baixo={folga + espaco.md}
-          aoTocar={irParaHoje}
-        />
-      )}
-      {arrumando ? (
-        <BarraDeArrumar
-          quantos={visiveis.length}
-          podeDesfazer={passos > 0}
-          aoDesfazer={desfazer}
-          aoTerminar={() => {
-            setArrumando(false);
-            setSelecionado(null);
-          }}
-          bandeja={bandeja}
-          aoPor={porDaBandeja}
-        />
-      ) : null}
+      <PilulaDeHoje
+        visivel={longe.visivel && aVista}
+        acima={longe.acima}
+        baixo={folga + espaco.md}
+        aoTocar={irParaHoje}
+      />
       {aviso}
       <Folha
         aberta={folhaDaCarteira}
@@ -656,70 +377,12 @@ const SOSSEGO_DA_CARTEIRA =
 
 const chaveDoBloco = (b: Bloco) => (b.tipo === "fase" ? `f${b.fase.n}` : `s${b.semana}`);
 const nada = () => {};
-const SEM_ENFEITES: EnfeiteNoBloco[] = [];
-
-/** Quanto a tela anda antes de o cenário recalcular a cor (o degradê é de ~27.000 px). */
-const PASSO_DO_CENARIO = 120;
-
-/** Os enfeites de um bloco — desenhados ANTES do resto, para a trilha ficar por cima. */
-const EnfeitesDoBloco = memo(function EnfeitesDoBloco({
-  enfeites,
-  semana,
-  parado,
-  arrumar,
-  selecionado,
-}: {
-  enfeites: EnfeiteNoBloco[];
-  semana: number;
-  parado: boolean;
-  arrumar: Omit<ArrumarEnfeite, "selecionado"> | null;
-  selecionado: string | null;
-}) {
-  if (!arrumar && enfeites.length === 0) return null;
-  return (
-    <>
-      {/* No modo Arrumar, um toque fora dos enfeites tira a seleção — e a
-          trilha embaixo não abre dia nenhum. */}
-      {arrumar ? (
-        <Pressable
-          accessible={false}
-          onPress={() => arrumar.aoSelecionar(null)}
-          style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }}
-        />
-      ) : null}
-      {enfeites.map((e) => (
-        <EnfeiteNaTrilha
-          key={e.p.k}
-          p={e.p}
-          y={e.y}
-          semana={semana}
-          parado={parado}
-          arrumar={arrumar ? { ...arrumar, selecionado: selecionado === e.p.k } : undefined}
-        />
-      ))}
-    </>
-  );
-});
-
-/** O que todo bloco recebe para desenhar os enfeites do Cantinho que moram nele. */
-type EnfeitesDoBlocoProps = {
-  enfeites: EnfeiteNoBloco[];
-  semanaAtual: number;
-  arrumar: Omit<ArrumarEnfeite, "selecionado"> | null;
-  selecionado: string | null;
-  parado: boolean;
-  arrumando: boolean;
-};
 
 const BlocoDaFase = memo(function BlocoDaFase({
   bloco,
-  enfeites,
-  semanaAtual,
-  arrumar,
-  selecionado,
-  parado,
-  arrumando,
-}: EnfeitesDoBlocoProps & { bloco: Extract<Bloco, { tipo: "fase" }> }) {
+}: {
+  bloco: Extract<Bloco, { tipo: "fase" }>;
+}) {
   return (
     <FaixaDaFase
       nome={bloco.fase.name}
@@ -728,16 +391,7 @@ const BlocoDaFase = memo(function BlocoDaFase({
       corDaFase={corDaFaseDaGestacao(bloco.fase.from)}
       travada={bloco.travada}
       altura={bloco.altura}
-      arrumando={arrumando}
-    >
-      <EnfeitesDoBloco
-        enfeites={enfeites}
-        semana={semanaAtual}
-        parado={parado}
-        arrumar={arrumar}
-        selecionado={selecionado}
-      />
-    </FaixaDaFase>
+    />
   );
 });
 
@@ -753,14 +407,8 @@ const BlocoDaSemana = memo(function BlocoDaSemana({
   hojeD,
   tocarNoDia,
   aoAbrirSemana,
-  pele,
-  enfeites,
-  semanaAtual,
-  arrumar,
-  selecionado,
   parado,
-  arrumando,
-}: EnfeitesDoBlocoProps & {
+}: {
   bloco: Extract<Bloco, { tipo: "semana" }>;
   resumo: ResumoDaSemana;
   proximo: PontoDaTrilha | null;
@@ -768,7 +416,7 @@ const BlocoDaSemana = memo(function BlocoDaSemana({
   hojeD: number;
   tocarNoDia: (D: number) => void;
   aoAbrirSemana: (semana: number) => void;
-  pele: TrilhaSkin | null;
+  parado: boolean;
 }) {
   const inicio = bloco.semana * 7;
   const porVir = inicio > hojeD;
@@ -791,15 +439,8 @@ const BlocoDaSemana = memo(function BlocoDaSemana({
         largura={largura}
         altura={bloco.altura}
       />
-      <EnfeitesDoBloco
-        enfeites={enfeites}
-        semana={semanaAtual}
-        parado={parado}
-        arrumar={arrumar}
-        selecionado={selecionado}
-      />
       <View
-        pointerEvents={arrumando ? "none" : "box-none"}
+        pointerEvents="box-none"
         style={{ position: "absolute", left: margem.tela, right: margem.tela, top: 8 }}
       >
         <BarraDaSemana
@@ -822,9 +463,7 @@ const BlocoDaSemana = memo(function BlocoDaSemana({
           semana={bloco.semana}
           estado={resumo.estados[i]!}
           tocarNoDia={tocarNoDia}
-          pele={pele}
           parado={parado}
-          arrumando={arrumando}
         />
       ))}
     </View>
@@ -838,9 +477,7 @@ function NoDoDia({
   semana,
   estado: e,
   tocarNoDia,
-  pele,
   parado,
-  arrumando,
 }: {
   D: number;
   x: number;
@@ -848,9 +485,7 @@ function NoDoDia({
   semana: number;
   estado: EstadoDoNo;
   tocarNoDia: (D: number) => void;
-  pele: TrilhaSkin | null;
   parado: boolean;
-  arrumando: boolean;
 }) {
   const hoje = e.tipo === "hoje";
   const fechado = e.tipo !== "futuro" && e.fechado;
@@ -884,9 +519,7 @@ function NoDoDia({
       selo
       rotulo={rotulo}
       aoTocar={tocarNoDia}
-      arte={pele ? (pele.arte[estadoDaPele(fechado, hoje)] as never) : null}
       corDoBrilho={tons.cheia.main}
-      arrumando={arrumando}
       parado={parado}
     />
   );
@@ -1139,7 +772,6 @@ const FaixaDoHumor = memo(function FaixaDoHumor({
         <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
           <Image
             source={BOLHA[reacao?.pose ?? "feliz"]}
-            allowDownscaling={false}
             accessible={false}
             contentFit="contain"
             style={{ width: 44, height: 44, marginVertical: -4 }}

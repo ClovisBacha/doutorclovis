@@ -22,8 +22,11 @@ import {
   presenteDaMissao,
   QUARTO_INICIAL,
   REGUA_DA_LUZ,
+  alternarAr,
+  situacaoDoAr,
   situacaoDoItem,
   vendaNoQuarto,
+  vendeAlgumDia,
   type Quartinho,
   type VitrineDoQuarto,
 } from "./quarto";
@@ -169,6 +172,19 @@ describe("o quartinho: pôr, tirar e ter", () => {
         vende: true,
       });
     }
+  });
+
+  test("o ar do quarto: livre se ela tem; à venda pela fase; o que nunca vende, não promete", () => {
+    expect(situacaoDoAr("bolhas", vitrine(["clima-bolhas"]))).toEqual({ tipo: "livre" });
+    expect(situacaoDoAr("peninhas", vitrine([], 24)).tipo).toBe("em-breve");
+    expect(situacaoDoAr("peninhas", vitrine([], 99)).tipo).toBe("comprar");
+    expect(vendeAlgumDia("clima-bolhas", FASES)).toBe(true);
+    expect(vendeAlgumDia("clima-neve", FASES)).toBe(false);
+    const q = alternarAr(quarto([]), "bolhas");
+    expect(q.ar).toBe("bolhas");
+    expect(alternarAr(alternarAr(q, "petalas"), "petalas").ar).toBeNull();
+    expect(lerQuartinho({ postos: [], ar: "bolhas" }).ar).toBe("bolhas");
+    expect(lerQuartinho({ postos: [], ar: "fumaça" }).ar).toBeUndefined();
   });
 
   test("a conta da compra e a fala do que ainda não abriu", () => {

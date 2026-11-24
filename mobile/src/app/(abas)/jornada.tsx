@@ -35,10 +35,6 @@ import {
   type LeituraDasConquistas,
 } from "~/componentes/jornada/economia";
 import { useLivresDeHoje } from "~/componentes/jornada/livres";
-import { lerOCantinho, type CantinhoOk } from "~/componentes/recompensas/economia-do-cantinho";
-import { fundoBgFor } from "@/lib/cantinho";
-import { SKIN_KEY, TRILHA_SKINS } from "@/lib/trilha-skins";
-import { CHAVE_DECOR, lerDecoracao, type Decoracao } from "~/lib/jornada/enfeites";
 
 import { FolhasDoPlacar, type FolhaDoPlacar } from "~/componentes/jornada/placar";
 import { FestaDoMarco } from "~/componentes/jornada/marco";
@@ -436,18 +432,9 @@ export function JornadaDaGestacao({
 
   const avisos = useAvisosDoDia({ carteira, recarregar, conquistas, loja, ehHoje: abre });
 
-  /* ── O Cantinho na trilha: o que ela tem, o cenário e a pele ── */
-  const cantinho = useCantinhoDaTrilha(trilha);
-  /* O céu das abas, atrás da trilha (se ela não equipou um cenário da lojinha). */
+  /* O céu das abas, atrás da trilha: o da hora, sempre (a trilha não se
+     enfeita mais — o que ela compra mora no quartinho, 24/11/2026). */
   const dasAbas = useCeuDasAbas();
-  const decorGravada = loja.blob[CHAVE_DECOR];
-  const decoracao = useMemo(() => lerDecoracao(decorGravada), [decorGravada]);
-  const possuidos = cantinho ? (cantinho.careMode ? [] : cantinho.owned) : null;
-  const cenario =
-    cantinho && !cantinho.careMode ? fundoBgFor(cantinho.equippedFundo, semana) : null;
-  const skin = loja.blob[SKIN_KEY];
-  const pele = typeof skin === "string" ? (TRILHA_SKINS[skin] ?? null) : null;
-  const aoGravarDecoracao = useCallback((d: Decoracao) => gravarChave(CHAVE_DECOR, d), []);
 
   /* ── O que a tela do bebê recebe, ESTÁVEL entre um desenho e outro: o
      herói (memo) não se redesenha a cada leitura que chega (18/11/2026). ── */
@@ -513,16 +500,18 @@ export function JornadaDaGestacao({
      não aqui antes de navegar: guardada aqui, a semana nunca via a primeira
      coleta, e a figurinha não DESCOLAVA (18/11/2026). */
   const aoAbrirSemana = useCallback((s: number) => ir(`/jornada/semana?semana=${s}`), []);
+  /* As sementinhas do placar: as conquistas que esperam o toque (que paga),
+     ou o quartinho, onde ela gasta (24/11/2026: a lojinha mora lá). */
   const aoAbrirLoja = useCallback(
-    () => ir(aResgatar > 0 ? "/jornada/recompensas?aba=conquistas" : "/jornada/recompensas"),
+    () => ir(aResgatar > 0 ? "/jornada/recompensas?aba=conquistas" : "/quartinho"),
     [aResgatar],
   );
   const aoAbrirAmigas = useCallback(() => irParaAba(rota("/amigas") as never), []);
   const aoContarNascimento = useCallback(() => ir("/jornada/nascimento"), []);
   const aoFecharFolha = useCallback(() => setFolha(null), []);
 
-  /* A trilha no céu: só como aba, e só sem cenário da lojinha (ele cobre). */
-  const noCeu = vista === "aba" && !!dasAbas && !cenario;
+  /* A trilha no céu: só como aba (fora das abas, a luz de fundo). */
+  const noCeu = vista === "aba" && !!dasAbas;
 
   /* Passou de 42 semanas: a trilha (presa no dia 300) dá lugar à tela da reta final. */
   if (dia.passouDe42) return <AlertaDas42Semanas nomeDoBebe={nomeDoBebe} />;
@@ -584,9 +573,8 @@ export function JornadaDaGestacao({
       edges={["top"]}
       style={{ flex: 1, backgroundColor: noCeu ? "transparent" : cor.fundo }}
     >
-      {/* Na aba, a trilha sobe pelo céu da hora (o das três abas). Com um
-          cenário da lojinha equipado, ou aberta fora das abas, a luz de fundo
-          (e o cenário, por cima). */}
+      {/* Na aba, a trilha sobe pelo céu da hora (o das três abas); aberta
+          fora das abas, a luz de fundo. */}
       {noCeu ? null : <FundoDeLuz />}
       <Caminho
         /* O cabeçalho vai na camada de cima da trilha, junto do placar: a
@@ -624,12 +612,6 @@ export function JornadaDaGestacao({
         aoAbrirAmigas={aoAbrirAmigas}
         aoAbrirFolha={setFolha}
         aoContarNascimento={aoContarNascimento}
-        decoracao={decoracao}
-        possuidos={possuidos}
-        cenario={cenario}
-        pele={pele}
-        podeSemear={loja.pronto && loja.nuvem === "ok"}
-        aoGravarDecoracao={aoGravarDecoracao}
         topo={avisos}
       />
       <FolhasDoPlacar
@@ -752,38 +734,6 @@ function useAvisosDoDia({
       ) : null}
     </>
   );
-}
-
-/**
- * O Cantinho dela, relido a cada foco da aba: quem compra um enfeite nas
- * Recompensas e volta ao Caminho já o encontra espalhado. Falha de leitura
- * guarda a última leitura boa (e, sem nenhuma, `null`: a trilha mostra o
- * layout gravado, como o site enquanto a lista não chega).
- */
-function useCantinhoDaTrilha(ativa: boolean): CantinhoOk | null {
-  const [c, setC] = useState<CantinhoOk | null>(null);
-  const assinatura = useRef("");
-  useFocusEffect(
-    useCallback(() => {
-      /* Só a trilha usa o Cantinho: a tela do bebê não lê. */
-      if (!ativa) return;
-      let vivo = true;
-      const cancelar = depoisDaVolta(() => {
-        void lerOCantinho().then((r) => {
-          if (!vivo || !r) return;
-          const s = JSON.stringify(r);
-          if (s === assinatura.current) return;
-          assinatura.current = s;
-          setC(r);
-        });
-      });
-      return () => {
-        vivo = false;
-        cancelar();
-      };
-    }, [ativa]),
-  );
-  return c;
 }
 
 /** O número de amigas da faixa do Caminho, relido a cada foco da aba (só na trilha). */

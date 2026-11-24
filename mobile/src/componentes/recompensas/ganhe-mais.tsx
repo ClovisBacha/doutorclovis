@@ -22,7 +22,7 @@ import { useSessao } from "~/lib/sessao";
 import { ALVO_MINIMO, canto, cor, curva, escala, espaco, fonte } from "~/tema";
 
 /**
- * "GANHE MAIS SEMENTINHAS" — a sanfona do fim do Meu Cantinho, recolhida por
+ * "GANHE MAIS SEMENTINHAS" — a sanfona do fim das Recompensas, recolhida por
  * padrão. Também abre pela pílula do saldo, no alto da tela.
  *
  * O que entra no app: indicar uma amiga, o depoimento e o código de quem a
@@ -88,7 +88,7 @@ export function GanheMais({
               color: cor.textoApagado,
             }}
           >
-            As sementinhas compram só enfeites do Meu Cantinho. Nenhuma aula depende delas.
+            As sementinhas compram só coisas para o quartinho do bebê. Nenhuma aula depende delas.
           </Text>
         </View>
       ) : null}

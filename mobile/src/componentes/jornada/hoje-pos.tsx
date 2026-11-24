@@ -872,7 +872,6 @@ function BarraDoColo({
           >
             <Image
               source={BOLHA.apaixonado}
-              allowDownscaling={false}
               style={{ width: 34, height: 34 }}
               contentFit="contain"
               accessible={false}

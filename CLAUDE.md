@@ -10,7 +10,7 @@ Nas palavras dele: "nada mais deve ser feito no site. O site não é pra existir
 mais." Todo trabalho novo vai para o app (`mobile/`). Nada em `src/` muda —
 nem para consertar um defeito do site, nem para facilitar o app. Quando o app
 precisar de uma regra diferente da do site, ela nasce no app (ex.:
-`semearPertoDeHoje` em `mobile/src/lib/jornada/enfeites.ts`).
+`vendaNoQuarto` em `mobile/src/lib/quartinho/quarto.ts`).
 
 ⚠️ **Mas o deploy da Vercel NÃO pode sair do ar.** O app chama as funções de
 servidor dele (`/_serverFn/<sha256 do arquivo e do nome>`, ver
@@ -182,9 +182,14 @@ ERA a paleta do Claude; não volte a ela.
   soltos sobre ele (`componentes/painel.tsx`).
 - **A bolha** (`BolhaViva`, em `movimento.tsx`): a arte de fundo transparente,
   animada por código. NADA a acompanha — sem vídeo, sem disco, sem brilho atrás
-  ("vamos tirar esse fundo rosa", o dono). Toda imagem dela leva
-  `allowDownscaling={false}`: o `expo-image` reduzia a arte ao tamanho da vista,
-  e a Bolha, que flutua e inclina, saía desfocada (23/11/2026). A apaixonada e
+  ("vamos tirar esse fundo rosa", o dono). ⚠️ **Nitidez (refeito em
+  24/11/2026, medido no simulador)**: o iOS reduz imagem na placa de vídeo com
+  o filtro TRILINEAR, que borra. A Bolha do CÉU vem no tamanho exato
+  (`BOLHA_DO_CEU`, 212/424/636 px, `assets/bolha/ceu/`) com
+  `allowDownscaling={false}`; TODAS as outras deixam o `expo-image` reduzir (o
+  padrão) — a correção de 23/11 (a arte de 960 inteira em todas) deixava as
+  pequenas mais borradas, comparadas ampliadas. E a Bolha para no pixel
+  inteiro: o `Flutuar` descansa em escala 1, e a inclinação tem zona morta. A apaixonada e
   a estudiosa vinham cortadas no alto: foram refeitas das ORIGINAIS do Drive
   (pasta "Imagens Obstétrica") por `mobile/scripts/bolha-do-drive.mjs`, que
   não corta enfeite solto, e moram em `mobile/assets/bolha/`. Arte nova da
@@ -217,6 +222,28 @@ flor-de-bolhas.tsx`, 23/11/2026, o dono: "uma arte mais 3D, com movimentos,
   proporcional à realidade" (o dono). A receita do item novo está em
   `docs/proposta-quartinho-e-itens.md`, e `quarto.test.ts` cobra.
   O que falta está em `docs/proposta-quartinho-e-itens.md`.
+- ⚠️ **O QUARTINHO É A LOJA, E A TRILHA NÃO SE ENFEITA (decisão do dono,
+  24/11/2026)**: "a trilha customizada não vai mais existir [...] o fundo
+  será baseado no clima do dia [...] os itens de fato comprados têm que ser
+  ali na aba do quartinho". A trilha sobe pelo céu da hora, sem enfeites,
+  Arrumar, cenário, ar nem pele das bolinhas; as sementinhas do placar levam
+  ao quartinho; as Recompensas ficaram com as conquistas, o "Ganhe mais" e a
+  porta do quartinho (o "Meu Cantinho" saiu). Ela compra ali mesmo, no
+  quarto (a folha de compra), pela MESMA regra da vitrine (`vendaNoQuarto`:
+  o Premium só pela loja por fase). **Cada item do catálogo tem UM destino**
+  em `lib/quartinho/migracao.ts` (no quarto, no ar, vem para o quarto quando
+  tiver arte, ou fora do jogo), e `migracao.test.ts` cobra que nenhum fique
+  sem. O "No ar" (pétalas, bolhinhas) é desenhado por código. Não há
+  "Salvar": o quarto se guarda sozinho, com folga (600 ms).
+- ⚠️ **O que travava o app (medido em 24/11/2026) e não volta**: laço eterno
+  (todo enfeite descansa: `lacoQueDescansa`, `rajada`); `shadowColor`/
+  `shadowRadius` numa vista sem fundo (o iOS recalcula a forma pelos pixels a
+  cada quadro: use uma cópia tingida da arte); mais de duas camadas num
+  `boxShadow` (cada camada é uma passada fora da tela); o céu da tela inteira
+  andando com a inclinação (só o número e a Bolha andam); imagem grande
+  reduzida no fio principal (arte do tamanho da tela, `allowDownscaling={false}`);
+  e tudo de uma vez na entrada de uma tela pesada (o quarto acende as luzes
+  depois da transição, `useDepoisDaEntrada`).
 - **Profundidade** (`componentes/jornada/ceu-do-bebe.tsx`): o número da semana
   atrás do bebê, em camadas que andam com o celular (`useParalaxe`) e com a
   rolagem; a régua do tempo (arrastar para ver o bebê crescer, com os dados de

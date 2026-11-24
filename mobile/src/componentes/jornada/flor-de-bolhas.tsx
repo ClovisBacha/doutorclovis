@@ -202,7 +202,6 @@ export const FlorDeBolhas = memo(function FlorDeBolhas({
       <Animated.View style={[{ position: "absolute" }, vistas.meio]} pointerEvents="none">
         <Image
           source={BOLHA.dormindo}
-          allowDownscaling={false}
           style={{ width: bolha, height: bolha }}
           contentFit="contain"
           accessible={false}

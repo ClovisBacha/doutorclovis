@@ -12,7 +12,7 @@ import { comAlfa } from "~/lib/cor";
 import { ALVO_MINIMO, canto, cor, curva, escala, espaco, fonte, sombra } from "~/tema";
 
 /**
- * As peças das duas abas das Recompensas (Meu Cantinho e Conquistas): a
+ * As peças das Recompensas (as conquistas e o "Ganhe mais"): a
  * pílula de ação, a medalha, o broto da moeda, o título de seção com arte, o
  * silêncio do Modo Cuidado e o esqueleto da leitura.
  */

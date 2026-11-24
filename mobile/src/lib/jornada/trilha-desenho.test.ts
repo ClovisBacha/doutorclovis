@@ -9,21 +9,14 @@ import {
   montarCaminho,
   tracadoDoBloco,
 } from "~/lib/jornada/caminho";
-import {
-  ABAIXO_DA_BARRA,
-  desviarDaBarra,
-  enfeitesPorBloco,
-  iniciosDasSemanas,
-  semearNovos,
-  Y_INICIAL_DO_SITE,
-} from "~/lib/jornada/enfeites";
 import type { Blob } from "~/lib/jornada/momentos";
 import { estadoDoNo, resumirSemanas } from "~/lib/jornada/trilha";
 
 /**
  * O DESENHO DA TRILHA (18/11/2026, a vistoria: "o jogo com cara de jogo e sem
  * soluço"). O blob é lido uma vez por semana, o traço liga os nós de uma
- * semana à outra, e o enfeite comprado nunca fica atrás da barra da semana.
+ * semana à outra. Desde 24/11/2026 a trilha não se enfeita: o que ela compra
+ * mora no quartinho.
  */
 
 const cinco = {
@@ -116,59 +109,12 @@ describe("o traço do caminho", () => {
   });
 });
 
-describe("o enfeite comprado nunca fica atrás da barra da semana", () => {
-  const alturas = [120, 300, 300];
-  const ehSemana = [false, true, true];
-  const em = (y: number) => ({ k: `k${y}`, id: "planta-trevo", x: 50, y, s: 1 });
-
-  test("no bloco de semana, a faixa da barra desce para baixo dela; na fase, nada muda", () => {
-    const inicios = [8, 128, 428];
-    const porBloco = enfeitesPorBloco(
-      [em(10), em(128), em(128 + 50), em(128 + ALTURA.semana + 7), em(128 + 200), em(428 + 119)],
-      alturas,
-      ehSemana,
-    );
-    expect(porBloco.map((b) => b.map((e) => e.y))).toEqual([
-      [2],
-      [ABAIXO_DA_BARRA, ABAIXO_DA_BARRA, ABAIXO_DA_BARRA, 200],
-      [ABAIXO_DA_BARRA],
-    ]);
-    expect(iniciosDasSemanas(alturas, ehSemana)).toEqual(inicios.slice(1));
-    // sem dizer quais blocos são semana, o lugar gravado vale (o modo Arrumar)
-    expect(enfeitesPorBloco([em(128 + 50)], alturas)[1]![0]!.y).toBe(50);
-  });
-
-  test("o desvio em y do site, e na semeadura", () => {
-    const inicios = iniciosDasSemanas(alturas, ehSemana);
-    expect(desviarDaBarra(128 + 30, inicios)).toBe(128 + ABAIXO_DA_BARRA);
-    expect(desviarDaBarra(128 + 200, inicios)).toBe(128 + 200);
-    expect(desviarDaBarra(60, inicios)).toBe(60);
-
-    const blocos = montarCaminho(FASES, 170);
-    const hs = blocos.map((b) => b.altura);
-    const semanas = blocos.map((b) => b.tipo === "semana");
-    const ini = iniciosDasSemanas(hs, semanas);
-    const total = Y_INICIAL_DO_SITE + hs.reduce((s, h) => s + h, 0) + 40;
-    const ids = ["bicho-joaninha", "luz-vela", "planta-suculenta", "agua-poca", "bicho-coelho"];
-    const r = semearNovos(null, ids, total, 17000, ini);
-    for (const p of r.decoracao!.items) {
-      const dentro = ini.map((i) => p.y - i).find((y) => y >= 0 && y < ALTURA.semana + 8);
-      expect(dentro).toBeUndefined();
-    }
-  });
-});
-
 describe("a trilha sem soluço (catraca do fonte)", () => {
   const RAIZ = join(import.meta.dir, "..", "..");
   const fonte = (...p: string[]) => semComentarios(readFileSync(join(RAIZ, ...p), "utf8"));
-  const TRILHA = [
-    "caminho.tsx",
-    "caminho-pos.tsx",
-    "blocos.tsx",
-    "pecas.tsx",
-    "enfeites.tsx",
-    "rolagem.tsx",
-  ].map((f) => ({ f, codigo: fonte("componentes", "caminho", f) }));
+  const TRILHA = ["caminho.tsx", "caminho-pos.tsx", "blocos.tsx", "pecas.tsx", "rolagem.tsx"].map(
+    (f) => ({ f, codigo: fonte("componentes", "caminho", f) }),
+  );
 
   test("nenhum laço eterno de enfeite: tudo dá algumas voltas e descansa", () => {
     for (const { f, codigo } of TRILHA) {
@@ -177,13 +123,13 @@ describe("a trilha sem soluço (catraca do fonte)", () => {
     }
   });
 
-  test("a lista abre em hoje sem o recentrar por tempo, e só ouve a rolagem no Arrumar", () => {
+  test("a lista abre em hoje sem o recentrar por tempo, e não ouve a rolagem", () => {
     const rolagem = fonte("componentes", "caminho", "rolagem.tsx");
     expect(rolagem).toMatch(/contentOffset/);
     const caminho = fonte("componentes", "caminho", "caminho.tsx");
     expect(caminho).not.toMatch(/setTimeout|onContentSizeChange|extraData/);
-    expect(caminho).toMatch(/onScroll=\{arrumando \? aoRolarArrumando : aoRolar\}/);
-    expect(fonte("componentes", "caminho", "enfeites.tsx")).not.toMatch(/rolagem\.addListener/);
+    /* Sem cenário e sem Arrumar, nada precisa da posição a cada quadro. */
+    expect(caminho).not.toMatch(/onScroll=/);
   });
 
   test("ícone é desenho, não emoji; cor vem do tema; sombra é a do tema", () => {
@@ -203,5 +149,23 @@ describe("a trilha sem soluço (catraca do fonte)", () => {
     expect(dia).toMatch(/const proxima = ordem\.find\(ehCuidado\)/);
     expect(dia).toMatch(/Voltar à trilha/);
     expect(dia).not.toMatch(/Caminho|Star\b/);
+  });
+});
+
+describe("a trilha não se enfeita mais (24/11/2026)", () => {
+  const RAIZ = join(import.meta.dir, "..", "..");
+  const fonte = (...p: string[]) => semComentarios(readFileSync(join(RAIZ, ...p), "utf8"));
+
+  test("sem enfeites, Arrumar, cenário, ar nem pele das bolinhas", () => {
+    const caminho = fonte("componentes", "caminho", "caminho.tsx");
+    expect(caminho).not.toMatch(/Arrumar|EnfeiteNaTrilha|FundoEAr|TrilhaSkin|decoracao|cenario/);
+    const tela = fonte("app", "(abas)", "jornada.tsx");
+    expect(tela).not.toMatch(/CHAVE_DECOR|SKIN_KEY|fundoBgFor|lerOCantinho/);
+  });
+
+  test("as sementinhas do placar levam ao quartinho, onde ela gasta", () => {
+    const tela = fonte("app", "(abas)", "jornada.tsx");
+    expect(tela).toMatch(/: "\/quartinho"\)/);
+    expect(fonte("app", "jornada", "recompensas.tsx")).not.toMatch(/AbaDoCantinho|Meu Cantinho/);
   });
 });

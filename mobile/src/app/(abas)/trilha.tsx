@@ -7,7 +7,7 @@ import { JornadaDaGestacao, JornadaDoPosParto } from "~/app/(abas)/jornada";
 /**
  * A ABA DA TRILHA — o jogo, à direita da barra (decisão do dono, 13/11/2026:
  * "o bebê é o centro [...] o jogo deve ficar na direita"). A trilha inteira,
- * como no Duolingo: fases, semanas, um nó por dia, o Cantinho espalhado e o
+ * como no Duolingo: fases, semanas, um nó por dia, sobre o céu da hora, e o
  * placar no topo (com a foto dela, que abre o Perfil). Depois do parto, a
  * trilha das 12 semanas de vida.
  *

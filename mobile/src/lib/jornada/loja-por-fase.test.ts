@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { CANTINHO_BY_ID, CANTINHO_ITEMS } from "@/lib/cantinho";
 import { CONJUNTO_POR_ID } from "@/lib/conjuntos";
 import { trofeusExigidos } from "@/lib/trofeus";
-import { conjuntosDaLoja, itensDaLoja, situacaoNaLoja, type LojaPorFase } from "./enfeites";
 import {
   conjuntosDaTabela,
   FASES_DA_LOJA,
@@ -18,13 +17,6 @@ import {
 import { sqlDaLojaPorFase } from "./loja-por-fase-sql";
 
 const RAIZ = join(import.meta.dir, "..", "..", "..", "..");
-
-const fase = (semana: number): LojaPorFase => ({
-  porItem: new Map(
-    linhasDaTabela().map((l) => [l.item_id, { preco: l.preco, semana: l.semana_minima }]),
-  ),
-  semana,
-});
 
 describe("a régua da loja por fase", () => {
   test("as fases sobem com a gestação, e a primeira abre desde o começo", () => {
@@ -103,35 +95,7 @@ describe("a vitrine por fase", () => {
     expect(quandoAbre(28)).toBe("No 3º trimestre");
     expect(quandoAbre(37)).toBe("Na reta final");
   });
-
-  test("com 20 semanas: 1º e 2º trimestres à venda, o 3º no fim e trancado, a reta final fora", () => {
-    const f = fase(20);
-    const itens = itensDaLoja([], f);
-    const ids = itens.map((i) => i.id);
-    expect(ids).toContain("planta-vaso");
-    expect(ids).toContain("trilha-origami");
-    expect(ids).toContain("fundo-quartinho");
-    expect(ids).not.toContain("trilha-perolas");
-    expect(situacaoNaLoja(CANTINHO_BY_ID["fundo-quartinho"]!, [], f)).toBe("em-breve");
-    /* Os trancados vão para o fim da vitrine. */
-    const primeiroTrancado = itens.findIndex((i) => situacaoNaLoja(i, [], f) === "em-breve");
-    expect(
-      itens.slice(primeiroTrancado).every((i) => situacaoNaLoja(i, [], f) === "em-breve"),
-    ).toBe(true);
-  });
-
-  test("sem a tabela (o banco antes do SQL), a vitrine de antes: nenhum Premium à venda", () => {
-    expect(itensDaLoja([]).some((i) => i.premium)).toBe(false);
-  });
-
-  test("depois do parto, tudo aberto e os conjuntos da reta final dá para fechar", () => {
-    const f = fase(SEMANA_DEPOIS_DO_PARTO);
-    expect(itensDaLoja([], f).some((i) => situacaoNaLoja(i, [], f) === "em-breve")).toBe(false);
-    expect(conjuntosDaLoja([], f).map((p) => p.conjunto.id)).toContain("mar");
-  });
-
-  test("um conjunto com peça da próxima fase ainda não aparece para fechar", () => {
-    expect(conjuntosDaLoja([], fase(20)).map((p) => p.conjunto.id)).not.toContain("lago");
-    expect(conjuntosDaLoja([], fase(20)).map((p) => p.conjunto.id)).toContain("recife");
-  });
+  /* A vitrine do Meu Cantinho (os itens à venda por semana, os conjuntos) saiu
+     com a lojinha da trilha (24/11/2026). A venda por fase continua: agora no
+     quartinho, por `vendaNoQuarto` (`quarto.test.ts`). */
 });

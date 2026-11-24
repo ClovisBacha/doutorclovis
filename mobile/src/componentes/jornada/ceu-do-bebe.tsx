@@ -33,7 +33,7 @@ import {
 import Svg, { Defs, Ellipse, RadialGradient, Stop } from "react-native-svg";
 import { selecao, Tocavel, toque } from "~/componentes/base";
 import { sombraDoTexto, type Ceu } from "~/componentes/ceu-vivo";
-import { BOLHA } from "~/componentes/artes";
+import { BOLHA_DO_CEU } from "~/componentes/artes";
 import { corJornada } from "~/componentes/jornada/cores";
 import { Flutuar, useMovimentoReduzido } from "~/componentes/movimento";
 import { bebeDaSemana } from "~/lib/bebe-da-semana";
@@ -287,7 +287,9 @@ export const CeuDoBebe = memo(function CeuDoBebe({
   const aoTocarNoBebe = useCallback(() => {
     toque();
     setFaiscas((n) => n + 1);
-    if (aoTocarNaBolha) setTimeout(aoTocarNaBolha, reduzido ? 0 : 380);
+    /* O quartinho abre logo depois do começo do pulinho: 380 ms parados
+       pareciam travamento (24/11/2026). */
+    if (aoTocarNaBolha) setTimeout(aoTocarNaBolha, reduzido ? 0 : 140);
     if (reduzido) return;
     pulo.setValue(0);
     Animated.timing(pulo, {
@@ -446,7 +448,7 @@ export const CeuDoBebe = memo(function CeuDoBebe({
                 onPress={aoTocarNoBebe}
               >
                 <Image
-                  source={viajando ? BOLHA.surpresa : BOLHA.feliz}
+                  source={viajando ? BOLHA_DO_CEU.surpresa : BOLHA_DO_CEU.feliz}
                   allowDownscaling={false}
                   style={{ width: lado, height: lado }}
                   contentFit="contain"

@@ -178,7 +178,6 @@ export function ArteDaBolha({ humor, tamanho }: { humor: HumorDaArte; tamanho: n
     <Flutuar>
       <Image
         source={fonte}
-        allowDownscaling={false}
         style={{ width: tamanho, height: tamanho }}
         contentFit="contain"
         accessible={false}
@@ -241,7 +240,6 @@ export function BolhaViva({
       >
         <Image
           source={ARTES[humor]}
-          allowDownscaling={false}
           style={{ width: tamanho * 0.94, height: tamanho * 0.94 }}
           contentFit="contain"
         />
@@ -413,7 +411,9 @@ export function Flutuar({
           {
             translateY: v.interpolate({ inputRange: [0, 1], outputRange: [amplitude, -amplitude] }),
           },
-          { scale: v.interpolate({ inputRange: [0, 1], outputRange: [1, 1.02] }) },
+          /* Descansa em 0,5 com escala 1 EXATA: 1,01 parado redesenhava a
+             Bolha fora do pixel inteiro, e ela ficava borrada (24/11/2026). */
+          { scale: v.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 1, 1.02] }) },
         ],
       }}
     >
@@ -538,6 +538,8 @@ export function useParalaxe(): Paralaxe {
    valores são os mesmos para todas, e só há um laço (ou uma escuta do sensor)
    enquanto houver alguém à vista usando. */
 type Paralaxe = { x: Animated.Value; y: Animated.Value };
+/** Abaixo disto a inclinação é zero (o celular parado na mão treme um pouco). */
+const ZONA_MORTA = 0.1;
 const PARALAXE: Paralaxe = { x: new Animated.Value(0), y: new Animated.Value(0) };
 let usuariosDaParalaxe = 0;
 let pararParalaxe: (() => void) | null = null;
@@ -576,8 +578,14 @@ function ligarParalaxe(): () => void {
       /* O sensor já vem suavizado (`ligarSensor`). O valor vai direto (sem uma
          animação nova a cada leitura), e só quando a mudança APARECE: o tremor
          da mão parada não redesenha a tela 30 vezes por segundo. */
-      soltar = assinarInclinacao((frente, lado) => {
-        if (Math.abs(lado - ultimo.x) < 0.04 && Math.abs(frente - ultimo.y) < 0.04) return;
+      soltar = assinarInclinacao((f, l) => {
+        /* A ZONA MORTA (24/11/2026): perto do reto, é reto. A base anda atrás
+           da mão, então com o celular parado tudo volta a zero EXATO — a
+           Bolha e o número param no pixel inteiro (sem girar nem borrar) e a
+           tela para de se redesenhar. */
+        const lado = Math.abs(l) < ZONA_MORTA ? 0 : l;
+        const frente = Math.abs(f) < ZONA_MORTA ? 0 : f;
+        if (Math.abs(lado - ultimo.x) < 0.05 && Math.abs(frente - ultimo.y) < 0.05) return;
         ultimo = { x: lado, y: frente };
         x.setValue(lado);
         y.setValue(frente);

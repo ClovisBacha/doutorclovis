@@ -7,9 +7,8 @@ import { conquistaNoApp } from "~/lib/jornada/conquistas";
  * "você tem N troféus": um número sem destino. O site mostrava a escada (o que
  * cada contagem abre) e quanto falta para o próximo degrau.
  *
- * No app os degraus são as três conquistas de troféu e o que o Cantinho do app
- * vende com troféu (a Borboleta; os outros dois itens de troféu são Premium e
- * ficaram fora da loja por fase).
+ * No app os degraus são as três conquistas de troféu e o que o quartinho vende
+ * com troféu (hoje, nada: a Borboleta saiu com a lojinha da trilha, 24/11/2026).
  * Sem react-native aqui: é testado pelo bun.
  */
 
@@ -31,7 +30,7 @@ export function escadaDosTrofeus(
   }
   for (const [id, n] of Object.entries(TROFEUS_PARA)) {
     const item = CANTINHO_BY_ID[id];
-    if (item && itensDaLojaDoApp.has(id)) por(n, `${item.name} no Cantinho`);
+    if (item && itensDaLojaDoApp.has(id)) por(n, `${item.name} no quartinho`);
   }
   const t = Math.max(0, Math.floor(trofeus || 0));
   const degraus = [...porContagem.entries()]
