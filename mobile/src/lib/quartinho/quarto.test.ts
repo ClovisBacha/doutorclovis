@@ -293,6 +293,16 @@ describe("o quartinho: a tela (catraca do fonte)", () => {
     expect(tela).not.toMatch(/CANTINHO_BY_ID\[[^\]]+\]\??\.price/);
   });
 
+  test("o olhinho esconde a bandeja e a traz de volta (o quarto limpo, 24/11/2026)", () => {
+    const tela = ler("app", "quartinho.tsx");
+    expect(tela).toMatch(/rotulo=\{limpo \? "Mostrar a bandeja" : "Esconder a bandeja/);
+    /* Escondida, a bandeja não recebe toque nem aparece para o leitor de tela. */
+    expect(tela).toMatch(/pointerEvents=\{limpo \? "none" : "auto"\}/);
+    expect(tela).toMatch(/accessibilityElementsHidden=\{limpo\}/);
+    /* O movimento é no fio nativo, e nenhum com "reduzir movimento". */
+    expect(tela).toMatch(/duration: reduzido \? 0 : 280/);
+  });
+
   test("Modo Cuidado não abre o quarto; sementinha não se compra; o quarto se grava", () => {
     const tela = ler("app", "quartinho.tsx");
     expect(tela).toMatch(/estadoDoPerfil === "pronto" && cuidado\) return <Redirect/);

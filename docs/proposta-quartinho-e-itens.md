@@ -63,6 +63,64 @@ quando o quarto tiver onde pôr o que ela comprou.
 **O que falta para lançar**: mais itens (um lote de ~16 por 2 créditos,
 na mesma cartela); a retrospectiva com as memórias; a Bolha vestida (ideia 2).
 
+## A cozinha, o quarto de frente e o quarto limpo (24/11/2026)
+
+O dono mandou duas referências (uma cozinha e o quarto decorado) e pediu:
+
+> "Essa é a imagem do novo cômodo cozinha que deve estar quando a pessoa
+> arrastar pro lado direito [...] a imagem está melhor no sentido de dar mais
+> profundidade e estar centralizado [...] a opção de você esconder os
+> elementos de baixo [...] deixando a imagem mais clean [...] a imagem do
+> quarto onde você deve pegar esse como exemplo para também exatamente fazer
+> essa profundidade que faltou"
+
+**Feito: o quarto limpo.** O olhinho, à esquerda acima da bandeja, esconde a
+bandeja, o desfazer, o dado e o cartão da missão; tocar de novo os traz (no
+fio nativo, e sem movimento com "reduzir movimento"). O chão que sobra embaixo
+da pintura tem agora a cor da última faixa dela já com a luz, medida no
+simulador: antes, com a bandeja escondida, aparecia uma faixa lisa mais clara.
+
+**O que a referência tem e o nosso quarto não**: a câmera DE FRENTE (um ponto
+de fuga): a parede do fundo no centro, as duas paredes do lado, o teto com os
+dois spots e o chão fundo, com a janela na parede da esquerda. A nossa pintura
+olha de um CANTO (só a parede da esquerda e a do fundo), por isso parece rasa
+e torta. Não se conserta por código: é outra pintura.
+
+**A arte que falta (orçada em 24/11/2026, uma tentativa de cada)**:
+
+| Peça                                                      | Modelo                  | Créditos |
+| --------------------------------------------------------- | ----------------------- | -------- |
+| O quarto de frente, vazio, de dia (editando a referência) | Nano Banana Pro, 2K     | 2        |
+| O mesmo quarto, a noite pintada                           | Nano Banana Pro, 2K     | 2        |
+| A cozinha vazia, de dia (editando a referência)           | Nano Banana Pro, 2K     | 2        |
+| A cozinha, a noite pintada                                | Nano Banana Pro, 2K     | 2        |
+| A cartela dos itens da cozinha (16, fundo transparente)   | GPT Image 2.6, 2K, alta | 2        |
+| **Total**                                                 |                         | **10**   |
+
+Com refação, até ~16. O saldo em 24/11/2026 era **2,47** (em 23/11, 36,97; o
+gasto não foi do app). Gerar mais alta que 9:16, se o modelo deixar: o iPhone
+é mais comprido que 9:16, e a pintura precisa cobrir a tela inteira para o
+quarto limpo não ter chão liso embaixo.
+
+**A cozinha, no código (quando a arte chegar)**:
+
+- Os cômodos lado a lado, numa rolagem que pagina: o quarto primeiro e a
+  cozinha à DIREITA dele (o dedo arrasta para a esquerda para chegar a ela,
+  como em toda página do iPhone). A bandeja mostra as abas do cômodo que está
+  na tela (a cozinha: Móveis, Decoração, Utensílios, Plantas, Tapetes).
+- A pintura é a estrutura (armários, pia, fogão, geladeira, janela); o que se
+  decora são os soltos da referência: o vaso grande, as prateleiras de potes, o
+  relógio, a planta pendurada, a cafeteira, o vaso de margaridas, o pote de
+  colheres, a panela e o tapete xadrez.
+- A posse: os itens da lojinha que cabem numa cozinha mudam de "vem para o
+  quarto" para ela (o bule de chá, a hortelã, a suculenta, o trevo, o
+  cactinho, as tulipas, o girassol). Os que só a cozinha tem chegam como
+  presente da Bolha e das missões, como os sete do quarto que não são da
+  lojinha: o catálogo do servidor não muda.
+- O quarto grava os postos da cozinha ao lado dos do quarto
+  (`dc-path-quartinho`), e os lugares de todos os itens do quarto são refeitos
+  para a câmera de frente.
+
 ## A migração da lojinha para o quartinho (24/11/2026)
 
 O dono: "a trilha customizada não vai mais existir [...] o fundo será baseado

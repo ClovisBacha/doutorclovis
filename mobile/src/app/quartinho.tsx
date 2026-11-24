@@ -5,6 +5,8 @@ import { StatusBar } from "expo-status-bar";
 import Check from "lucide-react-native/icons/check";
 import ChevronLeft from "lucide-react-native/icons/chevron-left";
 import Dices from "lucide-react-native/icons/dices";
+import Eye from "lucide-react-native/icons/eye";
+import EyeOff from "lucide-react-native/icons/eye-off";
 import Gift from "lucide-react-native/icons/gift";
 import Heart from "lucide-react-native/icons/heart";
 import Lock from "lucide-react-native/icons/lock";
@@ -177,8 +179,10 @@ const QUARTO_NOITE = require("../../assets/quartinho/quarto-noite.webp");
 const ESTRELAS_DA_NOITE = require("../../assets/quartinho/estrelas-noite.webp");
 /** A arte do quarto tem 1536 × 2752. */
 const PROPORCAO_DO_QUARTO = 2752 / 1536;
-/** O chão que aparece embaixo da arte, se a tela for mais alta que ela. */
-const CHAO = { dia: "#e7ae73", noite: "#2a1f3d" } as const;
+/** O chão que aparece embaixo da arte, se a tela for mais alta que ela: a cor
+    da última faixa da pintura JÁ com a luz por cima (medida no simulador em
+    24/11/2026). Com a bandeja escondida, outra cor virava uma faixa lisa. */
+const CHAO = { dia: "#cc8655", noite: "#291928" } as const;
 
 const ROXO = corJornada.roxo;
 /** A tinta sobre o vidro lilás (11:1 sobre ele). */
@@ -257,6 +261,11 @@ function Quartinho() {
   /* O que o "Desfazer" devolve: os quartos de antes, do mais velho ao mais novo. */
   const [antes, setAntes] = useState<IdDoItem[][]>([]);
   const falas = useRef(0);
+  /* O quarto limpo: a bandeja escondida (na bancada, `&limpo=1`). */
+  const [limpo, setLimpo] = useState(() => parametroDaBancada("limpo") === "1");
+  const sumir = useRef(new Animated.Value(limpo ? 1 : 0)).current;
+  const [alturaDaBandeja, setAlturaDaBandeja] = useState(200);
+  const reduzido = useMovimentoReduzido();
 
   /* O quarto se grava COM FOLGA (24/11/2026): cada gravação acorda a loja da
      jornada inteira (e a tela do bebê, que está por baixo, se redesenhava a
@@ -509,6 +518,25 @@ function Quartinho() {
     }
   }, [quarto, vitrine, mudar, noite]);
 
+  /* O QUARTO LIMPO (o dono, 24/11/2026: "esconder os elementos de baixo [...]
+     deixando a imagem mais clean se a pessoa quiser ver"): o olhinho esconde a
+     bandeja, o desfazer, o dado e o cartão da missão; tocar de novo os traz. */
+  const alternarLimpo = useCallback(() => {
+    const agora = !limpo;
+    setLimpo(agora);
+    if (agora) setMissaoAberta(false);
+    Animated.timing(sumir, {
+      toValue: agora ? 1 : 0,
+      duration: reduzido ? 0 : 280,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [limpo, sumir, reduzido]);
+  const aparecer = useMemo(
+    () => sumir.interpolate({ inputRange: [0, 0.6, 1], outputRange: [1, 0, 0] }),
+    [sumir],
+  );
+
   /* Estável: a Cena é `memo`, e uma seta nova a cada fala a redesenhava inteira. */
   const aoTocarNoQuarto = useCallback(
     (id: IdDoItem) => setCategoria(ITEM_POR_ID[id].categoria),
@@ -588,10 +616,10 @@ function Quartinho() {
         ) : null}
       </View>
 
-      {/* A bandeja: desfazer e o dado soltos em cima, as abas e os itens. O
-          quarto se guarda sozinho: o "Salvar meu quarto" saiu (o dono,
-          24/11/2026). */}
-      <View
+      {/* A bandeja: o olhinho à esquerda; desfazer e o dado soltos à direita;
+          as abas e os itens. O quarto se guarda sozinho: o "Salvar meu
+          quarto" saiu (o dono, 24/11/2026). */}
+      <Animated.View
         pointerEvents="box-none"
         style={{
           position: "absolute",
@@ -601,40 +629,74 @@ function Quartinho() {
           paddingBottom: area.bottom + espaco.xs,
           paddingHorizontal: espaco.sm,
           gap: espaco.sm,
+          /* Limpo, tudo desce a altura da bandeja: o olhinho pousa onde ela
+             estava, e ela some por baixo da tela. */
+          transform: [
+            {
+              translateY: sumir.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, alturaDaBandeja + espaco.sm],
+              }),
+            },
+          ],
         }}
       >
         <View
           pointerEvents="box-none"
           style={{
             flexDirection: "row",
-            justifyContent: "flex-end",
+            alignItems: "center",
             gap: espaco.sm,
             paddingHorizontal: espaco.xs,
           }}
         >
-          <BotaoRedondo rotulo="Desfazer" aoTocar={desfazer} apagado={!antes.length}>
-            <Undo2 size={22} color={TINTA} strokeWidth={2.6} />
+          <BotaoRedondo
+            rotulo={limpo ? "Mostrar a bandeja" : "Esconder a bandeja para ver o quarto"}
+            aoTocar={alternarLimpo}
+          >
+            {limpo ? (
+              <Eye size={22} color={TINTA} strokeWidth={2.4} />
+            ) : (
+              <EyeOff size={22} color={TINTA} strokeWidth={2.4} />
+            )}
           </BotaoRedondo>
-          <BotaoRedondo rotulo="Decorar aleatoriamente" aoTocar={aoAcaso} apagado={!quarto}>
-            <Dices size={22} color={TINTA} strokeWidth={2.4} />
-          </BotaoRedondo>
+          <View style={{ flex: 1 }} />
+          <Animated.View
+            pointerEvents={limpo ? "none" : "box-none"}
+            style={{ flexDirection: "row", gap: espaco.sm, opacity: aparecer }}
+          >
+            <BotaoRedondo rotulo="Desfazer" aoTocar={desfazer} apagado={!antes.length}>
+              <Undo2 size={22} color={TINTA} strokeWidth={2.6} />
+            </BotaoRedondo>
+            <BotaoRedondo rotulo="Decorar aleatoriamente" aoTocar={aoAcaso} apagado={!quarto}>
+              <Dices size={22} color={TINTA} strokeWidth={2.4} />
+            </BotaoRedondo>
+          </Animated.View>
         </View>
-        <VidroLilas raio={30} estilo={{ paddingVertical: espaco.sm }}>
-          <Abas ativa={categoria} aoEscolher={setCategoria} />
-          {quarto ? (
-            <Bandeja
-              categoria={categoria}
-              quarto={quarto}
-              vitrine={vitrine}
-              lendo={lendo}
-              aoTocar={aoTocarNoItem}
-              aoTocarNoAr={aoTocarNoAr}
-            />
-          ) : (
-            <View style={{ height: 116 }} />
-          )}
-        </VidroLilas>
-      </View>
+        <Animated.View
+          pointerEvents={limpo ? "none" : "auto"}
+          accessibilityElementsHidden={limpo}
+          importantForAccessibility={limpo ? "no-hide-descendants" : "auto"}
+          onLayout={(e) => setAlturaDaBandeja(Math.round(e.nativeEvent.layout.height))}
+          style={{ opacity: aparecer }}
+        >
+          <VidroLilas raio={30} estilo={{ paddingVertical: espaco.sm }}>
+            <Abas ativa={categoria} aoEscolher={setCategoria} />
+            {quarto ? (
+              <Bandeja
+                categoria={categoria}
+                quarto={quarto}
+                vitrine={vitrine}
+                lendo={lendo}
+                aoTocar={aoTocarNoItem}
+                aoTocarNoAr={aoTocarNoAr}
+              />
+            ) : (
+              <View style={{ height: 116 }} />
+            )}
+          </VidroLilas>
+        </Animated.View>
+      </Animated.View>
 
       {aComprar && quarto ? (
         <FolhaDeCompra
