@@ -11,7 +11,6 @@ import Lock from "lucide-react-native/icons/lock";
 import Undo2 from "lucide-react-native/icons/undo-2";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  Alert,
   Animated,
   Easing,
   Pressable,
@@ -33,26 +32,33 @@ import Svg, {
   Rect,
   Stop,
 } from "react-native-svg";
-import { CANTINHO_BY_ID } from "@/lib/cantinho";
 import { selecao, sucesso, toque } from "~/componentes/base";
 import { corJornada } from "~/componentes/jornada/cores";
 import { useJornada } from "~/componentes/jornada/usarJornada";
 import { ArteDaBolha, useMovimentoReduzido, type HumorDaArte } from "~/componentes/movimento";
-import { lerOCantinho, type CantinhoOk } from "~/componentes/recompensas/economia-do-cantinho";
+import {
+  comprarItem,
+  lerALojaPorFase,
+  lerOCantinho,
+  type CantinhoOk,
+} from "~/componentes/recompensas/economia-do-cantinho";
 import { TEM_VIDRO_DO_SISTEMA, Vidro } from "~/componentes/vidro";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { clarear } from "~/lib/cor";
 import { ymdLocal } from "~/lib/gestacao";
 import { gravarChave } from "~/lib/jornada/loja";
+import { semanaDaLoja, type ItemPorFase } from "~/lib/jornada/loja-por-fase";
 import {
   alternar,
   APOIO,
   CATEGORIAS,
   CHAVE_DO_QUARTINHO,
+  contaDaCompra,
   cumprirSePronta,
   decorarAoAcaso,
   ehNoiteNoQuarto,
   emOrdemDeDesenho,
+  falaDoEmBreve,
   faltaOBerco,
   guardarMemoria,
   ITEM_POR_ID,
@@ -68,6 +74,7 @@ import {
   type ItemDoQuarto,
   type Quartinho,
   type Situacao,
+  type VitrineDoQuarto,
 } from "~/lib/quartinho/quarto";
 import { useSessao } from "~/lib/sessao";
 import { ALVO_MINIMO, cor, curva, espaco, fonte } from "~/tema";
@@ -114,6 +121,7 @@ import { ALVO_MINIMO, cor, curva, espaco, fonte } from "~/tema";
  *
  * Bancada: rota=/quartinho [&hora=21] [&postos=berco,poltrona…] [&missao=1]
  *          [&missoes=ursinho,parede (cumpridas ontem)] [&itens=objeto-berco,… (da lojinha)]
+ *          [&comprar=luminaria (abre a compra)] [&saldo=N] [&semana=N]
  */
 
 const ARTE: Record<IdDoItem, number> = {
@@ -183,13 +191,21 @@ function Quartinho() {
   const { width: L } = useWindowDimensions();
   /* Abre a jornada dela (o quarto mora no blob da jornada), como toda tela
      da Jornada: aberta direto, sem passar pela aba, ela também carrega. */
-  const { loja } = useJornada();
+  const { dia, loja } = useJornada();
   const hoje = hojeDaTela();
   const noite = ehNoiteNoQuarto(horaDaTela());
 
   const [quarto, setQuarto] = useState<Quartinho | null>(null);
   const [categoria, setCategoria] = useState<Categoria>("moveis");
   const [cantinho, setCantinho] = useState<CantinhoOk | null | "lendo">("lendo");
+  /* A loja por fase do banco: `undefined` lendo, `null` sem a tabela. */
+  const [porFase, setPorFase] = useState<ReadonlyMap<string, ItemPorFase> | null | undefined>();
+  /* O item que ela está comprando ali mesmo (a folha de compra aberta). */
+  const [aComprar, setAComprar] = useState<IdDoItem | null>(() => {
+    const id = parametroDaBancada("comprar");
+    return id && id in ITEM_POR_ID ? (id as IdDoItem) : null;
+  });
+  const [comprando, setComprando] = useState(false);
   const [fala, setFala] = useState(
     noite ? "Boa noite! Que quartinho gostoso." : "Seu quarto, do seu jeito!",
   );
@@ -214,16 +230,27 @@ function Quartinho() {
   useEffect(() => {
     let vivo = true;
     void lerOCantinho().then((c) => vivo && setCantinho(c));
+    void lerALojaPorFase().then((f) => vivo && setPorFase(f));
     return () => {
       vivo = false;
     };
   }, []);
 
-  const posse = useMemo(
-    () => (cantinho && cantinho !== "lendo" ? new Set(cantinho.owned) : null),
-    [cantinho],
+  const semana = semanaDaLoja({
+    semanaDaGestacao: dia.modo === "gestacao" ? dia.semana : null,
+    nasceu: dia.modo === "pos",
+  });
+  const vitrine = useMemo<VitrineDoQuarto>(
+    () => ({
+      posse: cantinho && cantinho !== "lendo" ? new Set(cantinho.owned) : null,
+      porFase: porFase ?? null,
+      semana,
+    }),
+    [cantinho, porFase, semana],
   );
-  const precoDaLojinha = useCallback((id: string) => CANTINHO_BY_ID[id]?.price, []);
+  /* Enquanto a posse ou a loja por fase chegam, o item da lojinha não diz nada. */
+  const lendo = cantinho === "lendo" || porFase === undefined;
+  const saldo = cantinho && cantinho !== "lendo" ? cantinho.balance : null;
 
   const mudar = useCallback(
     (proximo: Quartinho, de: Quartinho) => {
@@ -253,14 +280,20 @@ function Quartinho() {
       if (!quarto) return;
       if (s.tipo === "comprar") {
         toque();
-        Alert.alert(
-          item.nome,
-          `Está na lojinha por ${s.preco} sementinhas. Depois de comprar, é só voltar aqui e pôr no quarto.`,
-          [
-            { text: "Agora não", style: "cancel" },
-            { text: "Ir à lojinha", onPress: () => router.push("/jornada/recompensas") },
-          ],
-        );
+        /* A leitura da lojinha falhou: sem o saldo e a posse, não vende (a
+           vitrine faz o mesmo: o "não consegui ler" vem antes da venda). */
+        if (cantinho === null) {
+          setPose("surpresa");
+          setFala("Não consegui ver as suas sementinhas agora. Tenta de novo daqui a pouco?");
+          return;
+        }
+        setAComprar(item.id);
+        return;
+      }
+      if (s.tipo === "em-breve") {
+        toque();
+        setPose("feliz");
+        setFala(falaDoEmBreve(s.quando));
         return;
       }
       if (s.tipo === "missao") {
@@ -287,8 +320,61 @@ function Quartinho() {
         );
       }
     },
-    [quarto, mudar, noite],
+    [quarto, mudar, noite, cantinho],
   );
+
+  /**
+   * A COMPRA ALI MESMO (24/11/2026): a mesma compra da lojinha
+   * (`comprarItem`, com as mesmas recusas), e o item entra no quarto na hora.
+   */
+  const comprar = useCallback(async () => {
+    if (!aComprar || comprando || !quarto) return;
+    const item = ITEM_POR_ID[aComprar];
+    const s = situacaoDoItem(item, quarto, vitrine);
+    if (s.tipo !== "comprar") return;
+    setComprando(true);
+    const r = await comprarItem(s.lojinha, s.daFase);
+    setComprando(false);
+    if (!r) {
+      setPose("surpresa");
+      setFala("Não deu para comprar agora. Tenta de novo daqui a pouco?");
+      return;
+    }
+    /* Comprado noutro aparelho conta como dela: só falta pôr no quarto. */
+    if (!r.ok && r.motivo !== "ja_possui") {
+      /* Só a recusa por saldo traz o saldo de verdade (o mesmo cuidado da lojinha). */
+      if (r.motivo === "saldo_insuficiente" && typeof r.balance === "number") {
+        const b = r.balance;
+        setCantinho((c) => (c && c !== "lendo" ? { ...c, balance: b } : c));
+      }
+      setPose("surpresa");
+      setFala(r.error || "Não deu para comprar agora.");
+      return;
+    }
+    setCantinho((c) =>
+      c && c !== "lendo"
+        ? {
+            ...c,
+            balance: r.ok ? r.balance : c.balance,
+            owned: c.owned.includes(s.lojinha) ? c.owned : [...c.owned, s.lojinha],
+          }
+        : c,
+    );
+    setAComprar(null);
+    sucesso();
+    const bonus = r.ok && r.bonusNovo ? ` E fechou um conjunto: +${r.bonusNovo} sementinhas!` : "";
+    if (faltaOBerco(quarto, item.id)) {
+      setPose("comemorando");
+      setFala(`O móbile é seu! Ele vai no berço.${bonus}`);
+      return;
+    }
+    const m = quarto.postos.includes(item.id) ? null : mudar(alternar(quarto, item.id), quarto);
+    setNovo(item.id);
+    if (!m) {
+      setPose("comemorando");
+      setFala(`É seu! Já pus no quarto.${bonus}`);
+    }
+  }, [aComprar, comprando, quarto, vitrine, mudar]);
 
   const salvar = useCallback(() => {
     if (!quarto) return;
@@ -314,16 +400,16 @@ function Quartinho() {
 
   const aoAcaso = useCallback(() => {
     if (!quarto) return;
-    const livres = ITENS.filter(
-      (i) => situacaoDoItem(i, quarto, posse, precoDaLojinha).tipo === "livre",
-    ).map((i) => i.id);
+    const livres = ITENS.filter((i) => situacaoDoItem(i, quarto, vitrine).tipo === "livre").map(
+      (i) => i.id,
+    );
     const m = mudar(decorarAoAcaso(quarto, livres, Math.random), quarto);
     setNovo(null);
     if (!m) {
       setPose(noite ? "dormindo" : "apaixonado");
       setFala("Arrumei do meu jeito. Gostou?");
     }
-  }, [quarto, posse, precoDaLojinha, mudar, noite]);
+  }, [quarto, vitrine, mudar, noite]);
 
   const alturaDoQuarto = L * PROPORCAO_DO_QUARTO;
 
@@ -410,9 +496,8 @@ function Quartinho() {
             <Bandeja
               categoria={categoria}
               quarto={quarto}
-              posse={posse}
-              lendo={cantinho === "lendo"}
-              precoDaLojinha={precoDaLojinha}
+              vitrine={vitrine}
+              lendo={lendo}
               aoTocar={aoTocarNoItem}
             />
           ) : (
@@ -429,6 +514,20 @@ function Quartinho() {
           </BotaoRedondo>
         </View>
       </View>
+
+      {aComprar && quarto ? (
+        <FolhaDeCompra
+          item={ITEM_POR_ID[aComprar]}
+          situacao={situacaoDoItem(ITEM_POR_ID[aComprar], quarto, vitrine)}
+          saldo={saldo}
+          comprando={comprando}
+          vaiProQuarto={!faltaOBerco(quarto, aComprar)}
+          noite={noite}
+          aoComprar={() => void comprar()}
+          aoFechar={() => !comprando && setAComprar(null)}
+          fundo={area.bottom}
+        />
+      ) : null}
     </View>
   );
 }
@@ -556,6 +655,192 @@ function BotaoDeSalvar({ aoTocar, desabilitado }: { aoTocar: () => void; desabil
         <Heart size={18} color={cor.branco} fill={cor.branco} strokeWidth={2} />
       </LinearGradient>
     </Pressable>
+  );
+}
+
+/* ── A compra ali mesmo ───────────────────────────────────────────────── */
+
+/**
+ * A FOLHA DE COMPRA (24/11/2026): tocar num item que ela ainda não tem abre
+ * esta folha de vidro lilás sobre o quarto, com o item, o preço e a conta
+ * (quanto fica, ou quanto falta). Comprar põe o item no quarto na hora. Antes
+ * era um alerta que mandava à lojinha.
+ */
+function FolhaDeCompra({
+  item,
+  situacao: s,
+  saldo,
+  comprando,
+  vaiProQuarto,
+  noite,
+  aoComprar,
+  aoFechar,
+  fundo,
+}: {
+  item: ItemDoQuarto;
+  situacao: Situacao;
+  saldo: number | null;
+  comprando: boolean;
+  /** `false`: o móbile sem o berço (compra, mas ainda não entra no quarto). */
+  vaiProQuarto: boolean;
+  noite: boolean;
+  aoComprar: () => void;
+  aoFechar: () => void;
+  fundo: number;
+}) {
+  const reduzido = useMovimentoReduzido();
+  const sobe = useRef(new Animated.Value(reduzido ? 1 : 0)).current;
+  useEffect(() => {
+    if (reduzido) return;
+    Animated.spring(sobe, { toValue: 1, useNativeDriver: true, speed: 16, bounciness: 6 }).start();
+  }, [sobe, reduzido]);
+
+  if (s.tipo !== "comprar") return null;
+  const conta = contaDaCompra(s.preco, saldo);
+  const rotulo = comprando ? "Comprando…" : vaiProQuarto ? "Comprar e pôr no quarto" : "Comprar";
+
+  return (
+    <View style={StyleSheet.absoluteFill}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Fechar a compra"
+        onPress={aoFechar}
+        style={[
+          StyleSheet.absoluteFill,
+          { backgroundColor: noite ? "rgba(10,6,30,0.45)" : "rgba(40,24,90,0.28)" },
+        ]}
+      />
+      <Animated.View
+        accessibilityViewIsModal
+        style={{
+          position: "absolute",
+          left: espaco.sm,
+          right: espaco.sm,
+          bottom: fundo + espaco.sm,
+          opacity: sobe,
+          transform: [
+            { translateY: sobe.interpolate({ inputRange: [0, 1], outputRange: [60, 0] }) },
+          ],
+        }}
+      >
+        <VidroLilas raio={32} estilo={{ padding: espaco.md, gap: espaco.md }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.md }}>
+            <LinearGradient
+              colors={["#ffffff", "#efe6ff"]}
+              style={{
+                width: 92,
+                height: 92,
+                borderRadius: 28,
+                ...curva,
+                alignItems: "center",
+                justifyContent: "center",
+                borderWidth: 1.5,
+                borderColor: "rgba(255,255,255,0.95)",
+                boxShadow: "0px 8px 18px -8px rgba(76,29,149,0.45)",
+              }}
+            >
+              <Image
+                source={ARTE[item.id]}
+                style={{ width: 72, height: 68 }}
+                contentFit="contain"
+                accessible={false}
+              />
+            </LinearGradient>
+            <View style={{ flex: 1, gap: 4 }}>
+              <Text style={{ ...fonte.display, fontSize: 22, lineHeight: 26, color: TINTA }}>
+                {item.nome}
+              </Text>
+              <View
+                accessible
+                accessibilityLabel={`${s.preco} sementinhas`}
+                style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+              >
+                <Text allowFontScaling={false} style={{ fontSize: 16 }}>
+                  🌱
+                </Text>
+                <Text
+                  style={{
+                    ...fonte.titulo,
+                    fontSize: 20,
+                    color: TINTA,
+                    fontVariant: ["tabular-nums"],
+                  }}
+                >
+                  {s.preco}
+                </Text>
+              </View>
+              <Text style={{ ...fonte.media, fontSize: 15, lineHeight: 19, color: TINTA }}>
+                {conta.pode
+                  ? conta.fica == null
+                    ? vaiProQuarto
+                      ? "Ele entra no quarto na hora."
+                      : "Depois é só pôr o berço."
+                    : `Você fica com ${conta.fica} sementinhas.`
+                  : `Faltam ${conta.faltam} sementinhas.`}
+              </Text>
+            </View>
+          </View>
+          {!conta.pode ? (
+            <Text style={{ ...fonte.normal, fontSize: 15, lineHeight: 20, color: TINTA }}>
+              Você ganha sementinhas nas aulas e nas atividades do dia.
+            </Text>
+          ) : null}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Agora não"
+              disabled={comprando}
+              onPress={() => {
+                toque();
+                aoFechar();
+              }}
+              style={({ pressed }) => ({
+                minHeight: ALVO_MINIMO + 6,
+                paddingHorizontal: espaco.md,
+                justifyContent: "center",
+                opacity: comprando ? 0.5 : 1,
+                transform: [{ scale: pressed ? 0.96 : 1 }],
+              })}
+            >
+              <Text style={{ ...fonte.forte, fontSize: 17, color: TINTA }}>Agora não</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${rotulo}, ${s.preco} sementinhas`}
+              accessibilityState={{ disabled: !conta.pode || comprando, busy: comprando }}
+              disabled={!conta.pode || comprando}
+              onPress={() => {
+                toque(false);
+                aoComprar();
+              }}
+              style={({ pressed }) => ({
+                flex: 1,
+                opacity: conta.pode ? 1 : 0.5,
+                transform: [{ scale: pressed ? 0.97 : 1 }],
+              })}
+            >
+              <LinearGradient
+                colors={["#a487fb", "#7c4fe8", "#6431d6"]}
+                locations={[0, 0.55, 1]}
+                style={{
+                  height: ALVO_MINIMO + 8,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 999,
+                  ...curva,
+                  borderWidth: 2,
+                  borderColor: "rgba(226,214,255,0.85)",
+                  boxShadow:
+                    "0px 10px 24px -8px rgba(100,49,214,0.8), 0px 0px 14px rgba(164,135,251,0.45)",
+                }}
+              >
+                <Text style={{ ...fonte.forte, fontSize: 17, color: cor.branco }}>{rotulo}</Text>
+              </LinearGradient>
+            </Pressable>
+          </View>
+        </VidroLilas>
+      </Animated.View>
+    </View>
   );
 }
 
@@ -1352,16 +1637,14 @@ function Abas({ ativa, aoEscolher }: { ativa: Categoria; aoEscolher: (c: Categor
 function Bandeja({
   categoria,
   quarto,
-  posse,
+  vitrine,
   lendo,
-  precoDaLojinha,
   aoTocar,
 }: {
   categoria: Categoria;
   quarto: Quartinho;
-  posse: ReadonlySet<string> | null;
+  vitrine: VitrineDoQuarto;
   lendo: boolean;
-  precoDaLojinha: (id: string) => number | undefined;
   aoTocar: (item: ItemDoQuarto, s: Situacao) => void;
 }) {
   const itens = ITENS.filter((i) => i.categoria === categoria);
@@ -1373,7 +1656,7 @@ function Bandeja({
       contentContainerStyle={{ gap: espaco.sm, paddingHorizontal: espaco.sm, paddingVertical: 10 }}
     >
       {itens.map((item) => {
-        const s = situacaoDoItem(item, quarto, posse, precoDaLojinha);
+        const s = situacaoDoItem(item, quarto, vitrine);
         return (
           <CartaoDoItem
             key={item.id}
@@ -1400,29 +1683,33 @@ function CartaoDoItem({
   posto: boolean;
   aoTocar: () => void;
 }) {
-  const fechado = s?.tipo === "comprar" || s?.tipo === "missao";
+  const fechado = s?.tipo === "comprar" || s?.tipo === "missao" || s?.tipo === "em-breve";
   const rotulo =
     s === null
       ? ""
       : s.tipo === "comprar"
         ? `${s.preco}`
-        : s.tipo === "missao"
-          ? "Missão"
-          : posto
-            ? "No quarto"
-            : item.lojinha
-              ? "Seu"
-              : "Grátis";
+        : s.tipo === "em-breve"
+          ? "Em breve"
+          : s.tipo === "missao"
+            ? "Missão"
+            : posto
+              ? "No quarto"
+              : item.lojinha
+                ? "Seu"
+                : "Grátis";
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected: posto, disabled: s === null }}
       accessibilityLabel={
         s?.tipo === "comprar"
-          ? `${item.nome}, ${s.preco} sementinhas na lojinha`
-          : s?.tipo === "missao"
-            ? `${item.nome}, presente da missão ${s.missao.texto}`
-            : `${item.nome}${posto ? ", no quarto. Toque para tirar" : ". Toque para pôr no quarto"}`
+          ? `${item.nome}, ${s.preco} sementinhas. Toque para comprar`
+          : s?.tipo === "em-breve"
+            ? `${item.nome}, ${s.quando.toLowerCase()} na lojinha`
+            : s?.tipo === "missao"
+              ? `${item.nome}, presente da missão ${s.missao.texto}`
+              : `${item.nome}${posto ? ", no quarto. Toque para tirar" : ". Toque para pôr no quarto"}`
       }
       disabled={s === null}
       onPress={aoTocar}
@@ -1457,7 +1744,7 @@ function CartaoDoItem({
               🌱
             </Text>
           ) : null}
-          {s?.tipo === "missao" ? (
+          {s?.tipo === "missao" || s?.tipo === "em-breve" ? (
             <Lock size={13} color={cor.textoApagado} strokeWidth={2.4} />
           ) : null}
           <Text

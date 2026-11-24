@@ -7,10 +7,12 @@ import {
   alternar,
   APOIO,
   CHAVE_DO_QUARTINHO,
+  contaDaCompra,
   decorarAoAcaso,
   cumprirSePronta,
   ehNoiteNoQuarto,
   emOrdemDeDesenho,
+  falaDoEmBreve,
   guardarMemoria,
   ITEM_POR_ID,
   ITENS,
@@ -21,11 +23,23 @@ import {
   QUARTO_INICIAL,
   REGUA_DA_LUZ,
   situacaoDoItem,
+  vendaNoQuarto,
   type Quartinho,
+  type VitrineDoQuarto,
 } from "./quarto";
+import { linhasDaTabela, type ItemPorFase } from "~/lib/jornada/loja-por-fase";
 
 const RAIZ = join(import.meta.dir, "..", "..", "..");
 const preco = (id: string) => CANTINHO_BY_ID[id]?.price;
+/** A loja por fase como o banco a devolve (a tabela gerada do mesmo arquivo). */
+const FASES: ReadonlyMap<string, ItemPorFase> = new Map(
+  linhasDaTabela().map((l) => [l.item_id, { preco: l.preco, semana: l.semana_minima }]),
+);
+const vitrine = (posse: string[] | null, semana = 24): VitrineDoQuarto => ({
+  posse: posse ? new Set(posse) : null,
+  porFase: FASES,
+  semana,
+});
 const quarto = (postos: Quartinho["postos"], missoes: Quartinho["missoes"] = {}): Quartinho => ({
   v: 1,
   postos,
@@ -113,25 +127,70 @@ describe("o quartinho: pôr, tirar e ter", () => {
     expect(alternar(comBerco, "berco").postos).toEqual(["comoda"]);
   });
 
-  test("da lojinha: livre se ela tem, e com o preço da lojinha se não tem", () => {
+  test("da lojinha: livre se ela tem; se não tem, à venda quando a fase dela chega", () => {
     const q = quarto([]);
     const berco = ITEM_POR_ID.berco;
-    expect(situacaoDoItem(berco, q, new Set(["objeto-berco"]), preco)).toEqual({ tipo: "livre" });
-    expect(situacaoDoItem(berco, q, new Set(), preco)).toEqual({
-      tipo: "comprar",
-      preco: preco("objeto-berco")!,
+    expect(situacaoDoItem(berco, q, vitrine(["objeto-berco"]))).toEqual({ tipo: "livre" });
+    /* O berço abre no 3º trimestre: na semana 24 ele ainda não se vende. */
+    expect(situacaoDoItem(berco, q, vitrine([], 24))).toEqual({
+      tipo: "em-breve",
       lojinha: "objeto-berco",
+      quando: "No 3º trimestre",
     });
+    expect(situacaoDoItem(berco, q, vitrine([], 30))).toEqual({
+      tipo: "comprar",
+      preco: FASES.get("objeto-berco")!.preco,
+      lojinha: "objeto-berco",
+      daFase: true,
+    });
+  });
+
+  test("a venda no quarto é a MESMA da vitrine da lojinha", () => {
+    /* O que não é Premium: à venda pelo preço do catálogo, sem a loja por fase. */
+    expect(vendaNoQuarto("objeto-cestinho", null, 0)).toEqual({
+      tipo: "comprar",
+      preco: preco("objeto-cestinho")!,
+      lojinha: "objeto-cestinho",
+      daFase: false,
+    });
+    /* Premium sem a tabela do banco: o servidor do site recusa, então não vende. */
+    expect(vendaNoQuarto("objeto-luminaria", null, 40).tipo).toBe("em-breve");
+    /* O preço que vale é o do banco, não o do catálogo. */
+    const caro = new Map([["objeto-luminaria", { preco: 999, semana: 0 }]]);
+    expect(vendaNoQuarto("objeto-luminaria", caro, 5)).toMatchObject({ preco: 999, daFase: true });
+    /* Depois do parto, tudo aberto. */
+    for (const i of ITENS.filter((x) => x.lojinha))
+      expect(situacaoDoItem(i, quarto([]), vitrine([], 99)).tipo).toBe("comprar");
+    /* Todo item da lojinha no quarto existe na vitrine em alguma fase (ou não é Premium). */
+    for (const i of ITENS.filter((x) => x.lojinha)) {
+      const c = CANTINHO_BY_ID[i.lojinha!]!;
+      expect({ i: i.id, vende: !c.premium || FASES.has(i.lojinha!) }).toEqual({
+        i: i.id,
+        vende: true,
+      });
+    }
+  });
+
+  test("a conta da compra e a fala do que ainda não abriu", () => {
+    expect(contaDaCompra(80, 100)).toEqual({ pode: true, fica: 20 });
+    expect(contaDaCompra(80, 80)).toEqual({ pode: true, fica: 0 });
+    expect(contaDaCompra(80, 50)).toEqual({ pode: false, faltam: 30 });
+    expect(contaDaCompra(80, null)).toEqual({ pode: true, fica: null });
+    expect(falaDoEmBreve("No 3º trimestre")).toBe("Abre no 3º trimestre. Junte sementinhas!");
+    expect(falaDoEmBreve("Em breve")).toBe("Esse chega em breve na lojinha.");
   });
 
   test("os presentes: os de saída livres; os da missão, só depois dela", () => {
     const q = quarto([]);
     for (const id of ["comoda", "prateleira", "ursinho"] as const)
-      expect(situacaoDoItem(ITEM_POR_ID[id], q, null, preco).tipo).toBe("livre");
-    expect(situacaoDoItem(ITEM_POR_ID["quadro-lua"], q, null, preco).tipo).toBe("missao");
+      expect(situacaoDoItem(ITEM_POR_ID[id], q, vitrine(null)).tipo).toBe("livre");
+    expect(situacaoDoItem(ITEM_POR_ID["quadro-lua"], q, vitrine(null)).tipo).toBe("missao");
     expect(
-      situacaoDoItem(ITEM_POR_ID["quadro-lua"], quarto([], { ursinho: "2026-11-23" }), null, preco)
-        .tipo,
+      situacaoDoItem(
+        ITEM_POR_ID["quadro-lua"],
+        quarto([], { ursinho: "2026-11-23" }),
+        vitrine(null),
+      ).tipo,
     ).toBe("livre");
     /* Toda missão que dá presente dá um item que não é da lojinha. */
     for (const m of MISSOES) {
@@ -208,6 +267,14 @@ describe("o quartinho: a tela (catraca do fonte)", () => {
 
   test("a Bolha do céu abre o quartinho", () => {
     expect(ler("componentes", "jornada", "hoje.tsx")).toMatch(/router\.push\("\/quartinho"\)/);
+  });
+
+  test("a compra é ali mesmo, pela mesma compra da lojinha, sem mandar à lojinha", () => {
+    const tela = ler("app", "quartinho.tsx");
+    expect(tela).toMatch(/comprarItem\(s\.lojinha, s\.daFase\)/);
+    expect(tela).toMatch(/lerALojaPorFase\(\)/);
+    expect(tela).not.toMatch(/router\.push\("\/jornada\/recompensas"\)/);
+    expect(tela).not.toMatch(/CANTINHO_BY_ID\[[^\]]+\]\??\.price/);
   });
 
   test("Modo Cuidado não abre o quarto; sementinha não se compra; o quarto se grava", () => {

@@ -48,8 +48,19 @@ arrastar (lugares fixos); a missão dá item, não moeda (quem paga é o servido
 do site, que não muda); a planta pendurada, o elefante, os cubinhos com letras
 e o quadro "Sonhe alto" não vieram (são arte de um próximo lote).
 
-**O que falta para lançar**: comprar o item ali mesmo (hoje leva à lojinha);
-decidir se o Arrumar da trilha sai; mais itens (um lote de ~16 por 2 créditos,
+**A compra ali mesmo (24/11/2026)**: tocar num item que ela não tem abre a
+folha de compra de vidro lilás, com o preço e a conta (quanto fica, quanto
+falta); comprar põe o item no quarto na hora. A venda segue a MESMA regra da
+vitrine da lojinha (`vendaNoQuarto`): o Premium só pela loja por fase, quando
+a fase dela chega, e pelo preço do banco. O que ainda não abriu mostra "Em
+breve" com cadeado, e a Bolha diz quando abre. Antes, o berço (3º trimestre)
+aparecia com preço e mandava à lojinha, onde nem estava.
+
+**O Arrumar da trilha fica, por enquanto**: só 9 dos ~90 enfeites da lojinha
+têm arte de quarto; tirar o Arrumar deixaria os outros sem lugar. Ele sai
+quando o quarto tiver onde pôr o que ela comprou.
+
+**O que falta para lançar**: mais itens (um lote de ~16 por 2 créditos,
 na mesma cartela); a retrospectiva com as memórias; a Bolha vestida (ideia 2).
 
 ## Como criar um item novo do quartinho (a receita)

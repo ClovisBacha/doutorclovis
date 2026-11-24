@@ -14,13 +14,17 @@
  *   bonito — sem arrastar, girar nem zoom ("eu não deixaria a experiência
  *   cheia de botões", a sugestão que veio junto).
  * - A POSSE: nove itens SÃO itens da lojinha (`lojinha`): ela os tem se os
- *   comprou lá, e o preço é o da lojinha. Os outros sete são presentes da
+ *   comprou, e o preço é o da lojinha. Desde 24/11/2026 ela compra ali mesmo,
+ *   no quarto, pela mesma regra da vitrine (a loja por fase). Os outros sete são presentes da
  *   Bolha: quatro de saída e três que as missões liberam. Nada aqui inventa
  *   preço nem moeda.
  * - AS MISSÕES: uma por dia, na ordem; cumprida, a Bolha comemora e dá o
  *   presente dela (um item). Elas não pagam sementinhas: quem paga é o
  *   servidor do site, que não muda.
  */
+
+import { CANTINHO_BY_ID } from "@/lib/cantinho";
+import { quandoAbre, type ItemPorFase } from "~/lib/jornada/loja-por-fase";
 
 export type Categoria = "moveis" | "decoracao" | "brinquedos" | "tapetes" | "plantas";
 
@@ -356,28 +360,87 @@ export function guardarMemoria(q: Quartinho, hoje: string): Quartinho {
 
 export type Situacao =
   | { tipo: "livre" }
-  | { tipo: "comprar"; preco: number; lojinha: string }
+  /** À venda AGORA: o preço que vale (o do banco, se é da loja por fase). */
+  | { tipo: "comprar"; preco: number; lojinha: string; daFase: boolean }
+  /** Ainda não abriu na lojinha: a fase dela não chegou (ou o banco não diz). */
+  | { tipo: "em-breve"; lojinha: string; quando: string }
   | { tipo: "missao"; missao: Missao };
 
 /**
+ * A LOJINHA COMO ELA É PARA ELA: a posse (os ids que o servidor devolve), a
+ * loja por fase lida do banco (`~/lib/jornada/loja-por-fase`) e a semana dela
+ * na régua da loja (`semanaDaLoja`). `porFase: null` = o banco ainda sem a
+ * tabela, ou a leitura falhou.
+ */
+export type VitrineDoQuarto = {
+  posse: ReadonlySet<string> | null;
+  porFase: ReadonlyMap<string, ItemPorFase> | null;
+  semana: number;
+};
+
+/**
+ * Como o item da lojinha se vende no quarto: pela MESMA regra da vitrine
+ * (`situacaoNaLoja`, em `~/lib/jornada/enfeites`). O que não é Premium está à
+ * venda pelo preço do catálogo; o Premium só pela loja por fase, quando a fase
+ * dela chega, e pelo preço do banco. Sem a tabela, o Premium não se vende (o
+ * servidor do site recusa todo Premium).
+ *
+ * ⚠️ 24/11/2026: a primeira versão mostrava o preço do catálogo em todo item e
+ * mandava ela à lojinha, onde o berço (3º trimestre) nem aparecia.
+ */
+export function vendaNoQuarto(
+  lojinha: string,
+  porFase: ReadonlyMap<string, ItemPorFase> | null,
+  semana: number,
+): Extract<Situacao, { tipo: "comprar" | "em-breve" }> {
+  const i = CANTINHO_BY_ID[lojinha];
+  if (!i || i.aposentado) return { tipo: "em-breve", lojinha, quando: "Em breve" };
+  if (!i.premium) return { tipo: "comprar", preco: i.price, lojinha, daFase: false };
+  const f = porFase?.get(lojinha);
+  if (!f) return { tipo: "em-breve", lojinha, quando: "Em breve" };
+  if (f.semana <= semana) return { tipo: "comprar", preco: f.preco, lojinha, daFase: true };
+  return { tipo: "em-breve", lojinha, quando: quandoAbre(f.semana) };
+}
+
+/**
  * Se ela pode pôr o item: os presentes de saída sempre; o da missão depois de
- * cumpri-la; o da lojinha se ela o tem (`posse`, os ids da lojinha que o
- * servidor devolve). `precoDaLojinha` vem do catálogo do site.
+ * cumpri-la; o da lojinha se ela o tem. O que ela não tem se compra ali mesmo,
+ * no quarto, quando já está à venda (`vendaNoQuarto`).
  */
 export function situacaoDoItem(
   item: ItemDoQuarto,
   q: Quartinho,
-  posse: ReadonlySet<string> | null,
-  precoDaLojinha: (id: string) => number | undefined,
+  vitrine: VitrineDoQuarto,
 ): Situacao {
   if (item.lojinha) {
-    if (posse?.has(item.lojinha)) return { tipo: "livre" };
-    return { tipo: "comprar", preco: precoDaLojinha(item.lojinha) ?? 0, lojinha: item.lojinha };
+    if (vitrine.posse?.has(item.lojinha)) return { tipo: "livre" };
+    return vendaNoQuarto(item.lojinha, vitrine.porFase, vitrine.semana);
   }
   if (item.missao && !q.missoes[item.missao]) {
     return { tipo: "missao", missao: MISSOES.find((m) => m.id === item.missao)! };
   }
   return { tipo: "livre" };
+}
+
+/** O que a Bolha diz do item que ainda não abriu (cabe nas duas linhas do balão). */
+export function falaDoEmBreve(quando: string): string {
+  return quando === "Em breve"
+    ? "Esse chega em breve na lojinha."
+    : `Abre ${quando.charAt(0).toLowerCase()}${quando.slice(1)}. Junte sementinhas!`;
+}
+
+/**
+ * A conta da compra, antes de ela confirmar: quanto fica, ou quanto falta.
+ * Saldo desconhecido (`null`) não tranca: quem decide é o servidor.
+ */
+export function contaDaCompra(
+  preco: number,
+  saldo: number | null,
+): { pode: true; fica: number | null } | { pode: false; faltam: number } {
+  if (saldo == null) return { pode: true, fica: null };
+  return saldo >= preco
+    ? { pode: true, fica: saldo - preco }
+    : { pode: false, faltam: preco - saldo };
 }
 
 /** Põe ou tira um item (tirar é sempre possível; pôr só o que está livre). */
