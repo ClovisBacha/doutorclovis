@@ -8,28 +8,67 @@
  *
  * - O QUARTO é uma arte vazia de dia (`assets/quartinho/quarto-dia.webp`) e
  *   a mesma, pintada de noite (`quarto-noite.webp`: o luar, a lua na janela
- *   e as estrelinhas da parede acesas). Cada ITEM
+ *   e as estrelinhas da parede acesas); a COZINHA também (`cozinha-dia.webp`,
+ *   `cozinha-noite.webp`: o luar na pia e a luzinha da coifa). Cada ITEM
  *   é uma arte à parte, com um lugar FIXO no quarto: decorar é escolher o
  *   que fica, e o quarto sai sempre
  *   bonito — sem arrastar, girar nem zoom ("eu não deixaria a experiência
  *   cheia de botões", a sugestão que veio junto).
- * - A POSSE: nove itens SÃO itens da lojinha (`lojinha`): ela os tem se os
- *   comprou, e o preço é o da lojinha. Desde 24/11/2026 ela compra ali mesmo,
- *   no quarto, pela mesma regra da vitrine (a loja por fase). Os outros sete são presentes da
- *   Bolha: quatro de saída e três que as missões liberam. Nada aqui inventa
- *   preço nem moeda.
+ * - A POSSE: os itens com `lojinha` SÃO itens da lojinha (nove no quarto, sete
+ *   na cozinha): ela os tem se os comprou, e o preço é o da lojinha. Desde
+ *   24/11/2026 ela compra ali mesmo, pela mesma regra da vitrine (a loja por
+ *   fase). Os outros são presentes da Bolha: os de saída (livres desde o
+ *   começo) e os que as missões liberam. Nada aqui inventa preço nem moeda.
  * - AS MISSÕES: uma por dia, na ordem; cumprida, a Bolha comemora e dá o
  *   presente dela (um item). Elas não pagam sementinhas: quem paga é o
  *   servidor do site, que não muda.
+ * - OS CÔMODOS (25/11/2026, o dono: "quando a pessoa arrastar pro lado direito
+ *   ele deve ir para a cozinha [...] a imagem está melhor no sentido de dar mais
+ *   profundidade e estar centralizado"): o quarto e, à direita dele, a
+ *   cozinha. As duas pinturas são da MESMA câmera, de frente (a parede do fundo
+ *   no centro, as paredes do lado, o teto e o chão), e cada item mora num
+ *   cômodo só. A posse e o guardado são um só (`postos`): o cômodo é do item.
  */
 
 import { CANTINHO_BY_ID } from "@/lib/cantinho";
 import { quandoAbre, type ItemPorFase } from "~/lib/jornada/loja-por-fase";
 import { AR_DO_QUARTO, type IdDoAr } from "./migracao";
 
-export type Categoria = "moveis" | "decoracao" | "brinquedos" | "tapetes" | "plantas";
+export type Comodo = "quarto" | "cozinha";
+
+/** Os cômodos, na ordem em que se arrastam: o quarto primeiro, a cozinha à direita. */
+export const COMODOS: readonly { id: Comodo; nome: string }[] = [
+  { id: "quarto", nome: "Quarto" },
+  { id: "cozinha", nome: "Cozinha" },
+];
+
+export type Categoria =
+  | "moveis"
+  | "decoracao"
+  | "brinquedos"
+  | "tapetes"
+  | "plantas"
+  | "utensilios";
 
 export type IdDoItem =
+  /* A cozinha (25/11/2026). */
+  | "potes"
+  | "planta-pendurada"
+  | "relogio"
+  | "hortela"
+  | "suculenta"
+  | "cactinho"
+  | "trevo"
+  | "tapete-xadrez"
+  | "cafeteira"
+  | "tulipas"
+  | "margaridas"
+  | "girassol"
+  | "colheres"
+  | "panela"
+  | "bule"
+  | "planta-grande"
+  /* O quarto. */
   | "berco"
   | "poltrona"
   | "comoda"
@@ -47,13 +86,25 @@ export type IdDoItem =
   | "tapete"
   | "planta";
 
-export type IdDaMissao = "ursinho" | "parede" | "leitura" | "tapete" | "mobile";
+export type IdDaMissao =
+  | "ursinho"
+  | "parede"
+  | "leitura"
+  | "tapete"
+  | "mobile"
+  | "bancada"
+  | "verde";
 
 /**
- * Onde o item fica, em FRAÇÕES da arte do quarto (1536 × 2752): `x` é o
+ * Onde o item fica, em FRAÇÕES da arte do cômodo dele (1536 × 2752): `x` é o
  * centro, `base` é a linha onde o pé dele encosta, `largura` é a largura dele
  * e `camada` é a ordem de desenho (a parede atrás, os brinquedos na frente).
  * `achatar` encolhe a altura (o tapete, visto mais de lado).
+ *
+ * ⚠️ A tela mostra a pintura COBRINDO a tela (corta as laterais num iPhone
+ * comprido: 8,8% de cada lado num 16 Pro). Item novo fica entre `x` 0,1 e 0,9,
+ * e com a `base` até 0,70: a linha dos botões soltos começa em 0,665 (medida
+ * no simulador), e a bandeja logo abaixo.
  */
 export type Lugar = { x: number; base: number; largura: number; camada: number; achatar?: number };
 
@@ -102,6 +153,8 @@ export type Luz = {
 export type ItemDoQuarto = {
   id: IdDoItem;
   nome: string;
+  /** O cômodo onde ele mora (a pintura de que o `lugar` é fração). */
+  comodo: Comodo;
   categoria: Categoria;
   /** A proporção da arte (altura / largura), para o lugar saber a altura. */
   proporcao: number;
@@ -114,31 +167,47 @@ export type ItemDoQuarto = {
   luz: Luz | null;
 };
 
+/*
+ * O QUARTO, de frente (25/11/2026): a parede do fundo vai de x 0,244 a 0,804 e
+ * de y 0,27 a 0,54 (o rodapé); a janela fica na parede da esquerda. Os lugares
+ * foram compostos numa prévia da tela com a bandeja por cima, e não de cabeça.
+ */
+const Q = "quarto" as const;
+/*
+ * A COZINHA, a mesma câmera: a parede do fundo de x 0,148 a 0,829; a bancada
+ * em y 0,508 (o tampo); o peitoril da janela em 0,4725; o fogão de x 0,703 a
+ * 0,80; a geladeira na direita, de pé no chão.
+ */
+const C = "cozinha" as const;
+
 export const ITENS: readonly ItemDoQuarto[] = [
-  /* A parede do fundo. */
+  /* ── O quarto ── A parede do fundo. */
   {
     id: "prateleira",
     nome: "Prateleira",
+    comodo: Q,
     categoria: "moveis",
     proporcao: 337 / 515,
-    lugar: { x: 0.66, base: 0.267, largura: 0.3, camada: 1 },
+    lugar: { x: 0.66, base: 0.36, largura: 0.19, camada: 1 },
     luz: null,
   },
   {
     id: "quadro-urso",
     nome: "Quadro do ursinho",
+    comodo: Q,
     categoria: "decoracao",
     proporcao: 351 / 353,
-    lugar: { x: 0.47, base: 0.352, largura: 0.14, camada: 1 },
+    lugar: { x: 0.36, base: 0.375, largura: 0.085, camada: 1 },
     luz: null,
     lojinha: "objeto-quadrinho",
   },
   {
     id: "quadro-lua",
     nome: "Quadro da lua",
+    comodo: Q,
     categoria: "decoracao",
     proporcao: 351 / 351,
-    lugar: { x: 0.69, base: 0.352, largura: 0.14, camada: 1 },
+    lugar: { x: 0.5, base: 0.375, largura: 0.085, camada: 1 },
     /* A lua do quadro é pintada com tinta que brilha: quase nada. */
     luz: { potencia: REGUA_DA_LUZ.tintaQueBrilha, tom: "#c3ccff", de: [0.48, 0.5] },
     missao: "ursinho",
@@ -147,44 +216,39 @@ export const ITENS: readonly ItemDoQuarto[] = [
   {
     id: "tapete",
     nome: "Tapete de estrelas",
+    comodo: Q,
     categoria: "tapetes",
     proporcao: 321 / 583,
-    lugar: { x: 0.56, base: 0.742, largura: 0.78, camada: 2, achatar: 0.62 },
+    lugar: { x: 0.53, base: 0.695, largura: 0.58, camada: 2, achatar: 0.6 },
     luz: null,
     lojinha: "objeto-tapete",
   },
   {
-    id: "planta",
-    nome: "Planta",
-    categoria: "plantas",
-    proporcao: 430 / 392,
-    lugar: { x: 0.085, base: 0.52, largura: 0.16, camada: 3 },
-    luz: null,
-    lojinha: "planta-vaso",
-  },
-  {
-    id: "comoda",
-    nome: "Cômoda",
-    categoria: "moveis",
-    proporcao: 435 / 397,
-    lugar: { x: 0.85, base: 0.54, largura: 0.25, camada: 3 },
-    luz: null,
-  },
-  {
     id: "berco",
     nome: "Berço",
+    comodo: Q,
     categoria: "moveis",
     proporcao: 417 / 471,
-    lugar: { x: 0.585, base: 0.565, largura: 0.42, camada: 3 },
+    lugar: { x: 0.44, base: 0.575, largura: 0.3, camada: 3 },
     luz: null,
     lojinha: "objeto-berco",
   },
   {
+    id: "comoda",
+    nome: "Cômoda",
+    comodo: Q,
+    categoria: "moveis",
+    proporcao: 435 / 397,
+    lugar: { x: 0.71, base: 0.555, largura: 0.17, camada: 3 },
+    luz: null,
+  },
+  {
     id: "mobile",
     nome: "Móbile",
+    comodo: Q,
     categoria: "decoracao",
     proporcao: 393 / 460,
-    lugar: { x: 0.505, base: 0.392, largura: 0.22, camada: 4 },
+    lugar: { x: 0.45, base: 0.455, largura: 0.14, camada: 4 },
     /* A estrela e a lua do móbile são do plástico que brilha no escuro. */
     luz: { potencia: REGUA_DA_LUZ.brilhaNoEscuro, tom: "#ffe58f", de: [0.6, 0.62] },
     lojinha: "objeto-mobile",
@@ -192,37 +256,53 @@ export const ITENS: readonly ItemDoQuarto[] = [
   {
     id: "coelhinho",
     nome: "Coelhinho",
+    comodo: Q,
     categoria: "brinquedos",
     proporcao: 448 / 293,
-    lugar: { x: 0.855, base: 0.392, largura: 0.11, camada: 4 },
+    /* Sentado em cima da cômoda. */
+    lugar: { x: 0.74, base: 0.461, largura: 0.055, camada: 4 },
     luz: null,
     lojinha: "bicho-coelho",
   },
   {
     id: "luminaria",
     nome: "Luminária",
+    comodo: Q,
     categoria: "moveis",
     proporcao: 519 / 240,
-    lugar: { x: 0.335, base: 0.578, largura: 0.12, camada: 4 },
+    /* Entre o berço e a cômoda. */
+    lugar: { x: 0.598, base: 0.58, largura: 0.07, camada: 4 },
     /* A lâmpada: o 1 da régua. Ilumina a parede, o chão e o que está perto. */
     luz: { potencia: REGUA_DA_LUZ.lampada, tom: "#ffb45e", de: [0.5, 0.14], chao: true },
     lojinha: "objeto-luminaria",
   },
   {
+    id: "planta",
+    nome: "Planta",
+    comodo: Q,
+    categoria: "plantas",
+    proporcao: 430 / 392,
+    lugar: { x: 0.15, base: 0.64, largura: 0.12, camada: 5 },
+    luz: null,
+    lojinha: "planta-vaso",
+  },
+  {
     id: "poltrona",
     nome: "Poltrona",
+    comodo: Q,
     categoria: "moveis",
     proporcao: 481 / 456,
-    lugar: { x: 0.165, base: 0.645, largura: 0.32, camada: 5 },
+    lugar: { x: 0.3, base: 0.645, largura: 0.2, camada: 5 },
     luz: null,
     lojinha: "objeto-poltrona",
   },
   {
     id: "cesto",
     nome: "Cesto de brinquedos",
+    comodo: Q,
     categoria: "brinquedos",
     proporcao: 490 / 410,
-    lugar: { x: 0.905, base: 0.665, largura: 0.19, camada: 5 },
+    lugar: { x: 0.84, base: 0.645, largura: 0.12, camada: 5 },
     luz: null,
     lojinha: "objeto-cestinho",
   },
@@ -230,37 +310,200 @@ export const ITENS: readonly ItemDoQuarto[] = [
   {
     id: "ursinho",
     nome: "Ursinho",
+    comodo: Q,
     categoria: "brinquedos",
     proporcao: 409 / 347,
-    lugar: { x: 0.3, base: 0.728, largura: 0.14, camada: 6 },
+    lugar: { x: 0.38, base: 0.67, largura: 0.085, camada: 6 },
     luz: null,
   },
   {
     id: "cavalinho",
     nome: "Cavalinho",
+    comodo: Q,
     categoria: "brinquedos",
     proporcao: 436 / 484,
-    lugar: { x: 0.47, base: 0.712, largura: 0.2, camada: 6 },
+    lugar: { x: 0.52, base: 0.662, largura: 0.11, camada: 6 },
     luz: null,
     missao: "parede",
   },
   {
     id: "argolas",
     nome: "Argolas",
+    comodo: Q,
     categoria: "brinquedos",
     proporcao: 444 / 346,
-    lugar: { x: 0.635, base: 0.684, largura: 0.085, camada: 6 },
+    lugar: { x: 0.63, base: 0.652, largura: 0.05, camada: 6 },
     luz: null,
     missao: "leitura",
   },
   {
     id: "cubos",
     nome: "Cubinhos",
+    comodo: Q,
     categoria: "brinquedos",
     proporcao: 387 / 370,
-    lugar: { x: 0.765, base: 0.704, largura: 0.12, camada: 6 },
+    lugar: { x: 0.67, base: 0.668, largura: 0.07, camada: 6 },
     luz: null,
     missao: "tapete",
+  },
+
+  /* ── A cozinha ── A parede do fundo. */
+  {
+    id: "potes",
+    nome: "Prateleira de potes",
+    comodo: C,
+    categoria: "decoracao",
+    proporcao: 266 / 510,
+    lugar: { x: 0.235, base: 0.39, largura: 0.17, camada: 1 },
+    luz: null,
+  },
+  {
+    id: "planta-pendurada",
+    nome: "Planta pendurada",
+    comodo: C,
+    categoria: "plantas",
+    proporcao: 564 / 438,
+    lugar: { x: 0.235, base: 0.488, largura: 0.11, camada: 1 },
+    luz: null,
+  },
+  {
+    id: "relogio",
+    nome: "Relógio",
+    comodo: C,
+    categoria: "decoracao",
+    proporcao: 399 / 393,
+    /* Entre a cortina e a coifa. */
+    lugar: { x: 0.695, base: 0.398, largura: 0.065, camada: 1 },
+    luz: null,
+    missao: "bancada",
+  },
+  /* O peitoril da janela (a torneira fica no meio, livre). */
+  {
+    id: "hortela",
+    nome: "Hortelã",
+    comodo: C,
+    categoria: "plantas",
+    proporcao: 363 / 385,
+    lugar: { x: 0.4, base: 0.4725, largura: 0.042, camada: 2 },
+    luz: null,
+    lojinha: "planta-hortela",
+  },
+  {
+    id: "suculenta",
+    nome: "Suculenta",
+    comodo: C,
+    categoria: "plantas",
+    proporcao: 343 / 335,
+    lugar: { x: 0.445, base: 0.4725, largura: 0.04, camada: 2 },
+    luz: null,
+    lojinha: "planta-suculenta",
+  },
+  {
+    id: "cactinho",
+    nome: "Cactinho",
+    comodo: C,
+    categoria: "plantas",
+    proporcao: 429 / 267,
+    lugar: { x: 0.555, base: 0.4725, largura: 0.034, camada: 2 },
+    luz: null,
+    lojinha: "planta-cacto",
+  },
+  {
+    id: "trevo",
+    nome: "Trevo",
+    comodo: C,
+    categoria: "plantas",
+    proporcao: 468 / 366,
+    lugar: { x: 0.6, base: 0.4725, largura: 0.04, camada: 2 },
+    luz: null,
+    lojinha: "planta-trevo",
+  },
+  /* O chão. */
+  {
+    id: "tapete-xadrez",
+    nome: "Tapete xadrez",
+    comodo: C,
+    categoria: "tapetes",
+    proporcao: 237 / 516,
+    lugar: { x: 0.47, base: 0.685, largura: 0.5, camada: 2, achatar: 0.55 },
+    luz: null,
+    missao: "verde",
+  },
+  /* A bancada, da esquerda para a direita, e o fogão. */
+  {
+    id: "cafeteira",
+    nome: "Cafeteira",
+    comodo: C,
+    categoria: "utensilios",
+    proporcao: 428 / 348,
+    lugar: { x: 0.17, base: 0.508, largura: 0.08, camada: 3 },
+    luz: null,
+  },
+  {
+    id: "tulipas",
+    nome: "Tulipas",
+    comodo: C,
+    categoria: "plantas",
+    proporcao: 523 / 372,
+    lugar: { x: 0.27, base: 0.508, largura: 0.055, camada: 3 },
+    luz: null,
+    lojinha: "planta-tulipa",
+  },
+  {
+    id: "margaridas",
+    nome: "Vaso de margaridas",
+    comodo: C,
+    categoria: "decoracao",
+    proporcao: 480 / 403,
+    lugar: { x: 0.355, base: 0.508, largura: 0.07, camada: 3 },
+    luz: null,
+  },
+  {
+    id: "girassol",
+    nome: "Girassol",
+    comodo: C,
+    categoria: "plantas",
+    proporcao: 546 / 385,
+    lugar: { x: 0.625, base: 0.508, largura: 0.06, camada: 3 },
+    luz: null,
+    lojinha: "planta-girassol",
+  },
+  {
+    id: "colheres",
+    nome: "Pote de colheres",
+    comodo: C,
+    categoria: "utensilios",
+    proporcao: 466 / 327,
+    lugar: { x: 0.68, base: 0.508, largura: 0.05, camada: 3 },
+    luz: null,
+  },
+  {
+    id: "panela",
+    nome: "Panela",
+    comodo: C,
+    categoria: "utensilios",
+    proporcao: 350 / 467,
+    lugar: { x: 0.728, base: 0.513, largura: 0.055, camada: 3 },
+    luz: null,
+  },
+  {
+    id: "bule",
+    nome: "Bule de chá",
+    comodo: C,
+    categoria: "utensilios",
+    proporcao: 336 / 440,
+    lugar: { x: 0.778, base: 0.513, largura: 0.05, camada: 3 },
+    luz: null,
+    lojinha: "objeto-chaleira",
+  },
+  {
+    id: "planta-grande",
+    nome: "Planta grande",
+    comodo: C,
+    categoria: "plantas",
+    proporcao: 575 / 483,
+    lugar: { x: 0.18, base: 0.665, largura: 0.15, camada: 5 },
+    luz: null,
   },
 ];
 
@@ -273,13 +516,28 @@ export const ITEM_POR_ID: Readonly<Record<IdDoItem, ItemDoQuarto>> = Object.from
   ITENS.map((i) => [i.id, i]),
 ) as Record<IdDoItem, ItemDoQuarto>;
 
-export const CATEGORIAS: readonly { id: Categoria; nome: string; icone: IdDoItem }[] = [
-  { id: "moveis", nome: "Móveis", icone: "poltrona" },
-  { id: "decoracao", nome: "Decoração", icone: "quadro-urso" },
-  { id: "brinquedos", nome: "Brinquedos", icone: "ursinho" },
-  { id: "tapetes", nome: "Tapetes", icone: "tapete" },
-  { id: "plantas", nome: "Plantas", icone: "planta" },
-];
+/** As abas da bandeja de cada cômodo (o ícone é um item dele). */
+export const CATEGORIAS: Readonly<
+  Record<Comodo, readonly { id: Categoria; nome: string; icone: IdDoItem }[]>
+> = {
+  quarto: [
+    { id: "moveis", nome: "Móveis", icone: "poltrona" },
+    { id: "decoracao", nome: "Decoração", icone: "quadro-urso" },
+    { id: "brinquedos", nome: "Brinquedos", icone: "ursinho" },
+    { id: "tapetes", nome: "Tapetes", icone: "tapete" },
+    { id: "plantas", nome: "Plantas", icone: "planta" },
+  ],
+  cozinha: [
+    { id: "utensilios", nome: "Utensílios", icone: "cafeteira" },
+    { id: "decoracao", nome: "Decoração", icone: "margaridas" },
+    { id: "plantas", nome: "Plantas", icone: "hortela" },
+    { id: "tapetes", nome: "Tapetes", icone: "tapete-xadrez" },
+  ],
+};
+
+/** Os itens de um cômodo, na ordem do catálogo. */
+export const itensDoComodo = (c: Comodo): readonly ItemDoQuarto[] =>
+  ITENS.filter((i) => i.comodo === c);
 
 /**
  * As missões, uma por dia e na ordem (a ideia que o dono trouxe: "escolha o
@@ -298,6 +556,13 @@ export const MISSOES: readonly Missao[] = [
   { id: "leitura", texto: "Monte o cantinho de leitura", precisa: [["poltrona"], ["luminaria"]] },
   { id: "tapete", texto: "Escolha o tapete", precisa: [["tapete"]] },
   { id: "mobile", texto: "Pendure o móbile no berço", precisa: [["berco"], ["mobile"]] },
+  /* As da cozinha vêm depois das do quarto (25/11/2026). */
+  { id: "bancada", texto: "Arrume a bancada da cozinha", precisa: [["margaridas"], ["colheres"]] },
+  {
+    id: "verde",
+    texto: "Ponha uma planta na cozinha",
+    precisa: [["planta-grande", "planta-pendurada"]],
+  },
 ];
 
 /** Os presentes de saída: o quarto já abre com eles à mão. */
@@ -561,22 +826,43 @@ export const APOIO: Readonly<Record<IdDoItem, Apoio>> = {
   tapete: "tapete",
   mobile: "movel",
   coelhinho: "movel",
+  /* A cozinha: o que fica na bancada, no peitoril e no fogão está "no móvel". */
+  "planta-grande": "chao",
+  potes: "parede",
+  "planta-pendurada": "parede",
+  relogio: "parede",
+  "tapete-xadrez": "tapete",
+  hortela: "movel",
+  suculenta: "movel",
+  cactinho: "movel",
+  trevo: "movel",
+  cafeteira: "movel",
+  tulipas: "movel",
+  margaridas: "movel",
+  girassol: "movel",
+  colheres: "movel",
+  panela: "movel",
+  bule: "movel",
 };
 
 /**
  * "Decorar aleatoriamente" (o botão do dado, dos mockups): sorteia entre o
  * que ela PODE pôr (`livres`), sempre com pelo menos três itens, e o móbile
- * só entra com o berço. `sorteio` devolve um número em [0, 1).
+ * só entra com o berço. `sorteio` devolve um número em [0, 1). Só mexe no
+ * cômodo que está na tela: o outro fica como ela deixou.
  */
 export function decorarAoAcaso(
   q: Quartinho,
   livres: readonly IdDoItem[],
   sorteio: () => number,
+  comodo: Comodo = "quarto",
 ): Quartinho {
-  let postos = livres.filter(() => sorteio() < 0.7);
-  if (postos.length < Math.min(3, livres.length)) postos = [...livres];
-  if (!postos.includes("berco")) postos = postos.filter((p) => p !== "mobile");
-  return { ...q, postos };
+  const daqui = livres.filter((id) => ITEM_POR_ID[id].comodo === comodo);
+  let escolhidos = daqui.filter(() => sorteio() < 0.7);
+  if (escolhidos.length < Math.min(3, daqui.length)) escolhidos = [...daqui];
+  if (!escolhidos.includes("berco")) escolhidos = escolhidos.filter((p) => p !== "mobile");
+  const doOutro = q.postos.filter((id) => ITEM_POR_ID[id].comodo !== comodo);
+  return { ...q, postos: [...doOutro, ...escolhidos] };
 }
 
 /** Os itens na ordem de desenho: a parede atrás, os brinquedos na frente. */

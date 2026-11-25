@@ -61,6 +61,7 @@ import {
   APOIO,
   CATEGORIAS,
   CHAVE_DO_QUARTINHO,
+  COMODOS,
   contaDaCompra,
   cumprirSePronta,
   decorarAoAcaso,
@@ -70,7 +71,7 @@ import {
   faltaOBerco,
   guardarMemoria,
   ITEM_POR_ID,
-  ITENS,
+  itensDoComodo,
   lerQuartinho,
   missaoDoDia,
   MISSOES,
@@ -80,6 +81,7 @@ import {
   situacaoDoItem,
   vendeAlgumDia,
   type Categoria,
+  type Comodo,
   type IdDaMissao,
   type IdDoItem,
   type ItemDoQuarto,
@@ -154,6 +156,23 @@ const ARTE: Record<IdDoItem, number> = {
   cesto: require("../../assets/quartinho/cesto.webp"),
   tapete: require("../../assets/quartinho/tapete.webp"),
   planta: require("../../assets/quartinho/planta.webp"),
+  /* A cozinha (25/11/2026): a cartela da cozinha, no estilo da referência dela. */
+  potes: require("../../assets/quartinho/potes.webp"),
+  "planta-pendurada": require("../../assets/quartinho/planta-pendurada.webp"),
+  relogio: require("../../assets/quartinho/relogio.webp"),
+  hortela: require("../../assets/quartinho/hortela.webp"),
+  suculenta: require("../../assets/quartinho/suculenta.webp"),
+  cactinho: require("../../assets/quartinho/cactinho.webp"),
+  trevo: require("../../assets/quartinho/trevo.webp"),
+  "tapete-xadrez": require("../../assets/quartinho/tapete-xadrez.webp"),
+  cafeteira: require("../../assets/quartinho/cafeteira.webp"),
+  tulipas: require("../../assets/quartinho/tulipas.webp"),
+  margaridas: require("../../assets/quartinho/margaridas.webp"),
+  girassol: require("../../assets/quartinho/girassol.webp"),
+  colheres: require("../../assets/quartinho/colheres.webp"),
+  panela: require("../../assets/quartinho/panela.webp"),
+  bule: require("../../assets/quartinho/bule.webp"),
+  "planta-grande": require("../../assets/quartinho/planta-grande.webp"),
 };
 /**
  * O AR DO QUARTO (24/11/2026, da lojinha da trilha, "No ar"): desenhado por
@@ -173,16 +192,26 @@ type Aba = Categoria | "ar";
 /** O que ela está comprando: um item do quarto ou um ar. */
 type ACompra = { tipo: "item"; id: IdDoItem } | { tipo: "ar"; id: IdDoAr };
 
-const QUARTO_DIA = require("../../assets/quartinho/quarto-dia.webp");
-const QUARTO_NOITE = require("../../assets/quartinho/quarto-noite.webp");
-/** O brilho das estrelinhas da parede (as mesmas da arte), para elas piscarem. */
+/** As pinturas dos cômodos (25/11/2026: de frente, a mesma câmera nas duas). */
+const PINTURA: Record<Comodo, { dia: number; noite: number }> = {
+  quarto: {
+    dia: require("../../assets/quartinho/quarto-dia.webp"),
+    noite: require("../../assets/quartinho/quarto-noite.webp"),
+  },
+  cozinha: {
+    dia: require("../../assets/quartinho/cozinha-dia.webp"),
+    noite: require("../../assets/quartinho/cozinha-noite.webp"),
+  },
+};
+/** O brilho das estrelinhas da parede do quarto (tiradas da pintura da noite), para piscarem. */
 const ESTRELAS_DA_NOITE = require("../../assets/quartinho/estrelas-noite.webp");
-/** A arte do quarto tem 1536 × 2752. */
+/** As pinturas têm 1536 × 2752. */
 const PROPORCAO_DO_QUARTO = 2752 / 1536;
-/** O chão que aparece embaixo da arte, se a tela for mais alta que ela: a cor
-    da última faixa da pintura JÁ com a luz por cima (medida no simulador em
-    24/11/2026). Com a bandeja escondida, outra cor virava uma faixa lisa. */
-const CHAO = { dia: "#cc8655", noite: "#291928" } as const;
+/** O fundo por trás da pintura enquanto ela carrega: a cor da última faixa dela. */
+const CHAO: Record<Comodo, { dia: string; noite: string }> = {
+  quarto: { dia: "#f3a55f", noite: "#4a3631" },
+  cozinha: { dia: "#e49e66", noite: "#463030" },
+};
 
 const ROXO = corJornada.roxo;
 /** A tinta sobre o vidro lilás (11:1 sobre ele). */
@@ -194,6 +223,8 @@ const SOMBRA_DA_NOITE = "#1c1466";
 const FALAS_AO_POR = ["Ficou lindo!", "Que fofura!", "Combinou demais!", "Amei esse cantinho!"];
 
 const hojeDaTela = () => ymdLocal();
+const comodoDaBancada = (): Comodo =>
+  parametroDaBancada("comodo") === "cozinha" ? "cozinha" : "quarto";
 
 function horaDaTela(): number {
   const h = Number(parametroDaBancada("hora"));
@@ -227,7 +258,7 @@ export default function TelaDoQuartinho() {
 
 function Quartinho() {
   const area = useSafeAreaInsets();
-  const { width: L } = useWindowDimensions();
+  const { width: L, height: H } = useWindowDimensions();
   /* Abre a jornada dela (o quarto mora no blob da jornada), como toda tela
      da Jornada: aberta direto, sem passar pela aba, ela também carrega. */
   const { dia, loja } = useJornada();
@@ -235,9 +266,12 @@ function Quartinho() {
   const noite = ehNoiteNoQuarto(horaDaTela());
 
   const [quarto, setQuarto] = useState<Quartinho | null>(null);
+  /* O cômodo na tela: o quarto, ou a cozinha à direita dele (na bancada, `&comodo=cozinha`). */
+  const [comodo, setComodo] = useState<Comodo>(comodoDaBancada);
   const [categoria, setCategoria] = useState<Aba>(() =>
-    parametroDaBancada("aba") === "ar" ? "ar" : "moveis",
+    parametroDaBancada("aba") === "ar" ? "ar" : CATEGORIAS[comodoDaBancada()][0]!.id,
   );
+  const paginas = useRef<ScrollView>(null);
   const [cantinho, setCantinho] = useState<CantinhoOk | null | "lendo">("lendo");
   /* A loja por fase do banco: `undefined` lendo, `null` sem a tabela. */
   const [porFase, setPorFase] = useState<ReadonlyMap<string, ItemPorFase> | null | undefined>();
@@ -250,7 +284,11 @@ function Quartinho() {
   });
   const [comprando, setComprando] = useState(false);
   const [fala, setFala] = useState(
-    noite ? "Boa noite! Que quartinho gostoso." : "Seu quarto, do seu jeito!",
+    comodoDaBancada() === "cozinha"
+      ? "Bem-vinda à cozinha!"
+      : noite
+        ? "Boa noite! Que quartinho gostoso."
+        : "Seu quarto, do seu jeito!",
   );
   const [pose, setPose] = useState<HumorDaArte>(noite ? "dormindo" : "feliz");
   const [novo, setNovo] = useState<IdDoItem | null>(null);
@@ -507,16 +545,70 @@ function Quartinho() {
 
   const aoAcaso = useCallback(() => {
     if (!quarto) return;
-    const livres = ITENS.filter((i) => situacaoDoItem(i, quarto, vitrine).tipo === "livre").map(
-      (i) => i.id,
-    );
-    const m = mudar(decorarAoAcaso(quarto, livres, Math.random), quarto);
+    /* Só o cômodo que está na tela: o outro fica como ela deixou. */
+    const livres = itensDoComodo(comodo)
+      .filter((i) => situacaoDoItem(i, quarto, vitrine).tipo === "livre")
+      .map((i) => i.id);
+    const m = mudar(decorarAoAcaso(quarto, livres, Math.random, comodo), quarto);
     setNovo(null);
     if (!m) {
       setPose(noite ? "dormindo" : "apaixonado");
       setFala("Arrumei do meu jeito. Gostou?");
     }
-  }, [quarto, vitrine, mudar, noite]);
+  }, [quarto, vitrine, mudar, noite, comodo]);
+
+  /**
+   * OS CÔMODOS (25/11/2026): arrastar para o lado leva à cozinha, e o
+   * seletor de baixo leva também. Ao chegar, a bandeja mostra as abas do
+   * cômodo e a Bolha diz onde ela está.
+   */
+  const chegarEm = useCallback(
+    (c: Comodo) => {
+      if (c === comodo) return;
+      selecao();
+      setComodo(c);
+      setCategoria((a) => (a === "ar" ? a : CATEGORIAS[c][0]!.id));
+      setNovo(null);
+      setPose(noite ? "dormindo" : "feliz");
+      const vazia = !quarto?.postos.some((id) => ITEM_POR_ID[id].comodo === c);
+      setFala(
+        c === "cozinha"
+          ? vazia
+            ? "A cozinha! Escolha o que pôr na bancada."
+            : "Bem-vinda à cozinha!"
+          : "De volta ao quarto.",
+      );
+    },
+    [comodo, noite, quarto],
+  );
+  const irPara = useCallback(
+    (c: Comodo) => {
+      const i = COMODOS.findIndex((x) => x.id === c);
+      paginas.current?.scrollTo({ x: i * L, y: 0, animated: !reduzido });
+      chegarEm(c);
+    },
+    [L, reduzido, chegarEm],
+  );
+  /* Os postos de cada cômodo, estáveis (a Cena é `memo`). */
+  const postosDe = useMemo(() => {
+    const p = quarto?.postos ?? [];
+    return {
+      quarto: p.filter((id) => ITEM_POR_ID[id].comodo === "quarto"),
+      cozinha: p.filter((id) => ITEM_POR_ID[id].comodo === "cozinha"),
+    } satisfies Record<Comodo, IdDoItem[]>;
+  }, [quarto?.postos]);
+  /**
+   * A PINTURA COBRE A TELA (25/11/2026, o dono: "deixar a imagem mais
+   * centralizada [...] tá tampando um pouco o que tem em cima"): a altura da
+   * pintura é a da tela, e as laterais sobram (num iPhone comprido, 8,8% de
+   * cada lado). Assim a parede do fundo fica no meio, entre o alto e a
+   * bandeja, e não há chão liso embaixo. Os itens vivem nas mesmas frações.
+   */
+  const pintura = useMemo(() => {
+    const largura = Math.max(L, H / PROPORCAO_DO_QUARTO);
+    const altura = largura * PROPORCAO_DO_QUARTO;
+    return { largura, altura, left: (L - largura) / 2, top: (H - altura) / 2 };
+  }, [L, H]);
 
   /* O QUARTO LIMPO (o dono, 24/11/2026: "esconder os elementos de baixo [...]
      deixando a imagem mais clean se a pessoa quiser ver"): o olhinho esconde a
@@ -543,35 +635,72 @@ function Quartinho() {
     [],
   );
 
-  const alturaDoQuarto = L * PROPORCAO_DO_QUARTO;
-
   return (
-    <View style={{ flex: 1, backgroundColor: noite ? CHAO.noite : CHAO.dia }}>
+    <View style={{ flex: 1, backgroundColor: CHAO[comodo][noite ? "noite" : "dia"] }}>
       <StatusBar style={noite ? "light" : "dark"} animated />
-      {/* O QUARTO: a arte, na largura da tela, e os itens nos lugares dela. */}
-      <View style={{ position: "absolute", left: 0, top: 0, width: L, height: alturaDoQuarto }}>
-        <Image
-          source={noite ? QUARTO_NOITE : QUARTO_DIA}
-          /* A pintura chega do tamanho da tela (1320 de largura): sem a
-             redução que o expo-image faria no fio principal, no meio da
-             entrada da tela (24/11/2026). */
-          allowDownscaling={false}
-          style={StyleSheet.absoluteFill}
-          contentFit="fill"
-          accessible
-          accessibilityLabel={noite ? "O quartinho do bebê, à noite" : "O quartinho do bebê"}
-        />
-        <Cena
-          postos={quarto?.postos ?? []}
-          novo={novo}
-          noite={noite}
-          largura={L}
-          altura={alturaDoQuarto}
-          aoTocar={aoTocarNoQuarto}
-          acesa={acesa}
-          ar={quarto?.ar ?? null}
-        />
-      </View>
+      {/* OS CÔMODOS, lado a lado: arrastar para a esquerda leva do quarto à
+          cozinha (como toda página do iPhone). Cada um é a pintura cobrindo a
+          tela e os itens nos lugares dela. */}
+      <ScrollView
+        ref={paginas}
+        horizontal
+        pagingEnabled
+        bounces={false}
+        showsHorizontalScrollIndicator={false}
+        contentOffset={{ x: COMODOS.findIndex((c) => c.id === comodoDaBancada()) * L, y: 0 }}
+        onMomentumScrollEnd={(e) => {
+          const i = Math.round(e.nativeEvent.contentOffset.x / L);
+          const c = COMODOS[Math.max(0, Math.min(COMODOS.length - 1, i))]!.id;
+          chegarEm(c);
+        }}
+        style={StyleSheet.absoluteFill}
+      >
+        {COMODOS.map((c) => (
+          <View key={c.id} style={{ width: L, height: H, overflow: "hidden" }}>
+            <View
+              style={{
+                position: "absolute",
+                left: pintura.left,
+                top: pintura.top,
+                width: pintura.largura,
+                height: pintura.altura,
+              }}
+            >
+              <Image
+                source={PINTURA[c.id][noite ? "noite" : "dia"]}
+                /* A pintura chega do tamanho dela (1536 × 2752, quase o da
+                   tela): sem a redução que o expo-image faria no fio
+                   principal, no meio da entrada da tela (24/11/2026). */
+                allowDownscaling={false}
+                style={StyleSheet.absoluteFill}
+                contentFit="fill"
+                accessible
+                accessibilityLabel={
+                  c.id === "cozinha"
+                    ? noite
+                      ? "A cozinha, à noite"
+                      : "A cozinha"
+                    : noite
+                      ? "O quartinho do bebê, à noite"
+                      : "O quartinho do bebê"
+                }
+              />
+              <Cena
+                comodo={c.id}
+                postos={postosDe[c.id]}
+                novo={novo}
+                noite={noite}
+                largura={pintura.largura}
+                altura={pintura.altura}
+                aoTocar={aoTocarNoQuarto}
+                acesa={acesa}
+                viva={acesa && c.id === comodo}
+                ar={quarto?.ar ?? null}
+              />
+            </View>
+          </View>
+        ))}
+      </ScrollView>
 
       {/* O alto: voltar, a Bolha falando, o saldo e a missão de hoje. */}
       <View
@@ -660,7 +789,15 @@ function Quartinho() {
               <EyeOff size={22} color={TINTA} strokeWidth={2.4} />
             )}
           </BotaoRedondo>
-          <View style={{ flex: 1 }} />
+          {/* ⚠️ Os mockups não têm este seletor: sem ele, ninguém descobre que
+              a cozinha existe (arrastar não se vê). É o quarto e a cozinha, e
+              tocar leva até lá, como arrastar. */}
+          <Animated.View
+            pointerEvents={limpo ? "none" : "box-none"}
+            style={{ flex: 1, alignItems: "center", opacity: aparecer }}
+          >
+            <SeletorDeComodo ativo={comodo} aoEscolher={irPara} />
+          </Animated.View>
           <Animated.View
             pointerEvents={limpo ? "none" : "box-none"}
             style={{ flexDirection: "row", gap: espaco.sm, opacity: aparecer }}
@@ -681,9 +818,10 @@ function Quartinho() {
           style={{ opacity: aparecer }}
         >
           <VidroLilas raio={30} estilo={{ paddingVertical: espaco.sm }}>
-            <Abas ativa={categoria} aoEscolher={setCategoria} />
+            <Abas comodo={comodo} ativa={categoria} aoEscolher={setCategoria} />
             {quarto ? (
               <Bandeja
+                comodo={comodo}
                 categoria={categoria}
                 quarto={quarto}
                 vitrine={vitrine}
@@ -1031,7 +1169,92 @@ function FolhaDeCompra({
 
 /* ── O quarto: os itens, as sombras e a luz ───────────────────────────── */
 
+/**
+ * A LUZ DE CADA CÔMODO, em frações da pintura dele (medidas nas pinturas de
+ * 25/11/2026). `janela` é a diagonal do vidro e `mancha` a vidraça no chão: o
+ * feixe vai de uma à outra (só no quarto, onde a janela fica de lado; na
+ * cozinha a janela é de frente, e a luz já está pintada na pia e no chão).
+ */
+type Ponto = readonly [number, number, number, number];
+type LuzDoComodo = {
+  janela: readonly (readonly [number, number])[] | null;
+  mancha: readonly (readonly [number, number])[] | null;
+  /** O clarão no vidro da janela. */
+  vidro: readonly [number, number, number];
+  /** A poça de luz no chão (o sol, de dia; o luar, de noite). */
+  poca: readonly [number, number, number];
+  /** Uma luz da noite que é da pintura (a luzinha da coifa), ou nenhuma. */
+  daNoite: { cx: number; cy: number; raio: number; tom: string; forca: number } | null;
+  cintilasDoDia: readonly Ponto[];
+  cintilasDaNoite: readonly Ponto[];
+};
+const LUZ: Record<Comodo, LuzDoComodo> = {
+  quarto: {
+    janela: [
+      [0.19, 0.3],
+      [0.105, 0.445],
+    ],
+    mancha: [
+      [0.16, 0.69],
+      [0.55, 0.6],
+    ],
+    vidro: [0.15, 0.37, 0.3],
+    poca: [0.35, 0.645, 0.36],
+    daNoite: null,
+    /* De dia, a poeira dourada na faixa do sol; de noite, os vaga-lumes. */
+    cintilasDoDia: [
+      [0.2, 0.36, 4, 0],
+      [0.26, 0.42, 3, 900],
+      [0.31, 0.5, 5, 1700],
+      [0.24, 0.53, 3, 2600],
+      [0.38, 0.56, 4, 400],
+      [0.42, 0.47, 3, 3100],
+      [0.18, 0.46, 3, 2100],
+      [0.33, 0.4, 3, 1300],
+    ],
+    cintilasDaNoite: [
+      [0.16, 0.5, 4, 0],
+      [0.36, 0.33, 3, 1200],
+      [0.62, 0.45, 4, 2300],
+      [0.8, 0.32, 3, 700],
+      [0.88, 0.52, 4, 3000],
+      [0.5, 0.62, 3, 1800],
+      [0.27, 0.6, 3, 2700],
+      [0.72, 0.62, 4, 400],
+    ],
+  },
+  cozinha: {
+    janela: null,
+    mancha: null,
+    vidro: [0.5, 0.41, 0.28],
+    poca: [0.42, 0.64, 0.34],
+    /* A luzinha da coifa, que a pintura da noite acende. */
+    daNoite: { cx: 0.79, cy: 0.45, raio: 0.2, tom: "#ffb45e", forca: 0.3 },
+    cintilasDoDia: [
+      [0.42, 0.38, 4, 0],
+      [0.5, 0.43, 3, 900],
+      [0.58, 0.4, 4, 1700],
+      [0.46, 0.5, 3, 2600],
+      [0.55, 0.56, 4, 400],
+      [0.4, 0.58, 3, 3100],
+      [0.62, 0.47, 3, 2100],
+      [0.36, 0.44, 3, 1300],
+    ],
+    cintilasDaNoite: [
+      [0.2, 0.42, 4, 0],
+      [0.35, 0.33, 3, 1200],
+      [0.6, 0.36, 4, 2300],
+      [0.3, 0.6, 3, 700],
+      [0.86, 0.56, 4, 3000],
+      [0.5, 0.62, 3, 1800],
+      [0.68, 0.58, 3, 2700],
+      [0.16, 0.56, 4, 400],
+    ],
+  },
+};
+
 const Cena = memo(function Cena({
+  comodo,
   postos,
   novo,
   noite,
@@ -1039,24 +1262,31 @@ const Cena = memo(function Cena({
   altura: A,
   aoTocar,
   acesa,
+  viva,
   ar,
 }: {
+  comodo: Comodo;
+  /** O que está NESTE cômodo. */
   postos: readonly IdDoItem[];
   novo: IdDoItem | null;
   noite: boolean;
   largura: number;
   altura: number;
   aoTocar: (id: IdDoItem) => void;
-  /** A tela já entrou: as luzes e as cintilas podem acender. */
+  /** A tela já entrou: as luzes podem acender. */
   acesa: boolean;
+  /** É o cômodo na tela: o que se mexe (as cintilas, as estrelinhas, o ar) só nele. */
+  viva: boolean;
   /** O ar do quarto ligado (as pétalas, as bolhinhas), ou nenhum. */
   ar: IdDoAr | null;
 }) {
   const itens = emOrdemDeDesenho(postos);
+  const luz = LUZ[comodo];
+  const feixe = luz.janela && luz.mancha ? { janela: luz.janela, chao: luz.mancha } : null;
   return (
     <>
-      {/* As estrelinhas da parede piscam (por baixo dos itens: estão na parede). */}
-      {noite && acesa ? <EstrelasQuePiscam /> : null}
+      {/* As estrelinhas da parede do quarto piscam (por baixo dos itens: estão na parede). */}
+      {noite && viva && comodo === "quarto" ? <EstrelasQuePiscam /> : null}
 
       {/* As sombras de contato: é o que põe cada coisa NO chão. */}
       {itens
@@ -1081,23 +1311,34 @@ const Cena = memo(function Cena({
         <>
           {/* O LUAR passa por cima dos itens: a faixa fria que vem da janela
               e a poça de luz onde a vidraça cai no chão. */}
-          <Feixe
-            id="luar"
-            largura={L}
-            altura={A}
-            janela={JANELA}
-            chao={MANCHA_NO_CHAO}
-            tom="#b9c8ff"
-            forca={0.075}
-          />
+          {feixe ? (
+            <Feixe
+              id={`luar-${comodo}`}
+              largura={L}
+              altura={A}
+              janela={feixe.janela}
+              chao={feixe.chao}
+              tom="#b9c8ff"
+              forca={0.075}
+            />
+          ) : null}
           <Brilho
-            cx={0.46 * L}
-            cy={0.59 * A}
-            raio={0.4 * L}
+            cx={luz.poca[0] * L}
+            cy={luz.poca[1] * A}
+            raio={luz.poca[2] * L}
             achatar={0.4}
             tom="#b4c4ff"
             forca={0.3}
           />
+          {luz.daNoite ? (
+            <Brilho
+              cx={luz.daNoite.cx * L}
+              cy={luz.daNoite.cy * A}
+              raio={luz.daNoite.raio * L}
+              tom={luz.daNoite.tom}
+              forca={luz.daNoite.forca}
+            />
+          ) : null}
           {/* A LUZ DOS ITENS: cada um acende pelo que a ficha dele diz
               (`luz`, na `REGUA_DA_LUZ`): o abajur ilumina o quarto, o móbile
               que brilha no escuro só acende de leve. */}
@@ -1105,39 +1346,53 @@ const Cena = memo(function Cena({
             item.luz ? <LuzDoItem key={item.id} item={item} largura={L} altura={A} /> : null,
           )}
           <Cantos largura={L} altura={A} tom="#070824" forca={0.5} />
-          <Cintilas noite largura={L} altura={A} />
+          {viva ? <Cintilas pontos={luz.cintilasDaNoite} noite largura={L} altura={A} /> : null}
         </>
       ) : (
         <>
           {/* O SOL: o clarão na janela, a faixa quente que entra e a poeira
               dourada no ar. */}
-          <Brilho cx={0.15 * L} cy={0.245 * A} raio={0.36 * L} tom="#fff3cf" forca={0.6} />
-          {/* O dourado da manhã, que toma o quarto inteiro a partir da janela. */}
-          <Brilho cx={0.3 * L} cy={0.36 * A} raio={0.95 * L} tom="#ffc98a" forca={0.22} />
-          <Feixe
-            id="sol"
-            largura={L}
-            altura={A}
-            janela={JANELA}
-            chao={MANCHA_NO_CHAO}
-            tom="#ffe6ad"
-            forca={0.07}
-          />
           <Brilho
-            cx={0.46 * L}
-            cy={0.59 * A}
-            raio={0.4 * L}
+            cx={luz.vidro[0] * L}
+            cy={luz.vidro[1] * A}
+            raio={luz.vidro[2] * L}
+            tom="#fff3cf"
+            forca={0.6}
+          />
+          {/* O dourado da manhã, que toma o cômodo inteiro a partir da janela. */}
+          <Brilho
+            cx={(luz.vidro[0] + 0.15) * L}
+            cy={(luz.vidro[1] + 0.08) * A}
+            raio={0.95 * L}
+            tom="#ffc98a"
+            forca={0.22}
+          />
+          {feixe ? (
+            <Feixe
+              id={`sol-${comodo}`}
+              largura={L}
+              altura={A}
+              janela={feixe.janela}
+              chao={feixe.chao}
+              tom="#ffe6ad"
+              forca={0.07}
+            />
+          ) : null}
+          <Brilho
+            cx={luz.poca[0] * L}
+            cy={luz.poca[1] * A}
+            raio={luz.poca[2] * L}
             achatar={0.4}
             tom="#ffd99a"
             forca={0.26}
           />
           <Cantos largura={L} altura={A} tom="#5a2a14" forca={0.2} />
-          <Cintilas largura={L} altura={A} />
+          {viva ? <Cintilas pontos={luz.cintilasDoDia} largura={L} altura={A} /> : null}
         </>
       )}
 
-      {/* O AR DO QUARTO, por cima de tudo (está no ar, entre ela e o quarto). */}
-      {acesa && ar ? <ArDoQuarto ar={ar} largura={L} altura={A} noite={noite} /> : null}
+      {/* O AR DO QUARTO, por cima de tudo (está no ar, entre ela e o cômodo). */}
+      {viva && ar ? <ArDoQuarto ar={ar} largura={L} altura={A} noite={noite} /> : null}
     </>
   );
 });
@@ -1343,16 +1598,6 @@ function Particula({
   );
 }
 
-/** A diagonal do vidro da janela e a mancha da vidraça no chão, em frações da arte. */
-const JANELA = [
-  [0.27, 0.15],
-  [0.1, 0.33],
-] as const;
-const MANCHA_NO_CHAO = [
-  [0.2, 0.64],
-  [0.74, 0.55],
-] as const;
-
 function caixaDoItem(item: ItemDoQuarto, L: number, A: number) {
   const { x, base, largura, achatar } = item.lugar;
   const w = largura * L;
@@ -1462,7 +1707,7 @@ function ItemNoQuarto({
       />
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${item.nome}, no quarto`}
+        accessibilityLabel={`${item.nome}, ${item.comodo === "cozinha" ? "na cozinha" : "no quarto"}`}
         accessibilityHint="Mostra na bandeja, para trocar ou tirar"
         onPress={() => aoTocar(item.id)}
         style={{ flex: 1 }}
@@ -1694,35 +1939,14 @@ function EstrelasQuePiscam() {
   );
 }
 
-/* [x, y, tamanho, atraso em ms]: de dia, a poeira dourada na faixa do sol; de
-   noite, os vaga-lumes pelo quarto. */
-type Ponto = readonly [number, number, number, number];
-const CINTILAS_DO_DIA: readonly Ponto[] = [
-  [0.24, 0.27, 4, 0],
-  [0.33, 0.34, 3, 900],
-  [0.41, 0.42, 5, 1700],
-  [0.3, 0.46, 3, 2600],
-  [0.5, 0.5, 4, 400],
-  [0.57, 0.38, 3, 3100],
-  [0.2, 0.37, 3, 2100],
-  [0.46, 0.31, 3, 1300],
-];
-const CINTILAS_DA_NOITE: readonly Ponto[] = [
-  [0.14, 0.44, 4, 0],
-  [0.36, 0.3, 3, 1200],
-  [0.62, 0.47, 4, 2300],
-  [0.82, 0.3, 3, 700],
-  [0.9, 0.5, 4, 3000],
-  [0.5, 0.62, 3, 1800],
-  [0.27, 0.58, 3, 2700],
-  [0.72, 0.6, 4, 400],
-];
-
+/* [x, y, tamanho, atraso em ms] de cada cintila: `LUZ` (no alto do arquivo) diz onde. */
 function Cintilas({
+  pontos,
   noite,
   largura,
   altura,
 }: {
+  pontos: readonly Ponto[];
   noite?: boolean;
   largura: number;
   altura: number;
@@ -1731,7 +1955,7 @@ function Cintilas({
   if (reduzido) return null;
   return (
     <>
-      {(noite ? CINTILAS_DA_NOITE : CINTILAS_DO_DIA).map(([x, y, t, atraso], i) => (
+      {pontos.map(([x, y, t, atraso], i) => (
         <Cintila
           key={i}
           x={x * largura}
@@ -2007,19 +2231,75 @@ function CartaoDaMissao({
 
 /* ── A bandeja ────────────────────────────────────────────────────────── */
 
-const ABAS: readonly { id: Aba; nome: string; arte: number }[] = [
-  ...CATEGORIAS.map((c) => ({ id: c.id, nome: c.nome, arte: ARTE[c.icone] })),
-  { id: "ar", nome: "No ar", arte: ARTE_DO_AR.bolhas },
-];
+/** As abas de cada cômodo: as categorias dele e o ar (que é do quartinho inteiro). */
+const ABAS: Record<Comodo, readonly { id: Aba; nome: string; arte: number }[]> = {
+  quarto: [
+    ...CATEGORIAS.quarto.map((c) => ({ id: c.id, nome: c.nome, arte: ARTE[c.icone] })),
+    { id: "ar", nome: "No ar", arte: ARTE_DO_AR.bolhas },
+  ],
+  cozinha: [
+    ...CATEGORIAS.cozinha.map((c) => ({ id: c.id, nome: c.nome, arte: ARTE[c.icone] })),
+    { id: "ar", nome: "No ar", arte: ARTE_DO_AR.bolhas },
+  ],
+};
 
-function Abas({ ativa, aoEscolher }: { ativa: Aba; aoEscolher: (c: Aba) => void }) {
+/** O quarto e a cozinha: o cômodo na tela, e tocar no outro leva até ele. */
+function SeletorDeComodo({
+  ativo,
+  aoEscolher,
+}: {
+  ativo: Comodo;
+  aoEscolher: (c: Comodo) => void;
+}) {
+  return (
+    <VidroLilas estilo={{ flexDirection: "row", padding: 4, gap: 2 }}>
+      {COMODOS.map((c) => {
+        const sim = c.id === ativo;
+        return (
+          <Pressable
+            key={c.id}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: sim }}
+            accessibilityLabel={c.nome}
+            accessibilityHint={sim ? undefined : "Vai para este cômodo; dá para arrastar também"}
+            onPress={() => aoEscolher(c.id)}
+            style={{ minHeight: ALVO_MINIMO, justifyContent: "center" }}
+          >
+            <View
+              style={{
+                paddingHorizontal: 12,
+                paddingVertical: 7,
+                borderRadius: 999,
+                backgroundColor: sim ? ROXO : "transparent",
+              }}
+            >
+              <Text style={{ ...fonte.forte, fontSize: 13, color: sim ? cor.branco : TINTA }}>
+                {c.nome}
+              </Text>
+            </View>
+          </Pressable>
+        );
+      })}
+    </VidroLilas>
+  );
+}
+
+function Abas({
+  comodo,
+  ativa,
+  aoEscolher,
+}: {
+  comodo: Comodo;
+  ativa: Aba;
+  aoEscolher: (c: Aba) => void;
+}) {
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={{ gap: 6, paddingHorizontal: espaco.sm, paddingVertical: 4 }}
     >
-      {ABAS.map((c) => {
+      {ABAS[comodo].map((c) => {
         const sim = c.id === ativa;
         return (
           <Pressable
@@ -2067,6 +2347,7 @@ function Abas({ ativa, aoEscolher }: { ativa: Aba; aoEscolher: (c: Aba) => void 
 }
 
 function Bandeja({
+  comodo,
   categoria,
   quarto,
   vitrine,
@@ -2074,6 +2355,7 @@ function Bandeja({
   aoTocar,
   aoTocarNoAr,
 }: {
+  comodo: Comodo;
   categoria: Aba;
   quarto: Quartinho;
   vitrine: VitrineDoQuarto;
@@ -2113,7 +2395,7 @@ function Bandeja({
         })}
       </ScrollView>
     );
-  const itens = ITENS.filter((i) => i.categoria === categoria);
+  const itens = itensDoComodo(comodo).filter((i) => i.categoria === categoria);
   return (
     <ScrollView
       horizontal
@@ -2129,7 +2411,7 @@ function Bandeja({
             nome={item.nome}
             arte={ARTE[item.id]}
             daLojinha={!!item.lojinha}
-            noLugar="No quarto"
+            noLugar={comodo === "cozinha" ? "Na cozinha" : "No quarto"}
             situacao={lendo && item.lojinha ? null : s}
             posto={quarto.postos.includes(item.id)}
             aoTocar={() => aoTocar(item, s)}

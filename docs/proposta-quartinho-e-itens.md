@@ -121,6 +121,65 @@ quarto limpo não ter chão liso embaixo.
   (`dc-path-quartinho`), e os lugares de todos os itens do quarto são refeitos
   para a câmera de frente.
 
+## A cozinha e o quarto de frente, feitos (25/11/2026)
+
+O dono recarregou o Higgsfield e pediu de noite: "faça o que você tem que
+fazer com os créditos, com a implementação da cozinha [...] deixar também a
+imagem mais centralizada [...] tá tampando um pouco o que tem em cima".
+
+**O que mudou na tela**:
+
+- O quarto é a pintura NOVA, de frente (feita da referência dele, vazia), e a
+  cozinha fica à direita: arrastar leva até ela, e o seletor "Quarto ·
+  Cozinha", na linha do olhinho, também. O seletor não está nos mockups: sem
+  ele ninguém descobre a cozinha.
+- A pintura COBRE a tela (a altura dela é a da tela), em vez de ficar presa à
+  largura: a parede do fundo cai no meio, entre o alto (a fala da Bolha) e a
+  bandeja, e não sobra chão liso embaixo. É o "mais centralizada".
+- A bandeja mostra as abas do cômodo da tela (a cozinha: Utensílios,
+  Decoração, Plantas, Tapetes; o "No ar" vale nos dois), o dado decora só ele,
+  e a Bolha diz onde ela chegou.
+- 16 itens na cozinha: 7 da lojinha (o bule, a hortelã, a suculenta, o trevo,
+  o cactinho, as tulipas e o girassol, que esperavam arte no quarto), 7
+  presentes de saída (a prateleira de potes, a planta pendurada, a cafeteira,
+  as margaridas, o pote de colheres, a panela e a planta grande) e 2 de missão
+  (o relógio, na "Arrume a bancada da cozinha", e o tapete xadrez, na "Ponha
+  uma planta na cozinha"). As missões da cozinha vêm depois das cinco do
+  quarto.
+- Os lugares de todos os itens do quarto foram refeitos para a câmera de
+  frente (o berço contra a parede do fundo, a cômoda com o coelhinho em cima,
+  a poltrona e a planta à esquerda, o tapete no meio do chão).
+
+**A arte (o que custou, 25/11/2026, saldo de 52,47)**:
+
+| Peça                                        | Como saiu                                                            | Créditos |
+| ------------------------------------------- | -------------------------------------------------------------------- | -------- |
+| O quarto de frente, vazio, de dia           | Nano Banana Pro, editando a referência do quarto                     | 2        |
+| O quarto de noite                           | Nano Banana Pro, editando o de dia (sai alinhado)                    | 2        |
+| A cozinha, três tentativas                  | a geladeira sempre cortada na borda, por mais que o texto pedisse    | 6        |
+| O outpaint da cozinha                       | devolveu a MESMA imagem (ignorou o tamanho)                          | 2        |
+| A cozinha que valeu                         | a v1 encolhida a 78% numa moldura cinza, e o modelo pintou a moldura | 2        |
+| A cozinha de noite (com a luzinha da coifa) | Nano Banana Pro, editando a de dia                                   | 2        |
+| A cartela dos 16 itens da cozinha           | GPT Image 2.6, 2K, alta, fundo transparente                          | 2        |
+| O ícone novo: quatro propostas e o recorte  | Nano Banana Pro (2 × 2) e o removedor de fundo                       | 9        |
+| **Total** (o saldo foi de 52,47 a 25,47)    |                                                                      | **27**   |
+
+⚠️ **Para AFASTAR a câmera de uma pintura, não peça no texto e não use o
+outpaint**: encolha a imagem (`sips -z`), ponha numa moldura de cor lisa
+(`sips -p ... --padColor D9D9D9`) e peça ao Nano Banana para pintar só a
+moldura, mantendo o miolo. Foi o único jeito que funcionou.
+
+**A receita da prévia** (como os lugares foram compostos): um HTML com a
+pintura em "cover" numa tela de 402 × 874 e cada item na fração dele, com a
+faixa do alto e a bandeja desenhadas por cima, fotografado pelo Chrome do
+Playwright. Os números saem da prévia e vão para `ITENS`; o simulador confere
+no fim.
+
+**O que falta**: as estrelinhas da parede piscam no quarto (tiradas da pintura
+da noite nova); a cozinha não tem nada que pisque além dos vaga-lumes. Os
+itens "vem para o quarto" que sobraram (57 − 7) continuam esperando a arte
+deles.
+
 ## A migração da lojinha para o quartinho (24/11/2026)
 
 O dono: "a trilha customizada não vai mais existir [...] o fundo será baseado
@@ -192,7 +251,11 @@ com a ficha inteira. O teste `quarto.test.ts` reprova o item que vier sem ela.
    frente e um pouco de cima), em `mobile/assets/quartinho/<id>.webp`, e a
    linha dela no mapa `ARTE` de `app/quartinho.tsx`.
 2. **O lugar** (`lugar`): o centro, a linha da base, a largura e a camada, em
-   frações do quarto.
+   frações da pintura do cômodo dele (`comodo`). A pintura cobre a tela e
+   perde 8,8% de cada lado num iPhone comprido: o item fica entre `x` 0,085 e
+   0,915, com a base até 0,70 (a linha dos botões começa em 0,665). Componha numa PRÉVIA da tela com a
+   bandeja por cima (a receita está em "A cozinha, feita", abaixo), nunca de
+   cabeça.
 3. **O apoio** (`APOIO`): `chao`, `parede`, `tapete` ou `movel`. Decide a
    sombra.
 4. **A posse**: `lojinha` (o item da lojinha que ele é), `missao` (a missão que

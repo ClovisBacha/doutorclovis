@@ -140,14 +140,17 @@ outro app na loja), o `slug` e o `scheme` `obstetrica` (links e login), o
 domínio `obstetrica.com.br` e o site, que não muda mais. Escreva "o app Mãe
 Esperta", nunca "a Mãe Esperta" (o app não é uma mãe).
 
-**O ícone (escolhido pelo dono em 20/11/2026): a Bolha de capelo saindo do
-livro aberto, no céu da noite** — aprender (o livro, o capelo) com leveza (a
-Bolha, a guia). A fonte é vetor, em `mobile/assets/marca/` (`icone.svg`,
-`simbolo.svg` sem fundo, `simbolo-mono.svg` de uma cor); dela saem `icon.png`
-(1024, sem alfa), as três camadas do Android, o `favicon.png`, a `abertura.png`
-(a splash) e `marca/instagram-perfil.png`. Mudou a marca? Mude o vetor e gere
-tudo de novo dele, nunca um PNG à mão. As propostas que não venceram estão no
-canvas "Logos Mãe Esperta" e no diário.
+**O ícone (pedido do dono em 25/11/2026): a Bolha de capelo DE PERTO,
+enchendo o quadrado, sobre o degradê framboesa e pêssego** ("grandes apps têm
+ícones grandes [...] nosso ícone acabou ficando um pouco pequeno [...] um bebê
+bolha somente com um chapéuzinho [...] maior na câmera"). As fontes são arte do
+Higgsfield, em `mobile/assets/marca/`: `icone-bolha.webp` (o ícone inteiro, 2048) e `bolha-de-capelo.webp` (a mesma Bolha recortada); delas saem, por
+`node mobile/scripts/gerar-marca.mjs`, o `icon.png` (1024, sem alfa), as três
+camadas do Android, o `favicon.png`, a `abertura.png` (a splash) e
+`marca/instagram-perfil.png`. Mudou a marca? Mude a fonte e rode o script,
+nunca um PNG à mão. O ícone anterior (20/11, a Bolha saindo do livro, vetor)
+está em `icone.svg`/`simbolo.svg`, guardado caso ele queira voltar; as três
+outras propostas de 25/11 estão no diário.
 
 ## O visual é "Amanhecer": vidro, luz e profundidade (pedido do dono, 16/11/2026)
 
@@ -222,6 +225,20 @@ flor-de-bolhas.tsx`, 23/11/2026, o dono: "uma arte mais 3D, com movimentos,
   proporcional à realidade" (o dono). A receita do item novo está em
   `docs/proposta-quartinho-e-itens.md`, e `quarto.test.ts` cobra.
   O que falta está em `docs/proposta-quartinho-e-itens.md`.
+- ⚠️ **O QUARTO DE FRENTE E A COZINHA À DIREITA (pedido do dono,
+  25/11/2026)**: "quando a pessoa arrastar pro lado direito ele deve ir para a
+  cozinha [...] dar mais profundidade e estar centralizado". Os cômodos são
+  páginas lado a lado (`COMODOS`: o quarto, a cozinha), as duas pinturas da
+  MESMA câmera de frente (a parede do fundo no centro, as paredes do lado, o
+  teto e o chão), e a pintura COBRE a tela (`Math.max(L, H / PROPORCAO)`: num
+  iPhone comprido sobram 8,8% de cada lado), para a parede do fundo ficar no
+  meio, entre o alto e a bandeja. Por isso todo item mora entre `x` 0,085 e
+  0,915 e com a base até 0,70 (`quarto.test.ts`). Cada item tem `comodo`; o
+  guardado e a posse são um só. O seletor "Quarto · Cozinha" (que os mockups
+  não têm) é o que mostra que a cozinha existe. A luz de cada cômodo mora em
+  `LUZ` (na tela), e o que se mexe só anda no cômodo da tela (`viva`). Os
+  lugares se compõem numa prévia com a bandeja por cima, nunca de cabeça (a
+  receita está na proposta).
 - ⚠️ **O QUARTINHO É A LOJA, E A TRILHA NÃO SE ENFEITA (decisão do dono,
   24/11/2026)**: "a trilha customizada não vai mais existir [...] o fundo
   será baseado no clima do dia [...] os itens de fato comprados têm que ser
@@ -231,8 +248,8 @@ flor-de-bolhas.tsx`, 23/11/2026, o dono: "uma arte mais 3D, com movimentos,
   porta do quartinho (o "Meu Cantinho" saiu). Ela compra ali mesmo, no
   quarto (a folha de compra), pela MESMA regra da vitrine (`vendaNoQuarto`:
   o Premium só pela loja por fase). **Cada item do catálogo tem UM destino**
-  em `lib/quartinho/migracao.ts` (no quarto, no ar, vem para o quarto quando
-  tiver arte, ou fora do jogo), e `migracao.test.ts` cobra que nenhum fique
+  em `lib/quartinho/migracao.ts` (no quartinho — o quarto ou a cozinha —, no
+  ar, vem quando tiver arte, ou fora do jogo), e `migracao.test.ts` cobra que nenhum fique
   sem. O "No ar" (pétalas, bolhinhas) é desenhado por código. Não há
   "Salvar": o quarto se guarda sozinho, com folga (600 ms).
 - ⚠️ **O que travava o app (medido em 24/11/2026) e não volta**: laço eterno

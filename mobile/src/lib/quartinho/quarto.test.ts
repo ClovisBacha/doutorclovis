@@ -6,7 +6,9 @@ import { semComentarios } from "@/lib/sem-comentarios";
 import {
   alternar,
   APOIO,
+  CATEGORIAS,
   CHAVE_DO_QUARTINHO,
+  COMODOS,
   contaDaCompra,
   decorarAoAcaso,
   cumprirSePronta,
@@ -16,6 +18,7 @@ import {
   guardarMemoria,
   ITEM_POR_ID,
   ITENS,
+  itensDoComodo,
   lerQuartinho,
   missaoDoDia,
   MISSOES,
@@ -57,7 +60,13 @@ describe("o quartinho: os itens", () => {
         i: i.id,
         tem: existsSync(join(RAIZ, "assets", "quartinho", `${i.id}.webp`)),
       }).toEqual({ i: i.id, tem: true });
-    for (const q of ["quarto-dia", "quarto-noite", "estrelas-noite"])
+    for (const q of [
+      "quarto-dia",
+      "quarto-noite",
+      "estrelas-noite",
+      "cozinha-dia",
+      "cozinha-noite",
+    ])
       expect(existsSync(join(RAIZ, "assets", "quartinho", `${q}.webp`))).toBe(true);
   });
 
@@ -71,16 +80,79 @@ describe("o quartinho: os itens", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  test("os lugares cabem no quarto, e a parede fica atrás do chão", () => {
+  test("os lugares cabem na tela: fora das laterais cortadas e acima da bandeja", () => {
+    /* A pintura cobre a tela: num iPhone comprido sobram 8,8% de cada lado
+       (25/11/2026), e a linha dos botões soltos começa em 0,665 (medida no simulador). */
     for (const i of ITENS) {
       const { x, base, largura } = i.lugar;
-      expect(x - largura / 2).toBeGreaterThanOrEqual(-0.01);
-      expect(x + largura / 2).toBeLessThanOrEqual(1.01);
-      expect(base).toBeGreaterThan(0.15);
-      expect(base).toBeLessThan(0.8);
+      expect({ i: i.id, esquerda: x - largura / 2 >= 0.085 }).toEqual({ i: i.id, esquerda: true });
+      expect({ i: i.id, direita: x + largura / 2 <= 0.915 }).toEqual({ i: i.id, direita: true });
+      expect(base).toBeGreaterThan(0.3);
+      expect({ i: i.id, acimaDaBandeja: base <= 0.7 }).toEqual({ i: i.id, acimaDaBandeja: true });
     }
     const ordem = emOrdemDeDesenho(["ursinho", "berco", "prateleira", "tapete"]).map((i) => i.id);
     expect(ordem).toEqual(["prateleira", "tapete", "berco", "ursinho"]);
+  });
+});
+
+describe("o quartinho: os cômodos (o quarto e a cozinha, 25/11/2026)", () => {
+  test("todo item mora num cômodo, e cada cômodo tem as abas dos itens dele", () => {
+    for (const c of COMODOS) {
+      const itens = itensDoComodo(c.id);
+      expect(itens.length).toBeGreaterThan(0);
+      const abas = new Set(CATEGORIAS[c.id].map((a) => a.id));
+      for (const i of itens)
+        expect({ i: i.id, aba: abas.has(i.categoria) }).toEqual({ i: i.id, aba: true });
+      /* O ícone da aba é um item do próprio cômodo, e nenhuma aba fica vazia. */
+      for (const a of CATEGORIAS[c.id]) {
+        expect(ITEM_POR_ID[a.icone].comodo).toBe(c.id);
+        expect(itens.some((i) => i.categoria === a.id)).toBe(true);
+      }
+    }
+    expect(COMODOS.map((c) => c.id)).toEqual(["quarto", "cozinha"]);
+    expect(ITENS.length).toBe(itensDoComodo("quarto").length + itensDoComodo("cozinha").length);
+  });
+
+  test("os itens da lojinha que foram para a cozinha", () => {
+    const daCozinha = itensDoComodo("cozinha").flatMap((i) => (i.lojinha ? [i.lojinha] : []));
+    expect(daCozinha.sort()).toEqual(
+      [
+        "objeto-chaleira",
+        "planta-cacto",
+        "planta-girassol",
+        "planta-hortela",
+        "planta-suculenta",
+        "planta-trevo",
+        "planta-tulipa",
+      ].sort(),
+    );
+  });
+
+  test("decorar ao acaso mexe só no cômodo da tela", () => {
+    const q = quarto(["berco", "comoda", "cafeteira"]);
+    const livres = ["comoda", "ursinho", "cafeteira", "panela", "potes"] as const;
+    const naCozinha = decorarAoAcaso(q, livres, () => 0.1, "cozinha");
+    /* O quarto ficou como estava; a cozinha foi sorteada. */
+    expect(naCozinha.postos.filter((id) => ITEM_POR_ID[id].comodo === "quarto")).toEqual([
+      "berco",
+      "comoda",
+    ]);
+    expect(naCozinha.postos.filter((id) => ITEM_POR_ID[id].comodo === "cozinha")).toEqual([
+      "cafeteira",
+      "panela",
+      "potes",
+    ]);
+  });
+
+  test("as missões da cozinha dão presente da cozinha, e só depois das do quarto", () => {
+    const ids = MISSOES.map((m) => m.id);
+    expect(ids.slice(-2)).toEqual(["bancada", "verde"]);
+    for (const id of ["bancada", "verde"] as const) {
+      const m = MISSOES.find((x) => x.id === id)!;
+      expect(presenteDaMissao(m)?.comodo).toBe("cozinha");
+      for (const grupo of m.precisa)
+        for (const i of grupo) expect(ITEM_POR_ID[i].comodo).toBe("cozinha");
+    }
   });
 });
 
@@ -291,6 +363,16 @@ describe("o quartinho: a tela (catraca do fonte)", () => {
     expect(tela).toMatch(/lerALojaPorFase\(\)/);
     expect(tela).not.toMatch(/router\.push\("\/jornada\/recompensas"\)/);
     expect(tela).not.toMatch(/CANTINHO_BY_ID\[[^\]]+\]\??\.price/);
+  });
+
+  test("a cozinha à direita: as páginas, a pintura cobrindo a tela e o seletor (25/11/2026)", () => {
+    const tela = ler("app", "quartinho.tsx");
+    expect(tela).toMatch(/<ScrollView[\s\S]{0,80}horizontal\s+pagingEnabled/);
+    /* A pintura cobre a tela (o dono: "mais centralizada"), e não fica presa à largura. */
+    expect(tela).toMatch(/Math\.max\(L, H \/ PROPORCAO_DO_QUARTO\)/);
+    expect(tela).toMatch(/<SeletorDeComodo ativo=\{comodo\}/);
+    /* O que se mexe só anda no cômodo da tela. */
+    expect(tela).toMatch(/viva=\{acesa && c\.id === comodo\}/);
   });
 
   test("o olhinho esconde a bandeja e a traz de volta (o quarto limpo, 24/11/2026)", () => {

@@ -10,8 +10,9 @@
  * Cada item do catálogo (`src/lib/cantinho.ts`, o do site, que não muda) tem
  * UM destino aqui, e a catraca `migracao.test.ts` cobra que nenhum fique sem:
  *
- * - `no-quarto`: já é um item do quarto, com arte e lugar (`ITENS`, em
- *   `quarto.ts`), e se compra ali mesmo.
+ * - `no-quarto`: já é um item do quartinho, com arte e lugar (`ITENS`, em
+ *   `quarto.ts`), no quarto ou na cozinha (desde 25/11/2026), e se compra ali
+ *   mesmo.
  * - `no-ar`: vira o AR do quarto (pétalas, bolhas, peninhas caindo), desenhado
  *   por código: não precisa de arte (`AR_DO_QUARTO`).
  * - `vem-para-o-quarto`: cabe num quarto de bebê e vai entrar quando a arte
@@ -71,6 +72,16 @@ export const DESTINO: Readonly<Record<string, Destino>> = {
   "planta-vaso": quarto("planta"),
   "bicho-coelho": quarto("coelhinho"),
 
+  /* ── Os que foram para a cozinha (25/11/2026): o bule no fogão, os vasinhos
+     no peitoril da janela, as tulipas e o girassol na bancada ── */
+  "objeto-chaleira": quarto("bule"),
+  "planta-suculenta": quarto("suculenta"),
+  "planta-trevo": quarto("trevo"),
+  "planta-hortela": quarto("hortela"),
+  "planta-cacto": quarto("cactinho"),
+  "planta-tulipa": quarto("tulipas"),
+  "planta-girassol": quarto("girassol"),
+
   /* ── O ar do quarto (por código, sem arte) ── */
   "clima-petalas": ar("petalas"),
   "clima-bolhas": ar("bolhas"),
@@ -82,7 +93,6 @@ export const DESTINO: Readonly<Record<string, Destino>> = {
   /* ── Objetos que vêm para o quarto ── */
   "objeto-novelo": vem("Cesta de tricô", "decoracao", "chao", "no chão, ao lado da poltrona"),
   "objeto-livrinho": vem("Livrinhos", "brinquedos", "chao", "uma pilha no chão, perto da poltrona"),
-  "objeto-chaleira": vem("Bule de chá", "decoracao", "movel", "em cima da cômoda"),
   "objeto-almofada": vem("Almofada", "decoracao", "chao", "no chão, perto do tapete"),
   "objeto-espelho": vem("Espelho", "decoracao", "parede", "na parede, acima da cômoda"),
   "objeto-fones": vem("Caixinha de som", "decoracao", "movel", "em cima da cômoda"),
@@ -90,12 +100,6 @@ export const DESTINO: Readonly<Record<string, Destino>> = {
   "objeto-caixinha": vem("Caixinha de música", "brinquedos", "movel", "em cima da cômoda"),
 
   /* ── As plantas: em vasos ── */
-  "planta-suculenta": vem("Suculenta", "plantas", "movel", "no peitoril da janela"),
-  "planta-trevo": vem("Trevo", "plantas", "movel", "no peitoril da janela"),
-  "planta-hortela": vem("Hortelã", "plantas", "movel", "no peitoril da janela"),
-  "planta-cacto": vem("Cactinho", "plantas", "movel", "na prateleira"),
-  "planta-tulipa": vem("Tulipas", "plantas", "movel", "em cima da cômoda"),
-  "planta-girassol": vem("Girassol", "plantas", "chao", "num vaso, no canto"),
   "planta-cerejeira": vem("Cerejeira", "plantas", "chao", "num vaso grande, no canto"),
   "planta-bonsai": vem("Bonsai", "plantas", "movel", "na prateleira"),
   "planta-roseira": vem("Roseira", "plantas", "chao", "num vaso, no canto"),
