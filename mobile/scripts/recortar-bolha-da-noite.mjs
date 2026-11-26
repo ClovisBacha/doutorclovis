@@ -1,7 +1,9 @@
 /**
  * O RECORTE DA BOLHA DO ÍCONE "NOITE A" (25/11/2026).
  *
- * A abertura e o Android precisam da Bolha de capelo sem o quadrado do ícone.
+ * A abertura, o Android e o ícone Aurora (`compor-icone.mjs`) precisam da
+ * Bolha de capelo sem o quadrado da arte. A arte é a do Noite A, o ícone de
+ * 25/11 (`marca/arte-noite-a.webp`, do Higgsfield).
  * O fundo do ícone é um degradê vertical (`TOPO` → `BASE`, medidos na arte); o
  * alfa de cada pixel é a distância da cor dele até esse degradê:
  * - o que é FIGURA fica inteiro (`forte`): o disco da bolha, medido na arte,
@@ -13,7 +15,7 @@
  * A figura é desmultiplicada do fundo: o recorte serve sobre fundo escuro (o
  * céu da noite da abertura, o fundo roxo do Android).
  *
- * Uso, no Mac (depois rode `gerar-marca.mjs`):
+ * Uso, no Mac (depois rode `compor-icone.mjs` e `gerar-marca.mjs`):
  *   node mobile/scripts/recortar-bolha-da-noite.mjs
  */
 import { execFileSync } from "node:child_process";
@@ -24,7 +26,7 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 
 const MARCA = join(dirname(fileURLToPath(import.meta.url)), "..", "assets", "marca");
-const src = "data:image/webp;base64," + readFileSync(join(MARCA, "icone-bolha.webp")).toString("base64");
+const src = "data:image/webp;base64," + readFileSync(join(MARCA, "arte-noite-a.webp")).toString("base64");
 
 const nav = await chromium.launch({
   executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",

@@ -10,7 +10,7 @@
     "backgroundColor": "#2a1f9a",
     "ios": {
       "bundleIdentifier": "br.com.obstetrica.app",
-      "buildNumber": "59",
+      "buildNumber": "60",
       "appleTeamId": "8PL2X9F9PV",
       "supportsTablet": false,
       "usesAppleSignIn": true,
@@ -37,7 +37,7 @@
     "android": {
       "package": "br.com.obstetrica.app",
       "adaptiveIcon": {
-        "backgroundColor": "#321f57",
+        "backgroundColor": "#5220d8",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"

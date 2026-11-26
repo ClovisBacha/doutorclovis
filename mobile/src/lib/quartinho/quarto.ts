@@ -48,9 +48,17 @@ export type Categoria =
   | "brinquedos"
   | "tapetes"
   | "plantas"
-  | "utensilios";
+  | "utensilios"
+  | "luzes";
 
 export type IdDoItem =
+  /* As LUZES desenhadas por código (26/11/2026). */
+  | "varal"
+  | "neon-lua"
+  | "projetor"
+  | "pisca-pisca"
+  | "fita-led"
+  | "pendentes"
   /* A cozinha (25/11/2026). */
   | "potes"
   | "planta-pendurada"
@@ -165,6 +173,14 @@ export type ItemDoQuarto = {
   missao?: IdDaMissao;
   /** A luz que ele emite à noite, pela `REGUA_DA_LUZ`. OBRIGATÓRIO: `null` é "não emite". */
   luz: Luz | null;
+  /**
+   * DESENHADO POR CÓDIGO (as luzes de 26/11/2026, o dono: "vamos adicionar
+   * outros tipos de luzes para cada ambiente", sem crédito): no cômodo ele é
+   * desenhado ao vivo (`componentes/quartinho/luzes.tsx`) e acende e apaga
+   * com um toque; a arte em `assets/quartinho/` é só a miniatura da bandeja
+   * (`scripts/gerar-luzes.mjs`). O `lugar` dele é a caixa do desenho.
+   */
+  desenhado?: true;
 };
 
 /*
@@ -505,6 +521,75 @@ export const ITENS: readonly ItemDoQuarto[] = [
     lugar: { x: 0.18, base: 0.665, largura: 0.15, camada: 5 },
     luz: null,
   },
+  /* ── As LUZES, desenhadas por código (26/11/2026). Presentes da Bolha:
+     a lojinha mora no servidor do site, que não muda, e não tem estes
+     itens. Cada uma acende e apaga com um toque. */
+  {
+    id: "varal",
+    nome: "Varal de luzinhas",
+    comodo: Q,
+    categoria: "luzes",
+    proporcao: 1,
+    /* No alto da parede do fundo, de canto a canto, atrás da prateleira. */
+    lugar: { x: 0.525, base: 0.302, largura: 0.53, camada: 0 },
+    luz: { potencia: REGUA_DA_LUZ.luzinhas, tom: "#ffd27a", de: [0.5, 0.5] },
+    desenhado: true,
+  },
+  {
+    id: "neon-lua",
+    nome: "Neon de lua",
+    comodo: Q,
+    categoria: "luzes",
+    proporcao: 1,
+    /* Na parede da direita, em perspectiva, acima do cesto. */
+    lugar: { x: 0.862, base: 0.395, largura: 0.07, camada: 1 },
+    luz: { potencia: REGUA_DA_LUZ.luzNoturna, tom: "#ff9fd6", de: [0.5, 0.5] },
+    desenhado: true,
+  },
+  {
+    id: "projetor",
+    nome: "Projetor de estrelas",
+    comodo: Q,
+    categoria: "luzes",
+    proporcao: 1,
+    /* Em cima da cômoda, ao lado do coelhinho (sem a cômoda, não entra). */
+    lugar: { x: 0.665, base: 0.463, largura: 0.042, camada: 4 },
+    luz: { potencia: REGUA_DA_LUZ.luzNoturna, tom: "#b9a8ff", de: [0.5, 0.3] },
+    desenhado: true,
+  },
+  {
+    id: "pisca-pisca",
+    nome: "Pisca-pisca na janela",
+    comodo: C,
+    categoria: "luzes",
+    proporcao: 1,
+    /* Pendurado no varão da cortina, em dois arcos. */
+    lugar: { x: 0.5, base: 0.362, largura: 0.34, camada: 2 },
+    luz: { potencia: REGUA_DA_LUZ.luzinhas, tom: "#ffd166", de: [0.5, 0.5] },
+    desenhado: true,
+  },
+  {
+    id: "fita-led",
+    nome: "Fita de LED na bancada",
+    comodo: C,
+    categoria: "luzes",
+    proporcao: 1,
+    /* Embaixo da borda do tampo, da ponta esquerda até o fogão. */
+    lugar: { x: 0.408, base: 0.52, largura: 0.58, camada: 2 },
+    luz: { potencia: REGUA_DA_LUZ.luzNoturna, tom: "#ffcf8a", de: [0.5, 0.5] },
+    desenhado: true,
+  },
+  {
+    id: "pendentes",
+    nome: "Pendentes de vidro",
+    comodo: C,
+    categoria: "luzes",
+    proporcao: 1,
+    /* Dois globos pendurados do teto, na frente da janela. */
+    lugar: { x: 0.5, base: 0.262, largura: 0.25, camada: 0 },
+    luz: { potencia: REGUA_DA_LUZ.lampada, tom: "#ffc27a", de: [0.5, 0.9], chao: true },
+    desenhado: true,
+  },
 ];
 
 /** Os itens da lojinha que o quartinho vende (os ids do catálogo do site). */
@@ -526,12 +611,14 @@ export const CATEGORIAS: Readonly<
     { id: "brinquedos", nome: "Brinquedos", icone: "ursinho" },
     { id: "tapetes", nome: "Tapetes", icone: "tapete" },
     { id: "plantas", nome: "Plantas", icone: "planta" },
+    { id: "luzes", nome: "Luzes", icone: "varal" },
   ],
   cozinha: [
     { id: "utensilios", nome: "Utensílios", icone: "cafeteira" },
     { id: "decoracao", nome: "Decoração", icone: "margaridas" },
     { id: "plantas", nome: "Plantas", icone: "hortela" },
     { id: "tapetes", nome: "Tapetes", icone: "tapete-xadrez" },
+    { id: "luzes", nome: "Luzes", icone: "pisca-pisca" },
   ],
 };
 
@@ -751,17 +838,31 @@ export function contaDaCompra(
 }
 
 /** Põe ou tira um item (tirar é sempre possível; pôr só o que está livre). */
+/**
+ * O que só fica em cima de outro item: o móbile no berço, o projetor de
+ * estrelas na cômoda. Sem o apoio, ele não entra; tirado o apoio, sai junto.
+ */
+export const PRECISA_DE: Readonly<Partial<Record<IdDoItem, IdDoItem>>> = {
+  mobile: "berco",
+  projetor: "comoda",
+};
+
 export function alternar(q: Quartinho, id: IdDoItem): Quartinho {
   const tem = q.postos.includes(id);
   let postos = tem ? q.postos.filter((p) => p !== id) : [...q.postos, id];
-  /* Sem berço, o móbile não tem onde ficar: sai junto. */
-  if (tem && id === "berco") postos = postos.filter((p) => p !== "mobile");
-  if (!tem && id === "mobile" && !postos.includes("berco")) return q;
+  /* Sem o apoio, o que fica em cima dele não tem onde ficar: sai junto. */
+  if (tem) postos = postos.filter((p) => PRECISA_DE[p] !== id);
+  if (!tem && faltaOApoio(q, id)) return q;
   return { ...q, postos };
 }
 
-export const faltaOBerco = (q: Quartinho, id: IdDoItem) =>
-  id === "mobile" && !q.postos.includes("berco");
+/** O apoio que falta para o item entrar (o berço do móbile, a cômoda do projetor). */
+export function faltaOApoio(q: Quartinho, id: IdDoItem): IdDoItem | null {
+  const apoio = PRECISA_DE[id];
+  return apoio && !q.postos.includes(apoio) ? apoio : null;
+}
+
+export const faltaOBerco = (q: Quartinho, id: IdDoItem) => faltaOApoio(q, id) === "berco";
 
 /** Quantos grupos da missão já estão no quarto, de quantos. */
 export function progressoDaMissao(m: Missao, q: Quartinho): { feitos: number; total: number } {
@@ -843,6 +944,14 @@ export const APOIO: Readonly<Record<IdDoItem, Apoio>> = {
   colheres: "movel",
   panela: "movel",
   bule: "movel",
+  /* As luzes: o varal, o neon e o pisca-pisca na parede; o projetor na
+     cômoda, a fita embaixo do tampo; os pendentes no teto (sem sombra). */
+  varal: "parede",
+  "neon-lua": "parede",
+  projetor: "movel",
+  "pisca-pisca": "parede",
+  "fita-led": "movel",
+  pendentes: "movel",
 };
 
 /**
@@ -860,7 +969,10 @@ export function decorarAoAcaso(
   const daqui = livres.filter((id) => ITEM_POR_ID[id].comodo === comodo);
   let escolhidos = daqui.filter(() => sorteio() < 0.7);
   if (escolhidos.length < Math.min(3, daqui.length)) escolhidos = [...daqui];
-  if (!escolhidos.includes("berco")) escolhidos = escolhidos.filter((p) => p !== "mobile");
+  escolhidos = escolhidos.filter((p) => {
+    const apoio = PRECISA_DE[p];
+    return !apoio || escolhidos.includes(apoio);
+  });
   const doOutro = q.postos.filter((id) => ITEM_POR_ID[id].comodo !== comodo);
   return { ...q, postos: [...doOutro, ...escolhidos] };
 }

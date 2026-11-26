@@ -1,6 +1,6 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { memo, useEffect, useRef } from "react";
+import { Fragment, memo, useEffect, useRef } from "react";
 import { Animated, Easing, Pressable, StyleSheet, Text, View } from "react-native";
 import Svg, {
   ClipPath,
@@ -15,6 +15,7 @@ import Svg, {
   Stop,
 } from "react-native-svg";
 import { useMovimentoReduzido } from "~/componentes/movimento";
+import { clarear, escurecer } from "~/lib/cor";
 import {
   chaveDaCoisa,
   coisasDoComodo,
@@ -601,44 +602,143 @@ function LuzDoTeto({
   A: number;
 }) {
   const v = useTransicao(acesa, 260);
-  const [px, py] = [coisa.ponto[0] * L, coisa.ponto[1] * A];
-  const [cx, cy] = [coisa.chao[0] * L, coisa.chao[1] * A];
   const forca = noite ? 1 : 0.6;
-  const id = `cone-${coisa.comodo}-${coisa.id}`;
   /* O cone: do ponto (estreito) até o chão (largo), sumindo para baixo, em
      QUATRO camadas cada vez mais estreitas (como o feixe da janela): a borda
      some aos poucos, sem a quina dura de um triângulo. */
   const camadas = [1, 0.78, 0.56, 0.34];
   return (
-    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: v }]}>
-      <View style={[StyleSheet.absoluteFill, { mixBlendMode: "screen" }]}>
-        <Svg width={L} height={A}>
-          <Defs>
-            <Degrade id={id} x1="0" y1={py} x2="0" y2={cy} gradientUnits="userSpaceOnUse">
-              <Stop offset="0" stopColor="#fff1d6" stopOpacity={0.07 * forca} />
-              <Stop offset="0.6" stopColor="#ffe2b8" stopOpacity={0.035 * forca} />
-              <Stop offset="1" stopColor="#ffe2b8" stopOpacity={0} />
-            </Degrade>
-          </Defs>
-          {camadas.map((k) => {
-            const topo = 0.016 * L * k;
-            const base = 0.19 * L * k;
-            return (
-              <Polygon
-                key={k}
-                points={`${px - topo},${py} ${px + topo},${py} ${cx + base},${cy} ${cx - base},${cy}`}
-                fill={`url(#${id})`}
+    <>
+      {/* APAGADA, de dia: a pintura tem o ponto aceso (a lente branca e o
+          halo); por cima dele, o halo some na cor do teto e a lente fica a
+          de uma luz desligada. De noite a pintura já está apagada. */}
+      {noite ? null : (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            { opacity: v.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) },
+          ]}
+        >
+          <Svg width={L} height={A}>
+            <Defs>
+              <RadialGradient
+                id={`teto-${coisa.comodo}-${coisa.id}`}
+                cx="50%"
+                cy="50%"
+                rx="50%"
+                ry="50%"
+              >
+                <Stop offset="0" stopColor={coisa.teto} stopOpacity={0.95} />
+                <Stop offset="0.55" stopColor={coisa.teto} stopOpacity={0.7} />
+                <Stop offset="1" stopColor={coisa.teto} stopOpacity={0} />
+              </RadialGradient>
+              <Degrade id={`lente-${coisa.comodo}-${coisa.id}`} x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor={escurecer(coisa.teto, 0.2)} />
+                <Stop offset="1" stopColor={escurecer(coisa.teto, 0.07)} />
+              </Degrade>
+            </Defs>
+            {coisa.pontos.map((p, i) => (
+              <Ellipse
+                key={`h${i}`}
+                cx={p.x * L}
+                cy={p.y * A}
+                rx={p.rx * L * 2.3}
+                ry={p.ry * A * 3.2}
+                fill={`url(#teto-${coisa.comodo}-${coisa.id})`}
               />
-            );
-          })}
-        </Svg>
-      </View>
-      {/* A poça no chão. */}
-      <Clarao cx={cx} cy={cy} raio={0.22 * L} achatar={0.38} tom="#ffd9a0" forca={0.42 * forca} />
-      {/* O halo e o ponto aceso. */}
-      <Clarao cx={px} cy={py + 2} raio={0.11 * L} tom="#ffe6bd" forca={0.75 * forca} />
-      <Clarao cx={px} cy={py} raio={0.03 * L} achatar={0.6} tom="#ffffff" forca={1} />
-    </Animated.View>
+            ))}
+            {coisa.pontos.map((p, i) => (
+              <Ellipse
+                key={`a${i}`}
+                cx={p.x * L}
+                cy={p.y * A}
+                rx={p.rx * L}
+                ry={p.ry * A}
+                fill={clarear(coisa.teto, 0.32)}
+                stroke={escurecer(coisa.teto, 0.12)}
+                strokeWidth={0.6}
+              />
+            ))}
+            {coisa.pontos.map((p, i) => (
+              <Ellipse
+                key={`l${i}`}
+                cx={p.x * L}
+                cy={p.y * A + p.ry * A * 0.06}
+                rx={p.rx * L * 0.79}
+                ry={p.ry * A * 0.7}
+                fill={`url(#lente-${coisa.comodo}-${coisa.id})`}
+              />
+            ))}
+          </Svg>
+        </Animated.View>
+      )}
+
+      {/* ACESA: o cone, a poça, o halo e o ponto. */}
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: v }]}>
+        <View style={[StyleSheet.absoluteFill, { mixBlendMode: "screen" }]}>
+          <Svg width={L} height={A}>
+            {coisa.pontos.map((p, i) => {
+              if (!p.chao) return null;
+              const [px, py] = [p.x * L, p.y * A];
+              const [cx, cy] = [p.chao[0] * L, p.chao[1] * A];
+              const id = `cone-${coisa.comodo}-${coisa.id}-${i}`;
+              return (
+                <Fragment key={id}>
+                  <Defs>
+                    <Degrade id={id} x1="0" y1={py} x2="0" y2={cy} gradientUnits="userSpaceOnUse">
+                      <Stop offset="0" stopColor="#fff1d6" stopOpacity={0.07 * forca} />
+                      <Stop offset="0.6" stopColor="#ffe2b8" stopOpacity={0.035 * forca} />
+                      <Stop offset="1" stopColor="#ffe2b8" stopOpacity={0} />
+                    </Degrade>
+                  </Defs>
+                  {camadas.map((k) => {
+                    const topo = p.rx * L * 0.7 * k;
+                    const base = 0.19 * L * k;
+                    return (
+                      <Polygon
+                        key={k}
+                        points={`${px - topo},${py} ${px + topo},${py} ${cx + base},${cy} ${cx - base},${cy}`}
+                        fill={`url(#${id})`}
+                      />
+                    );
+                  })}
+                </Fragment>
+              );
+            })}
+          </Svg>
+        </View>
+        {coisa.pontos.map((p, i) => (
+          <Fragment key={i}>
+            {p.chao ? (
+              <Clarao
+                cx={p.chao[0] * L}
+                cy={p.chao[1] * A}
+                raio={0.22 * L}
+                achatar={0.38}
+                tom="#ffd9a0"
+                forca={0.42 * forca}
+              />
+            ) : null}
+            <Clarao
+              cx={p.x * L}
+              cy={p.y * A + 2}
+              raio={p.rx * L * 4.6}
+              tom="#ffe6bd"
+              forca={0.75 * forca}
+            />
+            <Clarao
+              cx={p.x * L}
+              cy={p.y * A}
+              raio={p.rx * L * 1.3}
+              achatar={0.6}
+              tom="#ffffff"
+              forca={1}
+            />
+          </Fragment>
+        ))}
+      </Animated.View>
+    </>
   );
 }
 

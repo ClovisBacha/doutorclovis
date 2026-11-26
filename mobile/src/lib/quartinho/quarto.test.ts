@@ -87,7 +87,8 @@ describe("o quartinho: os itens", () => {
       const { x, base, largura } = i.lugar;
       expect({ i: i.id, esquerda: x - largura / 2 >= 0.085 }).toEqual({ i: i.id, esquerda: true });
       expect({ i: i.id, direita: x + largura / 2 <= 0.915 }).toEqual({ i: i.id, direita: true });
-      expect(base).toBeGreaterThan(0.3);
+      /* Os pendentes de vidro pendem do teto (26/11/2026): só eles ficam acima. */
+      expect(base).toBeGreaterThan(i.id === "pendentes" ? 0.2 : 0.3);
       expect({ i: i.id, acimaDaBandeja: base <= 0.7 }).toEqual({ i: i.id, acimaDaBandeja: true });
     }
     const ordem = emOrdemDeDesenho(["ursinho", "berco", "prateleira", "tapete"]).map((i) => i.id);

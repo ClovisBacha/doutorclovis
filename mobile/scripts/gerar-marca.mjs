@@ -3,19 +3,22 @@
  *
  * O dono: "grandes apps têm ícones grandes [...] nosso ícone acabou ficando um
  * pouco pequeno. O ideal seria um bebê bolha somente com um chapéuzinho [...]
- * maior na câmera [...] se inspire em logos famosos de aplicativo". O ícone
- * passou a ser a Bolha de capelo DE PERTO, enchendo o quadrado, no CÉU DA NOITE
- * (o "Noite A", escolhido por ele entre as quatro propostas: "eu gostei do
- * noite A [...] seria um dos ícones que mais chamaria a atenção") — arte do
- * Higgsfield. Guardados para o caso de ele querer voltar: o "Viva A" do build
- * 58 (degradê framboesa e pêssego, `*-viva.webp`) e o vetor da Bolha saindo do
- * livro (20/11/2026, `icone.svg`).
+ * maior na câmera [...] se inspire em logos famosos de aplicativo". Desde
+ * 26/11/2026 o ícone é o "AURORA": a Bolha de capelo de perto, com base
+ * branca e contorno de adesivo, sobre o violeta com véus rosa e azul (ele:
+ * "veja como ele some no meio dos outros"; ver `compor-icone.mjs`). Guardados
+ * para o caso de ele querer voltar: a arte do "Noite A" de 25/11
+ * (`arte-noite-a.webp`), o "Viva A" do build 58 (`*-viva.webp`) e o vetor da
+ * Bolha saindo do livro (20/11/2026, `icone.svg`).
  *
- * FONTES (nunca edite um PNG derivado à mão: mude a fonte e rode isto):
- * - `assets/marca/icone-bolha.webp`: o ícone inteiro, 2048 × 2048;
- * - `assets/marca/bolha-de-capelo.webp`: a mesma Bolha recortada (fundo
- *   transparente, o brilho virou halo), para a abertura e o Android. Sai do
- *   ícone por `scripts/recortar-bolha-da-noite.mjs` (rode antes deste);
+ * A CADEIA (nunca edite um PNG derivado à mão: mude a fonte e rode tudo):
+ *   arte-noite-a.webp → recortar-bolha-da-noite.mjs → bolha-de-capelo.webp
+ *   bolha-de-capelo.webp → compor-icone.mjs → icone-bolha.webp
+ *   icone-bolha.webp + bolha-de-capelo.webp → este script → os PNGs do app
+ * - `assets/marca/icone-bolha.webp`: o ícone inteiro, 2048 × 2048, usado
+ *   inteiro (ZOOM 1);
+ * - `assets/marca/bolha-de-capelo.webp`: a Bolha recortada, para a abertura e
+ *   o Android;
  * - `assets/marca/bolha-de-capelo-viva.webp`: o recorte limpo do Viva A, só
  *   para a silhueta do ícone monocromático do Android.
  *
@@ -37,13 +40,12 @@ const MOBILE = join(dirname(fileURLToPath(import.meta.url)), "..");
 const A = join(MOBILE, "assets");
 const url = (p) => "data:image/webp;base64," + readFileSync(p).toString("base64");
 
-/* O recorte do ícone: um pouco mais perto que a arte (1,06), com o centro um
-   pouco acima do meio, para o capelo não encostar na borda nem no canto
-   arredondado que o iOS recorta. */
-const ZOOM = 1.04;
-const CENTRO_Y = 0.48;
-/* O fundo do Android: o mesmo degradê do ícone (medido na arte, de cima para baixo). */
-const DEGRADE = ["#402b73", "#321f57", "#20113c"];
+/* O recorte do ícone: o Aurora já é composto no quadrado (`compor-icone.mjs`),
+   então entra inteiro. */
+const ZOOM = 1;
+const CENTRO_Y = 0.5;
+/* O fundo do Android: o violeta do ícone Aurora (de cima para baixo). */
+const DEGRADE = ["#6a2bff", "#5220d8", "#3a0fb0"];
 
 const nav = await chromium.launch({
   executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",

@@ -140,23 +140,24 @@ outro app na loja), o `slug` e o `scheme` `obstetrica` (links e login), o
 domínio `obstetrica.com.br` e o site, que não muda mais. Escreva "o app Mãe
 Esperta", nunca "a Mãe Esperta" (o app não é uma mãe).
 
-**O ícone (pedido do dono em 25/11/2026): a Bolha de capelo DE PERTO,
-enchendo o quadrado, no CÉU DA NOITE** ("grandes apps têm ícones grandes [...]
-nosso ícone acabou ficando um pouco pequeno [...] um bebê bolha somente com um
-chapéuzinho [...] maior na câmera"). Das quatro propostas ele escolheu a
-"Noite A" ("foi o que eu mais gostei. Esse do fundo do pêssego eu não gostei
-tanto"); o build 58 saiu com a "Viva A" (framboesa e pêssego), guardada em
-`*-viva.webp`. As fontes são arte do Higgsfield, em `mobile/assets/marca/`:
-`icone-bolha.webp` (o ícone inteiro, 2048) e `bolha-de-capelo.webp` (a mesma
-Bolha recortada, com o brilho como halo, por
-`node mobile/scripts/recortar-bolha-da-noite.mjs`); delas saem, por
-`node mobile/scripts/gerar-marca.mjs`, o `icon.png` (1024, sem alfa), as três
-camadas do Android (fundo roxo `#321f57`; o monocromático é a silhueta do
-recorte limpo da Viva A, a mesma pose), o `favicon.png`, a `abertura.png` (a
-splash, no céu da noite `#2a1f9a`) e `marca/instagram-perfil.png`. Mudou a
-marca? Mude a fonte e rode os scripts, nunca um PNG à mão. O ícone de 20/11 (a
-Bolha saindo do livro, vetor) está em `icone.svg`/`simbolo.svg`; a comparação
-das quatro propostas, em `docs/icones-25-11.webp`.
+**O ícone é o "AURORA" (escolha do dono em 26/11/2026): a Bolha de capelo DE
+PERTO, enorme e cortada embaixo, com base branca e contorno de adesivo, sobre o
+violeta com um véu rosa no alto e um azul embaixo.** Ele mandou o print da tela
+inicial: "veja como ele some no meio dos outros". A causa, medida no print: a
+Bolha é TRANSPARENTE e pegava o roxo escuro de trás; o fundo escuro se
+misturava com o papel de parede; as estrelinhas viravam ruído. ⚠️ Ícone novo
+se prova NO PRINT DELE (colado no lugar do atual, nítido e desfocado), nunca
+só no quadrado grande. A cadeia, em `mobile/assets/marca/` (nunca um PNG à
+mão: mude a fonte e rode os scripts, nesta ordem):
+`arte-noite-a.webp` (a arte do Higgsfield, o ícone de 25/11) →
+`recortar-bolha-da-noite.mjs` → `bolha-de-capelo.webp` →
+`compor-icone.mjs` → `icone-bolha.webp` (2048) → `gerar-marca.mjs` → o
+`icon.png` (1024, sem alfa), as três camadas do Android (fundo violeta
+`#5220d8`), o `favicon.png`, a `abertura-ios.png` (a splash do iPhone, no céu
+da noite da trilha), a `abertura.png` (a do Android) e
+`marca/instagram-perfil.png`. Guardados, caso ele queira voltar: o Viva A
+(`*-viva.webp`) e o vetor de 20/11 (`icone.svg`/`simbolo.svg`); as propostas
+estão no diário.
 
 ## O visual é "Amanhecer": vidro, luz e profundidade (pedido do dono, 16/11/2026)
 
@@ -291,6 +292,19 @@ flor-de-bolhas.tsx`, 23/11/2026, o dono: "uma arte mais 3D, com movimentos,
   estado é do aparelho (`dc-quartinho-coisas:<uid>`): brincadeira, não posse.
   Coisa nova entra medida na pintura e composta numa foto do simulador
   (`&coisas=cozinha:geladeira,...` na bancada); `coisas.test.ts` cobra.
+  ⚠️ De dia a pintura tem as luzes do teto ACESAS: apagadas, a tela desenha
+  por cima a lente desligada na cor do teto (o dono, 26/11: "parecem estar
+  acesas já antes de ligar"). No quarto, cada toque acende o par do lado (o
+  ponto do fundo e o da frente, que fica sob o alto da tela).
+- **As LUZES da bandeja (26/11/2026, sem crédito)**: a aba "Luzes" de cada
+  cômodo tem três itens DESENHADOS POR CÓDIGO (`desenhado: true`; o quarto:
+  varal de luzinhas, neon de lua, projetor de estrelas; a cozinha:
+  pisca-pisca na janela, fita de LED na bancada, pendentes de vidro), em
+  `componentes/quartinho/luzes.tsx`. A arte da bandeja é só a miniatura
+  (`scripts/gerar-luzes.mjs`). Postas, nascem acesas, e um toque apaga
+  (`apagada:<id>` no mesmo estado das coisas). São presentes da Bolha: a
+  lojinha mora no servidor do site, que não muda. O projetor fica na cômoda
+  (`PRECISA_DE`, como o móbile no berço).
 - ⚠️ **O que travava o app (medido em 24/11/2026) e não volta**: laço eterno
   (todo enfeite descansa: `lacoQueDescansa`, `rajada`); `shadowColor`/
   `shadowRadius` numa vista sem fundo (o iOS recalcula a forma pelos pixels a

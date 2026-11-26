@@ -51,6 +51,7 @@ import {
   type CantinhoOk,
 } from "~/componentes/recompensas/economia-do-cantinho";
 import { LuzesDasCoisas, PortasECortinas, ToquesDasCoisas } from "~/componentes/quartinho/coisas";
+import { LuzDesenhada } from "~/componentes/quartinho/luzes";
 import { TEM_VIDRO_DO_SISTEMA, Vidro } from "~/componentes/vidro";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { clarear } from "~/lib/cor";
@@ -69,6 +70,7 @@ import {
   ehNoiteNoQuarto,
   emOrdemDeDesenho,
   falaDoEmBreve,
+  faltaOApoio,
   faltaOBerco,
   guardarMemoria,
   ITEM_POR_ID,
@@ -94,10 +96,13 @@ import { AR_DO_QUARTO, type IdDoAr } from "~/lib/quartinho/migracao";
 import {
   alternarCoisa,
   chaveDaCoisa,
+  chaveDaLuzApagada,
   coisasDoComodo,
   falaDaCoisa,
+  falaDaLuzDaBandeja,
   ligada,
   lerEstadoDasCoisas,
+  luzDaBandejaAcesa,
   type Coisa,
   type EstadoDasCoisas,
 } from "~/lib/quartinho/coisas";
@@ -148,10 +153,18 @@ import { ALVO_MINIMO, cor, curva, espaco, fonte } from "~/tema";
  * Bancada: rota=/quartinho [&hora=21] [&postos=berco,poltrona…] [&missao=1]
  *          [&missoes=ursinho,parede (cumpridas ontem)] [&itens=objeto-berco,… (da lojinha)]
  *          [&comprar=luminaria|ar:bolhas (abre a compra)] [&saldo=N] [&semana=N]
- *          [&aba=ar (a bandeja no ar)] [&ar=bolhas (o ar ligado)]
+ *          [&aba=ar|luzes|… (a aba da bandeja)] [&ar=bolhas (o ar ligado)]
  */
 
 const ARTE: Record<IdDoItem, number> = {
+  /* As luzes desenhadas por código: a arte é só a miniatura da bandeja
+     (`scripts/gerar-luzes.mjs`); no cômodo, `LuzDesenhada`. */
+  varal: require("../../assets/quartinho/varal.webp"),
+  "neon-lua": require("../../assets/quartinho/neon-lua.webp"),
+  projetor: require("../../assets/quartinho/projetor.webp"),
+  "pisca-pisca": require("../../assets/quartinho/pisca-pisca.webp"),
+  "fita-led": require("../../assets/quartinho/fita-led.webp"),
+  pendentes: require("../../assets/quartinho/pendentes.webp"),
   berco: require("../../assets/quartinho/berco.webp"),
   poltrona: require("../../assets/quartinho/poltrona.webp"),
   comoda: require("../../assets/quartinho/comoda.webp"),
@@ -287,9 +300,12 @@ function Quartinho() {
   const [quarto, setQuarto] = useState<Quartinho | null>(null);
   /* O cômodo na tela: o quarto, ou a cozinha à direita dele (na bancada, `&comodo=cozinha`). */
   const [comodo, setComodo] = useState<Comodo>(comodoDaBancada);
-  const [categoria, setCategoria] = useState<Aba>(() =>
-    parametroDaBancada("aba") === "ar" ? "ar" : CATEGORIAS[comodoDaBancada()][0]!.id,
-  );
+  const [categoria, setCategoria] = useState<Aba>(() => {
+    const aba = parametroDaBancada("aba");
+    if (aba === "ar") return "ar";
+    const abas = CATEGORIAS[comodoDaBancada()];
+    return abas.find((c) => c.id === aba)?.id ?? abas[0]!.id;
+  });
   const paginas = useRef<ScrollView>(null);
   const [cantinho, setCantinho] = useState<CantinhoOk | null | "lendo">("lendo");
   /* A loja por fase do banco: `undefined` lendo, `null` sem a tabela. */
@@ -376,6 +392,22 @@ function Quartinho() {
       });
       setFala(falaDaCoisa(c, !ligada(coisas, chave)));
       setPose("feliz");
+    },
+    [uid, coisas],
+  );
+  /* Tocar numa luz da bandeja posta no cômodo acende ou apaga (e mostra a aba). */
+  const aoTocarNaLuz = useCallback(
+    (id: IdDoItem) => {
+      toque();
+      const chave = chaveDaLuzApagada(id);
+      setCoisas((antes) => {
+        const depois = alternarCoisa(antes, chave);
+        if (uid && !ehBancada()) void gravarJson(chaveDasCoisas(uid), depois);
+        return depois;
+      });
+      setFala(falaDaLuzDaBandeja(id, !luzDaBandejaAcesa(coisas, id)));
+      setPose("feliz");
+      setCategoria("luzes");
     },
     [uid, coisas],
   );
@@ -466,9 +498,14 @@ function Quartinho() {
         setFala(`Esse vem de presente na missão "${s.missao.texto.toLowerCase()}".`);
         return;
       }
-      if (faltaOBerco(quarto, item.id)) {
+      const apoio = faltaOApoio(quarto, item.id);
+      if (apoio) {
         toque();
-        setFala("O móbile vai no berço. Põe o berço primeiro?");
+        setFala(
+          apoio === "berco"
+            ? "O móbile vai no berço. Põe o berço primeiro?"
+            : "O projetor fica em cima da cômoda. Põe a cômoda primeiro?",
+        );
         return;
       }
       selecao();
@@ -764,6 +801,8 @@ function Quartinho() {
                 viva={acesa && c.id === comodo}
                 ar={quarto?.ar ?? null}
                 semJanela={cortinaFechada(coisas, c.id)}
+                coisas={coisas}
+                aoTocarNaLuz={aoTocarNaLuz}
               />
               <LuzesDasCoisas
                 comodo={c.id}
@@ -1340,6 +1379,8 @@ const Cena = memo(function Cena({
   viva,
   ar,
   semJanela,
+  coisas,
+  aoTocarNaLuz,
 }: {
   comodo: Comodo;
   /** O que está NESTE cômodo. */
@@ -1357,6 +1398,9 @@ const Cena = memo(function Cena({
   ar: IdDoAr | null;
   /** A cortina fechada: o sol e o luar não entram pela janela. */
   semJanela: boolean;
+  /** As coisas tocadas (as luzes da bandeja que ela apagou moram aqui). */
+  coisas: EstadoDasCoisas;
+  aoTocarNaLuz: (id: IdDoItem) => void;
 }) {
   const itens = emOrdemDeDesenho(postos);
   const luz = LUZ[comodo];
@@ -1374,17 +1418,30 @@ const Cena = memo(function Cena({
           <SombraNoChao key={item.id} item={item} noite={noite} largura={L} altura={A} />
         ))}
 
-      {itens.map((item) => (
-        <ItemNoQuarto
-          key={item.id}
-          item={item}
-          novo={novo === item.id}
-          noite={noite}
-          largura={L}
-          altura={A}
-          aoTocar={aoTocar}
-        />
-      ))}
+      {itens.map((item) =>
+        item.desenhado ? (
+          <LuzDesenhada
+            key={item.id}
+            item={item}
+            acesa={luzDaBandejaAcesa(coisas, item.id)}
+            noite={noite}
+            novo={novo === item.id}
+            largura={L}
+            altura={A}
+            aoTocar={aoTocarNaLuz}
+          />
+        ) : (
+          <ItemNoQuarto
+            key={item.id}
+            item={item}
+            novo={novo === item.id}
+            noite={noite}
+            largura={L}
+            altura={A}
+            aoTocar={aoTocar}
+          />
+        ),
+      )}
 
       {!acesa ? null : noite ? (
         <>
@@ -1424,7 +1481,9 @@ const Cena = memo(function Cena({
               (`luz`, na `REGUA_DA_LUZ`): o abajur ilumina o quarto, o móbile
               que brilha no escuro só acende de leve. */}
           {itens.map((item) =>
-            item.luz ? <LuzDoItem key={item.id} item={item} largura={L} altura={A} /> : null,
+            item.luz && !item.desenhado ? (
+              <LuzDoItem key={item.id} item={item} largura={L} altura={A} />
+            ) : null,
           )}
           <Cantos largura={L} altura={A} tom="#070824" forca={0.5} />
           {viva ? <Cintilas pontos={luz.cintilasDaNoite} noite largura={L} altura={A} /> : null}
@@ -2378,8 +2437,17 @@ function Abas({
   ativa: Aba;
   aoEscolher: (c: Aba) => void;
 }) {
+  /* A aba escolhida fica à vista (a de Luzes mora no fim da fileira: tocar
+     numa luz do cômodo a abre, e ela não pode ficar fora da tela). */
+  const rolagem = useRef<ScrollView>(null);
+  const posicoes = useRef<Partial<Record<Aba, number>>>({});
+  useEffect(() => {
+    const x = posicoes.current[ativa];
+    if (x != null) rolagem.current?.scrollTo({ x: Math.max(0, x - 40), animated: true });
+  }, [ativa]);
   return (
     <ScrollView
+      ref={rolagem}
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={{ gap: 6, paddingHorizontal: espaco.sm, paddingVertical: 4 }}
@@ -2392,6 +2460,11 @@ function Abas({
             accessibilityRole="tab"
             accessibilityState={{ selected: sim }}
             accessibilityLabel={c.nome}
+            onLayout={(e) => {
+              posicoes.current[c.id] = e.nativeEvent.layout.x;
+              if (c.id === ativa && e.nativeEvent.layout.x > 200)
+                rolagem.current?.scrollTo({ x: e.nativeEvent.layout.x - 40, animated: false });
+            }}
             onPress={() => {
               selecao();
               aoEscolher(c.id);

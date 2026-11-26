@@ -5,11 +5,16 @@ import { semComentarios } from "@/lib/sem-comentarios";
 import {
   alternarCoisa,
   chaveDaCoisa,
+  chaveDaLuzApagada,
   COISAS,
   coisasDoComodo,
   falaDaCoisa,
+  falaDaLuzDaBandeja,
   lerEstadoDasCoisas,
+  LUZES_DA_BANDEJA,
+  luzDaBandejaAcesa,
   luzesAcesas,
+  TOQUE_DA_LUZ,
 } from "./coisas";
 
 /**
@@ -52,9 +57,14 @@ describe("as coisas do quartinho", () => {
       });
       expect(x1 > x0 && y1 > y0).toBe(true);
       if (c.tipo === "luz") {
-        /* O ponto aceso está dentro do toque, e a luz cai para baixo dele. */
-        expect(c.ponto[0] > x0 && c.ponto[0] < x1 && c.ponto[1] > y0 && c.ponto[1] < y1).toBe(true);
-        expect(c.chao[1]).toBeGreaterThan(c.ponto[1]);
+        /* O primeiro ponto é o que se toca; a luz de cada um cai para baixo dele. */
+        const p = c.pontos[0]!;
+        expect(p.x > x0 && p.x < x1 && p.y > y0 && p.y < y1).toBe(true);
+        for (const q of c.pontos) {
+          if (q.chao) expect(q.chao[1]).toBeGreaterThan(q.y);
+          expect(q.rx > 0 && q.ry > 0 && q.rx < 0.05 && q.ry < 0.02).toBe(true);
+        }
+        expect(c.teto).toMatch(/^#[0-9a-f]{6}$/);
       }
       if (c.tipo === "porta")
         for (const f of c.folhas) {
@@ -74,6 +84,30 @@ describe("as coisas do quartinho", () => {
         }
       }
     }
+  });
+
+  test("as luzes da bandeja: desenhadas, uma de cada tipo por cômodo, tocáveis à vista", () => {
+    const porComodo = (c: string) =>
+      LUZES_DA_BANDEJA.filter((i) => i.comodo === c)
+        .map((i) => i.id)
+        .sort();
+    expect(porComodo("quarto")).toEqual(["neon-lua", "projetor", "varal"]);
+    expect(porComodo("cozinha")).toEqual(["fita-led", "pendentes", "pisca-pisca"]);
+    for (const i of LUZES_DA_BANDEJA) {
+      expect(i.categoria).toBe("luzes");
+      /* Presente da Bolha: a lojinha mora no servidor do site, que não muda. */
+      expect(i.lojinha).toBeUndefined();
+      /* A ficha de luz vem da régua, como a de todo item. */
+      expect(i.luz).not.toBeNull();
+      const t = TOQUE_DA_LUZ[i.id]!;
+      expect(t).toBeDefined();
+      expect(t[0] >= 0.085 && t[2] <= 0.915 && t[0] < t[2] && t[1] < t[3]).toBe(true);
+    }
+    /* Postas, nascem acesas; o estado guarda as apagadas. */
+    expect(luzDaBandejaAcesa([], "varal")).toBe(true);
+    expect(luzDaBandejaAcesa(alternarCoisa([], chaveDaLuzApagada("varal")), "varal")).toBe(false);
+    expect(lerEstadoDasCoisas(["apagada:varal", "apagada:berco"])).toEqual(["apagada:varal"]);
+    expect(falaDaLuzDaBandeja("projetor", true)).toBe("Olha o céu no teto!");
   });
 
   test("tocar liga e desliga; o que vem do aparelho é filtrado", () => {

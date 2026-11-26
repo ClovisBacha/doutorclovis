@@ -19,7 +19,7 @@
  * brincadeira, não posse — não vale sementinha nem vai para o servidor.
  */
 
-import type { Comodo } from "./quarto";
+import { ITENS, type Comodo, type IdDoItem, type ItemDoQuarto } from "./quarto";
 
 export type TipoDaCoisa = "luz" | "porta" | "cortina";
 
@@ -37,9 +37,14 @@ export type Coisa = {
 } & (
   | {
       tipo: "luz";
-      /** O ponto de luz no teto e onde a luz cai no chão. */
-      ponto: readonly [number, number];
-      chao: readonly [number, number];
+      /**
+       * Os pontos de luz que este toque acende (no quarto, o do fundo e o da
+       * frente do mesmo lado: o da frente fica embaixo do alto da tela). O
+       * primeiro é o que se toca.
+       */
+      pontos: readonly PontoDeLuz[];
+      /** A cor do teto em volta, de dia (a lente apagada é desenhada nela). */
+      teto: string;
     }
   | {
       tipo: "porta";
@@ -66,6 +71,23 @@ export type Coisa = {
       remendos: { dia: readonly Remendo[]; noite: readonly Remendo[] };
     }
 );
+
+/**
+ * Um ponto de luz do teto: o centro e o aro (raios, em frações da arte), e
+ * onde a luz cai no chão (o cone e a poça), se cai à vista.
+ *
+ * ⚠️ De dia a pintura tem o ponto ACESO (a lente branca e o halo): apagado, a
+ * tela desenha por cima a lente apagada, na cor do teto (25/11/2026, o dono:
+ * "elas acabam parecendo estar acesas já antes de ligar"). De noite a pintura
+ * já tem o ponto apagado.
+ */
+export type PontoDeLuz = {
+  x: number;
+  y: number;
+  rx: number;
+  ry: number;
+  chao?: readonly [number, number];
+};
 
 export type Remendo = {
   /** A mancha de luz, um quadrilátero em frações da arte. */
@@ -95,18 +117,24 @@ export const COISAS: readonly Coisa[] = [
     id: "luz-esquerda",
     comodo: "quarto",
     tipo: "luz",
-    nome: "a luz do teto da esquerda",
-    ponto: [0.305, 0.226],
-    chao: [0.33, 0.6],
+    nome: "as luzes do teto da esquerda",
+    pontos: [
+      { x: 0.305, y: 0.227, rx: 0.0234, ry: 0.0048, chao: [0.33, 0.6] },
+      { x: 0.228, y: 0.098, rx: 0.0358, ry: 0.0099, chao: [0.25, 0.84] },
+    ],
+    teto: "#e4b8a7",
     toque: [0.25, 0.195, 0.36, 0.26],
   },
   {
     id: "luz-direita",
     comodo: "quarto",
     tipo: "luz",
-    nome: "a luz do teto da direita",
-    ponto: [0.695, 0.226],
-    chao: [0.67, 0.6],
+    nome: "as luzes do teto da direita",
+    pontos: [
+      { x: 0.697, y: 0.227, rx: 0.0234, ry: 0.0048, chao: [0.67, 0.6] },
+      { x: 0.773, y: 0.098, rx: 0.0358, ry: 0.0099, chao: [0.75, 0.84] },
+    ],
+    teto: "#e4b8a7",
     toque: [0.64, 0.195, 0.75, 0.26],
   },
   {
@@ -176,8 +204,8 @@ export const COISAS: readonly Coisa[] = [
     comodo: "cozinha",
     tipo: "luz",
     nome: "a luz do teto da esquerda",
-    ponto: [0.283, 0.278],
-    chao: [0.3, 0.66],
+    pontos: [{ x: 0.285, y: 0.278, rx: 0.0202, ry: 0.004, chao: [0.3, 0.66] }],
+    teto: "#f0c7ae",
     toque: [0.23, 0.25, 0.34, 0.31],
   },
   {
@@ -185,8 +213,8 @@ export const COISAS: readonly Coisa[] = [
     comodo: "cozinha",
     tipo: "luz",
     nome: "a luz do teto da direita",
-    ponto: [0.681, 0.278],
-    chao: [0.66, 0.66],
+    pontos: [{ x: 0.682, y: 0.278, rx: 0.0202, ry: 0.004, chao: [0.66, 0.66] }],
+    teto: "#f0c7ae",
     toque: [0.63, 0.25, 0.74, 0.31],
   },
   {
@@ -271,7 +299,18 @@ export const coisasDoComodo = (comodo: Comodo) => COISAS.filter((c) => c.comodo 
  */
 export type EstadoDasCoisas = readonly string[];
 
-const CHAVES = new Set(COISAS.map(chaveDaCoisa));
+/**
+ * AS LUZES DA BANDEJA (os itens desenhados, 26/11/2026): postas no cômodo,
+ * nascem ACESAS. O estado guarda as que ela APAGOU (`apagada:<id>`), na mesma
+ * lista das coisas.
+ */
+export const chaveDaLuzApagada = (id: IdDoItem) => `apagada:${id}`;
+export const LUZES_DA_BANDEJA: readonly ItemDoQuarto[] = ITENS.filter((i) => i.desenhado);
+
+const CHAVES = new Set([
+  ...COISAS.map(chaveDaCoisa),
+  ...LUZES_DA_BANDEJA.map((i) => chaveDaLuzApagada(i.id)),
+]);
 
 /** Lê o que veio do aparelho, jogando fora o que não existe (ou não é texto). */
 export function lerEstadoDasCoisas(bruto: unknown): EstadoDasCoisas {
@@ -290,6 +329,33 @@ export function alternarCoisa(estado: EstadoDasCoisas, chave: string): EstadoDas
 export function luzesAcesas(estado: EstadoDasCoisas, comodo: Comodo): number {
   return coisasDoComodo(comodo).filter((c) => c.tipo === "luz" && ligada(estado, chaveDaCoisa(c)))
     .length;
+}
+
+/** Onde o dedo acerta cada luz (frações da pintura): o desenho, e não a caixa quadrada do item. */
+export const TOQUE_DA_LUZ: Partial<Record<IdDoItem, readonly [number, number, number, number]>> = {
+  varal: [0.26, 0.265, 0.79, 0.33],
+  "neon-lua": [0.825, 0.305, 0.9, 0.405],
+  projetor: [0.64, 0.425, 0.69, 0.468],
+  "pisca-pisca": [0.33, 0.328, 0.67, 0.372],
+  "fita-led": [0.12, 0.505, 0.7, 0.53],
+  pendentes: [0.385, 0.17, 0.615, 0.27],
+};
+
+export const luzDaBandejaAcesa = (estado: EstadoDasCoisas, id: IdDoItem) =>
+  !ligada(estado, chaveDaLuzApagada(id));
+
+/** O que a Bolha diz ao acender ou apagar uma luz da bandeja. */
+const ACESA: Partial<Record<IdDoItem, readonly [string, string]>> = {
+  varal: ["Luzinhas acesas!", "Luzinhas apagadas."],
+  "neon-lua": ["A lua acendeu!", "Neon apagado."],
+  projetor: ["Olha o céu no teto!", "Projetor desligado."],
+  "pisca-pisca": ["Pisca-pisca aceso!", "Pisca-pisca apagado."],
+  "fita-led": ["Bancada iluminada!", "Fita apagada."],
+  pendentes: ["Pendentes acesos!", "Pendentes apagados."],
+};
+export function falaDaLuzDaBandeja(id: IdDoItem, acesa: boolean): string {
+  const f = ACESA[id];
+  return f ? f[acesa ? 0 : 1] : acesa ? "Luz acesa!" : "Luz apagada.";
 }
 
 /**
