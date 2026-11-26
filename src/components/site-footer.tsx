@@ -56,7 +56,7 @@ export function SiteFooter() {
                 >
                   {DOCTOR.supportEmail}
                 </a>
-                <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground/80">
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground/80">
                   Suporte: comece pelo <strong>chat do app</strong> (na hora); se precisar, e-mail
                   com resposta em até 1 dia útil.
                 </p>

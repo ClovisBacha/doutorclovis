@@ -16,6 +16,14 @@ export type FalaDoMascote = {
   texto: string;
   /** Rótulo do toque, para leitor de tela. */
   aria: string;
+  /**
+   * O que o toque no BALÃO faz, quando a fala promete um lugar.
+   *
+   * É a porta do "Você sabia?": a bolha apresenta uma função e o toque leva
+   * até ela. Sem isto, o balão repete o toque do personagem (o chat) — que é
+   * o certo para a frase do dia, que não promete lugar nenhum.
+   */
+  aoTocar?: () => void;
 };
 
 /**

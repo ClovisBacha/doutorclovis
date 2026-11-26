@@ -37,18 +37,25 @@ export type PassoDoTutorial = {
    * `null` na abertura e no fecho: eles falam do app inteiro, e acender um
    * ícone ali faria a paciente procurar significado onde não há.
    */
-  destaca: "sos" | "saude" | "home" | "jogo" | "chat" | null;
+  destaca: "sos" | "saude" | "home" | "jogo" | "comunidade" | "menu" | "bolha" | null;
   titulo: string;
   corpo: string;
 };
 
 /**
  * A ordem é a da BARRA, da esquerda para a direita: SOS · Saúde · Bebê · Jogo
- * · Chat. Ensinar numa ordem diferente da que o dedo encontra obrigaria a
- * paciente a traduzir o tutorial para a tela.
+ * · Comunidade — e depois as duas portas do TOPO: o ☰ e a própria bolha.
+ * Ensinar numa ordem diferente da que o dedo encontra obrigaria a paciente a
+ * traduzir o tutorial para a tela.
  *
- * A única exceção é o SOS vir primeiro, e ele já é o primeiro da barra: é o
- * que ela precisa saber ANTES de precisar.
+ * ⚠️ O quinto cartão dizia "chat" e destacava um item que a barra NÃO TEM
+ * desde que o chat mudou-se para a bolha (ago/2026): nenhum ícone acendia, e
+ * a Comunidade — que ocupa aquele lugar — nunca era ensinada. O estudo de
+ * navegação (set/2026) achou isso: o único momento em que o app se explica
+ * gastava um cartão apontando para o vazio.
+ *
+ * O ☰ e a bolha ganharam cartão pela mesma razão: das 24 abas do app, 15 só
+ * têm porta no ☰, e o chat só existe tocando na bolha — e nada dizia isso.
  */
 export const PASSOS_DO_TUTORIAL: PassoDoTutorial[] = [
   {
@@ -86,11 +93,25 @@ export const PASSOS_DO_TUTORIAL: PassoDoTutorial[] = [
       "Uma aula rápida, uma meditação, um movimento leve. Cinco minutos que rendem o dia — e rendem Sementinhas.",
   },
   {
-    id: "chat",
-    destaca: "chat",
+    id: "comunidade",
+    destaca: "comunidade",
+    titulo: "Quem está nessa com você",
+    corpo:
+      "Outras gestantes, suas amigas, o chá de bebê e o álbum da família. Tocar de novo no ícone mostra os atalhos da aba.",
+  },
+  {
+    id: "menu",
+    destaca: "menu",
+    titulo: "O resto mora no ☰",
+    corpo:
+      "Consultas, registros, assinatura, seu médico e o acompanhante — e a lista de tudo o que o app faz, para nada ficar escondido.",
+  },
+  {
+    id: "bolha",
+    destaca: "bolha",
     titulo: "Dúvida às três da manhã?",
     corpo:
-      "Pergunte aqui. Eu respondo com o que o seu médico ensinou ao app — e o que for para ele mesmo, você manda com um toque.",
+      "Me toque aqui em cima e pergunte. Eu respondo com o que o seu médico ensinou ao app — e o que for para ele mesmo, você manda com um toque.",
   },
   {
     id: "fecho",

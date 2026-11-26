@@ -65,7 +65,7 @@ export function InviteDoctorCTA({ variant = "card" }: { variant?: "card" | "hero
             href={waHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-full bg-emerald-500 px-6 py-2.5 text-sm font-bold text-white shadow-sm transition-transform hover:scale-[1.03]"
+            className="rounded-full bg-emerald-700 px-6 py-2.5 text-sm font-bold text-white shadow-sm transition-transform hover:scale-[1.03]"
           >
             Convidar no WhatsApp
           </a>
@@ -97,7 +97,7 @@ export function InviteDoctorCTA({ variant = "card" }: { variant?: "card" | "hero
               href={waHref}
               target="_blank"
               rel="noopener noreferrer"
-              className="rounded-full bg-emerald-500 px-4 py-1.5 text-xs font-semibold text-white"
+              className="rounded-full bg-emerald-700 px-4 py-1.5 text-xs font-semibold text-white"
             >
               Convidar no WhatsApp
             </a>

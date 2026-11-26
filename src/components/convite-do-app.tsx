@@ -37,7 +37,7 @@ export function ConviteDoApp({
        meio é o app se convidando para a festa. */
     <div className="mt-8 border-t border-border pt-5 text-center">
       <p className="text-[13px] font-semibold">{titulo}</p>
-      <p className="mx-auto mt-0.5 max-w-[34ch] text-[12px] leading-snug text-muted-foreground">
+      <p className="mx-auto mt-0.5 max-w-[34ch] text-xs leading-snug text-muted-foreground">
         {sub}
       </p>
       <a

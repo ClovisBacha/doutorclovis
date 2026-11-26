@@ -2,5 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "bun run build",
   "installCommand": "bun install",
+  "ignoreCommand": "git diff --quiet ${VERCEL_GIT_PREVIOUS_SHA:-HEAD^} HEAD -- . ':(exclude)mobile' ':(exclude)docs' ':(exclude)CLAUDE.md'",
   "crons": [{ "path": "/api/push-weekly-tick", "schedule": "0 12 * * *" }]
 }

@@ -36,7 +36,47 @@
  */
 import { faseDaGratidao, type FaseGratidao } from "@/lib/gratidao";
 
-export type Fase = FaseGratidao;
+/**
+ * ⚠️ **O PÓS-PARTO DEIXOU DE SER UM BALDE SÓ, e isto era o "app morre no parto"
+ * aparecendo na régua de pareamento.**
+ *
+ * `faseDe` devolvia `"pos"` para toda mãe: a de um recém-nascido de nove dias
+ * era considerada "da mesma fase" que a de uma criança de dois anos. Quem liga
+ * o filtro pedindo gente parecida recebia exatamente o contrário — e as duas
+ * pessoas com MENOS em comum no aplicativo inteiro são a mãe da primeira semana
+ * e a mãe que já voltou a trabalhar.
+ *
+ * Os cortes são de vida, não de aritmética:
+ *
+ * · `pos_recem` (até 3 meses) — noite virada, amamentação, coto, puerpério;
+ * · `pos_bebe` (3 a 12) — sono acertando, papinha, colo, creche à vista;
+ * · `pos_crianca` (12+) — anda, fala, e o assunto deixa de ser o corpo dela.
+ */
+export type FasePos = "pos_recem" | "pos_bebe" | "pos_crianca";
+export type Fase = FaseGratidao | FasePos;
+
+/** Os cortes do pós-parto, em meses de vida do bebê. */
+export const CORTE_RECEM_MESES = 3;
+export const CORTE_BEBE_MESES = 12;
+
+/**
+ * A fase de uma mãe, pela idade do bebê MAIS NOVO.
+ *
+ * ⚠️ **O MAIS NOVO, e não o primeiro filho.** Quem teve o segundo bebê há dois
+ * meses está na primeira semana de novo, e parear pela idade do mais velho a
+ * mandaria para a turma de quem já dorme a noite inteira.
+ *
+ * ⚠️ **Idade desconhecida devolve `pos_recem`, e não `null`.** Aqui o
+ * desconhecido tem um lado seguro claro: `birth_date` existe (então ela é mãe),
+ * e o pós-parto recente é onde a companhia mais importa. Deixar `null` a tiraria
+ * do filtro inteiro — que é o mesmo que dizer que ela não tem par.
+ */
+export function fasePosParto(mesesDoBebe: number | null | undefined): FasePos {
+  if (mesesDoBebe == null || !Number.isFinite(mesesDoBebe)) return "pos_recem";
+  if (mesesDoBebe < CORTE_RECEM_MESES) return "pos_recem";
+  if (mesesDoBebe < CORTE_BEBE_MESES) return "pos_bebe";
+  return "pos_crianca";
+}
 
 /**
  * A fase de alguém, a partir da semana.
@@ -47,8 +87,12 @@ export type Fase = FaseGratidao;
  * fingir uma fase colocaria estranhas no recorte de quem ligou o filtro
  * justamente para não vê-las.
  */
-export function faseDe(semanas: number | null | undefined, posParto: boolean): Fase | null {
-  if (posParto) return "pos";
+export function faseDe(
+  semanas: number | null | undefined,
+  posParto: boolean,
+  mesesDoBebe?: number | null,
+): Fase | null {
+  if (posParto) return fasePosParto(mesesDoBebe);
   if (semanas == null || !Number.isFinite(semanas)) return null;
   return faseDaGratidao(semanas, false);
 }

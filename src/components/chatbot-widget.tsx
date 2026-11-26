@@ -60,7 +60,7 @@ export function ChatbotWidget() {
         {open ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
       </button>
       {open && (
-        <div className="fixed bottom-[10.5rem] right-4 md:bottom-24 md:right-6 z-50 flex h-[30rem] max-h-[calc(100dvh-14rem)] w-[22rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-soft)]">
+        <div className="fixed bottom-[10.5rem] right-4 md:bottom-24 md:right-6 z-50 flex h-[30rem] max-h-[calc(100dvh-14rem)] w-[22rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl card-material shadow-[var(--shadow-soft)]">
           <div className="border-b border-border bg-primary px-4 py-3 text-primary-foreground">
             <p className="font-serif text-lg">Assistente da plataforma</p>
             <p className="text-xs opacity-80">Dúvidas sobre o app, o site e suporte</p>
@@ -168,7 +168,7 @@ export function ChatbotWidget() {
               <Send className="h-4 w-4" />
             </button>
           </form>
-          <p className="border-t border-border bg-background px-3 pb-2 text-center text-[10px] leading-tight text-muted-foreground">
+          <p className="border-t border-border bg-background px-3 pb-2 text-center text-xs leading-tight text-muted-foreground">
             Assistente de IA — não substitui a consulta médica. Em urgência, ligue 192 (SAMU).
           </p>
         </div>

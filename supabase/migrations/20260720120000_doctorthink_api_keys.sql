@@ -2,7 +2,7 @@
 -- 20260720120000 — DoctorThink: API keys (produto do Segundo Cérebro)
 -- ════════════════════════════════════════════════════════════════════════
 -- Chaves de API por inquilino (app cliente) para consumir o DoctorThink via
--- /api/doctorthink/*. Guardamos só o HASH (sha256) da chave — nunca a chave
+-- /api/doctorthink/… Guardamos só o HASH (sha256) da chave — nunca a chave
 -- crua. Server-only: todo acesso passa por service_role.
 
 CREATE TABLE IF NOT EXISTS public.doctorthink_api_keys (

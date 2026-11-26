@@ -18,7 +18,12 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { salvarConsulta } from "@/lib/clinical.functions";
-import { sinalPressao } from "@/lib/sinais-clinicos";
+import {
+  foraDaFaixa,
+  fraseDaFaixa,
+  sinalPressao,
+  type FaixaDeEntrada,
+} from "@/lib/sinais-clinicos";
 import { resumoParaAchados } from "@/lib/resumo-da-consulta";
 import type { EventoClinico } from "@/lib/clinical.functions";
 
@@ -176,12 +181,16 @@ export function RegistrarConsulta({
      `no-unused-vars` estão desligados neste projeto) e o efeito de um typo
      seria um TypeError dentro do `async salvar()` — botão sem reação, sem
      toast, sem pista. */
-  const FAIXAS: Partial<Record<keyof Campos, { min: number; max: number; nome: string }>> = {
-    systolic: { min: 50, max: 300, nome: "A sistólica" },
-    diastolic: { min: 20, max: 200, nome: "A diastólica" },
-    pesoKg: { min: 25, max: 350, nome: "O peso" },
-    alturaUterinaCm: { min: 5, max: 60, nome: "A altura uterina" },
-    bpmFetal: { min: 60, max: 220, nome: "O BCF" },
+  /* ⚠️ SÓ PISO, SEM TETO — a mesma decisão da régua da paciente
+     (`sinais-clinicos.ts`), e as duas leem os MESMOS dois helpers de lá. Duas
+     réguas divergiriam no primeiro ajuste, e a divergência apareceria como o
+     médico conseguindo registrar um número que a paciente não consegue. */
+  const FAIXAS: Partial<Record<keyof Campos, FaixaDeEntrada>> = {
+    systolic: { min: 50, nome: "A sistólica", unidade: "" },
+    diastolic: { min: 20, nome: "A diastólica", unidade: "" },
+    pesoKg: { min: 0, acimaDe: true, nome: "O peso", unidade: "" },
+    alturaUterinaCm: { min: 0, acimaDe: true, nome: "A altura uterina", unidade: "" },
+    bpmFetal: { min: 60, nome: "O BCF", unidade: "" },
   };
 
   function foraDeFaixa(): string | null {
@@ -189,9 +198,7 @@ export function RegistrarConsulta({
       if (!faixa) continue;
       const v = num(f[campo as keyof Campos]);
       if (v == null) continue;
-      if (v < faixa.min || v > faixa.max) {
-        return `${faixa.nome} precisa ficar entre ${faixa.min} e ${faixa.max}. Confira o número.`;
-      }
+      if (foraDaFaixa(faixa, v)) return fraseDaFaixa(faixa);
     }
     return null;
   }
@@ -291,7 +298,9 @@ export function RegistrarConsulta({
               ? "Já existe uma consulta registrada nesta data e hora."
               : motivo === "banco_desatualizado"
                 ? "Falta aplicar o SQL das consultas (APLICAR_CONSULTA.sql) no Supabase."
-                : "Não consegui salvar a consulta. Tente de novo.",
+                : motivo === "teto_antigo_no_banco"
+                  ? "O banco ainda tem o limite antigo de faixa. Rode de novo o APLICAR_CONSULTA.sql no Supabase — o app já aceita este valor."
+                  : "Não consegui salvar a consulta. Tente de novo.",
         );
         return;
       }

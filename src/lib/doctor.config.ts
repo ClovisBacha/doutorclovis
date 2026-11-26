@@ -10,7 +10,7 @@ export const DOCTOR = {
   email: "contato@drclovisbacha.com.br",
   /** E-mail de SUPORTE da plataforma Obstétrica (chat primeiro, e-mail depois) */
   supportEmail: "obstetrica.app@gmail.com",
-  /** WhatsApp com DDI (usado pelo componente whatsapp-button) */
+  /** WhatsApp com DDI — a fonte ÚNICA do número do consultório no site. */
   whatsappUrl: "https://wa.me/5531986342903",
   whatsappDisplay: "+55 (31) 98634-2903",
   /** Endereço do consultório — deixar vazio para não exibir no rodapé */

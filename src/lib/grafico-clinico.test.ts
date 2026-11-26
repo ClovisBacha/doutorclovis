@@ -9,6 +9,9 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+
+import { semComentarios } from "./sem-comentarios";
 import { seriesDePressao } from "@/components/grafico-clinico";
 import { sinalPressao } from "./sinais-clinicos";
 
@@ -111,5 +114,84 @@ describe("3. o desenho", () => {
     const [sis, dia] = seriesDePressao([], gravidadeReal);
     expect(sis.pontos).toEqual([]);
     expect(dia.pontos).toEqual([]);
+  });
+});
+
+describe("⚠️ o ponto do gráfico não se anuncia como botão", () => {
+  test('o alvo do ponto é `role="img"`, e não `role="button"`', async () => {
+    /* Ele não tem `onClick` nem ação de teclado: anunciar "botão" faz a
+       paciente apertar Enter e nada acontecer — e a varredura de
+       acessibilidade o contava como um controle de toque de 13×13px, muito
+       abaixo dos 44. É um ponto de dado com descrição, e os valores continuam
+       legíveis pela fita de estatísticas e pela lista abaixo. */
+    const { readFileSync } = await import("node:fs");
+    const { semComentarios } = await import("@/lib/sem-comentarios");
+    const codigo = semComentarios(readFileSync("src/components/grafico-clinico.tsx", "utf8"));
+    expect(codigo).not.toContain('role="button"');
+    /* E o alvo continua existindo, maior que a marca — 4px de ponto com 4px de
+       alvo é impossível de acertar no celular. */
+    expect(codigo).toMatch(/r=\{14\}[\s\S]{0,200}fill="transparent"/);
+  });
+});
+
+describe("⚠️ a identidade é da TELA, e a moldura é de quem já desenhou o cartão", () => {
+  const grafico = semComentarios(readFileSync("src/components/grafico-clinico.tsx", "utf8"));
+  const chutes = semComentarios(readFileSync("src/components/kicks-tab.tsx", "utf8"));
+
+  test("a paleta é CATÁLOGO FECHADO, nunca um hex por prop", () => {
+    /* Prop de cor livre convida o próximo a escolher um tom bonito e não
+       medido — cada par daqui passou nas seis checagens do validador nos dois
+       modos, contra a superfície de cada um. */
+    expect(grafico).toContain("paleta?: PaletaDoGrafico");
+    expect(grafico).toMatch(/const PALETAS = \{/);
+    expect(grafico).not.toMatch(/cor\?: string/);
+  });
+
+  test("cada paleta define os DOIS tokens, nos DOIS modos", () => {
+    const i = grafico.indexOf("const PALETAS = {");
+    const bloco = grafico.slice(i, grafico.indexOf("} as const;", i));
+    for (const nome of ["clinica", "chutes"]) {
+      const j = bloco.indexOf(nome + ":");
+      expect(j).toBeGreaterThan(-1);
+      const fim = bloco.indexOf('",', j);
+      const linha = bloco.slice(j, fim);
+      for (const tok of [
+        "[--serie-a:#",
+        "[--serie-b:#",
+        "dark:[--serie-a:#",
+        "dark:[--serie-b:#",
+      ]) {
+        expect(nome + " → " + linha).toContain(tok);
+      }
+    }
+  });
+
+  test("⚠️ os chutes NÃO herdam o índigo do prontuário", () => {
+    const i = grafico.indexOf("chutes:");
+    const linha = grafico.slice(i, grafico.indexOf('",', i));
+    expect(linha).not.toContain("#4F46E5");
+    /* `sky-700` é o MESMO tom do botão de iniciar sessão da aba. */
+    expect(linha.toUpperCase()).toContain("#0369A1");
+    expect(chutes).toContain('paleta="chutes"');
+    expect(chutes).toContain("bg-sky-700");
+  });
+
+  test("⚠️ a figura não desenha moldura dentro de um cartão que já existe", () => {
+    /* Duas bordas concêntricas, com a de dentro sendo justamente o cartão de
+       contorno que o app da paciente já tinha tirado de todas as outras
+       telas. */
+    expect(grafico).toContain('moldura?: "cartao" | "nenhuma"');
+    expect(grafico).toMatch(/moldura === "cartao" \? "rounded-2xl border/);
+    const i = chutes.indexOf("<GraficoClinico");
+    const uso = chutes.slice(i, chutes.indexOf("/>", i));
+    expect(uso).toContain('moldura="nenhuma"');
+    /* E o cartão de fora continua sendo o material do app. */
+    expect(chutes.slice(Math.max(0, i - 400), i)).toContain("card-material");
+  });
+
+  test("o estado vazio usa a MESMA caixa — senão ele volta a aninhar", () => {
+    const figuras = grafico.match(/<figure className=\{caixa\}>/g) ?? [];
+    expect(figuras.length).toBe(2);
+    expect(grafico).not.toContain('<figure className="rounded-2xl border');
   });
 });

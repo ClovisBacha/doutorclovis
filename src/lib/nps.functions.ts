@@ -22,6 +22,13 @@ export const shouldAskNps = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const user = await getUser(data.accessToken);
     if (!user) return { ok: false as const, ask: false };
+    /* ⚠️ **CONTA NOVA NÃO É PERGUNTADA.** O único corte era "90 dias desde a
+       última resposta" — quem criava a conta era perguntada na primeira
+       abertura, e a resposta mediria a expectativa dela, não o produto. A régua
+       mora em `nps.ts`, junto do resto das decisões de QUANDO é decente
+       perguntar. */
+    const { contaNovaDemais } = await import("@/lib/nps");
+    if (contaNovaDemais(user.created_at, new Date())) return { ok: true as const, ask: false };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const recent = await safe<boolean>(async () => {
       const since = new Date(Date.now() - NINETY_DAYS_MS).toISOString();

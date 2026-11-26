@@ -9,7 +9,13 @@
  */
 
 import { afterEach, describe, expect, test } from "bun:test";
-import { limparVoltar, quantosEsperandoVoltar, registrarVoltar, voltarAgora } from "./voltar";
+import {
+  limparVoltar,
+  quantosEsperandoVoltar,
+  registrarVoltar,
+  registrarVoltarDeFundo,
+  voltarAgora,
+} from "./voltar";
 
 afterEach(() => limparVoltar());
 
@@ -126,6 +132,69 @@ describe("um handler que explode perde a vez, não fecha o app", () => {
     registrarVoltar(() => {
       throw new Error("estourou");
     });
+    expect(voltarAgora()).toBe("vazio");
+  });
+});
+
+describe("⚠️ o registro de FUNDO é consultado por último, sempre", () => {
+  test("mesmo registrando DEPOIS — que é a ordem real dos efeitos do React", () => {
+    /* O efeito do FILHO roda antes do do PAI. A subida de aba de
+       `minha-conta` (o pai) registra DEPOIS da Comunidade (o filho); pelo
+       caminho normal ela entraria acima e engoliria o voltar antes de a aba
+       ter a vez — de um perfil aberto, o voltar sairia da Comunidade inteira
+       em vez de devolver o feed. */
+    const ordem: string[] = [];
+    registrarVoltar(() => {
+      ordem.push("filho");
+      return true;
+    });
+    registrarVoltarDeFundo(() => {
+      ordem.push("pai");
+      return true;
+    });
+    expect(voltarAgora()).toBe("consumido");
+    expect(ordem).toEqual(["filho"]);
+  });
+
+  test("e ele assume quando o de cima RECUSA", () => {
+    const ordem: string[] = [];
+    registrarVoltar(() => {
+      ordem.push("filho");
+      return false;
+    });
+    registrarVoltarDeFundo(() => {
+      ordem.push("pai");
+      return true;
+    });
+    expect(voltarAgora()).toBe("consumido");
+    expect(ordem).toEqual(["filho", "pai"]);
+  });
+
+  test("⚠️ uma folha aberta depois continua ganhando dos dois", () => {
+    /* É a garantia que já existia e não pode ter sido desfeita: folha de
+       compra sobre a tela do cantinho — o voltar fecha a folha primeiro. */
+    const ordem: string[] = [];
+    registrarVoltarDeFundo(() => {
+      ordem.push("fundo");
+      return true;
+    });
+    registrarVoltar(() => {
+      ordem.push("tela");
+      return false;
+    });
+    registrarVoltar(() => {
+      ordem.push("folha");
+      return true;
+    });
+    expect(voltarAgora()).toBe("consumido");
+    expect(ordem).toEqual(["folha"]);
+  });
+
+  test("o cancelador tira só ele, e a pilha volta ao que era", () => {
+    const cancelar = registrarVoltarDeFundo(() => true);
+    expect(quantosEsperandoVoltar()).toBe(1);
+    cancelar();
+    expect(quantosEsperandoVoltar()).toBe(0);
     expect(voltarAgora()).toBe("vazio");
   });
 });
