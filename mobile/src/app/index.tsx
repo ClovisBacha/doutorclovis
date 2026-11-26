@@ -1,3 +1,4 @@
+import { Image } from "expo-image";
 import { Redirect, router } from "expo-router";
 import { ActivityIndicator, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -65,17 +66,33 @@ export default function Porta() {
   return <Redirect href="/jornada" />;
 }
 
+const ABERTURA = require("../../assets/abertura-ios.png");
+
 /**
  * Enquanto a porta decide (a rede lenta passou do teto da splash, ou ela
- * acabou de entrar e o perfil ainda vem): a mesma cor da splash, com o
- * indicador no meio da tela — nunca uma folha clara com um spinner embaixo
+ * acabou de entrar e o perfil ainda vem): a mesma imagem da splash, com o
+ * indicador embaixo da Bolha — nunca uma folha clara com um spinner embaixo
  * da ilha do iPhone.
  */
 function Abrindo() {
   return (
     <View style={{ flex: 1, backgroundColor: CEUS.noite.chao }}>
+      {/* A mesma imagem da splash do iPhone (o céu da trilha com a Bolha), para
+          a troca não piscar; o indicador fica embaixo da Bolha. */}
+      <Image
+        source={ABERTURA}
+        contentFit="cover"
+        style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }}
+        accessible={false}
+      />
       <SafeAreaView
-        style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 12 }}
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "flex-end",
+          paddingBottom: "30%",
+          gap: 12,
+        }}
         accessible
         accessibilityRole="progressbar"
         accessibilityLabel="Abrindo o app"

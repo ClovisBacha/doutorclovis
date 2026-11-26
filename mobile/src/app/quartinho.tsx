@@ -50,6 +50,7 @@ import {
   lerOCantinho,
   type CantinhoOk,
 } from "~/componentes/recompensas/economia-do-cantinho";
+import { LuzesDasCoisas, PortasECortinas, ToquesDasCoisas } from "~/componentes/quartinho/coisas";
 import { TEM_VIDRO_DO_SISTEMA, Vidro } from "~/componentes/vidro";
 import { ehBancada, parametroDaBancada } from "~/lib/bancada";
 import { clarear } from "~/lib/cor";
@@ -90,6 +91,17 @@ import {
   type VitrineDoQuarto,
 } from "~/lib/quartinho/quarto";
 import { AR_DO_QUARTO, type IdDoAr } from "~/lib/quartinho/migracao";
+import {
+  alternarCoisa,
+  chaveDaCoisa,
+  coisasDoComodo,
+  falaDaCoisa,
+  ligada,
+  lerEstadoDasCoisas,
+  type Coisa,
+  type EstadoDasCoisas,
+} from "~/lib/quartinho/coisas";
+import { gravarJson, lerJson } from "~/lib/armazem";
 import { useSessao } from "~/lib/sessao";
 import { ALVO_MINIMO, cor, curva, espaco, fonte } from "~/tema";
 
@@ -226,6 +238,13 @@ const hojeDaTela = () => ymdLocal();
 const comodoDaBancada = (): Comodo =>
   parametroDaBancada("comodo") === "cozinha" ? "cozinha" : "quarto";
 
+/** A cortina deste cômodo está fechada? */
+const cortinaFechada = (estado: EstadoDasCoisas, comodo: Comodo) =>
+  coisasDoComodo(comodo).some((c) => c.tipo === "cortina" && ligada(estado, chaveDaCoisa(c)));
+
+/** As coisas tocadas do quartinho, no aparelho, por conta. */
+const chaveDasCoisas = (uid: string) => `dc-quartinho-coisas:${uid}`;
+
 function horaDaTela(): number {
   const h = Number(parametroDaBancada("hora"));
   return Number.isFinite(h) && parametroDaBancada("hora") != null ? h : new Date().getHours();
@@ -327,6 +346,39 @@ function Quartinho() {
   useEffect(() => gravarJa, [gravarJa]);
   /* O que é pesado de desenhar (as luzes, as cintilas) entra depois da entrada da tela. */
   const acesa = useDepoisDaEntrada();
+
+  /* AS COISAS QUE SE TOCAM (25/11/2026): a luz do teto, a geladeira, o forno
+     e a cortina. É brincadeira, não posse: o estado mora no aparelho, por
+     conta (`dc-`: apagado no sair), e não no servidor. Na bancada,
+     `&coisas=cozinha:geladeira,quarto:luz-esquerda`. */
+  const uid = useSessao().sessao?.user.id ?? null;
+  const [coisas, setCoisas] = useState<EstadoDasCoisas>(() =>
+    lerEstadoDasCoisas((parametroDaBancada("coisas") ?? "").split(",")),
+  );
+  useEffect(() => {
+    if (!uid || ehBancada()) return;
+    let vivo = true;
+    void lerJson<unknown>(chaveDasCoisas(uid), []).then((b) => {
+      if (vivo) setCoisas(lerEstadoDasCoisas(b));
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [uid]);
+  const aoTocarNaCoisa = useCallback(
+    (c: Coisa) => {
+      toque();
+      const chave = chaveDaCoisa(c);
+      setCoisas((antes) => {
+        const depois = alternarCoisa(antes, chave);
+        if (uid && !ehBancada()) void gravarJson(chaveDasCoisas(uid), depois);
+        return depois;
+      });
+      setFala(falaDaCoisa(c, !ligada(coisas, chave)));
+      setPose("feliz");
+    },
+    [uid, coisas],
+  );
 
   /* O quarto guardado chega com a loja; a bancada entra pelo mesmo estado. */
   useEffect(() => {
@@ -685,6 +737,21 @@ function Quartinho() {
                       : "O quartinho do bebê"
                 }
               />
+              <PortasECortinas
+                comodo={c.id}
+                estado={coisas}
+                pintura={PINTURA[c.id][noite ? "noite" : "dia"]}
+                noite={noite}
+                largura={pintura.largura}
+                altura={pintura.altura}
+              />
+              <ToquesDasCoisas
+                comodo={c.id}
+                estado={coisas}
+                largura={pintura.largura}
+                altura={pintura.altura}
+                aoTocar={aoTocarNaCoisa}
+              />
               <Cena
                 comodo={c.id}
                 postos={postosDe[c.id]}
@@ -696,6 +763,14 @@ function Quartinho() {
                 acesa={acesa}
                 viva={acesa && c.id === comodo}
                 ar={quarto?.ar ?? null}
+                semJanela={cortinaFechada(coisas, c.id)}
+              />
+              <LuzesDasCoisas
+                comodo={c.id}
+                estado={coisas}
+                noite={noite}
+                largura={pintura.largura}
+                altura={pintura.altura}
               />
             </View>
           </View>
@@ -1264,6 +1339,7 @@ const Cena = memo(function Cena({
   acesa,
   viva,
   ar,
+  semJanela,
 }: {
   comodo: Comodo;
   /** O que está NESTE cômodo. */
@@ -1279,10 +1355,13 @@ const Cena = memo(function Cena({
   viva: boolean;
   /** O ar do quarto ligado (as pétalas, as bolhinhas), ou nenhum. */
   ar: IdDoAr | null;
+  /** A cortina fechada: o sol e o luar não entram pela janela. */
+  semJanela: boolean;
 }) {
   const itens = emOrdemDeDesenho(postos);
   const luz = LUZ[comodo];
-  const feixe = luz.janela && luz.mancha ? { janela: luz.janela, chao: luz.mancha } : null;
+  const feixe =
+    !semJanela && luz.janela && luz.mancha ? { janela: luz.janela, chao: luz.mancha } : null;
   return (
     <>
       {/* As estrelinhas da parede do quarto piscam (por baixo dos itens: estão na parede). */}
@@ -1322,14 +1401,16 @@ const Cena = memo(function Cena({
               forca={0.075}
             />
           ) : null}
-          <Brilho
-            cx={luz.poca[0] * L}
-            cy={luz.poca[1] * A}
-            raio={luz.poca[2] * L}
-            achatar={0.4}
-            tom="#b4c4ff"
-            forca={0.3}
-          />
+          {semJanela ? null : (
+            <Brilho
+              cx={luz.poca[0] * L}
+              cy={luz.poca[1] * A}
+              raio={luz.poca[2] * L}
+              achatar={0.4}
+              tom="#b4c4ff"
+              forca={0.3}
+            />
+          )}
           {luz.daNoite ? (
             <Brilho
               cx={luz.daNoite.cx * L}
@@ -1352,13 +1433,15 @@ const Cena = memo(function Cena({
         <>
           {/* O SOL: o clarão na janela, a faixa quente que entra e a poeira
               dourada no ar. */}
-          <Brilho
-            cx={luz.vidro[0] * L}
-            cy={luz.vidro[1] * A}
-            raio={luz.vidro[2] * L}
-            tom="#fff3cf"
-            forca={0.6}
-          />
+          {semJanela ? null : (
+            <Brilho
+              cx={luz.vidro[0] * L}
+              cy={luz.vidro[1] * A}
+              raio={luz.vidro[2] * L}
+              tom="#fff3cf"
+              forca={0.6}
+            />
+          )}
           {/* O dourado da manhã, que toma o cômodo inteiro a partir da janela. */}
           <Brilho
             cx={(luz.vidro[0] + 0.15) * L}
@@ -1378,14 +1461,16 @@ const Cena = memo(function Cena({
               forca={0.07}
             />
           ) : null}
-          <Brilho
-            cx={luz.poca[0] * L}
-            cy={luz.poca[1] * A}
-            raio={luz.poca[2] * L}
-            achatar={0.4}
-            tom="#ffd99a"
-            forca={0.26}
-          />
+          {semJanela ? null : (
+            <Brilho
+              cx={luz.poca[0] * L}
+              cy={luz.poca[1] * A}
+              raio={luz.poca[2] * L}
+              achatar={0.4}
+              tom="#ffd99a"
+              forca={0.26}
+            />
+          )}
           <Cantos largura={L} altura={A} tom="#5a2a14" forca={0.2} />
           {viva ? <Cintilas pontos={luz.cintilasDoDia} largura={L} altura={A} /> : null}
         </>

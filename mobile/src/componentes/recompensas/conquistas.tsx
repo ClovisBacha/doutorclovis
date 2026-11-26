@@ -42,7 +42,18 @@ import {
 } from "~/lib/jornada/conquistas";
 import { dataCompleta } from "~/lib/jornada/dia";
 import { useSessao } from "~/lib/sessao";
-import { canto, cor, curva, escala, espaco, fonte, fonteDoNumero, margem, ouro } from "~/tema";
+import {
+  canto,
+  cor,
+  curva,
+  escala,
+  espaco,
+  folha,
+  fonte,
+  fonteDoNumero,
+  margem,
+  ouro,
+} from "~/tema";
 
 /**
  * A ABA CONQUISTAS — a sala de troféus (18/11/2026, a vistoria): medalhas
@@ -553,12 +564,12 @@ function FolhaDaMedalha({
             ...fonte.normal,
             ...escala.corpo,
             textAlign: "center",
-            color: cor.textoCorpo,
+            color: folha.texto,
           }}
         >
           {descricaoNoApp(m.def)}
         </Text>
-        <Text style={{ ...fonte.media, ...escala.nota, color: cor.textoApagado }}>
+        <Text style={{ ...fonte.media, ...escala.nota, color: folha.apagado }}>
           {bloqueada ? "Ainda bloqueada" : quando ? `Desbloqueada em ${quando}` : "Desbloqueada"}
         </Text>
       </View>
@@ -574,8 +585,8 @@ function FolhaDaMedalha({
       {!bloqueada ? (
         <CompartilharConquista
           d={cartaoDaConquista(m.def)}
-          tinta={cor.primaria}
-          fundoDoBotao={cor.destaque}
+          tinta={cor.branco}
+          fundoDoBotao={cor.primaria}
         />
       ) : null}
     </Folha>

@@ -518,3 +518,22 @@ mostra o app.
 - **Arte**: sai das originais e de prompts guardados, nunca retocada à mão
   (`mobile/scripts/bolha-do-drive.mjs`). Cada lote é orçado antes e gera só
   com o OK do dono.
+
+## As coisas que se tocam, feitas (26/11/2026, sem crédito)
+
+As duas luzes do teto de cada cômodo acendem e apagam; a geladeira e o forno
+abrem; a cortina fecha e abre. Nada disso é arte nova (`lib/quartinho/coisas.ts`
+e `componentes/quartinho/coisas.tsx`):
+
+- a **porta** é o pedaço da pintura girando na dobradiça (`transformOrigin` +
+  `perspective`), com o miolo desenhado por código atrás dela;
+- a **cortina** é o tecido liso da pintura, esticado num quadrilátero (o do
+  quarto segue a perspectiva da parede); a luz da janela pintada no chão some
+  sob um remendo do próprio chão;
+- a **luz** é o ponto, o cone em quatro camadas e a poça, somados (`screen`).
+
+Para uma coisa nova: medir na pintura em tamanho real (recorte com `sips`),
+pôr as frações em `COISAS`, e compor numa foto do simulador com
+`&coisas=<cômodo>:<id>` na bancada. Ideias que ficaram para depois: a coifa que
+acende, a torneira que pinga, o abajur do quarto que já é item (a luz dele vem
+da `REGUA_DA_LUZ`).

@@ -10,7 +10,7 @@
     "backgroundColor": "#2a1f9a",
     "ios": {
       "bundleIdentifier": "br.com.obstetrica.app",
-      "buildNumber": "58",
+      "buildNumber": "59",
       "appleTeamId": "8PL2X9F9PV",
       "supportsTablet": false,
       "usesAppleSignIn": true,
@@ -37,7 +37,7 @@
     "android": {
       "package": "br.com.obstetrica.app",
       "adaptiveIcon": {
-        "backgroundColor": "#f76677",
+        "backgroundColor": "#321f57",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -66,7 +66,13 @@
         {
           "image": "./assets/abertura.png",
           "imageWidth": 200,
-          "backgroundColor": "#2a1f9a"
+          "backgroundColor": "#2a1f9a",
+          "ios": {
+            "image": "./assets/abertura-ios.png",
+            "resizeMode": "cover",
+            "enableFullScreenImage_legacy": true,
+            "backgroundColor": "#2a1f9a"
+          }
         }
       ],
       [

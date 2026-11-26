@@ -37,7 +37,13 @@ import { corJornada } from "~/componentes/jornada/cores";
 import { concluirMomento, FimDoMomento, type Desfecho } from "~/componentes/jornada/fim";
 import { pagarAula } from "~/componentes/jornada/economia";
 import { useBalanco, useQuique } from "~/componentes/jornada/efeitos";
-import { BarraDoTopo, Bolha, BolhaFalando, voltarParaJornada } from "~/componentes/jornada/pecas";
+import {
+  BarraDoTopo,
+  Bolha,
+  BolhaFalando,
+  FundoDaFolha,
+  voltarParaJornada,
+} from "~/componentes/jornada/pecas";
 import { AberturaDaAula } from "~/componentes/jornada/abertura-da-aula";
 import { BolhaNaEspera } from "~/componentes/bolha/na-espera";
 import { useAtividade, useJornada } from "~/componentes/jornada/usarJornada";
@@ -71,6 +77,7 @@ import {
   curva,
   escala,
   espaco,
+  folha,
   fonte,
   luz,
   sombra,
@@ -88,7 +95,7 @@ import { AvisoMedico } from "~/componentes/aviso-medico";
  * reabre. Se o banco de aulas não descer, o desafio do dia (local) entra no
  * lugar — o momento do dia não fica refém da rede.
  *
- * Abre com a abertura de 1,5 s na cor da semana (`AberturaDaAula`, o
+ * Abre com a abertura de 1,5 s no roxo da aula (`AberturaDaAula`, o
  * `QuizIntro` do site), que o banco de aulas aproveita para descer.
  *
  * 18/11/2026 (a vistoria: "três telas de site coladas, e não uma lição"): a
@@ -107,6 +114,7 @@ import { AvisoMedico } from "~/componentes/aviso-medico";
  *   [&etapa=licao|pergunta|verificada|fim|feita]
  *   [&acertou=1 (o veredito certo)] [&acertos=0 (o fim com 0)] [&espera=1 (o fim somando)]
  *   [&fechou=1 (a aula fechou o dia: o troféu, as cinco estrelas e o bônus)]
+ *   [&abertura=parada (a abertura fica na tela, para a foto)]
  */
 export default function Aula() {
   const { dia, loja } = useJornada();
@@ -128,6 +136,7 @@ export default function Aula() {
       {(abertura === "mostrando" || abertura === "saindo") && dia.modo === "gestacao" ? (
         <AberturaDaAula
           semana={dia.semana}
+          parada={ehBancada() && parametroDaBancada("abertura") === "parada"}
           aoComecarASair={() => setAbertura("saindo")}
           aoTerminar={() => setAbertura("feita")}
         />
@@ -725,7 +734,10 @@ function FolhaDoVeredito({
   }, [visivel, reduzido, v, explicacaoAberta]);
   const c = ultimo.current;
   const fora = (altura || 480) + 24;
-  const tinta = c?.acertou ? cor.sementinha : cor.quase;
+  /* O veredito é uma folha de vidro escuro, como as outras do app (25/11/2026:
+     o bloco verde "não tem nada a ver" com a aula, que é roxa): o acerto em
+     verde claro, o "quase" no pêssego, sobre a ameixa. */
+  const tinta = c?.acertou ? folha.sementinha : folha.destaque;
   return (
     <Animated.View
       pointerEvents={visivel ? "auto" : "none"}
@@ -743,13 +755,14 @@ function FolhaDoVeredito({
         borderTopLeftRadius: CANTO_DA_FOLHA,
         borderTopRightRadius: CANTO_DA_FOLHA,
         ...curva,
+        overflow: "hidden",
         borderTopWidth: StyleSheet.hairlineWidth,
-        borderColor: cor.branco,
-        backgroundColor: c?.acertou ? cor.acertoFundo : cor.quaseFundo,
+        borderColor: folha.borda,
         ...sombraFlutuante,
         transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [fora, 0] }) }],
       }}
     >
+      <FundoDaFolha />
       {c ? (
         <View
           /* O quanto a folha cobre do miolo: o texto dela, acima do pé. */
@@ -776,7 +789,7 @@ function FolhaDoVeredito({
             <Entrada deslocamento={6}>
               <Text
                 accessibilityLiveRegion="polite"
-                style={{ ...fonte.normal, ...escala.corpo, color: cor.texto }}
+                style={{ ...fonte.normal, ...escala.corpo, color: folha.texto }}
               >
                 {c.porque}
               </Text>
@@ -827,8 +840,8 @@ function BotaoDeExplicar({
           borderRadius: canto.pilula,
           ...curva,
           borderWidth: 1.5,
-          borderColor: comAlfa(tinta, 0.32),
-          backgroundColor: "rgba(255,255,255,0.7)",
+          borderColor: comAlfa(tinta, 0.45),
+          backgroundColor: folha.superficie,
           transform: [{ scale: mola }],
         }}
       >

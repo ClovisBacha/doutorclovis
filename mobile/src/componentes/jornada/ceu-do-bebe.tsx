@@ -306,8 +306,6 @@ export const CeuDoBebe = memo(function CeuDoBebe({
   const camadas = useMemo(() => {
     const anda = (v: Animated.Value, px: number) =>
       v.interpolate({ inputRange: [-1, 1], outputRange: [-px, px] });
-    const gira = (v: Animated.Value, graus: number) =>
-      v.interpolate({ inputRange: [-1, 1], outputRange: [`${-graus}deg`, `${graus}deg`] });
     const numero: EstiloAnimado = {
       position: "absolute",
       left: 0,
@@ -345,13 +343,6 @@ export const CeuDoBebe = memo(function CeuDoBebe({
             extrapolate: "clamp",
           }),
         },
-        {
-          scale: rolagem.interpolate({
-            inputRange: [-300, 0, total],
-            outputRange: [1.14, 1, 0.82],
-            extrapolate: "clamp",
-          }),
-        },
       ],
     };
     const sombra: EstiloAnimado = {
@@ -365,14 +356,14 @@ export const CeuDoBebe = memo(function CeuDoBebe({
         outputRange: [0, 1, 1],
         extrapolate: "clamp",
       }),
-      transform: [
-        { perspective: 700 },
-        { scale: bebeChega.interpolate({ inputRange: [0, 1], outputRange: [0.78, 1] }) },
-        { translateX: anda(x, 14) },
-        { translateY: anda(y, 9) },
-        { rotateY: gira(x, 9) },
-        { rotateX: gira(y, -6) },
-      ],
+      /* ⚠️ A Bolha NUNCA muda de tamanho nem gira em 3D (25/11/2026, o dono:
+         "a imagem ainda está aproximando [...] na hora que você aproxima o
+         bebê bolha, ele desfoca"). Ela vem no tamanho exato do pixel
+         (`BOLHA_DO_CEU`), e o iPhone borra toda imagem que ele reescala: o
+         zoom ao puxar a tela (1,14), o encolher ao rolar (0,82), a chegada
+         (0,78) e o giro com o celular saíram. Ela só desliza com a
+         inclinação, como as outras camadas. */
+      transform: [{ translateX: anda(x, 14) }, { translateY: anda(y, 9) }],
     };
     const crescendo: EstiloAnimado = {
       transform: [
@@ -426,7 +417,7 @@ export const CeuDoBebe = memo(function CeuDoBebe({
         </Animated.Text>
       </Animated.View>
 
-      {/* 2 · O bebê: perto. Vem na frente, gira de leve e encolhe ao rolar. */}
+      {/* 2 · A Bolha: perto, na frente, sempre no tamanho exato (nítida). */}
       <Animated.View pointerEvents="box-none" style={camadas.perto}>
         <Animated.View pointerEvents="none" style={camadas.sombra}>
           <SombraDeContato largura={Math.round(190 * k)} />

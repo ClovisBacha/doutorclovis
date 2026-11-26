@@ -9,6 +9,7 @@ import {
   Modal,
   PanResponder,
   Pressable,
+  StyleSheet,
   Text,
   useWindowDimensions,
   View,
@@ -16,7 +17,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { toque, Tocavel } from "~/componentes/base";
+import { TintaClara, toque, Tocavel } from "~/componentes/base";
 import {
   BolhaViva,
   rajada,
@@ -24,7 +25,7 @@ import {
   type HumorDaBolha,
 } from "~/componentes/movimento";
 import { PilulaSos } from "~/componentes/cabecalho";
-import { Vidro } from "~/componentes/vidro";
+import { FundoDeVidroEscuro, Vidro } from "~/componentes/vidro";
 import { EstrelaDoDia } from "~/componentes/caminho/pecas";
 import { Estouro } from "~/componentes/jornada/efeitos";
 import { corJornada } from "~/componentes/jornada/cores";
@@ -35,6 +36,7 @@ import {
   curva,
   escala,
   espaco,
+  folha,
   fonte,
   luz,
   ouro,
@@ -442,10 +444,13 @@ export function Folha({
             }
           }}
           style={{
-            backgroundColor: luz.base,
             borderTopLeftRadius: CANTO_DA_FOLHA,
             borderTopRightRadius: CANTO_DA_FOLHA,
             ...curva,
+            overflow: "hidden",
+            borderWidth: StyleSheet.hairlineWidth,
+            borderBottomWidth: 0,
+            borderColor: folha.borda,
             paddingHorizontal: espaco.lg,
             paddingTop: espaco.sm,
             paddingBottom: baixo + espaco.lg,
@@ -453,8 +458,9 @@ export function Folha({
             transform: [{ translateY: Animated.add(sobe, arrasto) }],
           }}
         >
+          <FundoDaFolha />
           <View style={{ alignItems: "center", paddingBottom: 2 }}>
-            <View style={{ width: 36, height: 5, borderRadius: 3, backgroundColor: cor.chevron }} />
+            <View style={{ width: 36, height: 5, borderRadius: 3, backgroundColor: folha.alca }} />
           </View>
           {titulo ? (
             <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
@@ -465,7 +471,7 @@ export function Folha({
                   ...fonte.display,
                   ...escala.titulo2,
                   letterSpacing: -0.2,
-                  color: cor.texto,
+                  color: folha.texto,
                 }}
               >
                 {titulo}
@@ -473,14 +479,23 @@ export function Folha({
               <FecharDaFolha aoTocar={aoFechar} />
             </View>
           ) : null}
-          {children}
+          <TintaClara.Provider value>{children}</TintaClara.Provider>
         </Animated.View>
       </View>
     </Modal>
   );
 }
 
-/** O X das folhas, como o do iPhone: um círculo cinza de 30, com o alvo de 44. */
+/**
+ * O FUNDO DA FOLHA: o Liquid Glass escuro do sistema, com a ameixa-noite da
+ * conversa da Bolha por cima (o texto branco segura o contraste sobre qualquer
+ * tela); sem o vidro do sistema, a ameixa quase opaca.
+ */
+export function FundoDaFolha() {
+  return <FundoDeVidroEscuro ameixa={folha.sobreOVidro} reserva={folha.semVidro} />;
+}
+
+/** O X das folhas, como o do iPhone: um círculo de 30, claro sobre o vidro, com o alvo de 44. */
 function FecharDaFolha({ aoTocar }: { aoTocar: () => void }) {
   return (
     <Pressable
@@ -495,13 +510,13 @@ function FecharDaFolha({ aoTocar }: { aoTocar: () => void }) {
         width: 30,
         height: 30,
         borderRadius: 15,
-        backgroundColor: cor.apagado,
+        backgroundColor: folha.apagadoFundo,
         alignItems: "center",
         justifyContent: "center",
         opacity: pressed ? 0.6 : 1,
       })}
     >
-      <X size={17} color={cor.textoApagado} strokeWidth={2.6} />
+      <X size={17} color={folha.apagado} strokeWidth={2.6} />
     </Pressable>
   );
 }

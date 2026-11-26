@@ -34,7 +34,7 @@ import {
   type DadosDoNascimento,
 } from "~/lib/jornada/pos-parto";
 import { useSessao } from "~/lib/sessao";
-import { canto, cor, curva, escala, espaco, fonte } from "~/tema";
+import { canto, cor, curva, escala, espaco, folha, fonte } from "~/tema";
 
 /**
  * CONTAR O NASCIMENTO — o dia (no calendário, nunca no futuro), e, se ela
@@ -341,7 +341,7 @@ export default function ContarONascimento() {
                 ...fonte.display,
                 ...escala.titulo2,
                 letterSpacing: -0.2,
-                color: cor.texto,
+                color: folha.texto,
               }}
             >
               {nome.trim() ? `${nome.trim()} nasceu?` : "O bebê nasceu?"}
@@ -354,14 +354,14 @@ export default function ContarONascimento() {
                 paddingVertical: espaco.md,
                 borderRadius: canto.dentro,
                 ...curva,
-                backgroundColor: cor.apagado,
+                backgroundColor: folha.superficie,
               }}
             >
-              <Text style={{ ...fonte.forte, ...escala.manchete, color: cor.texto }}>
+              <Text style={{ ...fonte.forte, ...escala.manchete, color: folha.texto }}>
                 {nascimentoPorExtenso(previa.dados)}
               </Text>
               {medidasPorExtenso(previa.dados) ? (
-                <Text style={{ ...fonte.normal, ...escala.legenda, color: cor.textoApagado }}>
+                <Text style={{ ...fonte.normal, ...escala.legenda, color: folha.apagado }}>
                   {medidasPorExtenso(previa.dados)}
                 </Text>
               ) : null}
@@ -371,7 +371,7 @@ export default function ContarONascimento() {
                 textAlign: "center",
                 ...fonte.normal,
                 ...escala.legenda,
-                color: cor.textoCorpo,
+                color: folha.apagado,
               }}
             >
               O app passa para o pós-parto: a trilha vira o 4º trimestre e a gestação fica guardada
@@ -390,7 +390,7 @@ export default function ContarONascimento() {
               aoTocar={() => setConfirmando(false)}
               estilo={{ minHeight: 44, justifyContent: "center", paddingHorizontal: espaco.lg }}
             >
-              <Text style={{ ...fonte.forte, ...escala.manchete, color: cor.textoApagado }}>
+              <Text style={{ ...fonte.forte, ...escala.manchete, color: folha.apagado }}>
                 Ainda não
               </Text>
             </Tocavel>

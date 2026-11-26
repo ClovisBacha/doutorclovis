@@ -194,6 +194,12 @@ const ROTA_DO_CUIDADO: Record<ChaveDoCuidado, string> = {
   gratitude: "/jornada/gratidao",
 };
 
+/** A folha do placar aberta de saída, na bancada (`&folha=chama|sementes|trofeus`). */
+function folhaDaBancada(): FolhaDoPlacar {
+  const f = parametroDaBancada("folha");
+  return f === "chama" || f === "sementes" || f === "trofeus" ? f : null;
+}
+
 /** A hora que escolhe o céu e a saudação (`&hora=` na bancada). */
 function horaDaTela(): number {
   const h = Number(parametroDaBancada("hora"));
@@ -423,7 +429,7 @@ export function JornadaDaGestacao({
   }, [conquistas]);
   useReconciliacao(D, loja.pronto && abre, recarregar);
   const amigas = useContagemDeAmigas(trilha);
-  const [folha, setFolha] = useState<FolhaDoPlacar>(null);
+  const [folha, setFolha] = useState<FolhaDoPlacar>(folhaDaBancada);
 
   const { dias: diasDeChama, perdoes } = calcularChama(loja.blob, D);
   const nomeDoBebe = (perfil.baby_name ?? "").trim() || null;

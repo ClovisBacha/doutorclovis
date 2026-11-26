@@ -50,6 +50,7 @@ import {
   curva,
   escala,
   espaco,
+  folha,
   fonte,
   fonteDoNumero,
   sombraFlutuante,
@@ -688,7 +689,7 @@ function FolhaDeConfirmar({
   const p = pedido ?? ultimo.current;
   return (
     <Folha aberta={!!pedido} aoFechar={aoFechar} titulo={p?.titulo}>
-      <Text style={{ ...fonte.normal, ...escala.legenda, color: cor.textoCorpo }}>{p?.texto}</Text>
+      <Text style={{ ...fonte.normal, ...escala.legenda, color: folha.apagado }}>{p?.texto}</Text>
       <View style={{ gap: espaco.sm, marginTop: espaco.xs }}>
         <Botao
           rotulo={p?.sim ?? ""}

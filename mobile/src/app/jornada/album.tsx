@@ -29,7 +29,7 @@ import {
   SEMANAS_DO_POS,
   semanaDeVida,
 } from "~/lib/jornada/pos-parto";
-import { canto, cor, curva, escala, espaco, fonte, margem, sombra } from "~/tema";
+import { canto, cor, curva, escala, espaco, folha, fonte, margem, sombra } from "~/tema";
 import { figurinhaDaSemana } from "~/lib/bebe-da-semana";
 
 /**
@@ -390,7 +390,7 @@ function FolhaDaSemanaDeVida({
                   },
                   sombra,
                 ]
-              : { borderWidth: 1.5, borderStyle: "dashed", borderColor: cor.chevron },
+              : { borderWidth: 1.5, borderStyle: "dashed", borderColor: folha.alca },
           ]}
         >
           <Text
@@ -401,10 +401,10 @@ function FolhaDaSemanaDeVida({
           </Text>
         </View>
         <View style={{ flex: 1, gap: 2 }}>
-          <Text style={{ ...fonte.forte, ...escala.manchete, color: cor.texto }}>
+          <Text style={{ ...fonte.forte, ...escala.manchete, color: folha.texto }}>
             {tem ? "Figurinha guardada" : "Essa semana ficou sem figurinha"}
           </Text>
-          <Text style={{ ...fonte.normal, ...escala.legenda, color: cor.textoApagado }}>
+          <Text style={{ ...fonte.normal, ...escala.legenda, color: folha.apagado }}>
             {diasCompletos === 0
               ? "Nenhum dia completo"
               : diasCompletos === 1
@@ -418,12 +418,12 @@ function FolhaDaSemanaDeVida({
           gap: espaco.xs,
           borderRadius: canto.dentro,
           ...curva,
-          backgroundColor: cor.cartao,
+          backgroundColor: folha.superficie,
           padding: espaco.lg,
         }}
       >
         <Sobrelinha>Nessa semana</Sobrelinha>
-        <Text style={{ ...fonte.normal, ...escala.corpo, color: cor.textoCorpo }}>
+        <Text style={{ ...fonte.normal, ...escala.corpo, color: folha.texto }}>
           {nestaSemanaDoPos(s)}
         </Text>
       </View>

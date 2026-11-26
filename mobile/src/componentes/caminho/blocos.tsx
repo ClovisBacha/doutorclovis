@@ -32,7 +32,7 @@ import {
 } from "~/lib/jornada/caminho";
 import type { PoseDaBolha } from "~/lib/bolha/conversa";
 import { coresDaSemanaDoPos } from "~/lib/jornada/pos-parto";
-import { brilhoDe, canto, cor, curva, escala, espaco, fonte, luz, margem, sombra } from "~/tema";
+import { canto, cor, curva, escala, espaco, fonte, luz, margem, sombra, veu } from "~/tema";
 
 /**
  * OS BLOCOS DA TRILHA — a faixa da fase, a barra da semana, o nó do dia e o
@@ -524,8 +524,10 @@ export const NoDaTrilha = memo(function NoDaTrilha({
 
 /**
  * O BALÃO DE CIMA DO NÓ DE HOJE — a Bolha falando (19/11/2026, "o bebê bolha
- * vai ser aquele personagem que vai conversar com a mãe"). A pílula continua
- * framboesa, a cor de agir, com a letra branca (5,1:1); a Bolha segura a
+ * vai ser aquele personagem que vai conversar com a mãe"). A pílula é o vidro
+ * de ameixa-noite da conversa da Bolha (25/11/2026, o dono: "vamos começar,
+ * tá uma cor rosa, feia [...] tem que tá um liquid glass"), com a letra
+ * branca; a Bolha segura a
  * ponta esquerda dela, maior que a pílula, e o texto é a fala, em letra de
  * frase ("Vamos começar?"), e não mais a etiqueta de botão em maiúsculas.
  * Nada atrás da Bolha: a arte fica solta sobre a pílula.
@@ -560,24 +562,30 @@ function Balao({
             height: ALTURA_DO_BALAO,
             justifyContent: "center",
             borderRadius: canto.pilula,
-            backgroundColor: cor.primaria,
+            backgroundColor: veu.vidroDaConversa,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: veu.vidroDaConversaBorda,
             paddingLeft: ARTE_DO_BALAO - 2,
             paddingRight: 14,
-            ...brilhoDe(cor.primaria, 0.5),
+            boxShadow: "0px 12px 26px -12px rgba(20,12,60,0.65)",
           }}
         >
-          {/* O rabinho vem antes do texto: fica embaixo da letra, por cima do corpo. */}
+          {/* O rabinho: um triângulo embaixo da pílula (um quadrado girado
+              por cima do vidro translúcido escurecia onde os dois se cruzam). */}
           <View
             style={{
               position: "absolute",
-              bottom: -4,
+              bottom: -7,
               left: "50%",
-              marginLeft: -5,
-              width: 10,
-              height: 10,
-              borderRadius: 2,
-              backgroundColor: cor.primaria,
-              transform: [{ rotate: "45deg" }],
+              marginLeft: -7,
+              width: 0,
+              height: 0,
+              borderLeftWidth: 7,
+              borderRightWidth: 7,
+              borderTopWidth: 7,
+              borderLeftColor: "transparent",
+              borderRightColor: "transparent",
+              borderTopColor: veu.vidroDaConversa,
             }}
           />
           <Image

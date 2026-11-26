@@ -69,6 +69,7 @@ import {
   curva,
   escala,
   espaco,
+  folha,
   fonte,
   fonteDoNumero,
   luz,
@@ -1408,18 +1409,18 @@ function FolhaDaSemana({
             ...escala.nota,
             letterSpacing: 1,
             textTransform: "uppercase",
-            color: cor.textoApagado,
+            color: folha.apagado,
           }}
         >
           Semana {semana} de vida
         </Text>
         <Text
           accessibilityRole="header"
-          style={{ ...fonte.display, ...escala.titulo2, letterSpacing: -0.2, color: cor.texto }}
+          style={{ ...fonte.display, ...escala.titulo2, letterSpacing: -0.2, color: folha.texto }}
         >
           O que esperar com o bebê
         </Text>
-        <Text style={{ ...fonte.normal, ...escala.corpo, color: cor.textoCorpo }}>
+        <Text style={{ ...fonte.normal, ...escala.corpo, color: folha.texto }}>
           {nestaSemanaDoPos(semana)}
         </Text>
       </View>

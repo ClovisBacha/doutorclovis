@@ -1,6 +1,6 @@
 import Check from "lucide-react-native/icons/check";
 import type { ReactNode } from "react";
-import { Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { T } from "~/componentes/base";
 import { ChamaDaSequencia, IconeSementinha, TrofeuParado } from "~/componentes/caminho/pecas";
 import { CompartilharConquista } from "~/componentes/jornada/cartao-de-conquista";
@@ -10,7 +10,8 @@ import { BolhaViva } from "~/componentes/movimento";
 import { ITENS_A_VENDA_NO_QUARTO } from "~/lib/quartinho/quarto";
 import { explicacaoDaChama } from "~/lib/jornada/trilha";
 import { escadaDosTrofeus } from "~/lib/jornada/trofeus";
-import { canto, cor, curva, escala, espaco, fonte } from "~/tema";
+import { comAlfa } from "~/lib/cor";
+import { canto, cor, curva, escala, espaco, folha, fonte } from "~/tema";
 
 export type FolhaDoPlacar = null | "sementes" | "chama" | "trofeus";
 
@@ -60,8 +61,8 @@ export function FolhasDoPlacar({
         {chama >= CHAMA_PARA_COMPARTILHAR ? (
           <CompartilharConquista
             d={cartaoDaChama(chama, pos)}
-            tinta={cor.atencao}
-            fundoDoBotao={cor.atencaoFundo}
+            tinta={cor.branco}
+            fundoDoBotao={cor.primaria}
           />
         ) : null}
       </Folha>
@@ -145,16 +146,16 @@ function EscadaDosTrofeus({ trofeus }: { trofeus: number }) {
               borderRadius: canto.pilula,
               paddingHorizontal: espaco.sm,
               paddingVertical: 4,
-              backgroundColor: d.feito ? cor.jogoFundo : cor.apagado,
+              backgroundColor: d.feito ? comAlfa(folha.jogo, 0.2) : folha.apagadoFundo,
             }}
           >
-            {d.feito ? <Check size={13} color={cor.jogo} strokeWidth={3} /> : null}
+            {d.feito ? <Check size={13} color={folha.jogo} strokeWidth={3} /> : null}
             <Text
               style={{
                 ...fonte.titulo,
                 ...escala.nota,
                 fontVariant: ["tabular-nums"],
-                color: d.feito ? cor.jogo : cor.textoApagado,
+                color: d.feito ? folha.jogo : folha.apagado,
               }}
             >
               {d.trofeus}
@@ -170,7 +171,7 @@ function EscadaDosTrofeus({ trofeus }: { trofeus: number }) {
         </View>
       ))}
       {proximo ? (
-        <T tipo="rotulo" cor={cor.jogo}>
+        <T tipo="rotulo" cor={folha.jogo}>
           {proximo.faltam === 1
             ? "Falta 1 dia completo para o próximo."
             : `Faltam ${proximo.faltam} dias completos para o próximo.`}
@@ -202,13 +203,17 @@ function LinhaDeGanho({ rotulo, valor }: { rotulo: string; valor: string }) {
         gap: espaco.sm,
         paddingVertical: 8,
         paddingHorizontal: espaco.md,
-        backgroundColor: cor.cartao,
+        backgroundColor: folha.superficie,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: folha.superficieBorda,
         borderRadius: canto.campo,
         ...curva,
       }}
     >
-      <Text style={{ flex: 1, ...fonte.media, ...escala.legenda, color: cor.texto }}>{rotulo}</Text>
-      <Text style={{ ...fonte.forte, ...escala.legenda, color: cor.sementinha }}>{valor}</Text>
+      <Text style={{ flex: 1, ...fonte.media, ...escala.legenda, color: folha.texto }}>
+        {rotulo}
+      </Text>
+      <Text style={{ ...fonte.forte, ...escala.legenda, color: folha.sementinha }}>{valor}</Text>
     </View>
   );
 }

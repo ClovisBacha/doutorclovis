@@ -5,12 +5,12 @@ import { Animated, Easing, Platform, Pressable } from "react-native";
 import { Bolha } from "~/componentes/jornada/pecas";
 import { useMovimentoReduzido } from "~/componentes/movimento";
 import { ABERTURA_DA_AULA } from "~/lib/bolha/falas-do-jogo";
-import { coresDaSemana } from "~/lib/jornada/caminho";
+import { corJornada } from "~/componentes/jornada/cores";
 import { comAlfa } from "~/lib/cor";
 import { cor, escala, fonte } from "~/tema";
 
 /**
- * A ABERTURA DA AULA — 1,5 s na cor da semana antes da lição, o `QuizIntro`
+ * A ABERTURA DA AULA — 1,5 s no roxo da aula antes da lição, o `QuizIntro`
  * do site: a Bolha estudiosa salta, "Semana 24 · Aula de hoje" e o convite
  * dela ("Dois minutinhos comigo?") sobem, e a tela se desfaz. Um toque pula.
  *
@@ -29,21 +29,32 @@ import { cor, escala, fonte } from "~/tema";
  * moeda saíram com ela (nada atrás da Bolha). O título é a fala dela.
  */
 
+/**
+ * O ROXO DA AULA (25/11/2026, o dono: "abre uma tela verde muito feia, que
+ * não tem nada a ver. A do aprendizado, ela é roxa"). A cor da semana mudava
+ * a cada semana (a 24 é verde-água, a 29 é verde): a abertura passa a ter a
+ * cor da própria aula, o violeta do jogo (o do botão e da barra da lição),
+ * do médio ao escuro. O branco no meio dele passa de 7:1.
+ */
+const ROXO_DA_AULA = [corJornada.roxoMedio, corJornada.roxo, corJornada.roxoEscuro] as const;
+
 const SAI_EM = 1250;
 const TERMINA_EM = 1500;
 
 export function AberturaDaAula({
   semana,
+  parada = false,
   aoComecarASair,
   aoTerminar,
 }: {
   semana: number;
+  /** Na bancada: a abertura não sai sozinha (para a foto). */
+  parada?: boolean;
   /** A cortina começou a se desfazer: a lição embaixo já pode entrar. */
   aoComecarASair?: () => void;
   aoTerminar: () => void;
 }) {
   const reduzido = useMovimentoReduzido();
-  const tom = coresDaSemana(semana);
   const pulo = useRef(new Animated.Value(reduzido ? 1 : 0)).current;
   const texto = useRef(new Animated.Value(reduzido ? 1 : 0)).current;
   const sub = useRef(new Animated.Value(reduzido ? 1 : 0)).current;
@@ -98,8 +109,8 @@ export function AberturaDaAula({
             380,
           )
         : null;
-    const t1 = setTimeout(() => sair(TERMINA_EM - SAI_EM), SAI_EM);
-    const t2 = setTimeout(terminar, TERMINA_EM + 200);
+    const t1 = parada ? undefined : setTimeout(() => sair(TERMINA_EM - SAI_EM), SAI_EM);
+    const t2 = parada ? undefined : setTimeout(terminar, TERMINA_EM + 200);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
@@ -139,8 +150,8 @@ export function AberturaDaAula({
         style={{ flex: 1 }}
       >
         <LinearGradient
-          colors={[tom.main, tom.lip]}
-          locations={[0, 0.8]}
+          colors={ROXO_DA_AULA}
+          locations={[0, 0.55, 1]}
           style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 }}
         >
           <Animated.View style={{ transform: [{ scale: escalaDaBolha }, { rotate: giro }] }}>

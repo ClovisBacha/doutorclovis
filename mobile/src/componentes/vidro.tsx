@@ -83,3 +83,33 @@ export function Vidro({
     </View>
   );
 }
+
+/**
+ * O VIDRO ESCURO DAS FOLHAS (25/11/2026, o dono: a folha do foguinho "com o
+ * fundo ainda branco, em vez daquele fundo liquid glass"). A ÚNICA exceção ao
+ * esquema claro: o fundo das folhas de baixo, que escrevem BRANCO. O Liquid
+ * Glass escuro do sistema leva a ameixa-noite por cima (`ameixa`), e é ela que
+ * segura o contraste do texto branco sobre qualquer tela, até num iPhone em
+ * modo escuro. Sem o vidro do sistema, a `reserva` quase opaca.
+ */
+export function FundoDeVidroEscuro({ ameixa, reserva }: { ameixa: string; reserva: string }) {
+  if (TEM_VIDRO_DO_SISTEMA)
+    return (
+      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+        <GlassView glassEffectStyle="regular" colorScheme="dark" style={StyleSheet.absoluteFill} />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: ameixa }]} />
+      </View>
+    );
+  return (
+    <View
+      pointerEvents="none"
+      style={[
+        StyleSheet.absoluteFill,
+        { backgroundColor: reserva },
+        Platform.OS === "web"
+          ? ({ backdropFilter: "blur(24px) saturate(160%)" } as unknown as ViewStyle)
+          : null,
+      ]}
+    />
+  );
+}

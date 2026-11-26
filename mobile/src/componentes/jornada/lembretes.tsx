@@ -26,7 +26,19 @@ import {
   reagendarLembretesDaJornada,
   type PreferenciaGuardada,
 } from "~/lib/lembretes-da-jornada";
-import { ALVO_MINIMO, canto, cor, curva, escala, espaco, fonte, luz, sombra, vidro } from "~/tema";
+import {
+  ALVO_MINIMO,
+  canto,
+  cor,
+  curva,
+  escala,
+  espaco,
+  folha,
+  fonte,
+  luz,
+  sombra,
+  vidro,
+} from "~/tema";
 
 /**
  * Os lembretes da jornada na tela: o contexto que a régua precisa (de onde ela
@@ -362,14 +374,18 @@ export function FolhaDoHorario({
                 justifyContent: "center",
                 borderRadius: canto.campo,
                 ...curva,
-                backgroundColor: ativa ? cor.primaria : pressed ? cor.destaque : cor.apagado,
+                backgroundColor: ativa
+                  ? cor.primaria
+                  : pressed
+                    ? folha.superficieBorda
+                    : folha.superficie,
               })}
             >
               <Text
                 style={{
                   ...fonte.titulo,
                   ...escala.legenda,
-                  color: ativa ? cor.branco : cor.texto,
+                  color: folha.texto,
                   fontVariant: ["tabular-nums"],
                 }}
               >

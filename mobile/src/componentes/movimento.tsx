@@ -411,9 +411,9 @@ export function Flutuar({
           {
             translateY: v.interpolate({ inputRange: [0, 1], outputRange: [amplitude, -amplitude] }),
           },
-          /* Descansa em 0,5 com escala 1 EXATA: 1,01 parado redesenhava a
-             Bolha fora do pixel inteiro, e ela ficava borrada (24/11/2026). */
-          { scale: v.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 1, 1.02] }) },
+          /* Só sobe e desce, sem escala nenhuma (25/11/2026): até o 1,02 do
+             alto do respiro reescalava a Bolha, que borrava e parecia
+             "aproximar" (o dono). */
         ],
       }}
     >

@@ -141,16 +141,22 @@ domínio `obstetrica.com.br` e o site, que não muda mais. Escreva "o app Mãe
 Esperta", nunca "a Mãe Esperta" (o app não é uma mãe).
 
 **O ícone (pedido do dono em 25/11/2026): a Bolha de capelo DE PERTO,
-enchendo o quadrado, sobre o degradê framboesa e pêssego** ("grandes apps têm
-ícones grandes [...] nosso ícone acabou ficando um pouco pequeno [...] um bebê
-bolha somente com um chapéuzinho [...] maior na câmera"). As fontes são arte do
-Higgsfield, em `mobile/assets/marca/`: `icone-bolha.webp` (o ícone inteiro, 2048) e `bolha-de-capelo.webp` (a mesma Bolha recortada); delas saem, por
+enchendo o quadrado, no CÉU DA NOITE** ("grandes apps têm ícones grandes [...]
+nosso ícone acabou ficando um pouco pequeno [...] um bebê bolha somente com um
+chapéuzinho [...] maior na câmera"). Das quatro propostas ele escolheu a
+"Noite A" ("foi o que eu mais gostei. Esse do fundo do pêssego eu não gostei
+tanto"); o build 58 saiu com a "Viva A" (framboesa e pêssego), guardada em
+`*-viva.webp`. As fontes são arte do Higgsfield, em `mobile/assets/marca/`:
+`icone-bolha.webp` (o ícone inteiro, 2048) e `bolha-de-capelo.webp` (a mesma
+Bolha recortada, com o brilho como halo, por
+`node mobile/scripts/recortar-bolha-da-noite.mjs`); delas saem, por
 `node mobile/scripts/gerar-marca.mjs`, o `icon.png` (1024, sem alfa), as três
-camadas do Android, o `favicon.png`, a `abertura.png` (a splash) e
-`marca/instagram-perfil.png`. Mudou a marca? Mude a fonte e rode o script,
-nunca um PNG à mão. O ícone anterior (20/11, a Bolha saindo do livro, vetor)
-está em `icone.svg`/`simbolo.svg`, guardado caso ele queira voltar; as três
-outras propostas de 25/11 estão no diário.
+camadas do Android (fundo roxo `#321f57`; o monocromático é a silhueta do
+recorte limpo da Viva A, a mesma pose), o `favicon.png`, a `abertura.png` (a
+splash, no céu da noite `#2a1f9a`) e `marca/instagram-perfil.png`. Mudou a
+marca? Mude a fonte e rode os scripts, nunca um PNG à mão. O ícone de 20/11 (a
+Bolha saindo do livro, vetor) está em `icone.svg`/`simbolo.svg`; a comparação
+das quatro propostas, em `docs/icones-25-11.webp`.
 
 ## O visual é "Amanhecer": vidro, luz e profundidade (pedido do dono, 16/11/2026)
 
@@ -191,8 +197,11 @@ ERA a paleta do Claude; não volte a ela.
   (`BOLHA_DO_CEU`, 212/424/636 px, `assets/bolha/ceu/`) com
   `allowDownscaling={false}`; TODAS as outras deixam o `expo-image` reduzir (o
   padrão) — a correção de 23/11 (a arte de 960 inteira em todas) deixava as
-  pequenas mais borradas, comparadas ampliadas. E a Bolha para no pixel
-  inteiro: o `Flutuar` descansa em escala 1, e a inclinação tem zona morta. A apaixonada e
+  pequenas mais borradas, comparadas ampliadas. ⚠️ **E a Bolha do céu NUNCA
+  muda de tamanho nem gira em 3D** (25/11/2026, o dono: "ela ainda está
+  aproximando [...] ela desfoca"): saíram o zoom ao puxar a tela, o encolher
+  ao rolar, a chegada em escala e o giro com o celular (`ceu-do-bebe.tsx`), e
+  o `Flutuar` só sobe e desce. Ela só desliza. A apaixonada e
   a estudiosa vinham cortadas no alto: foram refeitas das ORIGINAIS do Drive
   (pasta "Imagens Obstétrica") por `mobile/scripts/bolha-do-drive.mjs`, que
   não corta enfeite solto, e moram em `mobile/assets/bolha/`. Arte nova da
@@ -203,6 +212,23 @@ ERA a paleta do Claude; não volte a ela.
   ficou ruim no chat"): ameixa-noite translúcido (`veu.vidroDaConversa`), a
   fala em branco num balão de vidro discreto, as respostas em pílulas de
   contorno e só o convite principal em framboesa. Nada de bloco branco.
+- ⚠️ **TODA FOLHA DE BAIXO É ESSE VIDRO, ESCURO** (25/11/2026, o dono: a folha
+  do foguinho "com o fundo ainda branco, em vez daquele fundo liquid glass"):
+  a `Folha` (`componentes/jornada/pecas.tsx`) é o Liquid Glass escuro do
+  sistema com a ameixa por cima (`FundoDeVidroEscuro`, a única exceção ao
+  esquema claro, em `vidro.tsx`), e o texto é branco. Dentro dela o `T`, o
+  `Botao` e a `Sobrelinha` já escrevem claro (`TintaClara`, em `base.tsx`); o
+  `Cartao` volta ao escuro dentro dele; texto à mão usa `folha.*` do tema. O
+  veredito da aula é o mesmo vidro (o bloco verde saiu), e o balão da Bolha
+  na trilha ("Vamos começar?") é o vidro da conversa, não mais framboesa.
+- **A aula abre no roxo da aula** (`abertura-da-aula.tsx`, 25/11/2026, o
+  dono: "abre uma tela verde muito feia [...] a do aprendizado, ela é roxa"):
+  o violeta do jogo, e não mais a cor da semana (a 24 é verde-água).
+- **A splash do iPhone é o céu da noite da trilha com a Bolha de capelo**
+  (25/11/2026, o dono: "esse fundo azul ficou muito feio"): `abertura-ios.png`
+  em tela cheia (`ios` do `expo-splash-screen` no `app.json`), feita por
+  `gerar-marca.mjs` da arte `anoitecer.webp` e do recorte da Bolha. A porta
+  (`app/index.tsx`) mostra a mesma imagem, para a troca não piscar.
 - **Respirar é a flor de bolhas na noite** (`componentes/jornada/
 flor-de-bolhas.tsx`, 23/11/2026, o dono: "uma arte mais 3D, com movimentos,
   assim como a Apple faz", "deixar tremendo enquanto respira"): seis bolhas de
@@ -252,6 +278,19 @@ flor-de-bolhas.tsx`, 23/11/2026, o dono: "uma arte mais 3D, com movimentos,
   ar, vem quando tiver arte, ou fora do jogo), e `migracao.test.ts` cobra que nenhum fique
   sem. O "No ar" (pétalas, bolhinhas) é desenhado por código. Não há
   "Salvar": o quarto se guarda sozinho, com folga (600 ms).
+- ⚠️ **AS COISAS DO QUARTINHO SE TOCAM (pedido do dono, 25/11/2026)**: "onde
+  tem luzes [...] quando a gente clicar em cima deles, eles têm que acender
+  [...] geladeira [...] abre a geladeira [...] forno [...] cortina, fecha e
+  abre". Sem arte nova: as medidas estão em `lib/quartinho/coisas.ts` (frações
+  da pintura) e o movimento em `componentes/quartinho/coisas.tsx` — a luz do
+  teto acende (o ponto, o cone em camadas e a poça); a porta é o pedaço da
+  PRÓPRIA pintura girando na dobradiça (`transformOrigin`), com o miolo
+  desenhado; a cortina é o tecido pintado esticado sobre a janela, e a luz da
+  janela pintada no chão some sob um remendo do próprio chão (ou da cor dele,
+  medida). A porta e a cortina vão por baixo dos itens, a luz por cima. O
+  estado é do aparelho (`dc-quartinho-coisas:<uid>`): brincadeira, não posse.
+  Coisa nova entra medida na pintura e composta numa foto do simulador
+  (`&coisas=cozinha:geladeira,...` na bancada); `coisas.test.ts` cobra.
 - ⚠️ **O que travava o app (medido em 24/11/2026) e não volta**: laço eterno
   (todo enfeite descansa: `lacoQueDescansa`, `rajada`); `shadowColor`/
   `shadowRadius` numa vista sem fundo (o iOS recalcula a forma pelos pixels a

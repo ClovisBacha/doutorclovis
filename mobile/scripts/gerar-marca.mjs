@@ -4,18 +4,24 @@
  * O dono: "grandes apps têm ícones grandes [...] nosso ícone acabou ficando um
  * pouco pequeno. O ideal seria um bebê bolha somente com um chapéuzinho [...]
  * maior na câmera [...] se inspire em logos famosos de aplicativo". O ícone
- * passou a ser a Bolha de capelo DE PERTO, enchendo o quadrado, sobre o degradê
- * framboesa e pêssego (o "Amanhecer" do app) — arte do Higgsfield, e não mais
- * o vetor da Bolha saindo do livro (20/11/2026, `icone.svg`, guardado para o
- * caso de ele querer voltar).
+ * passou a ser a Bolha de capelo DE PERTO, enchendo o quadrado, no CÉU DA NOITE
+ * (o "Noite A", escolhido por ele entre as quatro propostas: "eu gostei do
+ * noite A [...] seria um dos ícones que mais chamaria a atenção") — arte do
+ * Higgsfield. Guardados para o caso de ele querer voltar: o "Viva A" do build
+ * 58 (degradê framboesa e pêssego, `*-viva.webp`) e o vetor da Bolha saindo do
+ * livro (20/11/2026, `icone.svg`).
  *
  * FONTES (nunca edite um PNG derivado à mão: mude a fonte e rode isto):
  * - `assets/marca/icone-bolha.webp`: o ícone inteiro, 2048 × 2048;
  * - `assets/marca/bolha-de-capelo.webp`: a mesma Bolha recortada (fundo
- *   transparente), para a abertura e o Android.
+ *   transparente, o brilho virou halo), para a abertura e o Android. Sai do
+ *   ícone por `scripts/recortar-bolha-da-noite.mjs` (rode antes deste);
+ * - `assets/marca/bolha-de-capelo-viva.webp`: o recorte limpo do Viva A, só
+ *   para a silhueta do ícone monocromático do Android.
  *
  * SAÍDAS: `icon.png` (1024, sem alfa: a App Store recusa), `favicon.png`, a
- * `abertura.png` (a splash), as três camadas do Android e
+ * `abertura-ios.png` (a splash do iPhone, em tela cheia, no céu da trilha), a
+ * `abertura.png` (a do Android), as três camadas do Android e
  * `marca/instagram-perfil.png`.
  *
  * Uso, no Mac (usa o Chrome pelo Playwright, como os outros scripts de arte):
@@ -34,17 +40,17 @@ const url = (p) => "data:image/webp;base64," + readFileSync(p).toString("base64"
 /* O recorte do ícone: um pouco mais perto que a arte (1,06), com o centro um
    pouco acima do meio, para o capelo não encostar na borda nem no canto
    arredondado que o iOS recorta. */
-const ZOOM = 1.06;
-const CENTRO_Y = 966 / 2048;
+const ZOOM = 1.04;
+const CENTRO_Y = 0.48;
 /* O fundo do Android: o mesmo degradê do ícone (medido na arte, de cima para baixo). */
-const DEGRADE = ["#ff9477", "#f76677", "#e8306e"];
+const DEGRADE = ["#402b73", "#321f57", "#20113c"];
 
 const nav = await chromium.launch({
   executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
 });
 const pag = await nav.newPage();
 const saidas = await pag.evaluate(
-  async ({ icone, bolha, ZOOM, CENTRO_Y, DEGRADE }) => {
+  async ({ icone, bolha, silhueta, ceu, ZOOM, CENTRO_Y, DEGRADE }) => {
     const carregar = (src) =>
       new Promise((ok, erro) => {
         const i = new Image();
@@ -52,7 +58,12 @@ const saidas = await pag.evaluate(
         i.onerror = erro;
         i.src = src;
       });
-    const [ic, bo] = await Promise.all([carregar(icone), carregar(bolha)]);
+    const [ic, bo, si, ce] = await Promise.all([
+      carregar(icone),
+      carregar(bolha),
+      carregar(silhueta),
+      carregar(ceu),
+    ]);
     const tela = (lado) => {
       const c = document.createElement("canvas");
       c.width = lado;
@@ -70,31 +81,58 @@ const saidas = await pag.evaluate(
       g.drawImage(ic, (ic.width - s) / 2, sy, s, s, 0, 0, lado, lado);
       return png(c);
     };
-    /* A caixa da Bolha recortada (o que tem tinta). */
-    const [cb, gb] = tela(bo.width);
-    gb.drawImage(bo, 0, 0);
-    const d = gb.getImageData(0, 0, bo.width, bo.height).data;
-    let x0 = bo.width, y0 = bo.height, x1 = 0, y1 = 0;
-    for (let y = 0; y < bo.height; y++)
-      for (let x = 0; x < bo.width; x++)
-        if (d[(y * bo.width + x) * 4 + 3] > 16) {
-          if (x < x0) x0 = x;
-          if (x > x1) x1 = x;
-          if (y < y0) y0 = y;
-          if (y > y1) y1 = y;
-        }
-    const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
-    /* A Bolha recortada, cabendo numa caixa de `caixa` px no meio de `lado`. */
-    const bolhaEm = (lado, caixa, branca = false) => {
+    /* A caixa do que é FIGURA num recorte (alfa acima do limiar): o halo do
+       brilho, mais fraco, fica de fora da medida, mas é desenhado inteiro
+       (cortá-lo na caixa deixava um retângulo de luz na abertura). */
+    const caixaDe = (img, limiar) => {
+      const [c, g] = tela(img.width);
+      g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, img.width, img.height).data;
+      let x0 = img.width, y0 = img.height, x1 = 0, y1 = 0;
+      for (let y = 0; y < img.height; y++)
+        for (let x = 0; x < img.width; x++)
+          if (d[(y * img.width + x) * 4 + 3] > limiar) {
+            if (x < x0) x0 = x;
+            if (x > x1) x1 = x;
+            if (y < y0) y0 = y;
+            if (y > y1) y1 = y;
+          }
+      return { img, x0, y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+    };
+    const figura = caixaDe(bo, 200);
+    const contorno = caixaDe(si, 16);
+    /* A figura cabendo numa caixa de `caixa` px no meio de `lado`. */
+    const bolhaEm = (f, lado, caixa, branca = false) => {
       const [c, g] = tela(lado);
-      const k = caixa / Math.max(bw, bh);
-      const w = bw * k, h = bh * k;
-      g.drawImage(cb, x0, y0, bw, bh, (lado - w) / 2, (lado - h) / 2, w, h);
+      const k = caixa / Math.max(f.w, f.h);
+      const dx = (lado - f.w * k) / 2 - f.x0 * k;
+      const dy = (lado - f.h * k) / 2 - f.y0 * k;
+      g.drawImage(f.img, dx, dy, f.img.width * k, f.img.height * k);
       if (branca) {
         g.globalCompositeOperation = "source-in";
         g.fillStyle = "#ffffff";
         g.fillRect(0, 0, lado, lado);
       }
+      return png(c);
+    };
+    /* A ABERTURA DO iPHONE, em tela cheia (25/11/2026, o dono: "esse fundo azul
+       ficou muito feio [...] faça o fundo como realmente do ambiente, do mesmo
+       fundo que tem na trilha"): o céu da noite da trilha (a mesma arte do
+       `CeuVivo`), com a Bolha de capelo no meio, um pouco acima do centro. */
+    const aberturaEmTelaCheia = () => {
+      const L = 1179;
+      const H = Math.round((L * ce.height) / ce.width);
+      const c = document.createElement("canvas");
+      c.width = L;
+      c.height = H;
+      const g = c.getContext("2d");
+      g.imageSmoothingQuality = "high";
+      g.drawImage(ce, 0, 0, L, H);
+      const f = figura;
+      const k = (L * 0.6) / Math.max(f.w, f.h);
+      const dx = L / 2 - (f.x0 + f.w / 2) * k;
+      const dy = H * 0.42 - (f.y0 + f.h / 2) * k;
+      g.drawImage(f.img, dx, dy, f.img.width * k, f.img.height * k);
       return png(c);
     };
     const fundo = (lado) => {
@@ -111,17 +149,25 @@ const saidas = await pag.evaluate(
       "icon-rgba.png": iconeEm(1024),
       "favicon.png": iconeEm(48),
       "marca/instagram-perfil.png": iconeEm(1080),
-      "abertura.png": bolhaEm(600, 560),
+      /* A do Android (12+: só um ícone no meio, sobre a cor) e a do iPhone. */
+      "abertura.png": bolhaEm(figura, 600, 500),
+      "abertura-ios.png": aberturaEmTelaCheia(),
       /* O Android recorta o ícone adaptável em círculo, gota ou quadrado: a
          Bolha fica dentro da zona segura (os 66% do meio). */
-      "android-icon-foreground.png": bolhaEm(512, 330),
+      "android-icon-foreground.png": bolhaEm(figura, 512, 300),
       "android-icon-background.png": fundo(512),
-      "android-icon-monochrome.png": bolhaEm(432, 280, true),
+      /* O monocromático é só a silhueta (o Android pinta numa cor só): sai do
+         recorte limpo do Viva A, a MESMA pose (capelo à esquerda), porque o
+         halo do Noite A a deixaria redonda demais. */
+      "android-icon-monochrome.png": bolhaEm(contorno, 432, 250, true),
     };
   },
   {
     icone: url(join(A, "marca", "icone-bolha.webp")),
     bolha: url(join(A, "marca", "bolha-de-capelo.webp")),
+    silhueta: url(join(A, "marca", "bolha-de-capelo-viva.webp")),
+    /* A arte do céu da noite que o app já usa (lida, nunca mudada: é do site). */
+    ceu: url(join(MOBILE, "..", "src", "assets", "ceu", "anoitecer.webp")),
     ZOOM,
     CENTRO_Y,
     DEGRADE,

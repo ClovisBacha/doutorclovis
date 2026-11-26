@@ -44,7 +44,7 @@ import {
   TAREFAS_DO_POS,
   type EstadoDoNoDoPos,
 } from "~/lib/jornada/pos-parto";
-import { ALVO_MINIMO, canto, cor, curva, escala, espaco, fonte, luz, margem } from "~/tema";
+import { ALVO_MINIMO, canto, cor, curva, escala, espaco, folha, fonte, luz, margem } from "~/tema";
 
 /**
  * A TRILHA DO 4º TRIMESTRE — as 12 semanas de vida em três fases ("Chegando
@@ -516,7 +516,7 @@ function FolhaDoDiaDoPos({
             style={{
               borderRadius: canto.dentro,
               ...curva,
-              backgroundColor: cor.cartao,
+              backgroundColor: folha.superficie,
               paddingVertical: 4,
             }}
           >
@@ -534,7 +534,7 @@ function FolhaDoDiaDoPos({
                     minHeight: ALVO_MINIMO,
                     paddingHorizontal: espaco.lg,
                     borderTopWidth: i === 0 ? 0 : 1,
-                    borderTopColor: cor.divisor,
+                    borderTopColor: folha.superficieBorda,
                   }}
                 >
                   {feito ? (
@@ -551,13 +551,13 @@ function FolhaDoDiaDoPos({
                       <Check size={13} color={cor.branco} strokeWidth={3.4} />
                     </View>
                   ) : (
-                    <Circle size={22} color={cor.chevron} strokeWidth={2} />
+                    <Circle size={22} color={folha.alca} strokeWidth={2} />
                   )}
                   <Text
                     style={{
                       ...fonte.media,
                       ...escala.chamada,
-                      color: feito ? cor.texto : cor.textoApagado,
+                      color: feito ? folha.texto : folha.apagado,
                     }}
                   >
                     {l.texto}
@@ -576,7 +576,7 @@ function FolhaDoDiaDoPos({
             }}
           >
             <Sobrelinha tinta={cor.chutes}>Nessa semana</Sobrelinha>
-            <Text style={{ ...fonte.normal, ...escala.chamada, color: cor.textoCorpo }}>
+            <Text style={{ ...fonte.normal, ...escala.chamada, color: folha.texto }}>
               {nestaSemanaDoPos(semana)}
             </Text>
           </View>

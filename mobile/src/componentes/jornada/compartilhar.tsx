@@ -15,7 +15,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Botao, selecao, toque } from "~/componentes/base";
+import { Botao, selecao, TintaClara, toque } from "~/componentes/base";
 import { fonteDaImagem } from "~/componentes/comunidade/imagem";
 import { FolhaDasRegras } from "~/componentes/comunidade/regras";
 import { Folha } from "~/componentes/jornada/pecas";
@@ -26,7 +26,7 @@ import { ehOfensivo, mensagemDoErro, recadoDaOfensa } from "~/lib/comunidade/reg
 import { marcarFeedSujo } from "~/lib/comunidade/sinal";
 import { useRegrasDaComunidade } from "~/lib/comunidade/usar-regras";
 import { useSessao } from "~/lib/sessao";
-import { ALVO_MINIMO, canto, cor, curva, escala, espaco, fonte, sombra } from "~/tema";
+import { ALVO_MINIMO, canto, cor, curva, escala, espaco, folha, fonte, sombra } from "~/tema";
 import { COMUNIDADE_NO_APP } from "~/config";
 
 type Modo = "previa" | "escrevendo" | "publicado";
@@ -198,7 +198,9 @@ export function FolhaDeCompartilhar({
               {/* A sombra fica na caixa de FORA: a imagem sai só do cartão. */}
               <View style={[{ width: largura, borderRadius: canto.cartao }, sombra]}>
                 <View ref={alvo} collapsable={false}>
-                  {children}
+                  {/* O cartão é uma imagem com as cores dele: o texto claro da
+                      folha escura não entra nele. */}
+                  <TintaClara.Provider value={false}>{children}</TintaClara.Provider>
                 </View>
               </View>
               <View style={{ alignSelf: "stretch", gap: espaco.sm }}>
@@ -224,7 +226,7 @@ export function FolhaDeCompartilhar({
                       textAlign: "center",
                       ...fonte.media,
                       ...escala.nota,
-                      color: cor.textoApagado,
+                      color: folha.apagado,
                     }}
                   >
                     Não deu para montar a imagem agora. Tente de novo.

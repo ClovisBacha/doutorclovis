@@ -36,12 +36,23 @@ describe("a abertura", () => {
     expect(APP.backgroundColor.toLowerCase()).toBe(NOITE);
     expect(SPLASH.image).toBe("./assets/abertura.png");
     expect(existsSync(join(MOBILE, "assets", "abertura.png"))).toBe(true);
+    /* No iPhone, o céu da trilha em tela cheia com a Bolha (25/11/2026, o
+       dono: "esse fundo azul ficou muito feio"), e a porta mostra a mesma. */
+    const ios = (SPLASH as unknown as { ios: Record<string, unknown> }).ios;
+    expect(ios).toMatchObject({
+      image: "./assets/abertura-ios.png",
+      resizeMode: "cover",
+      enableFullScreenImage_legacy: true,
+    });
+    expect(String(ios.backgroundColor).toLowerCase()).toBe(NOITE);
+    expect(existsSync(join(MOBILE, "assets", "abertura-ios.png"))).toBe(true);
     /* O modelo do Expo (a grade com círculos) não volta. */
     expect(existsSync(join(MOBILE, "assets", "splash-icon.png"))).toBe(false);
     /* A porta, enquanto decide, fica no mesmo céu, centrada e fora da ilha. */
     const porta = codigo(SRC, "app", "index.tsx");
     expect(porta).toMatch(/backgroundColor: CEUS\.noite\.chao/);
-    expect(porta).toMatch(/<SafeAreaView[\s\S]*?justifyContent: "center"/);
+    expect(porta).toMatch(/require\("\.\.\/\.\.\/assets\/abertura-ios\.png"\)/);
+    expect(porta).toMatch(/<SafeAreaView[\s\S]*?justifyContent: "flex-end"/);
     expect(porta).not.toMatch(/<Carregando/);
   });
 

@@ -49,6 +49,15 @@ describe("o vidro e a luz", () => {
   test("o Liquid Glass é sempre o claro, e só entra pelo componente `Vidro`", () => {
     const vidro = de(join("componentes", "vidro.tsx"));
     expect(vidro).toMatch(/<GlassView[\s\S]*?colorScheme="light"/);
+    /* A única exceção: o fundo das folhas de baixo (25/11/2026), que escrevem
+       branco — o vidro escuro sempre com a ameixa por cima. */
+    expect(vidro.match(/colorScheme="dark"/g)).toHaveLength(1);
+    expect(vidro).toMatch(
+      /colorScheme="dark"[^\n]*\/>\s*<View style=\{\[StyleSheet\.absoluteFill, \{ backgroundColor: ameixa \}\]\} \/>/,
+    );
+    expect(de(join("componentes", "jornada", "pecas.tsx"))).toMatch(
+      /<FundoDeVidroEscuro ameixa=\{folha\.sobreOVidro\} reserva=\{folha\.semVidro\} \/>/,
+    );
     const fora = FONTES.filter(
       (f) =>
         f.arquivo !== join("componentes", "vidro.tsx") && /from "expo-glass-effect"/.test(f.codigo),

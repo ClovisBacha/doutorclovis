@@ -339,3 +339,33 @@ export const veu = {
   campoFoco: "rgba(255,255,255,0.85)",
   placeholder: "rgba(255,255,255,0.58)",
 } as const;
+
+/**
+ * A FOLHA DE BAIXO NO VIDRO DA NOITE (25/11/2026, o dono: a folha do foguinho
+ * "com o fundo ainda branco, em vez daquele fundo liquid glass que a gente tá
+ * trabalhando"). Toda folha que sobe de baixo (`Folha`, em
+ * `componentes/jornada/pecas.tsx`) é o vidro da conversa da Bolha: o Liquid
+ * Glass escuro do sistema com a ameixa-noite por cima (sem o vidro do
+ * sistema, a ameixa quase opaca), texto branco. Dentro dela, o `T` já escreve
+ * claro (`TintaClara`, em `base.tsx`); o texto escrito à mão usa estas cores.
+ */
+export const folha = {
+  /** A ameixa por cima do vidro do sistema: a da conversa, um pouco mais cheia
+      (sobre uma tela clara, como a da aula, a de 62% ficava cinza). */
+  sobreOVidro: "rgba(34,22,84,0.74)",
+  /** Sem o vidro do sistema (iOS antigo, web): quase opaca, para ler. */
+  semVidro: "rgba(30,21,70,0.96)",
+  borda: "rgba(255,255,255,0.18)",
+  texto: "#ffffff",
+  apagado: "#ddd6f7",
+  /** O que agrupa conteúdo dentro da folha (no lugar do cartão branco). */
+  superficie: "rgba(255,255,255,0.08)",
+  superficieBorda: "rgba(255,255,255,0.12)",
+  alca: "rgba(255,255,255,0.38)",
+  /** O fundo do X e das pílulas apagadas. */
+  apagadoFundo: "rgba(255,255,255,0.14)",
+  /** O destaque (o pêssego do amanhecer) e o violeta do jogo, claros. */
+  destaque: "#ffc9a8",
+  jogo: "#c9b8ff",
+  sementinha: "#b6f0a8",
+} as const;

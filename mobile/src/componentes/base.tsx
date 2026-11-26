@@ -28,6 +28,7 @@ import {
   curva,
   escala,
   espaco,
+  folha,
   fonte,
   luz,
   raio,
@@ -123,6 +124,12 @@ export function Tela({
 
 type TipoTexto = "titulo" | "subtitulo" | "corpo" | "apagado" | "rotulo" | "numero" | "nota";
 
+/**
+ * O texto sobre o vidro escuro (as folhas de baixo, 25/11/2026): dentro de
+ * `<TintaClara.Provider value>` o `T` escreve branco, e o apagado em lilás claro.
+ */
+export const TintaClara = createContext(false);
+
 export function T({
   children,
   tipo = "corpo",
@@ -138,11 +145,13 @@ export function T({
   linhas?: number;
   centro?: boolean;
 }) {
+  const clara = useContext(TintaClara);
   return (
     <Text
       numberOfLines={linhas}
       style={[
         estilosTexto[tipo],
+        clara ? (tipo === "apagado" || tipo === "nota" ? claroApagado : claroCheio) : null,
         corTexto ? { color: corTexto } : null,
         centro ? { textAlign: "center" } : null,
         estilo,
@@ -152,6 +161,9 @@ export function T({
     </Text>
   );
 }
+
+const claroCheio = { color: folha.texto } as const;
+const claroApagado = { color: folha.apagado } as const;
 
 /* A escala do tema (`escala`): o título grande na serifada, o resto na SF Pro. */
 const estilosTexto = StyleSheet.create({
@@ -206,10 +218,13 @@ export function Cartao({
     sombra,
     estilo,
   ];
-  if (!aoTocar) return <View style={base}>{children}</View>;
+  /* O cartão é material claro: dentro dele o texto volta a ser escuro, mesmo
+     numa folha de vidro escuro (`TintaClara`). */
+  const dentro = <TintaClara.Provider value={false}>{children}</TintaClara.Provider>;
+  if (!aoTocar) return <View style={base}>{dentro}</View>;
   return (
     <CartaoTocavel base={base} aoTocar={aoTocar} rotuloAcessivel={rotuloAcessivel}>
-      {children}
+      {dentro}
     </CartaoTocavel>
   );
 }
@@ -305,6 +320,9 @@ export function Botao({
   icone?: ReactNode;
 }) {
   const cheio = tipo === "primario" || tipo === "perigo";
+  /* Sobre o vidro escuro (as folhas): o secundário é a superfície clara do
+     vidro, e o de texto escreve branco. */
+  const clara = useContext(TintaClara);
   const corCheia = tipo === "perigo" ? cor.urgente : (corFundo ?? cor.primaria);
   /* Desabilitado é a FACE CLARA da própria cor, e não a cor cheia esmaecida
      (que parece um botão quebrado). Carregando continua inteiro, com o
@@ -315,7 +333,9 @@ export function Botao({
       ? clarear(corCheia, 0.84)
       : corCheia
     : tipo === "secundario"
-      ? cor.cartao
+      ? clara
+        ? folha.superficie
+        : cor.cartao
       : tipo === "suave"
         ? cor.destaque
         : "transparent";
@@ -324,10 +344,14 @@ export function Botao({
       ? clarear(corCheia, 0.4)
       : cor.branco
     : off
-      ? cor.textoApagado
+      ? clara
+        ? folha.apagado
+        : cor.textoApagado
       : tipo === "suave"
         ? cor.textoDestaque
-        : cor.primariaEscura;
+        : clara
+          ? folha.texto
+          : cor.primariaEscura;
   const altura = tamanho === "grande" ? 54 : tamanho === "compacto" ? 36 : 48;
   const folga = Math.max(0, (ALVO_MINIMO - altura) / 2);
   const mola = useMolaDeToque(0.96);
@@ -358,7 +382,10 @@ export function Botao({
             alignItems: "center",
             justifyContent: "center",
           },
-          tipo === "secundario" && { borderWidth: 1, borderColor: cor.borda },
+          tipo === "secundario" && {
+            borderWidth: 1,
+            borderColor: clara ? folha.superficieBorda : cor.borda,
+          },
           cheio && !off ? { boxShadow: `0px 10px 22px -10px ${comAlfa(corCheia, 0.75)}` } : null,
           dentro,
           { transform: [{ scale: mola.escala }] },
@@ -622,13 +649,8 @@ export function TituloDaSecao({
 }
 
 /** A sobrelinha (o "eyebrow"): 13 pt, firme, em maiúsculas, com respiro entre as letras. */
-export function Sobrelinha({
-  children,
-  tinta = cor.textoApagado,
-}: {
-  children: ReactNode;
-  tinta?: string;
-}) {
+export function Sobrelinha({ children, tinta }: { children: ReactNode; tinta?: string }) {
+  const clara = useContext(TintaClara);
   return (
     <Text
       style={{
@@ -636,7 +658,7 @@ export function Sobrelinha({
         ...escala.nota,
         letterSpacing: 0.6,
         textTransform: "uppercase",
-        color: tinta,
+        color: tinta ?? (clara ? folha.apagado : cor.textoApagado),
       }}
     >
       {children}
