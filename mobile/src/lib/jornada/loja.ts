@@ -342,8 +342,9 @@ export function marcarNoPos(D: number, tarefa: TarefaDoPos): Omit<MarcaDoPos, "b
 
 /**
  * Acende uma flag a mais no dia que NÃO é um dos cinco momentos — o `humor` do
- * check-in "Como você está hoje?". Ela acende a chama (qualquer flag do dia
- * conta) mas não é estrela, não paga e não fecha o dia, como no site.
+ * check-in "Como você está hoje?". Ela NÃO acende a chama (26/11/2026: a
+ * chama é só do que ela fez, `O_QUE_ACENDE_A_CHAMA`), não é estrela, não
+ * paga e não fecha o dia.
  */
 export function marcarFlagDoDia(D: number, flag: string, pos = false) {
   const chave = chaveDoDia(D, pos);

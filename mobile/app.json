@@ -10,7 +10,7 @@
     "backgroundColor": "#2a1f9a",
     "ios": {
       "bundleIdentifier": "br.com.obstetrica.app",
-      "buildNumber": "60",
+      "buildNumber": "61",
       "appleTeamId": "8PL2X9F9PV",
       "supportsTablet": false,
       "usesAppleSignIn": true,

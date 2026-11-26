@@ -2,7 +2,7 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { createContext, memo, useContext, useEffect, useRef, useState } from "react";
 import { Animated, AppState, Easing, StyleSheet, useWindowDimensions, View } from "react-native";
-import Svg, { Circle, Defs, Ellipse, RadialGradient, Stop } from "react-native-svg";
+import Svg, { Defs, Ellipse, RadialGradient, Stop } from "react-native-svg";
 import { useMovimentoReduzido, vaivemQueDescansa } from "~/componentes/movimento";
 import { parametroDaBancada } from "~/lib/bancada";
 
@@ -11,20 +11,29 @@ import { parametroDaBancada } from "~/lib/bancada";
  * ainda melhor e imersivo [...] um app que as pessoas vão baixar e ficar
  * impressionadas").
  *
- * As quatro artes do céu foram pintadas do tamanho da tela inteira do iPhone
+ * As artes do céu foram pintadas do tamanho da tela inteira do iPhone
  * (1440×3113), com horizonte, colinas, sol e lua — e o app mostrava só a
  * metade de cima, com uma folha branca por baixo. Agora o céu da hora é o
  * LUGAR: ocupa a tela toda, parado atrás da rolagem (como o fundo do app
  * Tempo da Apple), e os painéis flutuam sobre ele.
  *
  * E ele está VIVO, conforme a hora: de noite as estrelas piscam, uma estrela
- * cadente passa e vaga-lumes sobem das colinas; de manhã, de dia e à tarde,
- * nuvens atravessam devagar e o brilho do sol respira. Tudo é enfeite — fora
- * da acessibilidade, sem toque, só opacidade e transform no fio nativo — e com
- * "reduzir movimento" fica a mesma cena, parada.
+ * cadente passa e vaga-lumes sobem das colinas; de dia nuvens atravessam
+ * devagar. Tudo é enfeite — fora da acessibilidade, sem toque, só opacidade e
+ * transform no fio nativo — e com "reduzir movimento" fica a mesma cena,
+ * parada.
+ *
+ * ⚠️ SÃO DOIS CÉUS, O DO DIA E O DA NOITE (decisão do dono, 23/11/2026,
+ * cobrada em 26/11): "tirar as 4 artes e deixar somente duas, de dia e noite;
+ * a de noite já sabemos qual é, a do dia [...] essa que está nas imagens que
+ * te mandei" — o LILÁS (`amanhecer.webp`), que é a paleta do app e o único em
+ * que o texto escuro se lê sem sombra. O azul do meio-dia (`dia.webp`) e o
+ * pôr do sol (`por-do-sol.webp`) saíram do app (os arquivos são do site, que
+ * não muda). A fase continua se chamando "amanhecer" no código, mas é o céu
+ * do DIA inteiro, das 5h às 19h. `ceu-vivo.test.ts` cobra.
  */
 
-export type FaseDoCeu = "amanhecer" | "dia" | "tarde" | "noite";
+export type FaseDoCeu = "amanhecer" | "noite";
 
 export type Ceu = {
   arte: number;
@@ -52,24 +61,6 @@ export const CEUS: Record<FaseDoCeu, Ceu> = {
     chao: "#b3a4e6",
     claro: true,
   },
-  dia: {
-    arte: require("../../../src/assets/ceu/dia.webp"),
-    tinta: "#ffffff",
-    sec: "#eaf4ff",
-    numero: "rgba(255,255,255,0.46)",
-    topo: "#0a45df",
-    chao: "#2284f0",
-    claro: false,
-  },
-  tarde: {
-    arte: require("../../../src/assets/ceu/por-do-sol.webp"),
-    tinta: "#ffffff",
-    sec: "#ffe9de",
-    numero: "rgba(255,255,255,0.4)",
-    topo: "#5a3f90",
-    chao: "#5e3a76",
-    claro: false,
-  },
   noite: {
     arte: require("../../../src/assets/ceu/anoitecer.webp"),
     tinta: "#ffffff",
@@ -81,11 +72,9 @@ export const CEUS: Record<FaseDoCeu, Ceu> = {
   },
 };
 
+/** O céu da hora: o lilás de dia (das 5h às 19h) e o da noite (as mesmas horas do quartinho). */
 export function ceuDaHora(hora: number): FaseDoCeu {
-  if (hora >= 5 && hora < 11) return "amanhecer";
-  if (hora >= 11 && hora < 16) return "dia";
-  if (hora >= 16 && hora < 19) return "tarde";
-  return "noite";
+  return hora >= 5 && hora < 19 ? "amanhecer" : "noite";
 }
 
 /** O céu de agora, pela hora do aparelho (na bancada, `&hora=`). */
@@ -204,22 +193,6 @@ export const CeuVivo = memo(function CeuVivo({
             <Nuvem y={0.2} largura={230} segundos={95} fase={0.15} forca={0.5} />
             <Nuvem y={0.43} largura={300} segundos={130} fase={0.6} forca={0.42} />
             <CamadaDeVagalumes qual={0} tom="#ffffff" periodo={5200} atraso={600} />
-          </>
-        ) : null}
-        {fase === "dia" ? (
-          <>
-            <Halo x={0.835} y={0.23} raio={120} tom="#fff6c9" />
-            {/* Nenhuma nuvem passa na faixa dos títulos (o alto da tela): lá o
-                texto é branco, e nuvem branca atrás dele o apagaria. */}
-            <Nuvem y={0.21} largura={250} segundos={80} fase={0.05} forca={0.8} />
-            <Nuvem y={0.4} largura={330} segundos={115} fase={0.5} forca={0.7} />
-          </>
-        ) : null}
-        {fase === "tarde" ? (
-          <>
-            <Halo x={0.85} y={0.585} raio={130} tom="#ffe08a" />
-            <Nuvem y={0.21} largura={280} segundos={110} fase={0.3} forca={0.3} tom="#ffd7c2" />
-            <Nuvem y={0.36} largura={220} segundos={85} fase={0.75} forca={0.28} tom="#ffd0b0" />
           </>
         ) : null}
       </Animated.View>
@@ -459,33 +432,6 @@ function CamadaDeVagalumes({
           </Animated.View>
         );
       })}
-    </View>
-  );
-}
-
-/** O brilho do sol, respirando. */
-function Halo({ x, y, raio, tom }: { x: number; y: number; raio: number; tom: string }) {
-  const { width, height } = useWindowDimensions();
-  /* Parado: a arte já tem o sol com raios; o halo só aquece em volta. */
-  return (
-    <View
-      style={{
-        position: "absolute",
-        left: x * width - raio,
-        top: y * height - raio,
-      }}
-    >
-      <Svg width={raio * 2} height={raio * 2}>
-        <Defs>
-          {/* A força (0,7) vai no degradê, e não numa opacidade da vista. */}
-          <RadialGradient id={`halo-${tom.slice(1)}`} cx="50%" cy="50%" r="50%">
-            <Stop offset="0" stopColor={tom} stopOpacity={0.63} />
-            <Stop offset="0.45" stopColor={tom} stopOpacity={0.2} />
-            <Stop offset="1" stopColor={tom} stopOpacity={0} />
-          </RadialGradient>
-        </Defs>
-        <Circle cx={raio} cy={raio} r={raio} fill={`url(#halo-${tom.slice(1)})`} />
-      </Svg>
     </View>
   );
 }

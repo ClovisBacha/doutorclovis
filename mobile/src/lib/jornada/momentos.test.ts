@@ -124,6 +124,27 @@ describe("a trilha e a chama", () => {
     expect(c.perdoes).toBe(0);
   });
 
+  test("só o que ela FEZ acende a chama: o humor sozinho não conta (26/11/2026)", () => {
+    const dias: Blob = {
+      "dc-path-day-168": { desafio: true },
+      "dc-path-day-169": { humor: true },
+      "dc-path-day-170": { humor: true, w_meditation: true },
+      "dc-path-day-171": { humor: true },
+    };
+    /* Hoje (171) só tem o humor: a chama ainda não cresceu hoje; ontem (170)
+       teve a meditação; 169 só o humor quebra a contagem antes dele. */
+    expect(diasComAlgumMomento(dias)).toEqual([168, 170]);
+    expect(chama(dias, 171).dias).toBe(1);
+    /* Marcar uma atividade hoje acende. */
+    const feito = marcarMomento(dias, 171, "gratitude").blob;
+    expect(chama(feito, 171).dias).toBe(2);
+    /* No pós-parto, o humor fecha o dia junto com o resto, mas não acende sozinho. */
+    expect(diasComAlgumMomento({ "dc-path-pos-day-20": { humor: true } }, true)).toEqual([]);
+    expect(diasComAlgumMomento({ "dc-path-pos-day-20": { leitura: true } }, true)).toEqual([20]);
+    /* Marca desconhecida ou falsa também não acende. */
+    expect(diasComAlgumMomento({ "dc-path-day-5": { abriu: true, desafio: false } })).toEqual([]);
+  });
+
   test("a explicação fala do perdão e do saldo sem cobrar", () => {
     const t = explicacaoDaChama(14, 2).join(" ");
     expect(t).toContain("14 dias seguidos");

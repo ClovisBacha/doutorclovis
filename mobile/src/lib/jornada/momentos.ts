@@ -159,9 +159,27 @@ export function fecharDiasCompletos(blob: Blob): { blob: Blob; fechados: number[
 }
 
 /**
- * Os dias em que ela fez ALGUMA coisa — é o que acende a chama (a mesma
- * pergunta de `diasComAlgumMomento` do site, sobre o blob já parseado).
- * O resto da chave tem de ser só dígitos.
+ * O QUE ACENDE A CHAMA: o que ela FEZ no dia — a aula (`desafio`), as quatro
+ * atividades (mexer, meditar, o momento com o bebê, a gratidão), a leitura da
+ * semana do pós-parto e o `bemestar` antigo do site (que só acende junto com
+ * uma atividade).
+ *
+ * ⚠️ O humor NÃO acende (26/11/2026, o dono: "as contagens do fogo [só] devem
+ * aumentar se a pessoa fizer os exercícios"). Antes contava qualquer marca do
+ * dia, e tocar em "Bem" na conversa com a Bolha já acendia a chama, sem ela
+ * ter feito nada. O check-in continua valendo para o pós-parto fechar o dia
+ * (é uma das três tarefas), mas não faz a chama crescer.
+ */
+export const O_QUE_ACENDE_A_CHAMA: ReadonlySet<string> = new Set([
+  "desafio",
+  ...ATIVIDADES.map((a) => `w_${a}`),
+  "leitura",
+  "bemestar",
+]);
+
+/**
+ * Os dias em que ela FEZ alguma coisa (`O_QUE_ACENDE_A_CHAMA`) — é o que
+ * acende a chama. O resto da chave tem de ser só dígitos.
  */
 export function diasComAlgumMomento(blob: Blob, pos = false): number[] {
   const prefixo = pos ? PREFIXO_DIA_POS : PREFIXO_DIA;
@@ -170,7 +188,11 @@ export function diasComAlgumMomento(blob: Blob, pos = false): number[] {
     if (!chave.startsWith(prefixo)) continue;
     const resto = chave.slice(prefixo.length);
     if (!/^\d+$/.test(resto)) continue;
-    if (ehObjeto(v) && Object.values(v).some(Boolean)) dias.push(Number(resto));
+    if (
+      ehObjeto(v) &&
+      Object.entries(v).some(([k, x]) => x === true && O_QUE_ACENDE_A_CHAMA.has(k))
+    )
+      dias.push(Number(resto));
   }
   return dias.sort((a, b) => a - b);
 }

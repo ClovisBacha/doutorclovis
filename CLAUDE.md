@@ -184,6 +184,17 @@ ERA a paleta do Claude; não volte a ela.
   etiquetas sobre a arte), sempre no esquema claro. Cartão de conteúdo é
   material com luz e sombra, nunca vidro. A barra flutua: rolagem dentro de uma
   aba termina com `useFimDaRolagem`/`useFolgaDaBarra`.
+- ⚠️ **A CHAMA SÓ CRESCE COM O QUE ELA FEZ** (pedido do dono, 26/11/2026: "as
+  contagens do fogo [só] devem aumentar se a pessoa fizer os exercícios"): a
+  aula, as quatro atividades, a leitura do pós-parto (e o `bemestar` antigo).
+  O humor do "Como você está hoje?" não acende (`O_QUE_ACENDE_A_CHAMA`, em
+  `lib/jornada/momentos.ts`); `momentos.test.ts` cobra.
+- ⚠️ **SÃO DOIS CÉUS: O LILÁS DE DIA E O DA NOITE** (decisão do dono,
+  23/11/2026; cobrada em 26/11: "as 4 telas de fundo ainda estão rodando,
+  lembra das 2 que combinamos?"). `ceuDaHora`: o lilás (`amanhecer.webp`, a
+  fase "amanhecer") das 5h às 19h, a noite das 19h às 5h — as horas da noite
+  do quartinho. O azul do meio-dia e o pôr do sol saíram do app;
+  `ceu-vivo.test.ts` cobra.
 - **O céu vivo** (`componentes/ceu-vivo.tsx`): o céu da hora é a TELA INTEIRA,
   vivo (estrelas, estrela cadente, nuvens, o sol respirando). Nas abas é UM
   céu só, em `(abas)/_layout.tsx`, atrás das três; cada aba fica transparente
